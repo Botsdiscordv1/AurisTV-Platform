@@ -357,22 +357,53 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   Widget _buildMetaRow(dynamic d, {required bool isMobile}) {
     final year = (d is AnimeDetail) ? d.year?.toString() : (d is MovieDetail ? d.releaseDate?.split('-').first : null);
     final rating = (d is AnimeDetail) ? d.rating?.toStringAsFixed(1) : (d is MovieDetail ? d.rating?.toStringAsFixed(1) : null);
-    final episodes = (d is AnimeDetail) ? "${d.episodes ?? '?'} eps" : null;
     
-    return Row(
+    // Obtenemos géneros
+    List<String> genres = [];
+    if (d is AnimeDetail) genres = d.genres;
+    else if (d is MovieDetail) genres = d.genres;
+
+    // Obtenemos certificación (priorizando detalle)
+    final cert = (d != null && d.certification != null && d.certification!.isNotEmpty) ? d.certification : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (year != null) ...[
-          Text(year, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-          const SizedBox(width: 12),
-        ],
-        if (rating != null) ...[
-          const Icon(Icons.star, color: Color(0xFFEF7A1E), size: 14),
-          const SizedBox(width: 4),
-          Text(rating, style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(width: 12),
-        ],
-        if (episodes != null)
-          Text(episodes, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        // Fila 1: Badges (Certificación + Géneros)
+        if ((cert != null && cert.isNotEmpty && cert != 'NR') || genres.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
+                    _buildBadge(context, cert.toUpperCase(), small: false),
+                    const SizedBox(width: 8),
+                  ],
+                  ...genres.take(5).map((g) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _buildBadge(context, g.toUpperCase(), small: false),
+                  )),
+                ],
+              ),
+            ),
+          ),
+        
+        // Fila 2: Rating (Estrella Amarilla) y Año
+        Row(
+          children: [
+            if (rating != null) ...[
+              const Icon(Icons.star, color: Color(0xFFFFC107), size: 18),
+              const SizedBox(width: 6),
+              Text(rating, style: const TextStyle(color: Color(0xFFFFC107), fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(width: 16),
+            ],
+            if (year != null)
+              Text(year, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+          ],
+        ),
       ],
     );
   }
@@ -382,13 +413,14 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: widget.onPlay,
-        icon: const Icon(Icons.play_arrow, size: 28),
-        label: const Text("REPRODUCIR", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        icon: const Icon(Icons.play_arrow, size: 28, color: Colors.black),
+        label: const Text("Reproducir", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFEF7A1E),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          elevation: 0,
         ),
       ),
     );
@@ -398,10 +430,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _CircularButton(icon: Icons.add, label: "Mi Lista", onTap: () {}),
-        _CircularButton(icon: Icons.thumb_up_outlined, label: "Calificar", onTap: () {}),
-        _CircularButton(icon: Icons.share_outlined, label: "Compartir", onTap: () {}),
-        _CircularButton(icon: Icons.download_for_offline_outlined, label: "Descargar", onTap: () {}),
+        _ActionSquareButton(icon: Icons.movie_outlined, label: "Tráiler", onTap: () {}),
+        _ActionSquareButton(icon: Icons.add, label: "Mi lista", onTap: () {}),
+        _ActionSquareButton(icon: Icons.thumb_up_outlined, label: "Me gusta", onTap: () {}),
+        _ActionSquareButton(icon: Icons.thumb_down_outlined, label: "No es para mí", onTap: () {}),
       ],
     );
   }
@@ -497,10 +529,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             Positioned.fill(child: _buildUpperButtons(context)),
           ]),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const SizedBox(height: 8), _buildMetaRow(d, isMobile: true), 
-            const SizedBox(height: 24), _buildMainActionButton(context, isMobile: true), 
+            const SizedBox(height: 12), _buildMetaRow(d, isMobile: true), 
+            const SizedBox(height: 20), _buildMainActionButton(context, isMobile: true), 
             const SizedBox(height: 16), _buildCircularActions(context, isMobile: true),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
             if (widget.totalSeasons > 1 || widget.currentSource != null) ...[
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -877,21 +909,33 @@ class _EpisodesSkeleton extends StatelessWidget {
 }
 
 // Helper widget for circular actions
-class _CircularButton extends StatelessWidget {
+class _ActionSquareButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _CircularButton({required this.icon, required this.label, required this.onTap});
+  const _ActionSquareButton({required this.icon, required this.label, required this.onTap});
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        IconButton(
-          icon: Icon(icon, color: Colors.white),
-          onPressed: onTap,
-          style: IconButton.styleFrom(backgroundColor: Colors.white10),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              width: 68,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Icon(icon, color: Colors.white, size: 26),
+            ),
+          ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
       ],
     );

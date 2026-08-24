@@ -77,7 +77,7 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/icons/auris-tv-icon.png"
   adaptive_icon_background: "#0B0B0D"
-  adaptive_icon_foreground: "assets/icons/auris-tv-icon.png"
+  adaptive_icon_foreground: "assets/icons/auris-launcher-foreground.svg"
   remove_alpha_ios: true
 
 flutter:
