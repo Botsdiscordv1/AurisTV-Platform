@@ -1,0 +1,133 @@
+import 'package:flutter/foundation.dart';
+
+class EpisodesResponse {
+  final String source;
+  final String url;
+  final String slug;
+  final int total;
+  final List<EpisodeInfo> episodes;
+
+  final List<EpisodeInfo> specials;
+
+  final int? tmdbId;
+  final int? season;
+  final List<RelatedInfo> relations;
+
+  final String? seasonAirDate;
+
+  const EpisodesResponse({
+    required this.source,
+    required this.url,
+    required this.slug,
+    required this.total,
+    this.episodes = const [],
+    this.specials = const [],
+    this.relations = const [],
+    this.tmdbId,
+    this.season,
+    this.seasonAirDate,
+  });
+
+  factory EpisodesResponse.fromJson(Map<String, dynamic> json) {
+    if (kDebugMode) {
+      print("[EpisodesResponse.fromJson] json['seasonAirDate']: ${json['seasonAirDate']}");
+    }
+    return EpisodesResponse(
+      source: json['source'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      slug: json['slug'] as String? ?? '',
+      total: json['total'] as int? ?? 0,
+      episodes: (json['episodes'] as List<dynamic>?)
+              ?.map((e) => EpisodeInfo.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      specials: (json['specials'] as List<dynamic>?)
+              ?.map((e) => EpisodeInfo.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      relations: (json['relations'] as List<dynamic>?)
+              ?.map((e) => RelatedInfo.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      tmdbId: json['tmdbId'] as int?,
+      season: json['season'] as int?,
+      seasonAirDate: json['seasonAirDate'] as String?,
+    );
+  }
+}
+
+class RelatedInfo {
+  final String title;
+  final String url;
+  final String slug;
+  final String cover;
+  final String relation;
+
+  const RelatedInfo({
+    required this.title,
+    required this.url,
+    required this.slug,
+    required this.cover,
+    required this.relation,
+  });
+
+  factory RelatedInfo.fromJson(Map<String, dynamic> json) {
+    return RelatedInfo(
+      title: json['title'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      slug: json['slug'] as String? ?? '',
+      cover: json['cover'] as String? ?? '',
+      relation: json['relation'] as String? ?? 'Relacionado',
+    );
+  }
+}
+
+class EpisodeInfo {
+  final int number;
+  final int id;
+  final String url;
+  final String? title;
+  final String? thumbnail;
+  final String? description;
+  final String? airDate;
+  final String? duration;
+  final int? runtime;
+
+  final String? quality;
+
+  final String? episodeType;
+
+  final int? tmdbSpecialNumber;
+
+  const EpisodeInfo({
+    required this.number,
+    required this.id,
+    this.url = '',
+    this.title,
+    this.thumbnail,
+    this.description,
+    this.airDate,
+    this.duration,
+    this.runtime,
+    this.quality,
+    this.episodeType,
+    this.tmdbSpecialNumber,
+  });
+
+  factory EpisodeInfo.fromJson(Map<String, dynamic> json) {
+    return EpisodeInfo(
+      number: int.tryParse(json['number']?.toString() ?? '') ?? 0,
+      id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      url: json['url'] as String? ?? '',
+      title: json['title'] as String?,
+      thumbnail: json['thumbnail'] as String?,
+      description: json['description'] as String?,
+      airDate: json['airDate'] as String?,
+      duration: json['duration'] as String?,
+      runtime: json['runtime'] as int?,
+      quality: json['quality'] as String?,
+      episodeType: json['episodeType'] as String?,
+      tmdbSpecialNumber: int.tryParse(json['tmdbSpecialNumber']?.toString() ?? ''),
+    );
+  }
+}

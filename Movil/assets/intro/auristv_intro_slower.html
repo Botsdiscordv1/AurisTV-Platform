@@ -1,0 +1,106 @@
+<div style="display:flex; flex-direction:column; align-items:center; gap:1.5rem; padding:2rem 0;">
+  <div style="background:#0a0a0a; border-radius:12px; padding:1.5rem; max-width:420px; width:100%;">
+    <svg id="cr-svg" viewBox="0 0 320 180" width="100%" role="img" style="overflow:visible;">
+      <title>Animación de intro estilo Crunchyroll para AurisTV, ritmo pausado</title>
+      <desc>Trazos de energía naranja convergen formando el ícono del ojo con un destello, luego las letras de AURISTV aparecen con calma y cada una recibe su propio brillo individual</desc>
+      <defs>
+        <mask id="iconMask" maskUnits="userSpaceOnUse" x="0" y="0" width="2048" height="1072">
+          <rect x="0" y="0" width="2048" height="1072" fill="white"/>
+          <path d="M 293.531 435.474 C 327.711 432.391 357.847 457.771 360.624 491.977 C 363.4 526.184 337.751 556.091 303.521 558.56 C 269.723 560.998 240.274 535.743 237.533 501.968 C 234.792 468.193 259.782 438.519 293.531 435.474 z" fill="black"/>
+          <path d="M 287.512 394.354 C 337.598 390.543 365.515 410.166 401.417 441.694 C 413.093 451.948 428.314 462.677 443.574 466.455 C 461.836 470.383 479.159 468.814 498.18 468.597 C 510.378 465.236 517.172 479.874 508.786 485.92 C 500.176 492.129 446.566 489.726 438.29 487.446 C 382.024 471.946 372.36 428.441 309.82 419.697 C 299.709 418.21 288.816 419.182 278.847 421.213 C 228.087 431.556 206.471 477.045 162.056 487.116 C 151.003 489.622 96.6871 492.107 89.0031 486.734 C 86.4331 484.937 84.9376 481.91 84.3366 478.889 C 83.8983 476.686 83.9885 474.529 85.3727 472.671 C 90.5068 465.78 135.301 469.472 146.047 468.378 C 179.823 464.94 202.774 433.408 229.373 415.715 C 247.12 403.91 266.379 396.935 287.512 394.354 z" fill="black"/>
+          <path d="M 94.1054 505.416 C 125.424 505.143 168.477 501.708 192.135 523.965 C 242.939 571.761 304.858 595.484 367.852 553.188 C 391.501 537.31 412.82 510.175 443.598 506.581 C 460.932 504.557 479.088 505.811 496.624 505.268 C 515.774 504.346 519.81 525.566 498.25 525.267 C 484.866 525.171 464.267 523.977 451.318 526.201 C 413.562 532.687 393.999 570.299 358.491 586.277 C 306.534 609.658 253.478 602.137 209.101 566.55 C 193.067 553.693 178.217 537.731 159.429 529.578 C 137.568 520.273 111.863 528.906 89.8862 524.233 C 80.2825 522.191 82.8057 509.102 94.1054 505.416 z" fill="black"/>
+        </mask>
+        <mask id="aMask" maskUnits="userSpaceOnUse" x="0" y="0" width="2048" height="1072">
+          <rect x="0" y="0" width="2048" height="1072" fill="white"/>
+          <path d="M 670.846 579.284 C 689.542 577.445 733.98 578.848 754.018 578.909 C 754.103 587.166 755.804 620.337 751.73 627.14 C 750.063 629.924 738.276 629.622 734.069 629.677 C 714.178 629.778 691.7 630.487 672.093 629.259 C 642.913 627.432 637.041 586.867 670.846 579.284 z" fill="black"/>
+        </mask>
+        <linearGradient id="shineGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="white" stop-opacity="0"/>
+          <stop offset="0.5" stop-color="white" stop-opacity="0.95"/>
+          <stop offset="1" stop-color="white" stop-opacity="0"/>
+        </linearGradient>
+        <clipPath id="clip-a" clipPathUnits="userSpaceOnUse"><use href="#path-a"/></clipPath>
+        <clipPath id="clip-u" clipPathUnits="userSpaceOnUse"><use href="#path-u"/></clipPath>
+        <clipPath id="clip-r" clipPathUnits="userSpaceOnUse"><use href="#path-r"/></clipPath>
+        <clipPath id="clip-i" clipPathUnits="userSpaceOnUse"><use href="#path-i1"/><use href="#path-i2"/></clipPath>
+        <clipPath id="clip-s" clipPathUnits="userSpaceOnUse"><use href="#path-s"/></clipPath>
+        <clipPath id="clip-t" clipPathUnits="userSpaceOnUse"><use href="#path-t"/></clipPath>
+        <clipPath id="clip-v" clipPathUnits="userSpaceOnUse"><use href="#path-v"/></clipPath>
+      </defs>
+      <g id="streaks" style="transform-box:fill-box; transform-origin:60px 89px; animation:swirlIn 1.1s cubic-bezier(.3,0,.5,1) forwards;">
+        <path d="M 60 40 A 49 49 0 0 1 109 89" fill="none" stroke="#ef7a1e" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+        <path d="M 109 89 A 49 49 0 0 1 60 138" fill="none" stroke="#ffb066" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+        <path d="M 60 138 A 49 49 0 0 1 11 89" fill="none" stroke="#ef7a1e" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+        <path d="M 11 89 A 49 49 0 0 1 60 40" fill="none" stroke="#ffb066" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+      </g>
+      <circle id="flash" cx="60" cy="89" r="4" fill="white" style="transform-box:fill-box; transform-origin:60px 89px; opacity:0; animation:flashPulse .9s ease-out .85s forwards;"/>
+      <g transform="translate(16.852,7.772) scale(0.143005)" fill="rgb(239,122,30)">
+        <g id="icon-group" style="transform-box:fill-box; transform-origin:center; opacity:0; animation:iconPop .8s cubic-bezier(.3,1.5,.4,1) .9s forwards;">
+          <path d="M 297.139 367.425 C 336.364 364.924 378.964 387.633 406.496 413.553 C 418.227 424.597 431.995 436.263 447.09 441.678 C 466.707 448.715 507.737 437.971 523.698 449.086 C 530.359 453.795 534.817 461.012 536.045 469.077 C 537.862 480.612 534.207 487.981 527.812 496.791 C 533.386 503.603 536.505 509.836 536.575 518.952 C 536.708 527.097 533.525 534.947 527.757 540.699 C 509.805 558.946 471.139 544.411 447.737 552.11 C 436.207 555.903 426.112 565.968 417.126 573.96 C 382.071 605.135 348.444 623.27 300.853 624.178 C 251.793 624.615 216.88 605.966 179.984 574.674 C 169.691 566.528 161.095 555.802 147.995 551.772 C 119.61 543.04 66.0195 566.753 60.5825 521.779 C 59.4386 512.317 63.6293 504.201 69.7729 497.212 C 59.288 484.979 56.5192 466.489 67.9036 454.249 C 85.8356 434.971 123.569 448.74 147.197 442.935 C 163.522 438.925 171.892 430.205 184.014 419.616 C 220.393 387.533 247.946 370.144 297.139 367.425 z" mask="url(#iconMask)"/>
+          <path d="M 295.699 469.62 C 310.922 467.404 325.099 477.835 327.513 493.028 C 329.927 508.22 319.682 522.532 304.522 525.144 C 294.538 526.864 284.4 523.079 277.986 515.237 C 271.573 507.394 269.875 496.708 273.542 487.263 C 277.209 477.819 285.674 471.079 295.699 469.62 z"/>
+          <path d="M 339.805 498.305 C 351.202 498.093 357.335 501.047 352.96 513.937 C 348.031 528.455 337.666 539.912 323.913 546.742 C 320.805 547.491 317.192 548.365 314.866 545.62 C 303.913 532.694 327.021 524.438 332.057 515.521 C 335.59 509.266 333.407 503.605 339.805 498.305 z"/>
+          <path d="M 333.965 623.179 C 345.128 621.692 357.971 625.195 359.425 636.348 C 363.367 666.589 357.527 700.633 381.134 724.97 C 389.544 733.64 401.378 737.425 413.912 737.866 C 437.434 738.551 459.514 711.116 440.386 691.398 C 430.911 681.63 411.573 690.131 413.61 699.198 C 439.263 698.505 422.532 732.271 402.013 719.786 C 388.076 711.307 387.277 696.109 394.27 682.518 C 400.117 671.154 409.189 665.79 421.004 661.95 C 462.106 653.334 488.118 692.802 475.169 730.09 C 469.737 745.58 458.293 758.229 443.422 765.18 C 424.59 774.187 400.713 774.419 380.904 767.484 C 331.065 749.917 320.184 692.833 319.693 646.271 C 319.571 634.697 323.752 627.95 333.965 623.179 z"/>
+          <path d="M 249.225 622.085 C 267.464 621.057 275.209 632.481 273.62 649.613 C 269.102 698.33 261.339 762.48 202.618 772.326 C 192.728 771.659 181.424 767.742 178.324 758.09 C 170.797 734.652 189.491 732.791 203.802 727.836 C 224.631 719.266 227.616 688.372 230.83 669.48 C 234.034 650.647 228.436 630.217 249.225 622.085 z"/>
+        </g>
+        <g id="letter-a" class="letter" style="opacity:0; animation:letterPop .7s ease-out 1.35s forwards;">
+          <path id="path-a" d="M 666.739 462.567 C 670.198 462.316 673.662 462.148 677.129 462.063 C 710.246 461.325 760.017 456.778 786.488 480.054 C 790.748 483.8 797.116 495.034 797.884 500.652 C 802.981 537.94 799.298 576.784 800.472 614.426 C 800.475 623.59 801.193 649.252 794.117 655.904 C 781.551 665.974 758.708 667.152 743.57 667.118 C 716.107 667.056 689.121 668.005 661.839 666.662 C 642.03 665.686 625.366 662.119 611.961 646.524 C 603.548 633.486 601.617 621.528 601.235 606.434 C 599.586 541.363 657.782 544.011 705.261 544.111 L 754.071 544.265 L 754.173 533.984 C 754.34 494.786 732.814 499.917 701.695 498.709 C 673.05 497.597 644.823 501.958 616.534 502.107 C 616.25 493.693 613.36 473.05 619.178 467.069 C 623.785 462.334 658.612 462.969 666.739 462.567 z" mask="url(#aMask)"/>
+        </g>
+        <g id="letter-u" class="letter" style="opacity:0; animation:letterPop .7s ease-out 1.44s forwards;">
+          <path id="path-u" d="M 1027.2 463.471 C 1031.78 463.421 1036.78 463.615 1041.4 463.697 C 1041.57 466.956 1041.66 470.219 1041.67 473.483 L 1041.78 556.185 C 1041.8 574.601 1042.65 593.684 1040.75 611.961 C 1035.19 665.559 986.725 667.39 944.479 667.118 C 904.678 666.862 852.358 670.444 840.847 620.446 C 837.559 605.988 838.679 588.619 838.699 573.758 L 838.791 515.015 C 838.621 497.971 838.69 480.927 838.998 463.885 C 853.54 463.352 869.355 463.705 883.919 463.871 C 884.891 491.361 884.466 532.56 884.019 559.198 C 882.846 629.131 885.786 633.732 956.958 631.303 C 977.533 630.601 992.711 626.668 995.726 602.096 C 997.603 586.801 996.776 570.431 996.761 554.942 C 996.539 524.575 996.597 494.207 996.934 463.842 L 1027.2 463.471 z"/>
+        </g>
+        <g id="letter-r" class="letter" style="opacity:0; animation:letterPop .7s ease-out 1.53s forwards;">
+          <path id="path-r" d="M 1147.26 463.414 C 1165.04 462.302 1199.54 462.94 1217.79 463.58 C 1218.23 474.962 1217.95 487.056 1217.86 498.497 C 1194.15 500.123 1152.38 491.691 1133.35 506.48 C 1122.34 515.042 1125.01 550.125 1125.02 564.006 L 1125.11 636.263 L 1125 666.088 C 1110.69 666.556 1095.36 666.262 1080.96 666.207 C 1080.47 635.733 1080.94 604.336 1080.78 573.914 C 1080.45 514.692 1072.4 468.677 1147.26 463.414 z"/>
+        </g>
+        <g id="letter-i" class="letter" style="opacity:0; animation:letterPop .7s ease-out 1.62s forwards;">
+          <path id="path-i1" d="M 1252.28 463.942 C 1265.33 463.289 1284.28 463.404 1297.32 463.919 C 1299 486.185 1297.6 514.058 1297.67 536.735 C 1297.8 579.76 1298.09 623.11 1297.5 666.116 C 1283.03 666.711 1266.51 666.334 1252 666.187 C 1250.88 612.639 1252.65 558.46 1251.89 504.849 C 1251.71 491.708 1251.51 476.978 1252.28 463.942 z"/>
+          <path id="path-i2" d="M 1252.07 392.867 C 1267.24 392.592 1282.41 392.608 1297.58 392.916 C 1298.08 401.711 1298.34 426.328 1297.13 434.325 C 1282.29 434.927 1266.94 434.654 1252.04 434.57 C 1251.76 420.67 1251.77 406.766 1252.07 392.867 z"/>
+        </g>
+        <g id="letter-s" class="letter" style="opacity:0; animation:letterPop .7s ease-out 1.71s forwards;">
+          <path id="path-s" d="M 1396.71 464.35 C 1406.71 462.923 1431.53 463.507 1442.71 463.528 L 1528.32 463.777 C 1528.49 475.507 1528.45 487.239 1528.19 498.967 C 1522.33 499.224 1516.33 499.035 1510.45 499.067 C 1477.92 499.245 1445.29 498.547 1412.77 499.21 C 1399.96 499.471 1387.14 505.42 1388.36 520.182 C 1389.73 536.81 1410.98 537.882 1423.38 541.449 C 1443.51 546.31 1463.85 550.853 1483.91 555.948 C 1509.25 562.384 1531.17 571.795 1533.12 601.571 C 1535.95 644.85 1517.08 664.248 1474.48 666.265 C 1431.46 666.741 1384.43 667 1341.52 666.183 C 1340.87 656.648 1341.23 638.814 1341.83 629.464 C 1383.21 627.805 1425.53 630.587 1467.02 628.943 C 1489.26 628.062 1494.17 600.487 1476.87 593.848 C 1455.38 585.604 1429.23 582.051 1406.67 575.781 C 1380.12 568.772 1345.81 564.17 1342.18 530.097 C 1337.87 489.748 1357.71 469.489 1396.71 464.35 z"/>
+        </g>
+        <g id="letter-t" class="letter" style="opacity:0; animation:letterPop .7s ease-out 1.8s forwards;">
+          <path id="path-t" d="M 1578.32 392.838 C 1593.31 392.639 1608.3 392.652 1623.28 392.878 L 1623.46 463.823 C 1646.09 463.635 1668.73 463.645 1691.37 463.854 C 1691.55 475.588 1691.88 487.231 1691.2 498.951 C 1669.69 499.573 1645.25 499.068 1623.51 499.097 L 1623.31 565.241 C 1623.28 578.214 1622.75 591.156 1623.97 604.077 C 1626.28 628.713 1639.16 629.149 1659.5 629.199 L 1691.05 629.306 C 1692.09 639.729 1691.52 655.355 1691.32 666.074 C 1674.63 667.005 1655.78 666.871 1639.08 666.026 C 1579.15 662.992 1577.94 629.06 1577.9 582.164 L 1577.91 525.522 L 1577.91 441.619 C 1577.91 426.452 1577.43 407.776 1578.32 392.838 z"/>
+        </g>
+        <g id="letter-v" class="letter" style="opacity:0; animation:letterPop .7s ease-out 1.89s forwards;">
+          <path id="path-v" d="M 1720.87 463.98 C 1735.24 463.197 1752.19 463.651 1766.58 463.919 C 1771.25 475.333 1776.3 491.154 1780.56 503.125 L 1809.8 585.577 C 1814.74 599.512 1819.53 613.532 1824.79 627.337 C 1826.86 633.798 1835.55 633.186 1837.82 626.959 C 1850.68 591.637 1862.67 555.924 1875.61 520.619 C 1882.5 501.792 1888.83 482.434 1896.29 463.872 C 1910.97 463.376 1927.5 463.601 1942.17 464.008 C 1939.81 471.638 1935.34 482.509 1932.44 490.242 C 1924.4 512.601 1874.7 650.783 1867.1 658.771 C 1859.26 667.004 1843.29 667.807 1832.52 667.909 C 1820.61 668.023 1804.03 667.535 1795.2 658.464 C 1792.43 655.617 1790.74 650.813 1789.23 647.139 C 1782.29 630.189 1720.72 470.914 1720.87 463.98 z"/>
+        </g>
+        <g clip-path="url(#clip-a)"><rect class="shine" x="451" y="300" width="150" height="900" fill="url(#shineGrad)" style="transform-box:fill-box; transform:skewX(-18deg); opacity:0; animation:shineA .5s ease-in 2.1s forwards; mix-blend-mode:screen;"/></g>
+        <g clip-path="url(#clip-u)"><rect class="shine" x="688" y="300" width="150" height="900" fill="url(#shineGrad)" style="transform-box:fill-box; transform:skewX(-18deg); opacity:0; animation:shineU .5s ease-in 2.19s forwards; mix-blend-mode:screen;"/></g>
+        <g clip-path="url(#clip-r)"><rect class="shine" x="930" y="300" width="150" height="900" fill="url(#shineGrad)" style="transform-box:fill-box; transform:skewX(-18deg); opacity:0; animation:shineR .5s ease-in 2.28s forwards; mix-blend-mode:screen;"/></g>
+        <g clip-path="url(#clip-i)"><rect class="shine" x="1101" y="300" width="150" height="900" fill="url(#shineGrad)" style="transform-box:fill-box; transform:skewX(-18deg); opacity:0; animation:shineI .5s ease-in 2.37s forwards; mix-blend-mode:screen;"/></g>
+        <g clip-path="url(#clip-s)"><rect class="shine" x="1191" y="300" width="150" height="900" fill="url(#shineGrad)" style="transform-box:fill-box; transform:skewX(-18deg); opacity:0; animation:shineS .5s ease-in 2.46s forwards; mix-blend-mode:screen;"/></g>
+        <g clip-path="url(#clip-t)"><rect class="shine" x="1427" y="300" width="150" height="900" fill="url(#shineGrad)" style="transform-box:fill-box; transform:skewX(-18deg); opacity:0; animation:shineT .5s ease-in 2.55s forwards; mix-blend-mode:screen;"/></g>
+        <g clip-path="url(#clip-v)"><rect class="shine" x="1570" y="300" width="150" height="900" fill="url(#shineGrad)" style="transform-box:fill-box; transform:skewX(-18deg); opacity:0; animation:shineV .5s ease-in 2.64s forwards; mix-blend-mode:screen;"/></g>
+      </g>
+    </svg>
+  </div>
+  <button id="replay-btn" style="font-size:13px;">
+    <i class="ti ti-refresh" style="font-size:16px; vertical-align:-3px; margin-right:6px;" aria-hidden="true"></i>Repetir animación
+  </button>
+</div>
+<style>
+@keyframes swirlIn { 0% { opacity:1; transform:scale(1.6) rotate(0deg); } 100% { opacity:0; transform:scale(0.15) rotate(240deg); } }
+@keyframes flashPulse { 0% { opacity:0; transform:scale(0); } 35% { opacity:1; transform:scale(5); } 100% { opacity:0; transform:scale(11); } }
+@keyframes iconPop { 0% { opacity:0; transform:scale(0.2); } 70% { opacity:1; transform:scale(1.12); } 100% { opacity:1; transform:scale(1); } }
+@keyframes letterPop { from { opacity:0; transform:translateX(-5px) scale(0.9); } to { opacity:1; transform:translateX(0) scale(1); } }
+@keyframes shineA { from{opacity:.95; transform:translateX(0) skewX(-18deg);} to{opacity:.95; transform:translateX(500px) skewX(-18deg);} }
+@keyframes shineU { from{opacity:.95; transform:translateX(0) skewX(-18deg);} to{opacity:.95; transform:translateX(500px) skewX(-18deg);} }
+@keyframes shineR { from{opacity:.95; transform:translateX(0) skewX(-18deg);} to{opacity:.95; transform:translateX(450px) skewX(-18deg);} }
+@keyframes shineI { from{opacity:.95; transform:translateX(0) skewX(-18deg);} to{opacity:.95; transform:translateX(350px) skewX(-18deg);} }
+@keyframes shineS { from{opacity:.95; transform:translateX(0) skewX(-18deg);} to{opacity:.95; transform:translateX(500px) skewX(-18deg);} }
+@keyframes shineT { from{opacity:.95; transform:translateX(0) skewX(-18deg);} to{opacity:.95; transform:translateX(420px) skewX(-18deg);} }
+@keyframes shineV { from{opacity:.95; transform:translateX(0) skewX(-18deg);} to{opacity:.95; transform:translateX(520px) skewX(-18deg);} }
+.letter { transform-box:fill-box; transform-origin:center; }
+</style>
+<script>
+document.getElementById('replay-btn').addEventListener('click', function() {
+  var svg = document.getElementById('cr-svg');
+  var all = svg.querySelectorAll('#streaks, #flash, #icon-group, .letter, .shine');
+  all.forEach(function(el) {
+    var anim = el.style.animation;
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = anim;
+  });
+});
+</script>

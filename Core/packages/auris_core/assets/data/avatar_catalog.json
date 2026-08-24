@@ -1,0 +1,414 @@
+{
+  "version": 1,
+  "franchises": [
+    {
+      "id": "yofukashi-no-uta",
+      "name": "Call of the Night",
+      "category": "anime",
+      "characters": [
+        {
+          "characterId": 168866,
+          "name": "Kou Yamori",
+          "role": "main",
+          "variants": [
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori v2.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori v3.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori v4.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori v5.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori v6.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori v7.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori v8.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori v9.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kou Yamori v10.webp"
+          ]
+        },
+        {
+          "characterId": 168774,
+          "name": "Nazuna Nanakusa",
+          "role": "main",
+          "variants": [
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa v2.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa v3.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa v4.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa v5.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa v6.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa v7.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa v8.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa v9.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Nazuna Nanakusa v10.webp"
+          ]
+        },
+        {
+          "characterId": 175663,
+          "name": "Akira Asai",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai v2.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai v3.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai v4.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai v5.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai v6.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai v7.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai v8.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai v9.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Akira Asai v10.webp"
+          ]
+        },
+        {
+          "characterId": 233097,
+          "name": "Hatsuka Suzushiro",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro v2.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro v3.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro v4.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro v5.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro v6.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro v7.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro v8.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro v9.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Hatsuka Suzushiro v10.webp"
+          ]
+        },
+        {
+          "characterId": 175661,
+          "name": "Kabura Honda",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda v2.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda v3.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda v4.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda v5.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda v6.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda v7.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda v8.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda v9.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Kabura Honda v10.webp"
+          ]
+        },
+        {
+          "characterId": 175658,
+          "name": "Seri Kikyou",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo v2.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo v3.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo v4.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo v5.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo v6.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo v7.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo v8.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo v9.webp",
+            "assets/avatars/animes/yofukashi_no_uta/Seri Kikyo v10.webp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dandadan",
+      "name": "Dandadan",
+      "category": "anime",
+      "characters": [
+        {
+          "characterId": 222593,
+          "name": "Ken Takakura",
+          "role": "main",
+          "variants": [
+            "assets/avatars/animes/dandadan/Takakura Ken.webp",
+            "assets/avatars/animes/dandadan/Takakura Ken v2.webp",
+            "assets/avatars/animes/dandadan/Takakura Ken v3.webp",
+            "assets/avatars/animes/dandadan/Takakura Ken v4.webp",
+            "assets/avatars/animes/dandadan/Takakura Ken v5.webp",
+            "assets/avatars/animes/dandadan/Takakura Ken v6.webp",
+            "assets/avatars/animes/dandadan/Takakura Ken v7.webp",
+            "assets/avatars/animes/dandadan/Takakura Ken v8.webp",
+            "assets/avatars/animes/dandadan/Takakura Ken v9.webp",
+            "assets/avatars/animes/dandadan/Takakura Ken v10.webp"
+          ]
+        },
+        {
+          "characterId": 222594,
+          "name": "Momo Ayase",
+          "role": "main",
+          "variants": [
+            "assets/avatars/animes/dandadan/Ayase Momo.webp",
+            "assets/avatars/animes/dandadan/Ayase Momo v2.webp",
+            "assets/avatars/animes/dandadan/Ayase Momo v3.webp",
+            "assets/avatars/animes/dandadan/Ayase Momo v4.webp",
+            "assets/avatars/animes/dandadan/Ayase Momo v5.webp",
+            "assets/avatars/animes/dandadan/Ayase Momo v6.webp",
+            "assets/avatars/animes/dandadan/Ayase Momo v7.webp",
+            "assets/avatars/animes/dandadan/Ayase Momo v8.webp",
+            "assets/avatars/animes/dandadan/Ayase Momo v9.webp",
+            "assets/avatars/animes/dandadan/Ayase Momo v10.webp"
+          ]
+        },
+        {
+          "characterId": 245466,
+          "name": "Aira Shiratori",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/dandadan/Shiratori Aira.webp",
+            "assets/avatars/animes/dandadan/Shiratori Aira v2.webp",
+            "assets/avatars/animes/dandadan/Shiratori Aira v3.webp",
+            "assets/avatars/animes/dandadan/Shiratori Aira v4.webp",
+            "assets/avatars/animes/dandadan/Shiratori Aira v5.webp",
+            "assets/avatars/animes/dandadan/Shiratori Aira v6.webp",
+            "assets/avatars/animes/dandadan/Shiratori Aira v7.webp",
+            "assets/avatars/animes/dandadan/Shiratori Aira v8.webp",
+            "assets/avatars/animes/dandadan/Shiratori Aira v9.webp",
+            "assets/avatars/animes/dandadan/Shiratori Aira v10.webp"
+          ]
+        },
+        {
+          "characterId": 234824,
+          "name": "Seiko Ayase",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/dandadan/Ayase Seiko.webp",
+            "assets/avatars/animes/dandadan/Ayase Seiko v2.webp",
+            "assets/avatars/animes/dandadan/Ayase Seiko v3.webp",
+            "assets/avatars/animes/dandadan/Ayase Seiko v4.webp",
+            "assets/avatars/animes/dandadan/Ayase Seiko v5.webp",
+            "assets/avatars/animes/dandadan/Ayase Seiko v6.webp",
+            "assets/avatars/animes/dandadan/Ayase Seiko v7.webp",
+            "assets/avatars/animes/dandadan/Ayase Seiko v8.webp",
+            "assets/avatars/animes/dandadan/Ayase Seiko v9.webp",
+            "assets/avatars/animes/dandadan/Ayase Seiko v10.webp"
+          ]
+        },
+        {
+          "characterId": 239956,
+          "name": "Turbo Babaa",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/dandadan/Turbo Granny.webp",
+            "assets/avatars/animes/dandadan/Turbo Granny v2.webp",
+            "assets/avatars/animes/dandadan/Turbo Granny v3.webp",
+            "assets/avatars/animes/dandadan/Turbo Granny v4.webp",
+            "assets/avatars/animes/dandadan/Turbo Granny v5.webp",
+            "assets/avatars/animes/dandadan/Turbo Granny v6.webp",
+            "assets/avatars/animes/dandadan/Turbo Granny v7.webp",
+            "assets/avatars/animes/dandadan/Turbo Granny v8.webp",
+            "assets/avatars/animes/dandadan/Turbo Granny v9.webp",
+            "assets/avatars/animes/dandadan/Turbo Granny v10.webp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kusuriya-no-hitorigoto",
+      "name": "Kusuriya no Hitorigoto",
+      "category": "anime",
+      "characters": [
+        {
+          "characterId": 126824,
+          "name": "Maomao",
+          "role": "main",
+          "variants": [
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao.webp",
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao v2.webp",
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao v3.webp",
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao v4.webp",
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao v5.webp",
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao v6.webp",
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao v7.webp",
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao v8.webp",
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao v9.webp",
+            "assets/avatars/animes/kusuriya_no_hitorigoto/Maomao v10.webp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sakamoto-days",
+      "name": "SAKAMOTO DAYS",
+      "category": "anime",
+      "characters": [
+        {
+          "characterId": 196522,
+          "name": "Tarou Sakamoto",
+          "role": "main",
+          "variants": [
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou.webp",
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou v2.webp",
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou v3.webp",
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou v4.webp",
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou v5.webp",
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou v6.webp",
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou v7.webp",
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou v8.webp",
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou v9.webp",
+            "assets/avatars/animes/sakamoto_days/Sakamoto Tarou v10.webp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seihantai-na-kimi-to-boku",
+      "name": "Seihantai na Kimi to Boku",
+      "category": "anime",
+      "characters": [
+        {
+          "characterId": 281250,
+          "name": "Miyu Suzuki",
+          "role": "main",
+          "variants": [
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu v2.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu v3.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu v4.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu v5.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu v6.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu v7.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu v8.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu v9.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Suzuki Miyu v10.webp"
+          ]
+        },
+        {
+          "characterId": 281251,
+          "name": "Yuusuke Tani",
+          "role": "main",
+          "variants": [
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke v2.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke v3.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke v4.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke v5.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke v6.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke v7.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke v8.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke v9.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Tani Yuusuke v10.webp"
+          ]
+        },
+        {
+          "characterId": 373190,
+          "name": "Aoi Satou",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi v2.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi v3.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi v4.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi v5.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi v6.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi v7.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi v8.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi v9.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Satou Aoi v10.webp"
+          ]
+        },
+        {
+          "characterId": 302625,
+          "name": "Kentarou Yamada",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou v2.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou v3.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou v4.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou v5.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou v6.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou v7.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou v8.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou v9.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Yamada Kentarou v10.webp"
+          ]
+        },
+        {
+          "characterId": 373191,
+          "name": "Manami Watanabe",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami v2.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami v3.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami v4.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami v5.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami v6.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami v7.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami v8.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami v9.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Watanabe Manami v10.webp"
+          ]
+        },
+        {
+          "characterId": 302624,
+          "name": "Natsumi Nishi",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi v2.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi v3.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi v4.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi v5.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi v6.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi v7.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi v8.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi v9.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Nishi Natsumi v10.webp"
+          ]
+        },
+        {
+          "characterId": 378435,
+          "name": "Rikako Honda",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako v2.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako v3.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako v4.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako v5.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako v6.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako v7.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako v8.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako v9.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Honda Rikako v10.webp"
+          ]
+        },
+        {
+          "characterId": 302626,
+          "name": "Shino Azuma",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino v2.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino v3.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino v4.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino v5.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino v6.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino v7.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino v8.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino v9.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Azuma Shino v10.webp"
+          ]
+        },
+        {
+          "characterId": 302627,
+          "name": "Shuuji Taira",
+          "role": "supporting",
+          "variants": [
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji v2.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji v3.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji v4.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji v5.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji v6.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji v7.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji v8.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji v9.webp",
+            "assets/avatars/animes/seihantai_na_kimi_to_boku/Taira Shuuji v10.webp"
+          ]
+        }
+      ]
+    }
+  ]
+}

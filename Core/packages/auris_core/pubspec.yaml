@@ -1,0 +1,44 @@
+name: auris_core
+description: "Cerebro compartido de AurisTV: Lógica, API y Modelos."
+version: 0.0.1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Lógica y Red
+  dio: ^5.5.0
+  supabase_flutter: ^2.6.0
+  flutter_riverpod: ^2.5.1
+  
+  # Persistencia
+  hive_ce: ^2.10.0
+  hive_ce_flutter: ^2.1.0
+  path_provider: ^2.1.4
+  
+  # Utils
+  uuid: ^4.6.0
+  collection: ^1.18.0
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/branding/
+    - assets/data/
+    - assets/avatars/
+    - assets/avatars/animes/dandadan/
+    - assets/avatars/animes/kusuriya_no_hitorigoto/
+    - assets/avatars/animes/sakamoto_days/
+    - assets/avatars/animes/seihantai_na_kimi_to_boku/
+    - assets/avatars/animes/yofukashi_no_uta/

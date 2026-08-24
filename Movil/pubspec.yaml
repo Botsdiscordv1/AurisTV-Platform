@@ -1,0 +1,95 @@
+name: auristv_mobile
+description: "AurisTV Móvil — app multimedia personal optimizada para Android/iOS"
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # LÓGICA COMPARTIDA (Paquete Local)
+  auris_core:
+    path: ../Core/packages/auris_core
+
+  # Reproductor de video nativo
+  media_kit: ^1.1.11
+  media_kit_video: ^1.2.5
+  media_kit_libs_video: ^1.0.5
+
+  # Navegación y Estado
+  go_router: ^14.2.0
+  flutter_riverpod: ^2.5.1
+
+  # Networking y Cache
+  dio: ^5.5.0
+  cached_network_image: ^3.4.0
+  palette_generator: ^0.3.3+4
+
+  # Persistencia Local
+  hive_ce: ^2.10.0
+  hive_ce_flutter: ^2.1.0
+  path_provider: ^2.1.4
+  flutter_secure_storage: ^11.0.0
+
+  # Autenticación
+  supabase_flutter: ^2.6.0
+  flutter_appauth: ^6.0.0
+
+  # UI e Iconos
+  cupertino_icons: ^1.0.8
+  url_launcher: ^6.3.2
+  google_fonts: ^6.2.1
+  flutter_svg: ^2.0.10+1
+  shimmer: ^3.0.0
+  material_symbols_icons: ^4.2960.0
+  
+  # Otros
+  uuid: ^4.6.0
+  device_info_plus: ^13.2.0
+  pointer_interceptor: ^0.10.1+2
+  youtube_player_iframe: ^5.1.2
+  fullscreen_window: ^1.2.1
+
+  # Dependencies requested to fix errors
+  webview_flutter: ^4.4.2
+  webview_flutter_android: ^3.10.1
+  volume_controller: ^2.0.7
+  collection: ^1.18.0
+  web: ^1.1.1
+
+dependency_overrides:
+  youtube_player_iframe_web:
+    path: ../Core/packages/youtube_player_iframe_web
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.12
+  hive_ce_generator: ^1.7.1
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/auris-tv-icon.png"
+  adaptive_icon_background: "#0B0B0D"
+  adaptive_icon_foreground: "assets/icons/auris-tv-icon.png"
+  remove_alpha_ios: true
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/branding/
+    - assets/data/
+    - assets/avatars/
+    - assets/avatars/animes/dandadan/
+    - assets/avatars/animes/kusuriya_no_hitorigoto/
+    - assets/avatars/animes/sakamoto_days/
+    - assets/avatars/animes/seihantai_na_kimi_to_boku/
+    - assets/avatars/animes/yofukashi_no_uta/
