@@ -460,7 +460,7 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
     final hasSubOrLat = qLower.contains('sub') || qLower.contains('latino') || qLower.contains('dub');
     return !hasSubOrLat;
   }
-  void addResult(SearchResult r) {
+  void addResult(SearchResult r, {bool ignoreSeason = false}) {
     final itemSources = r.sources.isNotEmpty ? r.sources : [SourceItem(source: r.source, url: r.url, quality: r.quality)];
     for (final s in itemSources) {
       final sName = s.source.toUpperCase();
@@ -468,7 +468,7 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
       if (isCastellano(r, s.quality)) continue;
       if (isMovieCategory != isMovieResult(r)) continue;
       final rSeason = r.season ?? extractSeason(r.title) ?? extractSeason(r.romaji) ?? extractSeason(r.english) ?? extractSeason(r.url) ?? extractSeason(r.slug) ?? 1;
-      if (targetSeason != null && rSeason != targetSeason && !isSeasonUnified(s.source)) continue;
+      if (targetSeason != null && rSeason != targetSeason && !isSeasonUnified(s.source) && !ignoreSeason) continue;
       final qLower = s.quality.toLowerCase();
       final hasSub = qLower.contains('sub');
       final hasLat = qLower.contains('latino') || qLower.contains('dub');
@@ -488,8 +488,42 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
       }
     }
   }
-  for (final r in (params.initialSources ?? const <SearchResult>[])) { addResult(r); }
+  for (final r in (params.initialSources ?? const <SearchResult>[])) { addResult(r, ignoreSeason: true); }
   final isMovieCard = params.category == 'movie' || params.category == 'movie_anime' || RegExp(r'\b(movie|película|film)\b', caseSensitive: false).hasMatch(searchQuery);
+
+  // Fuentes que no se descubren vía la búsqueda del server (p.ej. AnimeD23: no
+  // tiene S1 y su búsqueda apunta a un espejo caído animed2023.com). Se sintetizan
+  // derivando la URL desde el slug compartido de las fuentes ya conocidas.
+  if (!isMovieCard && params.season != null && !searchSources.any((s) => s.source == 'AnimeD23')) {
+    final seeds = params.initialSources ?? const <SearchResult>[];
+    String? sharedSlug;
+    for (final s in seeds) {
+      if (s.slug != null && s.slug!.isNotEmpty) { sharedSlug = s.slug; break; }
+    }
+    if (sharedSlug == null) {
+      for (final s in seeds) {
+        final m = RegExp(r'/anime/([^/?#]+)').firstMatch(s.url) ?? RegExp(r'/([^/?#]+)/?$').firstMatch(s.url);
+        if (m != null && (m.group(1)?.isNotEmpty ?? false)) { sharedSlug = m.group(1); break; }
+      }
+    }
+    if (sharedSlug != null) {
+      addResult(
+        SearchResult(
+          title: params.title.isNotEmpty ? params.title : (params.metadataTitle ?? ''),
+          url: 'https://animed23.com/anime/$sharedSlug/',
+          quality: '',
+          thumbnail: seeds.firstWhereOrNull((s) => s.thumbnail.isNotEmpty)?.thumbnail ?? '',
+          banner: seeds.firstWhereOrNull((s) => s.banner != null)?.banner,
+          source: 'AnimeD23',
+          slug: sharedSlug,
+          year: params.year,
+          season: params.season,
+          fromDiscovery: true,
+        ),
+        ignoreSeason: true,
+      );
+    }
+  }
   final movieMarker = RegExp(r'\b(movie|película|film)\b', caseSensitive: false);
   List<SearchResult> mergedResults = searchData?.results ?? const <SearchResult>[];
   final baseSearchData = baseSearchAsync?.valueOrNull;
