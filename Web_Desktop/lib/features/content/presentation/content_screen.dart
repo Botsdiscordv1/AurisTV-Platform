@@ -2090,8 +2090,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       });
     }
 
-    // AnimeJara ya viene con `#season-N` aplicado en `activeSources`.
-    final rawCurrentSource = activeSources.isNotEmpty ? activeSources[_selectedSourceIndex % activeSources.length] : null;
+    // No fijar la fuente por defecto hasta que la búsqueda suplementaria
+    // (que trae AV1/AnimeJara) termine: evita abrir con A23 y parpadear a AV1.
+    final sourcesSettled = !searchLoading;
+    final rawCurrentSource = (sourcesSettled && activeSources.isNotEmpty)
+        ? activeSources[_selectedSourceIndex % activeSources.length]
+        : null;
     final currentSource = _withSeasonUnified(rawCurrentSource, effectiveSeasonForUrl);
     final episodesUrl = currentSource?.url ?? widget.url;
     final episodesSource = currentSource?.source ?? widget.source;
@@ -2195,11 +2199,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ),
             sources: [currentSource ?? SearchResult(title: widget.title, url: episodesUrl, quality: '', thumbnail: initialThumbnail ?? '', source: episodesSource)],
           ))
-        : isMetadataSource
-            // Fuente de metadatos sin endpoint de episodios: mostrar skeleton
-            // mientras las fuentes de scraping (JKAnime, AnimeAV1, Aniyae) terminan de cargarse.
+        : (!sourcesSettled)
             ? const AsyncValue<GroupedEpisodesResult?>.loading()
-            : ref.watch(groupedEpisodesProvider(GroupedEpisodesParams(
+            : isMetadataSource
+                // Fuente de metadatos sin endpoint de episodios: mostrar skeleton
+                // mientras las fuentes de scraping (JKAnime, AnimeAV1, Aniyae) terminan de cargarse.
+                ? const AsyncValue<GroupedEpisodesResult?>.loading()
+                : ref.watch(groupedEpisodesProvider(GroupedEpisodesParams(
                 title: seasonSwitched ? (seasonTitle ?? widget.title) : widget.title,
                 metadataTitle: episodeReqMetaTitle,
                 category: widget.category,
