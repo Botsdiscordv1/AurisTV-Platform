@@ -82,7 +82,7 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
       text,
       style: TextStyle(
         color: Colors.white, 
-        fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
+        fontSize: ResponsiveUtils.sp(context, small ? 9 : 12), 
         fontWeight: FontWeight.w900
       ),
     ),
@@ -179,6 +179,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final String? inferredSeasonAirDate;
   final PlaybackHistory? latestHistory;
   final Set<String>? unavailableSources;
+  final int? season;
 
   const _ContentHeader({
     required this.title, 
@@ -202,6 +203,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
     this.inferredSeasonAirDate,
     this.latestHistory,
     this.unavailableSources,
+    this.season,
   });
 
   @override ConsumerState<_ContentHeader> createState() => _ContentHeaderState();
@@ -369,7 +371,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         : (d?.backdrop?.isNotEmpty == true ? d!.backdrop! : widget.poster);
     final _openedSeasonN = extractSeason(widget.title) ?? 1;
     final heroTitle = (widget.currentSeason != _openedSeasonN)
-        ? seasonTitleFor(stripSeasonSuffix(widget.title), widget.currentSeason)
+        ? seasonTitleFor(stripSeasonSuffix(widget.title ?? ''), widget.currentSeason)
         : widget.title;
     final width = MediaQuery.sizeOf(context).width;
 
@@ -380,7 +382,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         onPointerMove: (_) => _handleInteraction(),
         onPointerHover: (_) => _handleInteraction(),
         child: Stack(clipBehavior: Clip.hardEdge, children: [
-          AspectRatio(aspectRatio: 2.8 / 1, child: LayoutBuilder(builder: (context, constraints) {
+          AspectRatio(aspectRatio: 3.2 / 1, child: LayoutBuilder(builder: (context, constraints) {
             final h = constraints.maxHeight; final ph = h * 1.35; final pw = ph * (16 / 9);
             return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
               Container(color: const Color(0xFF0B0B0D)),
@@ -436,9 +438,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   Widget _buildDesktopOverlay(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
     final isUltraCompact = width < 1050; final isCompact = width >= 1050 && width < 1250;
     final hPadding = ResponsiveUtils.horizontalPadding(context); 
-    final titleSize = isUltraCompact ? 32.0 : (isCompact ? 40.0 : 64.0);
-    final titleTop = isUltraCompact ? 115.0 : 165.0; final contentSpacing = isUltraCompact ? 12.0 : 40.0;
-    return PointerInterceptor(child: SizedBox(height: width / 2.8, child: Stack(children: [
+    final titleSize = ResponsiveUtils.sp(context, isUltraCompact ? 22.0 : (isCompact ? 28.0 : 36.0)); 
+    final contentSpacing = ResponsiveUtils.sp(context, 12.0);
+    
+    return PointerInterceptor(child: SizedBox(height: width / 3.2, child: Stack(children: [
       Positioned.fill(
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -446,40 +449,73 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: [
-                const Color(0xFF0B0B0D).withOpacity(0.85),
-                const Color(0xFF0B0B0D).withOpacity(0.4),
-                const Color(0xFF0B0B0D).withOpacity(0.1),
+                const Color(0xFF0B0B0D).withOpacity(0.95),
+                const Color(0xFF0B0B0D).withOpacity(0.6),
+                const Color(0xFF0B0B0D).withOpacity(0.2),
                 Colors.transparent,
               ],
-              stops: const [0.0, 0.3, 0.5, 0.8],
+              stops: const [0.0, 0.4, 0.7, 1.0],
             ),
           ),
         ),
       ),
-      Positioned(left: hPadding, top: titleTop, child: AnimatedOpacity(duration: const Duration(milliseconds: 1200), curve: Curves.easeInOut, opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, child: SizedBox(width: isUltraCompact ? width * 0.7 : 800.0, child: _heroTitleWidget(heroTitle, d?.logo, logoReady, isUltraCompact ? width * 0.7 : 800.0, titleSize * 2.6, TextStyle(color: Colors.white, fontSize: titleSize, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: isUltraCompact ? 1 : 4, shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4)]))))),
-      Positioned(left: hPadding, right: hPadding, bottom: isUltraCompact ? 10 : 24, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-          _buildCircularActions(context, isCompact: isUltraCompact), SizedBox(height: contentSpacing),
-          _buildMainActionButton(context, isCompact: isUltraCompact), SizedBox(height: contentSpacing),
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            if (widget.totalSeasons > 1) ...[_SeasonSelector(title: widget.title, currentSeason: widget.currentSeason, totalSeasons: widget.totalSeasons, onSeasonSelected: widget.onSeasonSelected, compact: isUltraCompact), SizedBox(width: isUltraCompact ? 8 : 16)],
-            if (widget.currentSource != null) _ServerSelector(currentSource: widget.currentSource!, sources: widget.sources, onSourceSelected: widget.onSourceSelected, compact: isUltraCompact, unavailableSources: widget.unavailableSources),
-          ]),
-        ]),
-        if (!isUltraCompact) ...[
-          SizedBox(width: contentSpacing), 
-          Expanded(
-            child: _buildSynopsis(d, isCompact: isCompact),
-          ),
-          SizedBox(width: contentSpacing),
-        ],
-        _buildMetaRow(d, isCompact: isUltraCompact || isCompact),
-      ])),
+      
+      // BLOQUE DE CONTENIDO (Logo integrado en columna)
+      Positioned(
+        left: hPadding, 
+        right: hPadding, 
+        bottom: ResponsiveUtils.sp(context, 10), 
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end, 
+          children: [
+            // 1. COLUMNA DE ACCIONES
+            SizedBox(
+              width: ResponsiveUtils.sp(context, isUltraCompact ? 280 : 320),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, 
+                mainAxisSize: MainAxisSize.min, 
+                children: [
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 1200), 
+                    curve: Curves.easeInOut, 
+                    opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, 
+                    child: _heroTitleWidget(heroTitle, d?.logo, logoReady, isUltraCompact ? width * 0.45 : 500.0, titleSize * 2.0, TextStyle(color: Colors.white, fontSize: titleSize, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: isUltraCompact ? 0.5 : 1.5, shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4)]))
+                  ),
+                  SizedBox(height: contentSpacing),
+                  _buildCircularActions(context, isCompact: true), 
+                  SizedBox(height: contentSpacing),
+                  _buildMainActionButton(context, isCompact: true), 
+                  SizedBox(height: contentSpacing),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (widget.totalSeasons > 1) ...[_SeasonSelector(title: widget.title, currentSeason: widget.currentSeason, totalSeasons: widget.totalSeasons, onSeasonSelected: widget.onSeasonSelected, compact: true), SizedBox(width: ResponsiveUtils.sp(context, 8))],
+                    if (widget.currentSource != null) _ServerSelector(currentSource: widget.currentSource!, sources: widget.sources, onSourceSelected: widget.onSourceSelected, compact: true, unavailableSources: widget.unavailableSources, season: widget.season),
+                  ]),
+                ]
+              ),
+            ),
+            
+            SizedBox(width: contentSpacing),
+            
+            // 2. SINOPSIS
+            Expanded(
+              flex: 4,
+              child: _buildSynopsis(d, isCompact: true),
+            ),
+            
+            SizedBox(width: contentSpacing),
+            
+            // 3. METADATOS
+            _buildMetaRow(d, isCompact: true),
+          ]
+        )
+      ),
     ])));
   }
 
   Widget _buildCircularActions(BuildContext context, {bool isCompact = false}) {
-    final size = isCompact ? 48.0 : 56.0; final iconSize = isCompact ? 24.0 : 28.0; final spacing = isCompact ? 12.0 : 16.0;
+    final size = ResponsiveUtils.sp(context, isCompact ? 42.0 : 48.0); 
+    final iconSize = ResponsiveUtils.sp(context, isCompact ? 20.0 : 24.0); 
+    final spacing = ResponsiveUtils.sp(context, isCompact ? 10.0 : 14.0);
     
     return Consumer(builder: (context, ref, _) {
       final favorites = ref.watch(favoritesProvider);
@@ -589,16 +625,27 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final cert = (detail is MovieDetail ? detail.certification : (detail is AnimeDetail ? detail.certification : null)) ?? 'NR';
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-      Row(mainAxisSize: MainAxisSize.min, children: [ if (widget.showRatingSkeleton && r == null) ...[_RatingSkeleton(width: isCompact ? 44 : 52, height: isCompact ? 18 : 20), SizedBox(width: 12)] else if (r != null && r > 0) ...[Icon(Icons.star_rounded, color: Colors.amber, size: isCompact ? 20 : 24), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: isCompact ? 18 : 20)), SizedBox(width: 12)], if (g != null && g.isNotEmpty) Wrap(spacing: 8, children: g.take(3).map<Widget>((genre) => _buildBadge(context, genre.toString().toUpperCase(), small: isCompact)).toList()) ]),
-      const SizedBox(height: 12),
-      Row(mainAxisSize: MainAxisSize.min, children: [ if (d != null && d.length >= 4) ...[Icon(Icons.calendar_today_rounded, color: const Color(0xFFA5A5AA), size: 14), const SizedBox(width: 6), Text(d.substring(0, 4), style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 16)), SizedBox(width: 12)], _buildBadge(context, cert, small: isCompact), const SizedBox(width: 8), _buildBadge(context, 'CC', small: isCompact) ]),
+      Row(mainAxisSize: MainAxisSize.min, children: [ if (widget.showRatingSkeleton && r == null) ...[_RatingSkeleton(width: ResponsiveUtils.sp(context, isCompact ? 38 : 44), height: ResponsiveUtils.sp(context, isCompact ? 16 : 18)), SizedBox(width: ResponsiveUtils.sp(context, 10))] else if (r != null && r > 0) ...[Icon(Icons.star_rounded, color: Colors.amber, size: ResponsiveUtils.sp(context, isCompact ? 18 : 22)), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: ResponsiveUtils.sp(context, isCompact ? 16 : 18))), SizedBox(width: ResponsiveUtils.sp(context, 10))], if (g != null && g.isNotEmpty) Wrap(spacing: 8, children: g.take(3).map<Widget>((genre) => _buildBadge(context, genre.toString().toUpperCase(), small: isCompact)).toList()) ]),
+      SizedBox(height: ResponsiveUtils.sp(context, 10)),
+      Row(mainAxisSize: MainAxisSize.min, children: [ if (d != null && d.length >= 4) ...[Icon(Icons.calendar_today_rounded, color: const Color(0xFFA5A5AA), size: ResponsiveUtils.sp(context, 12)), const SizedBox(width: 6), Text(d.substring(0, 4), style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 15))), SizedBox(width: ResponsiveUtils.sp(context, 10))], _buildBadge(context, cert, small: isCompact), const SizedBox(width: 8), _buildBadge(context, 'CC', small: isCompact) ]),
     ]);
   }
 
-  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) => Text(detail?.overview ?? '', maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.95), fontSize: isCompact ? 16 : 19, height: 1.5, fontWeight: FontWeight.w700, letterSpacing: -0.2));
+  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) => Text(
+    detail?.overview ?? '', 
+    maxLines: 4, 
+    overflow: TextOverflow.ellipsis, 
+    style: TextStyle(
+      color: Colors.white.withOpacity(0.9), 
+      fontSize: ResponsiveUtils.sp(context, 13), // Reducido para calcar WEB en TV
+      height: 1.3, 
+      fontWeight: FontWeight.w500, 
+      letterSpacing: -0.1
+    )
+  );
   Widget _buildUpperButtons(BuildContext context) {
     return Stack(children: [
-      Positioned(top: 40, left: 40, child: PointerInterceptor(child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), onPressed: () => Navigator.of(context).pop()))),
+      Positioned(top: ResponsiveUtils.sp(context, 20), left: ResponsiveUtils.sp(context, 30), child: PointerInterceptor(child: IconButton(icon: Icon(Icons.arrow_back, color: Colors.white, size: ResponsiveUtils.sp(context, 24)), onPressed: () => Navigator.of(context).pop()))),
     ]);
   }
 }
@@ -611,18 +658,66 @@ class _SeasonSelector extends StatefulWidget {
 
 class _SeasonSelectorState extends State<_SeasonSelector> {
   bool _isHovered = false;
-  @override Widget build(BuildContext context) => Theme(data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E26)), child: PopupMenuButton<int>(onSelected: widget.onSeasonSelected, offset: const Offset(0, 56), constraints: const BoxConstraints(minWidth: 220), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.white12)), itemBuilder: (context) => List.generate(widget.totalSeasons, (i) => PopupMenuItem(value: i + 1, height: 56, child: Text('Temporada ${i + 1}', style: TextStyle(color: (i + 1) == widget.currentSeason ? Colors.white : const Color(0xFFA5A5AA), fontWeight: (i + 1) == widget.currentSeason ? FontWeight.bold : FontWeight.normal, fontSize: 18)))), child: MouseRegion(onEnter: (_) => setState(() => _isHovered = true), onExit: (_) => setState(() => _isHovered = false), child: AnimatedContainer(duration: const Duration(milliseconds: 200), width: widget.compact ? 160 : 220, height: widget.compact ? 44 : 56, decoration: BoxDecoration(color: _isHovered ? const Color(0xFF454652) : const Color(0xFF32333E), borderRadius: BorderRadius.circular(8), border: Border.all(color: _isHovered ? const Color(0xFFA5A5AA) : Colors.transparent, width: 1.5)), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('T ${widget.currentSeason}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))]))))));
-}
+  bool _isFocused = false;
 
-class _ServerSelector extends StatefulWidget {
-  final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources;
-  const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources});
-  @override State<_ServerSelector> createState() => _ServerSelectorState();
-}
-
-class _ServerSelectorState extends State<_ServerSelector> {
-  bool _isHovered = false;
   @override Widget build(BuildContext context) {
+    final bool isActive = _isHovered || _isFocused;
+    
+    return Theme(
+      data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E26)), 
+      child: PopupMenuButton<int>(
+        onSelected: widget.onSeasonSelected, 
+        offset: Offset(0, ResponsiveUtils.sp(context, 50)), 
+        constraints: BoxConstraints(minWidth: ResponsiveUtils.sp(context, 180)), 
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.white12)), 
+        itemBuilder: (context) => List.generate(widget.totalSeasons, (i) => PopupMenuItem(value: i + 1, height: ResponsiveUtils.sp(context, 48), child: Text('Temporada ${i + 1}', style: TextStyle(color: (i + 1) == widget.currentSeason ? Colors.white : const Color(0xFFA5A5AA), fontWeight: (i + 1) == widget.currentSeason ? FontWeight.bold : FontWeight.normal, fontSize: ResponsiveUtils.sp(context, 16))))), 
+        child: Focus(
+          onFocusChange: (focused) => setState(() => _isFocused = focused),
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _isHovered = true), 
+            onExit: (_) => setState(() => _isHovered = false), 
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200), 
+              width: ResponsiveUtils.sp(context, widget.compact ? 130 : 180), 
+              height: ResponsiveUtils.sp(context, widget.compact ? 38 : 48), 
+              decoration: BoxDecoration(
+                color: isActive ? const Color(0xFF454652) : const Color(0xFF32333E), 
+                borderRadius: BorderRadius.circular(8), 
+                border: Border.all(
+                  color: isActive ? Colors.white : Colors.transparent, 
+                  width: isActive ? 2.0 : 1.5
+                ),
+              ), 
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: ResponsiveUtils.sp(context, 16)), 
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+                  children: [
+                    Text('T ${widget.currentSeason}', style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 18), fontWeight: FontWeight.bold)), 
+                    Icon(Icons.keyboard_arrow_down, color: isActive ? Colors.white : const Color(0xFFA5A5AA), size: ResponsiveUtils.sp(context, 20))
+                  ]
+                )
+              )
+            )
+          ),
+        )
+      )
+    );
+  }
+}
+
+class _ServerSelector extends ConsumerStatefulWidget {
+  final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season;
+  const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources, this.season});
+  @override ConsumerState<_ServerSelector> createState() => _ServerSelectorState();
+}
+
+class _ServerSelectorState extends ConsumerState<_ServerSelector> {
+  bool _isHovered = false;
+  bool _isFocused = false;
+
+  @override Widget build(BuildContext context) {
+    final bool isActive = _isHovered || _isFocused;
     final groupedSources = <String, int>{};
     for (int i = 0; i < widget.sources.length; i++) {
       final s = widget.sources[i];
@@ -636,6 +731,19 @@ class _ServerSelectorState extends State<_ServerSelector> {
     
     final uniqueIndices = groupedSources.values
         .where((i) => widget.unavailableSources?.contains(simplifySourceName(widget.sources[i].source)) != true)
+        .where((i) {
+          final s = widget.sources[i];
+          if (s.source != 'AnimeD23') return true;
+          final ok = ref.watch(d23SeasonCheckProvider((
+            url: s.url,
+            title: s.title,
+            fullTitle: s.metadataTitle,
+            category: 'anime',
+            season: widget.season ?? s.season,
+            year: s.year,
+          ))).valueOrNull;
+          return ok == true;
+        })
         .toList();
     uniqueIndices.sort((a, b) => sourceDisplayRank(widget.sources[a].source)
         .compareTo(sourceDisplayRank(widget.sources[b].source)));
@@ -644,8 +752,8 @@ class _ServerSelectorState extends State<_ServerSelector> {
       data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E26)), 
       child: PopupMenuButton<int>(
         onSelected: widget.onSourceSelected, 
-        offset: const Offset(0, 56), 
-        constraints: const BoxConstraints(minWidth: 220), 
+        offset: Offset(0, ResponsiveUtils.sp(context, 50)), 
+        constraints: BoxConstraints(minWidth: ResponsiveUtils.sp(context, 180)), 
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.white12)), 
         itemBuilder: (context) => uniqueIndices.map((i) {
           final s = widget.sources[i];
@@ -653,48 +761,54 @@ class _ServerSelectorState extends State<_ServerSelector> {
           final isSelected = sName == simplifySourceName(widget.currentSource.source);
           return PopupMenuItem(
             value: i,
-            height: 56,
+            height: ResponsiveUtils.sp(context, 48),
             child: Row(children: [
               Expanded(child: Text(
                 sName,
                 style: TextStyle(
                   color: isSelected ? Colors.white : const Color(0xFFA5A5AA),
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 16
+                  fontSize: ResponsiveUtils.sp(context, 14)
                 )
               )),
             ])
           );
         }).toList(),
-        child: MouseRegion(
-          onEnter: (_) => setState(() => _isHovered = true), 
-          onExit: (_) => setState(() => _isHovered = false), 
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200), 
-            width: widget.compact ? 160 : 220, 
-            height: widget.compact ? 44 : 56, 
-            decoration: BoxDecoration(
-              color: _isHovered ? const Color(0xFF454652) : const Color(0xFF32333E), 
-              borderRadius: BorderRadius.circular(8), 
-              border: Border.all(color: _isHovered ? const Color(0xFFA5A5AA) : Colors.transparent, width: 1.5)
-            ), 
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20), 
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween, 
-                children: [
-                  Expanded(
-                    child: Text(
-                      simplifySourceName(widget.currentSource.source), 
-                      overflow: TextOverflow.ellipsis, 
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
-                    )
-                  ), 
-                  Icon(Icons.dns_rounded, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))
-                ]
+        child: Focus(
+          onFocusChange: (focused) => setState(() => _isFocused = focused),
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _isHovered = true), 
+            onExit: (_) => setState(() => _isHovered = false), 
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200), 
+              width: ResponsiveUtils.sp(context, widget.compact ? 130 : 180), 
+              height: ResponsiveUtils.sp(context, widget.compact ? 38 : 48), 
+              decoration: BoxDecoration(
+                color: isActive ? const Color(0xFF454652) : const Color(0xFF32333E), 
+                borderRadius: BorderRadius.circular(8), 
+                border: Border.all(
+                  color: isActive ? Colors.white : Colors.transparent, 
+                  width: isActive ? 2.0 : 1.5
+                ),
+              ), 
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: ResponsiveUtils.sp(context, 16)), 
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+                  children: [
+                    Expanded(
+                      child: Text(
+                        simplifySourceName(widget.currentSource.source), 
+                        overflow: TextOverflow.ellipsis, 
+                        style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 16), fontWeight: FontWeight.bold)
+                      )
+                    ), 
+                    Icon(Icons.dns_rounded, color: isActive ? Colors.white : const Color(0xFFA5A5AA), size: ResponsiveUtils.sp(context, 20))
+                  ]
+                )
               )
             )
-          )
+          ),
         )
       )
     );
@@ -777,115 +891,389 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
     return isDub ? 'DUB' : 'SUB';
   }
 
+  bool _focused = false;
+
+  void _showOverlay(BuildContext context) {
+    _hideTimer?.cancel();
+    if (_isOverlayShown || _overlayEntry != null) return;
+    
+    _showTimer?.cancel();
+    // Debounce de 300ms para TV: equilibrio entre rapidez y evitar ruido
+    _showTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && (_focused || _isHovered)) {
+        _performShow(context);
+      }
+    });
+  }
+
+  void _performShow(BuildContext context) {
+    if (!mounted || (!_focused && !_isHovered) || _overlayEntry != null) return;
+
+    final oldActiveState = _activeState;
+    _activeState = this;
+    _isOverlayShown = true;
+    
+    final overlay = Overlay.of(context);
+    final RenderBox renderBox = context.findRenderObject() as RenderBox;
+    final Size cardSize = renderBox.size;
+    final Offset position = renderBox.localToGlobal(Offset.zero);
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    final double popupWidth = cardSize.width + 48;
+    const double edgePadding = 24.0;
+    
+    double cardCenterX = position.dx + cardSize.width / 2;
+    double popupHalfWidth = popupWidth / 2;
+    
+    double targetCenterX = cardCenterX;
+    if (targetCenterX - popupHalfWidth < edgePadding) {
+      targetCenterX = edgePadding + popupHalfWidth;
+    } else if (targetCenterX + popupHalfWidth > screenWidth - edgePadding) {
+      targetCenterX = screenWidth - edgePadding - popupHalfWidth;
+    }
+    
+    double offsetX = targetCenterX - cardCenterX; 
+    double offsetY = -27; // Senior Fix: Anclaje cinemático para imagen Edge-to-Edge (WEB Exact)
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Stack(
+        children: [
+          CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.topCenter,
+            followerAnchor: Alignment.topCenter,
+            offset: Offset(offsetX, offsetY),
+            child: TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 150),
+              tween: Tween(begin: 0.0, end: 1.0),
+              builder: (context, opacity, child) => Opacity(opacity: opacity, child: child),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.onTap,
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: popupWidth,
+                    padding: EdgeInsets.zero, 
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF191E25),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.6),
+                          blurRadius: 30,
+                          spreadRadius: 5,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                          child: Stack(
+                            children: [
+                              AspectRatio(
+                                aspectRatio: 16 / 9,
+                                child: CachedNetworkImage(
+                                  imageUrl: widget.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => CachedNetworkImage(
+                                    imageUrl: widget.fallbackImageUrl,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => _episodePlaceholder(widget.episodeNumber),
+                                  ),
+                                ),
+                              ),
+                              if (widget.progress != null && widget.progress! > 0)
+                                Positioned(
+                                  bottom: 0, left: 0, right: 0,
+                                  child: Container(
+                                    height: 3,
+                                    color: Colors.black26,
+                                    child: FractionallySizedBox(
+                                      alignment: Alignment.centerLeft,
+                                      widthFactor: widget.progress,
+                                      child: Container(color: const Color(0xFFEF7A1E)),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.only(
+                            left: 24, 
+                            right: 24, 
+                            bottom: 24, 
+                            top: ResponsiveUtils.sp(context, 12)
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _displayTitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: ResponsiveUtils.sp(context, 16),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: ResponsiveUtils.sp(context, 6)),
+                              Text(
+                                widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
+                                maxLines: 8,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: const Color(0xFFA5A5AA),
+                                  fontSize: ResponsiveUtils.sp(context, 13),
+                                  height: 1.5,
+                                  fontWeight: FontWeight.normal,
+                                ),
+                              ),
+                              SizedBox(height: ResponsiveUtils.sp(context, 8)),
+                              Row(
+                                children: [
+                                  if (widget.certification != null && widget.certification != 'NR') ...[
+                                    _buildBadge(context, widget.certification!, small: true),
+                                    SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                                  ],
+                                  if (_typeBadge != null) ...[
+                                    _buildBadge(context, _typeBadge!, small: true),
+                                    SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                                  ],
+                                  _buildBadge(context, _languageBadge, small: true),
+                                  SizedBox(width: ResponsiveUtils.sp(context, 10)),
+                                  if (!_isSpecial && widget.duration != null) ...[
+                                    Text(
+                                      widget.duration!,
+                                      style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
+                                    ),
+                                    SizedBox(width: ResponsiveUtils.sp(context, 10)),
+                                  ],
+                                  if (!_isSpecial && widget.releaseDate != null)
+                                    Text(
+                                      _formatDate(widget.releaseDate),
+                                      style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    overlay.insert(_overlayEntry!);
+    
+    if (oldActiveState != null && oldActiveState != this) {
+      oldActiveState._performHide();
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  void _hideOverlay({bool immediate = false}) {
+    _showTimer?.cancel();
+    if (immediate) {
+      _performHide();
+    } else {
+      _hideTimer?.cancel();
+      _hideTimer = Timer(const Duration(milliseconds: 100), () {
+        if (mounted && !_focused && !_isHovered) {
+          _performHide();
+        }
+      });
+    }
+  }
+
+  void _performHide() {
+    _isOverlayShown = false;
+    if (_overlayEntry != null) {
+      _overlayEntry?.remove();
+      _overlayEntry = null;
+    }
+    if (_activeState == this) _activeState = null;
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _showTimer?.cancel();
     _hideTimer?.cancel();
     if (_activeState == this) _activeState = null;
+    _overlayEntry?.remove();
     super.dispose();
   }
 
   @override Widget build(BuildContext context) {
+    final bool isActive = _isHovered || _focused;
+    final bool isOverlayActive = _isOverlayShown || _overlayEntry != null;
+    final double padding = ResponsiveUtils.sp(context, 6); 
+
     return CompositedTransformTarget(
       link: _layerLink,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
-        child: InkWell(
-          onTap: widget.onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Stack(children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: CachedNetworkImage(
-                        imageUrl: widget.imageUrl,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => CachedNetworkImage(
-                          imageUrl: widget.fallbackImageUrl,
+      child: Focus(
+        onFocusChange: (focused) {
+          setState(() => _focused = focused);
+          if (focused) {
+            Scrollable.ensureVisible(
+              context,
+              alignment: 0.5,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+            _showOverlay(context);
+          } else {
+            _hideOverlay();
+          }
+        },
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent) {
+            if (event.logicalKey == LogicalKeyboardKey.enter || 
+                event.logicalKey == LogicalKeyboardKey.select ||
+                event.logicalKey == LogicalKeyboardKey.space) {
+              widget.onTap();
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
+        child: MouseRegion(
+          onEnter: (_) {
+            setState(() => _isHovered = true);
+            _showOverlay(context);
+          },
+          onExit: (_) {
+            setState(() => _isHovered = false);
+            _hideOverlay();
+          },
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(12),
+            focusColor: Colors.transparent, // Senior Fix: Quitar naranja de enfoque
+            hoverColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 1. MINIATURA
+                  Stack(children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: CachedNetworkImage(
+                          imageUrl: widget.imageUrl,
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => _episodePlaceholder(widget.episodeNumber),
+                          errorWidget: (_, __, ___) => CachedNetworkImage(
+                            imageUrl: widget.fallbackImageUrl,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => _episodePlaceholder(widget.episodeNumber),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  if (widget.progress != null && widget.progress! > 0)
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        height: 3,
-                        color: Colors.black26,
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: widget.progress,
-                          child: Container(color: const Color(0xFFEF7A1E)),
+                    if (widget.progress != null && widget.progress! > 0)
+                      Positioned(
+                        bottom: 0, left: 0, right: 0,
+                        child: Container(
+                          height: 3,
+                          color: Colors.black26,
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: widget.progress,
+                            child: Container(color: const Color(0xFFEF7A1E)),
+                          ),
                         ),
                       ),
-                    ),
-                ]),
-                SizedBox(height: ResponsiveUtils.sp(context, 12)),
-                Text(
-                  _displayTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: ResponsiveUtils.sp(context, 16),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: ResponsiveUtils.sp(context, 6)),
-                if (!_isSpecial)
+                  ]),
+                  SizedBox(height: ResponsiveUtils.sp(context, 10)),
+                  
+                  // 2. TÍTULO
                   Text(
-                    widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
-                    maxLines: 2,
+                    _displayTitle,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: const Color(0xFFA5A5AA),
-                      fontSize: ResponsiveUtils.sp(context, 13),
-                      height: 1.5,
-                      fontWeight: FontWeight.normal,
+                      color: Colors.white,
+                      fontSize: ResponsiveUtils.sp(context, 14),
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                if (!_isSpecial) SizedBox(height: ResponsiveUtils.sp(context, 8)),
-                Row(
-                  children: [
-                    if (widget.certification != null && widget.certification != 'NR') ...[
-                      _buildBadge(context, widget.certification!, small: true),
-                      SizedBox(width: ResponsiveUtils.sp(context, 8)),
-                    ],
-                    if (_typeBadge != null) ...[
-                      _buildBadge(context, _typeBadge!, small: true),
-                      SizedBox(width: ResponsiveUtils.sp(context, 8)),
-                    ],
-                    _buildBadge(context, _languageBadge, small: true),
-                    SizedBox(width: ResponsiveUtils.sp(context, 10)),
-                    if (!_isSpecial && widget.duration != null) ...[
-                      Text(
-                        widget.duration!,
-                        style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
+                  SizedBox(height: ResponsiveUtils.sp(context, 4)),
+                  
+                  // 3. DESCRIPCIÓN
+                  Expanded(
+                    child: Text(
+                      widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: const Color(0xFFA5A5AA),
+                        fontSize: ResponsiveUtils.sp(context, 11),
+                        height: 1.3,
+                        fontWeight: FontWeight.normal,
                       ),
-                      SizedBox(width: ResponsiveUtils.sp(context, 10)),
+                    ),
+                  ),
+                  SizedBox(height: ResponsiveUtils.sp(context, 8)),
+                  
+                  // 4. METADATA
+                  Row(
+                    children: [
+                      if (widget.certification != null && widget.certification != 'NR') ...[
+                        _buildBadge(context, widget.certification!, small: true),
+                        SizedBox(width: ResponsiveUtils.sp(context, 6)),
+                      ],
+                      if (_typeBadge != null) ...[
+                        _buildBadge(context, _typeBadge!, small: true),
+                        SizedBox(width: ResponsiveUtils.sp(context, 6)),
+                      ],
+                      if (_languageBadge != null) ...[
+                        _buildBadge(context, _languageBadge, small: true),
+                        SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                      ],
+                      if (!_isSpecial && widget.duration != null) ...[
+                        Text(
+                          widget.duration!,
+                          style: TextStyle(
+                            color: const Color(0xFFA5A5AA), 
+                            fontSize: ResponsiveUtils.sp(context, 10),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (!_isSpecial && widget.releaseDate != null)
+                        Text(
+                          _formatDate(widget.releaseDate),
+                          style: TextStyle(
+                            color: const Color(0xFFA5A5AA), 
+                            fontSize: ResponsiveUtils.sp(context, 10),
+                          ),
+                        ),
                     ],
-                    if (!_isSpecial && widget.releaseDate != null)
-                      Text(
-                        _formatDate(widget.releaseDate),
-                        style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
-                      ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1036,52 +1424,100 @@ class _ExpandableTextState extends State<_ExpandableText> {
   }
 }
 
-class _DetailButton extends StatelessWidget {
+class _DetailButton extends StatefulWidget {
   final VoidCallback? onPressed; final IconData icon; final String label; final bool isPrimary; final bool compact; final bool isLoading;
   const _DetailButton({required this.onPressed, required this.icon, required this.label, this.isPrimary = false, this.compact = false, this.isLoading = false});
+
+  @override
+  State<_DetailButton> createState() => _DetailButtonState();
+}
+
+class _DetailButtonState extends State<_DetailButton> {
+  bool _focused = false;
+  bool _hovered = false;
+
   @override Widget build(BuildContext context) {
-    final bool isDisabled = onPressed == null || isLoading;
-    return Container(
-      height: (compact ? 44 : 56), 
-      decoration: BoxDecoration(
-        color: isPrimary ? (isDisabled ? const Color(0xFFA5A5AA) : Colors.white) : Colors.white10, 
-        borderRadius: BorderRadius.circular(8)
-      ), 
-      child: Material(
-        color: Colors.transparent, 
-        child: InkWell(
-          onTap: isDisabled ? null : onPressed, 
-          borderRadius: BorderRadius.circular(8), 
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20), 
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center, 
-              children: [
-                if (isLoading) 
-                  const SizedBox(
-                    width: 24, 
-                    height: 24, 
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3, 
-                      color: Colors.black
+    final bool isDisabled = widget.onPressed == null || widget.isLoading;
+    final bool isActive = (_focused || _hovered) && !isDisabled;
+
+    // Estilo Netflix de Home: Blanco con ligera opacidad al enfocar/hover
+    final Color bgColor = widget.isPrimary 
+        ? (isActive ? Colors.white.withOpacity(0.9) : Colors.white)
+        : (isActive ? Colors.white.withOpacity(0.2) : Colors.white10);
+    
+    final Color fgColor = widget.isPrimary ? Colors.black : Colors.white;
+
+    return Focus(
+      onFocusChange: (focused) => setState(() => _focused = focused),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && !isDisabled) {
+          if (event.logicalKey == LogicalKeyboardKey.enter || 
+              event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onPressed?.call();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: ResponsiveUtils.sp(context, widget.compact ? 38 : 48), 
+          decoration: BoxDecoration(
+            color: bgColor, 
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: _focused ? [
+              BoxShadow(
+                color: Colors.white.withOpacity(0.2),
+                blurRadius: 15,
+                spreadRadius: 2,
+              )
+            ] : [],
+          ), 
+          child: Material(
+            color: Colors.transparent, 
+            child: InkWell(
+              onTap: isDisabled ? null : widget.onPressed, 
+              borderRadius: BorderRadius.circular(8), 
+              focusColor: Colors.transparent, // Desactivar resaltado naranja del tema
+              hoverColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              splashColor: Colors.white.withOpacity(0.1),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: ResponsiveUtils.sp(context, 16)), 
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center, 
+                  children: [
+                    if (widget.isLoading) 
+                      SizedBox(
+                        width: ResponsiveUtils.sp(context, 20), 
+                        height: ResponsiveUtils.sp(context, 20), 
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5, 
+                          color: fgColor,
+                        )
+                      )
+                    else
+                      Icon(widget.icon, color: fgColor, size: ResponsiveUtils.sp(context, 24)),
+                    SizedBox(width: ResponsiveUtils.sp(context, 10)), 
+                    Text(
+                      widget.isLoading ? 'Buscando fuentes...' : widget.label, 
+                      style: TextStyle(
+                        color: fgColor, 
+                        fontSize: ResponsiveUtils.sp(context, 18), 
+                        fontWeight: FontWeight.bold
+                      )
                     )
-                  )
-                else
-                  Icon(icon, color: isPrimary ? Colors.black : Colors.white, size: 30),
-                const SizedBox(width: 12), 
-                Text(
-                  isLoading ? 'Buscando fuentes...' : label, 
-                  style: TextStyle(
-                    color: isPrimary ? Colors.black : Colors.white, 
-                    fontSize: 20, 
-                    fontWeight: FontWeight.bold
-                  )
+                  ]
                 )
-              ]
+              )
             )
           )
-        )
-      )
+        ),
+      ),
     );
   }
 }
@@ -1094,37 +1530,68 @@ class _DetailIconButton extends StatefulWidget {
 
 class _DetailIconButtonState extends State<_DetailIconButton> {
   bool _isHovered = false;
+  bool _isFocused = false;
+
   @override Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true), 
-      onExit: (_) => setState(() => _isHovered = false), 
-      child: Tooltip(
-        message: widget.label, 
-        child: AnimatedScale(
-          scale: _isHovered ? 1.1 : 1.0, 
-          duration: const Duration(milliseconds: 200), 
-          child: Container(
-            height: widget.size ?? 56, 
-            width: widget.size ?? 56, 
-            decoration: BoxDecoration(
-              color: Colors.white10, 
-              shape: BoxShape.circle, 
-              border: Border.all(color: widget.color ?? Colors.white24)
-            ), 
-            child: IconButton(
-              icon: Icon(widget.icon, color: widget.color ?? Colors.white, size: widget.iconSize ?? 28), 
-              onPressed: widget.onPressed
+    final bool isActive = _isHovered || _isFocused;
+
+    return Focus(
+      onFocusChange: (focused) => setState(() => _isFocused = focused),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.enter || 
+              event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true), 
+        onExit: (_) => setState(() => _isHovered = false), 
+        child: Tooltip(
+          message: widget.label, 
+          child: AnimatedScale(
+            scale: isActive ? 1.1 : 1.0, 
+            duration: const Duration(milliseconds: 200), 
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: widget.size ?? ResponsiveUtils.sp(context, 48), 
+              width: widget.size ?? ResponsiveUtils.sp(context, 48), 
+              decoration: BoxDecoration(
+                color: isActive ? Colors.white.withOpacity(0.2) : Colors.white10, 
+                shape: BoxShape.circle, 
+                border: Border.all(color: widget.color ?? (isActive ? Colors.white : Colors.white24)),
+                boxShadow: _isFocused ? [
+                  BoxShadow(
+                    color: Colors.white.withOpacity(0.2),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                  )
+                ] : [],
+              ), 
+              child: IconButton(
+                icon: Icon(widget.icon, color: widget.color ?? Colors.white, size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)), 
+                onPressed: widget.onPressed,
+                style: IconButton.styleFrom(
+                  focusColor: Colors.transparent, 
+                  hoverColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                ),
+              )
             )
           )
         )
-      )
+      ),
     );
   }
 }
 
 class _DetailInfoCard extends StatelessWidget {
   final Widget child; const _DetailInfoCard({required this.child});
-  @override Widget build(BuildContext context) => Container(width: double.infinity, padding: const EdgeInsets.all(28), decoration: BoxDecoration(color: const Color(0xFF121519), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF66696E), width: 1.0)), child: child);
+  @override Widget build(BuildContext context) => Container(width: double.infinity, padding: EdgeInsets.all(ResponsiveUtils.sp(context, 20)), decoration: BoxDecoration(color: const Color(0xFF121519), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF66696E), width: 1.0)), child: child);
 }
 
 // --- MAIN WIDGETS ---
@@ -1220,11 +1687,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _selectedTabIndex = i),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: ResponsiveUtils.sp(context, 12), vertical: ResponsiveUtils.sp(context, 8)),
               decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: selected ? const Color(0xFFEF7A1E) : Colors.transparent, width: 3)),
               ),
-              child: Text(labels[i], style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: selected ? Colors.white : const Color(0xFFA5A5AA))),
+              child: Text(labels[i], style: TextStyle(fontSize: ResponsiveUtils.sp(context, 18), fontWeight: FontWeight.w900, color: selected ? Colors.white : const Color(0xFFA5A5AA))),
             ),
           );
         }),
@@ -1236,11 +1703,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final width = MediaQuery.sizeOf(context).width;
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final hPadding = (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
-    final episodesCrossAxisCount = (width < 1000 ? 2 : (width < 1400 ? 3 : (width < 2100 ? 4 : (width < 2800 ? 5 : 6))));
-    final episodesAspectRatio = (width < 1000 ? 1.25 : 1.1);
+    final episodesCrossAxisCount = (width < 1000 ? 5 : (width < 1400 ? 6 : (width < 2100 ? 6 : (width < 2800 ? 7 : 8))));
+    final episodesAspectRatio = (width < 1000 ? 0.82 : 0.8); 
 
     final isAnimeCatFetch = widget.category == 'anime';
-    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title);
+    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie';
     final fetchAnimeDetail = isAnimeCatFetch || widget.category == 'movie_anime' || widget.category == 'all';
 
     const metadataSourceHints = {'anilist', 'tmdb', 'trakt', 'mal', 'jikan'};
@@ -1254,7 +1721,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final animeDetailAsync = !fetchAnimeDetail
         ? const AsyncValue<AnimeDetail?>.data(null)
-        : ref.watch(animeDetailProvider(AnimeDetailParams(title: widget.title, metadataTitle: widget.metadataTitle, year: widget.year)));
+        : ref.watch(animeDetailProvider(AnimeDetailParams(title: widget.title, metadataTitle: widget.metadataTitle, year: widget.year, kind: widget.result?.kind)));
 
     final needMovieFallback = !isAnimeCatFetch &&
         !isMovieCatFetch &&
@@ -1263,14 +1730,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final movieDetailAsync = isAnimeCatFetch
         ? const AsyncValue<MovieDetail?>.data(null)
-        : (needMovieFallback
+        : (isMovieCatFetch || needMovieFallback)
             ? ref.watch(movieDetailProvider(MovieDetailParams(
                 title: widget.title,
                 metadataTitle: widget.metadataTitle,
                 category: widget.category,
                 server: originServer,
               )))
-            : const AsyncValue<MovieDetail?>.data(null));
+            : const AsyncValue<MovieDetail?>.data(null);
 
     final detailData = isMovieCatFetch
         ? (movieDetailAsync.valueOrNull ?? animeDetailAsync.valueOrNull)
@@ -1279,9 +1746,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final resolvedKind = (detailData is AnimeDetail
             ? detailData.kind
             : (detailData is MovieDetail ? detailData.kind : null)) ??
+        widget.result?.kind ??
         widget.category;
     final isAnimeCategory = resolvedKind == 'anime';
-    final isMovieCategory = resolvedKind == 'movie' || _isMovieLikeTitle(widget.title);
+    final isMovieCategory = resolvedKind == 'movie' ||
+        widget.result?.kind?.toLowerCase() == 'movie' ||
+        _isMovieLikeTitle(widget.title);
     final effectiveCategory = isMovieCategory ? 'movie_anime' : widget.category;
 
     final detailLoading = (isMovieCategory ? movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null : animeDetailAsync.isLoading) || (isAnimeCategory ? false : movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null);
@@ -1301,14 +1771,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final effectiveSeasonForUrl = _selectedSeason ?? (openedSeasonN > 1 ? openedSeasonN : null);
 
     final seasonSwitched = _selectedSeason != null && _selectedSeason != openedSeasonN;
-    final seasonTitle = seasonSwitched ? seasonTitleFor(stripSeasonSuffix(widget.title), _selectedSeason!) : null;
+    final seasonTitle = seasonSwitched ? seasonTitleFor(stripSeasonSuffix(widget.title ?? ''), _selectedSeason!) : null;
     final seasonSourcesParams = seasonTitle != null
         ? DiscoveredSourcesParams(title: seasonTitle, metadataTitle: seasonTitle, category: effectiveCategory, year: widget.year, season: _selectedSeason, server: originServer, initialSources: initialSources)
         : sourcesParams;
     final seasonSources = ref.watch(discoveredSourcesProvider(seasonSourcesParams));
     
     final seasonAnimeDetailAsync = seasonTitle != null
-        ? ref.watch(animeDetailProvider(AnimeDetailParams(title: seasonTitle, metadataTitle: seasonTitle, year: null, season: _selectedSeason)))
+        ? ref.watch(animeDetailProvider(AnimeDetailParams(title: seasonTitle, metadataTitle: seasonTitle, year: null, season: _selectedSeason, kind: null)))
         : animeDetailAsync;
     final displayAnimeDetailAsync = seasonSwitched
         ? (seasonAnimeDetailAsync.valueOrNull != null ? seasonAnimeDetailAsync : animeDetailAsync)
@@ -1509,6 +1979,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               movieDetailAsync: movieDetailAsync, 
               currentSource: currentSource, 
               sources: activeSources, 
+              season: currentSeason, 
               sourceRating: currentSource?.score, 
               showRatingSkeleton: currentSource?.score == null && detailLoading, 
               isLoadingSources: searchLoading && activeSources.isEmpty,
@@ -1546,7 +2017,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             SliverMainAxisGroup(slivers: [
               SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _buildTabBar(tabLabels, selectedTabIndex, hPadding),
-                const SizedBox(height: 16),
+                SizedBox(height: ResponsiveUtils.sp(context, 12)),
               ]))),
               if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex) episodesAsync.when(
                 data: (epBundle) {
@@ -1559,14 +2030,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         padding: const EdgeInsets.only(bottom: 32),
                         child: Text(
                           '${epData.total} episodios', 
-                          style: const TextStyle(
-                            color: Color(0xFFA5A5A5), 
-                            fontSize: 20,
+                          style: TextStyle(
+                            color: const Color(0xFFA5A5A5), 
+                            fontSize: ResponsiveUtils.sp(context, 15),
                           )
                         )
                       )
                     ),
-                    SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
+                    SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: ResponsiveUtils.sp(context, 8), crossAxisSpacing: ResponsiveUtils.sp(context, 8), childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
                       final ep = index < epData.episodes.length ? epData.episodes[index] : null; final omdb = index < omdbEpisodes.length ? omdbEpisodes[index] : null;
                       final epNum = (ep?.number ?? index + 1).toString();
                       final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
@@ -1593,7 +2064,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                           ),
                         ),
                       ),
-                      SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
+                      SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: ResponsiveUtils.sp(context, 8), crossAxisSpacing: ResponsiveUtils.sp(context, 8), childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
                         final sp = epData.specials[index];
                         final spSource = currentSource;
                         final spQuality = sp.quality ?? spSource?.quality ?? '';
@@ -1623,7 +2094,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       episodeReqMetaTitle,
       episodeReqYear,
     ),
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              SliverToBoxAdapter(child: SizedBox(height: ResponsiveUtils.sp(context, 24))),
             ]),
           ],
         ),
@@ -1653,15 +2124,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   Widget _buildHeaderSkeleton(BuildContext context) {
     return Stack(clipBehavior: Clip.hardEdge, children: [
-      AspectRatio(aspectRatio: 2.8 / 1, child: Container(color: const Color(0xFF0B0B0D))),
+      AspectRatio(aspectRatio: 3.2 / 1, child: Container(color: const Color(0xFF0B0B0D))),
       Positioned(
         left: 40, right: 40, bottom: 24,
-        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            const SizedBox(
-              width: 800,
-              child: _SkeletonBox(width: 500, height: 60),
-            ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            const _SkeletonBox(width: 400, height: 80),
             const SizedBox(height: 24),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -1678,25 +2145,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             const SizedBox(height: 24),
             Container(width: 220, height: 56, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8))),
           ]),
-          const Spacer(),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            const Row(mainAxisSize: MainAxisSize.min, children: [
-              _RatingSkeleton(width: 52, height: 20),
-              SizedBox(width: 12),
-              _SkeletonBox(width: 60, height: 20),
-              SizedBox(width: 8),
-              _SkeletonBox(width: 40, height: 20),
-            ]),
-            const SizedBox(height: 12),
-            const Row(mainAxisSize: MainAxisSize.min, children: [
-              _SkeletonBox(width: 80, height: 18),
-              SizedBox(width: 12),
-              _SkeletonBox(width: 50, height: 18),
-              SizedBox(width: 8),
-              _SkeletonBox(width: 30, height: 18),
-            ]),
-          ]),
-        ]),
       ),
     ]);
   }
@@ -1873,11 +2321,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     return [
       SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(hPadding, 32, hPadding, 16), 
+          padding: EdgeInsets.fromLTRB(hPadding, ResponsiveUtils.sp(context, 24), hPadding, ResponsiveUtils.sp(context, 12)), 
           child: Text(
             'Personajes y Actores de Voz', 
             style: GoogleFonts.poppins(
-              fontSize: 26,
+              fontSize: ResponsiveUtils.sp(context, 22),
               fontWeight: FontWeight.bold,
               color: Colors.white,
               letterSpacing: -0.4,
@@ -1886,7 +2334,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ),
       ),
       SliverToBoxAdapter(child: _CharacterCarouselLocal(characters: detail.characters, horizontalPadding: hPadding)),
-      const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      SliverToBoxAdapter(child: SizedBox(height: ResponsiveUtils.sp(context, 24))),
     ];
   }
 
@@ -1895,11 +2343,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     return [
       SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(hPadding, 32, hPadding, 16), 
+          padding: EdgeInsets.fromLTRB(hPadding, ResponsiveUtils.sp(context, 24), hPadding, ResponsiveUtils.sp(context, 12)), 
           child: Text(
             'Elenco Principal', 
             style: GoogleFonts.poppins(
-              fontSize: 26,
+              fontSize: ResponsiveUtils.sp(context, 22),
               fontWeight: FontWeight.bold,
               color: Colors.white,
               letterSpacing: -0.4,
@@ -1908,7 +2356,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ),
       ),
       SliverToBoxAdapter(child: _CastCarouselLocal(cast: detail.cast, horizontalPadding: hPadding)),
-      const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      SliverToBoxAdapter(child: SizedBox(height: ResponsiveUtils.sp(context, 24))),
     ];
   }
 
@@ -1980,7 +2428,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
             child: Text(
               widget.title, 
               style: GoogleFonts.poppins(
-                fontSize: 26,
+                fontSize: ResponsiveUtils.sp(context, 22),
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: -0.4,
@@ -2390,7 +2838,7 @@ class _GalleryTabContent extends ConsumerStatefulWidget {
 class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
   String _selectedFilter = "all";
   @override Widget build(BuildContext context) {
-    final params = GalleryParams(kind: widget.kind, title: widget.title, year: widget.year);
+    final params = GalleryParams(kind: widget.kind, title: stripSeasonSuffix(widget.title ?? ''), year: widget.year);
     final async = ref.watch(galleryProvider(params));
     return async.when(
       loading: () => SliverPadding(

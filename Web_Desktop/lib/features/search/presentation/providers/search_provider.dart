@@ -9,12 +9,6 @@ final searchRepositoryProvider = Provider<AurisRepository>((ref) {
   return ref.watch(aurisRepositoryProvider);
 });
 
-final searchResultsProvider =
-    FutureProvider.family<SearchResponse, SearchParams>((ref, params) async {
-  final repo = ref.watch(searchRepositoryProvider);
-  return repo.search(params.category, params.query);
-});
-
 final searchTrendingProvider = FutureProvider<List<SearchResult>>((ref) async {
   final repo = ref.watch(searchRepositoryProvider);
   // Obtenemos tendencias haciendo una búsqueda vacía en la categoría principal
@@ -87,23 +81,6 @@ final movieTitlesProvider =
   final repo = ref.watch(searchRepositoryProvider);
   return repo.getMovieTitles(query);
 });
-
-class SearchParams {
-  final String category;
-  final String query;
-
-  const SearchParams({required this.category, required this.query});
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is SearchParams &&
-          category == other.category &&
-          query == other.query;
-
-  @override
-  int get hashCode => category.hashCode ^ query.hashCode;
-}
 
 // Senior: Sugerencias basadas exclusivamente en el historial local (Privacidad y Rapidez)
 final searchSuggestionsProvider = StateNotifierProvider<SearchSuggestionsNotifier, List<String>>((ref) {

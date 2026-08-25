@@ -20,11 +20,13 @@ class ScreenBrightnessController {
     }
   }
 
-  /// Devuelve el brillo actual de la ventana; si no hay override, el del sistema.
+  /// Devuelve el brillo actual de la ventana; si no hay override, el del sistema (retorna 0.5 como base).
   static Future<double> getBrightness() async {
     try {
       final value = await _channel.invokeMethod<double>('getBrightness');
-      return value ?? 0.5;
+      // Si el valor es < 0, significa que usa el brillo del sistema.
+      if (value == null || value < 0) return 0.5;
+      return value.clamp(0.0, 1.0);
     } catch (_) {
       return 0.5;
     }

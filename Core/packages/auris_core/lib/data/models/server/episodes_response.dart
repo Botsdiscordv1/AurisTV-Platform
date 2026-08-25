@@ -15,6 +15,12 @@ class EpisodesResponse {
 
   final String? seasonAirDate;
 
+  /// Indica que la temporada pedida no existe en esta fuente (p.ej. AnimeD23
+  /// solo tiene S3 y se pidió S1/S2). Lo usa el core para no listar la fuente
+  /// en temporadas que no tiene.
+  final bool? seasonNotAvailable;
+  final String? error;
+
   const EpisodesResponse({
     required this.source,
     required this.url,
@@ -26,6 +32,8 @@ class EpisodesResponse {
     this.tmdbId,
     this.season,
     this.seasonAirDate,
+    this.seasonNotAvailable,
+    this.error,
   });
 
   factory EpisodesResponse.fromJson(Map<String, dynamic> json) {
@@ -52,6 +60,8 @@ class EpisodesResponse {
       tmdbId: json['tmdbId'] as int?,
       season: json['season'] as int?,
       seasonAirDate: json['seasonAirDate'] as String?,
+      seasonNotAvailable: json['seasonNotAvailable'] as bool?,
+      error: json['error'] as String?,
     );
   }
 }

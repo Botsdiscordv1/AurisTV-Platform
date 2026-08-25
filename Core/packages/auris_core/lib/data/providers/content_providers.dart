@@ -378,7 +378,7 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
       ? ref.watch(contentSearchProvider(ContentSearchParams(query: romanQuery, category: params.category, year: params.year, server: params.server)))
       : null;
   final isMovieCategory = params.category == 'movie' || params.category == 'movie_anime';
-  final detailAsync = isMovieCategory ? const AsyncValue<AnimeDetail?>.data(null) : ref.watch(animeDetailProvider(AnimeDetailParams(title: params.title, metadataTitle: params.metadataTitle, year: params.year, season: params.season)));
+  final detailAsync = isMovieCategory ? const AsyncValue<AnimeDetail?>.data(null) : ref.watch(animeDetailProvider(AnimeDetailParams(title: params.title, metadataTitle: params.metadataTitle, year: params.year, season: params.season, kind: null)));
   final searchData = searchAsync.valueOrNull;
   final detail = detailAsync.valueOrNull;
   final qBase = cleanTitleForMatching(params.title);
@@ -561,5 +561,39 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
     if ((isAjr && familyMatch(r)) || strictMatch(r) || (r.kind?.toLowerCase() == 'movie' && familyMatch(r))) addResult(r);
   }
   if (searchSources.isEmpty) { for (final r in eligible) { if (familyMatch(r)) addResult(r); } }
+
   return searchSources;
+});
+
+/// Verifica de forma aislada si AnimeD23 tiene episodios para la temporada
+/// pedida. Se usa para ocultar el chip de D23 en la UI cuando el server
+/// responde `seasonNotAvailable` (o sin episodios), sin bloquear la lista
+/// completa de servidores (la probe de D23 puede tardar varios segundos).
+final d23SeasonCheckProvider = FutureProvider.family<bool, ({
+  String url,
+  String? title,
+  String? fullTitle,
+  String category,
+  int? season,
+  int? year,
+})>((ref, p) async {
+  try {
+    final repo = ref.watch(aurisRepositoryProvider);
+    final res = await repo
+        .getEpisodes(
+          p.url,
+          'AnimeD23',
+          category: p.category,
+          title: p.title,
+          fullTitle: p.fullTitle,
+          season: p.season,
+          year: p.year,
+        )
+        .timeout(const Duration(seconds: 15));
+    // El server devuelve `seasonNotAvailable` (o sin episodios) cuando la
+    // temporada pedida no existe en D23; en ese caso la ocultamos.
+    return !(res.seasonNotAvailable == true || res.episodes.isEmpty);
+  } catch (_) {
+    return true;
+  }
 });

@@ -24,7 +24,7 @@ final _galleryLocalProvider = FutureProvider.family<GalleryResponse, GalleryPara
 bool _isDubQuality(String q) => isDubQuality(q);
 bool _isMovieResult(SearchResult r) => isMovieResult(r);
 int? _extractSeason(String? s) => extractSeason(s);
-String _stripSeasonSuffix(String title) => stripSeasonSuffix(title);
+String _stripSeasonSuffix(String? title) => stripSeasonSuffix(title ?? '');
 String _seasonTitleFor(String baseTitle, int season) => seasonTitleFor(baseTitle, season);
 String _seasonTitleRoman(String baseTitle, int season) => seasonTitleRoman(baseTitle, season);
 bool _isSeasonUnified(String source) => isSeasonUnified(source);
@@ -199,6 +199,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final String? inferredSeasonAirDate;
   final PlaybackHistory? latestHistory;
   final Set<String>? unavailableSources;
+  final int? season;
 
   const _ContentHeader({
     required this.title, 
@@ -222,6 +223,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
     this.inferredSeasonAirDate,
     this.latestHistory,
     this.unavailableSources,
+    this.season,
   });
 
   @override ConsumerState<_ContentHeader> createState() => _ContentHeaderState();
@@ -372,7 +374,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         // Fila 1: Badges (Certificación + Géneros)
         if ((cert != null && cert.isNotEmpty && cert != 'NR') || genres.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.only(bottom: 10),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -413,13 +415,13 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: widget.onPlay,
-        icon: const Icon(Icons.play_arrow, size: 28, color: Colors.black),
+        icon: const Icon(Icons.play_arrow, size: 24, color: Colors.black),
         label: const Text("Reproducir", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 0,
         ),
       ),
@@ -428,7 +430,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   Widget _buildCircularActions(BuildContext context, {required bool isMobile}) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _ActionSquareButton(icon: Icons.movie_outlined, label: "Tráiler", onTap: () {}),
         _ActionSquareButton(icon: Icons.add, label: "Mi lista", onTap: () {}),
@@ -529,34 +531,35 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             Positioned.fill(child: _buildUpperButtons(context)),
           ]),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const SizedBox(height: 12), _buildMetaRow(d, isMobile: true), 
-            const SizedBox(height: 20), _buildMainActionButton(context, isMobile: true), 
+            const SizedBox(height: 8), _buildMetaRow(d, isMobile: true), 
+            const SizedBox(height: 24), _buildMainActionButton(context, isMobile: true), 
             const SizedBox(height: 16), _buildCircularActions(context, isMobile: true),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             if (widget.totalSeasons > 1 || widget.currentSource != null) ...[
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    if (widget.totalSeasons > 1) ...[
-                      _SeasonSelector(
+              Row(
+                children: [
+                  if (widget.totalSeasons > 1) 
+                    Expanded(
+                      child: _SeasonSelector(
                         title: widget.title, 
                         currentSeason: widget.currentSeason, 
                         totalSeasons: widget.totalSeasons, 
                         onSeasonSelected: widget.onSeasonSelected, 
                         compact: true
-                      ), 
-                      const SizedBox(width: 12)
-                    ],
-                    if (widget.currentSource != null) 
-                      _ServerSelector(
+                      ),
+                    ),
+                  if (widget.totalSeasons > 1 && widget.currentSource != null) const SizedBox(width: 12),
+                  if (widget.currentSource != null) 
+                    Expanded(
+                      child: _ServerSelector(
                         currentSource: widget.currentSource!, 
                         sources: widget.sources, 
                         onSourceSelected: widget.onSourceSelected, 
-                        compact: true
+                        compact: true,
+                        season: widget.season,
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
               const SizedBox(height: 16),
             ],
@@ -585,13 +588,13 @@ class _SeasonSelectorState extends State<_SeasonSelector> {
   @override Widget build(BuildContext context) => Theme(data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E26)), child: PopupMenuButton<int>(onSelected: widget.onSeasonSelected, offset: const Offset(0, 56), constraints: const BoxConstraints(minWidth: 220), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.white12)), itemBuilder: (context) => List.generate(widget.totalSeasons, (i) => PopupMenuItem(value: i + 1, height: 56, child: Text('Temporada ${i + 1}', style: TextStyle(color: (i + 1) == widget.currentSeason ? Colors.white : const Color(0xFFA5A5AA), fontWeight: (i + 1) == widget.currentSeason ? FontWeight.bold : FontWeight.normal, fontSize: 18)))), child: MouseRegion(onEnter: (_) => setState(() => _isHovered = true), onExit: (_) => setState(() => _isHovered = false), child: AnimatedContainer(duration: const Duration(milliseconds: 200), width: widget.compact ? 160 : 220, height: widget.compact ? 44 : 56, decoration: BoxDecoration(color: _isHovered ? const Color(0xFF454652) : const Color(0xFF32333E), borderRadius: BorderRadius.circular(8), border: Border.all(color: _isHovered ? const Color(0xFFA5A5AA) : Colors.transparent, width: 1.5)), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('T ${widget.currentSeason}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))]))))));
 }
 
-class _ServerSelector extends StatefulWidget {
-  final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources;
-  const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources});
-  @override State<_ServerSelector> createState() => _ServerSelectorState();
+class _ServerSelector extends ConsumerStatefulWidget {
+  final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season;
+  const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources, this.season});
+  @override ConsumerState<_ServerSelector> createState() => _ServerSelectorState();
 }
 
-class _ServerSelectorState extends State<_ServerSelector> {
+class _ServerSelectorState extends ConsumerState<_ServerSelector> {
   bool _isHovered = false;
   @override Widget build(BuildContext context) {
     // Senior Clean Logic: Agrupamos por nombre de servidor para evitar duplicados visuales (SUB/LAT)
@@ -612,6 +615,19 @@ class _ServerSelectorState extends State<_ServerSelector> {
     // mostrarlos deshabilitados: si no tiene stream, no aparece en la lista.
     final uniqueIndices = groupedSources.values
         .where((i) => widget.unavailableSources?.contains(simplifySourceName(widget.sources[i].source)) != true)
+        .where((i) {
+          final s = widget.sources[i];
+          if (s.source != 'AnimeD23') return true;
+          final ok = ref.watch(d23SeasonCheckProvider((
+            url: s.url,
+            title: s.title,
+            fullTitle: s.metadataTitle,
+            category: 'anime',
+            season: widget.season ?? s.season,
+            year: s.year,
+          ))).valueOrNull;
+          return ok == true;
+        })
         .toList();
     // Orden de display fijo: AnimeAV1 -> AnimeJara -> AnimeD23 -> JKAnime ->
     // TIOAnime -> FLV -> Aniyae (al final, por catálogos incompletos).
@@ -916,28 +932,31 @@ class _ActionSquareButton extends StatelessWidget {
   const _ActionSquareButton({required this.icon, required this.label, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(4),
-            child: Container(
-              width: 68,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.white12),
+    return Expanded(
+      child: Column(
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(4),
+              child: Container(
+                height: 48,
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: Icon(icon, color: Colors.white, size: 26),
               ),
-              child: Icon(icon, color: Colors.white, size: 26),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-      ],
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ],
+      ),
     );
   }
 }
@@ -1347,7 +1366,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     // Clasificación pre-carga (solo categoría, porque aún no tenemos el payload).
     final isAnimeCatFetch = widget.category == 'anime';
-    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title);
+    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie';
     // Una movie_anime es una Pel\u00EDcula de anime: tambi\u00E9n queremos el detalle de
     // anime (AniList) para mostrar la franquicia en "Relacionado" + sus OP/ED.
     // 'all' (b\u00FAsqueda global) tambi\u00E9n incluye anime, as\u00ED que lo pedimos igual.
@@ -1376,7 +1395,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final animeDetailAsync = !fetchAnimeDetail
         ? const AsyncValue<AnimeDetail?>.data(null)
-        : ref.watch(animeDetailProvider(AnimeDetailParams(title: widget.title, metadataTitle: widget.metadataTitle, year: widget.year)));
+        : ref.watch(animeDetailProvider(AnimeDetailParams(title: widget.title, metadataTitle: widget.metadataTitle, year: widget.year, kind: widget.result?.kind)));
 
     // Para category='all' no sabemos de antemano si es anime o movie. Pedimos
     // el detalle de anime primero y solo consultamos /api/detail/movie como
@@ -1389,14 +1408,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final movieDetailAsync = isAnimeCatFetch
         ? const AsyncValue<MovieDetail?>.data(null)
-        : (needMovieFallback
+        : (isMovieCatFetch || needMovieFallback)
             ? ref.watch(movieDetailProvider(MovieDetailParams(
                 title: widget.title,
                 metadataTitle: widget.metadataTitle,
                 category: widget.category,
                 server: originServer,
               )))
-            : const AsyncValue<MovieDetail?>.data(null));
+            : const AsyncValue<MovieDetail?>.data(null);
 
     // Para las Pel\u00EDculas de anime el detalle "principal" es el de Pel\u00EDcula
     // (runtime, plataformas, directores...); el de anime se usa solo para el tab
@@ -1410,9 +1429,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final resolvedKind = (detailData is AnimeDetail
             ? detailData.kind
             : (detailData is MovieDetail ? detailData.kind : null)) ??
+        widget.result?.kind ??
         widget.category;
     final isAnimeCategory = resolvedKind == 'anime';
-    final isMovieCategory = resolvedKind == 'movie' || _isMovieLikeTitle(widget.title);
+    final isMovieCategory = resolvedKind == 'movie' ||
+        widget.result?.kind?.toLowerCase() == 'movie' ||
+        _isMovieLikeTitle(widget.title);
     // categor\u00EDa efectiva: si el t\u00EDtulo es de Pel\u00EDcula pero lleg\u00F3 con category="all"
     // (p.ej. abierto desde la b\u00FAsqueda "Todo"), el provider debe tratarlo como movie
     // y no como serie, o descartaría los resultados de movie y pediría episodios de la
@@ -1475,19 +1497,20 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         : sourcesParams;
     final seasonSources = ref.watch(discoveredSourcesProvider(seasonSourcesParams));
     ref.listen(discoveredSourcesProvider(seasonSourcesParams), (prev, next) {
-      if (next.isNotEmpty) {
+      final nextList = next;
+      if (nextList != null && nextList.isNotEmpty) {
         // AnimeJara/GnulaHD se derivan del mismo `next` que se está fusionando.
         // Antes se derivaba de `searchSources`, que por el timing asíncrono de los
         // providers puede no haber resuelto AJR todavía cuando este listener
         // dispara, dejando a AnimeJara fuera del player (veías 4 de 5).
-        final ajr = next
+        final ajr = nextList
             .where((s) => _isSeasonUnified(s.source))
             .map((s) => _withSeasonUnified(s, effectiveSeasonForUrl))
             .where((s) => s != null)
             .cast<SearchResult>()
             .toList();
         final merged = <SearchResult>[
-          ...next.where((s) => !_isSeasonUnified(s.source)),
+          ...nextList.where((s) => !_isSeasonUnified(s.source)),
           ...ajr,
         ];
         ref.read(activeContentSourcesProvider.notifier).state = merged;
@@ -1507,7 +1530,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     // temporada de forma determinística (sin él, un título base ambiguo como
     // "Youjo Senki" devuelve S1 o S2 según el ranking de AniList).
     final seasonAnimeDetailAsync = seasonTitle != null
-        ? ref.watch(animeDetailProvider(AnimeDetailParams(title: seasonTitle, metadataTitle: seasonTitle, year: null, season: _selectedSeason)))
+        ? ref.watch(animeDetailProvider(AnimeDetailParams(title: seasonTitle, metadataTitle: seasonTitle, year: null, season: _selectedSeason, kind: null)))
         : animeDetailAsync;
     final displayAnimeDetailAsync = seasonSwitched
         ? (seasonAnimeDetailAsync.valueOrNull != null ? seasonAnimeDetailAsync : animeDetailAsync)
@@ -1750,6 +1773,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               movieDetailAsync: movieDetailAsync, 
               currentSource: currentSource, 
               sources: activeSources, 
+              season: currentSeason, 
               sourceRating: currentSource?.score, 
               showRatingSkeleton: currentSource?.score == null && detailLoading, 
               // El spinner del botón "Reproducir" se detiene en cuanto llega el
@@ -1805,7 +1829,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               ],
               Container(padding: const EdgeInsets.symmetric(vertical: 16), decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12), bottom: BorderSide(color: Colors.white12))), child: Row(children: [
                 Expanded(child: Column(children: [const Text('Lanzamientos', style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text((detailData is AnimeDetail ? detailData.firstAirDate : (detailData is MovieDetail ? detailData.releaseDate : null))?.split('-').first ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))])),
-                Expanded(child: Column(children: [Text(_isMovieContent(detailData) ? 'Duraci\u00F3n' : 'Temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text(_isMovieContent(detailData) ? _formatRuntime(_getRuntime(detailData)) : '$totalSeasons', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))]))
+                Expanded(child: Column(children: [Text(isMovieCategory ? 'Duraci\u00F3n' : 'Temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text(isMovieCategory ? _formatRuntime(_getRuntime(detailData)) : (detailData == null ? 'N/A' : '$totalSeasons'), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))]))
               ])),
               const SizedBox(height: 24),
             ]))),
@@ -2838,7 +2862,7 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
 
   @override
   Widget build(BuildContext context) {
-    final params = GalleryParams(kind: widget.kind, title: widget.title, year: widget.year);
+    final params = GalleryParams(kind: widget.kind, title: _stripSeasonSuffix(widget.title), year: widget.year);
     final async = ref.watch(galleryProvider(params));
     final isMobile = ResponsiveUtils.isMobile(context);
 

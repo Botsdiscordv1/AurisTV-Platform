@@ -448,11 +448,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
 
     SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    
+    // Senior Immersive Fix: Usar immersiveSticky para máxima compatibilidad con notch
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       systemNavigationBarColor: Colors.transparent,
       systemNavigationBarDividerColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
     ));
     
     ScreenBrightnessController.getBrightness().then((b) {

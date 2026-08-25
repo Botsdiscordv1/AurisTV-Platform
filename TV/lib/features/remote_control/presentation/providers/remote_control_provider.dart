@@ -17,12 +17,14 @@ final remoteControlProvider = StateNotifierProvider<RemoteControlNotifier, Remot
 class RemoteControlState {
   final List<RemoteDevice> availableDevices;
   final RemoteDevice? currentDevice;
+  final String? activeTargetDeviceId;
   final bool isInitialized;
   final Map<String, dynamic>? lastReceivedCommand;
 
   RemoteControlState({
     this.availableDevices = const [],
     this.currentDevice,
+    this.activeTargetDeviceId,
     this.isInitialized = false,
     this.lastReceivedCommand,
   });
@@ -30,12 +32,14 @@ class RemoteControlState {
   RemoteControlState copyWith({
     List<RemoteDevice>? availableDevices,
     RemoteDevice? currentDevice,
+    String? activeTargetDeviceId,
     bool? isInitialized,
     Map<String, dynamic>? lastReceivedCommand,
   }) {
     return RemoteControlState(
       availableDevices: availableDevices ?? this.availableDevices,
       currentDevice: currentDevice ?? this.currentDevice,
+      activeTargetDeviceId: activeTargetDeviceId ?? this.activeTargetDeviceId,
       isInitialized: isInitialized ?? this.isInitialized,
       lastReceivedCommand: lastReceivedCommand ?? this.lastReceivedCommand,
     );
@@ -131,6 +135,19 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
     await _purgeStaleSessions(user.id);
     _startHeartbeat();
     _subscribeToCommands();
+    _subscribeToDevices(user.id);
+  }
+
+  void _subscribeToDevices(String userId) {
+    _devicesSubscription?.cancel();
+    _devicesSubscription = _supabase
+        .from('remote_sessions')
+        .stream(primaryKey: ['device_id'])
+        .eq('user_id', userId)
+        .listen((data) {
+          final devices = data.map((d) => RemoteDevice.fromJson(d)).toList();
+          state = state.copyWith(availableDevices: devices);
+        });
   }
 
   Future<void> _purgeStaleSessions(String userId) async {
@@ -198,6 +215,31 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
   void _processCommand(Map<String, dynamic> command) {
     debugPrint('Received remote command: $command');
     state = state.copyWith(lastReceivedCommand: command);
+  }
+
+  void setActiveTarget(String? deviceId) {
+    state = state.copyWith(activeTargetDeviceId: deviceId);
+  }
+
+  Future<void> sendCommand(String targetId, String action, Map<String, dynamic>? data) async {
+    final currentDevice = state.currentDevice;
+    if (currentDevice == null) return;
+
+    try {
+      await _supabase.from('remote_sessions').update({
+        'last_command': {
+          'action': action,
+          'data': data ?? {},
+          'timestamp': DateTime.now().toIso8601String(),
+          'sender_id': currentDevice.id,
+        },
+      }).match({
+        'user_id': currentDevice.userId,
+        'device_id': targetId,
+      });
+    } catch (e) {
+      debugPrint('Error sending remote command: $e');
+    }
   }
 
   Future<void> updateStatus({

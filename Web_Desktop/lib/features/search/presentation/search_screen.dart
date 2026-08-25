@@ -90,8 +90,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final displayTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
     final metaTitle = result.metadataTitle ?? result.scrapedTitle ?? result.title;
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
+    final openCategory = result.kind?.toLowerCase() == 'movie' ? 'movie' : _selectedCategory;
     context.push(
-      '/content/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(_selectedCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
+      '/content/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(openCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
       extra: result,
     );
   }
@@ -279,10 +280,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           itemCount: results.length,
           itemBuilder: (context, index) {
             final result = results[index];
+            final info = _cardInfo(result);
             return FocusablePosterCard(
               title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
               posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
-              subtitle: _cardSubtitle(result),
+              badge: info['format'] as String?,
+              badgeColor: info['formatColor'] as Color?,
+              subtitle: info['status'] as String?,
+              subtitleColor: info['statusColor'] as Color?,
               onTap: () => _onContentTap(result),
             );
           },
@@ -389,25 +394,37 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
   return grouped.values.toList();
 }
 
-String _cardSubtitle(SearchResult result) {
+Map<String, dynamic> _cardInfo(SearchResult result) {
   final raw = result.quality.toUpperCase();
-  // Reemplaza la parte de IDIOMA ("TV ANIME • Sub Español") por el ESTADO de
-  // emisión: "TV ANIME • EN EMISION" / "TV ANIME • FINALIZADO".
-  final format = raw.contains('•') ? raw.split('•').first.trim() : (result.kind == 'movie' ? 'PELÍCULA' : 'TV ANIME');
+  // El formato va arriba a la derecha. Se prioriza el `type` del server
+  // (Película/TV/OVA/ONA/Especial), que es el clasificador fiable, frente a
+  // parsear `quality` (el meta de AV1 puede sobrescribirlo erróneamente).
+  final String typeLabel;
+  if (result.type != null && result.type!.isNotEmpty) {
+    final up = result.type!.toUpperCase();
+    typeLabel = up == 'TV' ? 'TV ANIME' : up;
+  } else {
+    typeLabel = raw.contains('•') ? raw.split('•').first.trim() : (result.kind == 'movie' ? 'PELÍCULA' : 'TV ANIME');
+  }
+  final format = typeLabel;
 
+  // El estado va abajo a la izquierda.
   String? statusLabel;
+  Color? statusColor;
   final s = (result.status ?? '').toLowerCase();
-  // "Próximamente" no se muestra en tarjetas de búsqueda: es contenido no
-  // disponible y una tarjeta de resultado implica reproducible. Si se quiere
-  // destacar, debe ser en una sección aparte de descubrimiento (trailer/metadata).
   if (s.contains('emisi')) {
-    statusLabel = 'EN EMISION';
+    statusLabel = 'EN EMISIÓN';
+    statusColor = const Color(0xFFEF7A1E); // AurisTV Brand Orange
   } else if (s.contains('finaliz') || s.contains('complet')) {
     statusLabel = 'FINALIZADO';
+    statusColor = Colors.black.withValues(alpha: 0.9);
   }
 
-  // Si no hay estado conocido, conserva el texto original (con el idioma).
-  if (statusLabel == null) return raw.isNotEmpty ? raw : '';
-  return '$format • $statusLabel';
+  return {
+    'format': format,
+    'formatColor': const Color(0xFF1976D2), // Azul
+    'status': statusLabel,
+    'statusColor': statusColor,
+  };
 }
 

@@ -80,15 +80,15 @@ class AurisRepositoryImpl implements AurisRepository {
   }
 
   @override
-  Future<SearchResponse> search(String category, String query, {int? year, String? server}) async {
+  Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase}) async {
     final normalized = _normalizeSearchCategory(category);
     if (server != null) {
-      return _searchOn(server, normalized, query, year: year);
+      return _searchOn(server, normalized, query, year: year, phase: phase);
     }
     if (normalized.toLowerCase() == 'all') {
-      return _searchAll(query, year);
+      return _searchAll(query, year, phase: phase);
     }
-    return _searchOn(ApiEndpoints.baseUrlForCategory(normalized), normalized, query, year: year);
+    return _searchOn(ApiEndpoints.baseUrlForCategory(normalized), normalized, query, year: year, phase: phase);
   }
 
   Future<SearchResponse> _searchOn(
@@ -96,9 +96,11 @@ class AurisRepositoryImpl implements AurisRepository {
     String category,
     String query, {
     int? year,
+    String? phase,
   }) async {
     final params = {'q': query};
     if (year != null) params['year'] = year.toString();
+    if (phase != null) params['phase'] = phase;
 
     final response = await _client.get(
       ApiEndpoints.searchByCategory(category),
@@ -112,7 +114,7 @@ class AurisRepositoryImpl implements AurisRepository {
     return SearchResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
-  Future<SearchResponse> _searchAll(String query, int? year) async {
+  Future<SearchResponse> _searchAll(String query, int? year, {String? phase}) async {
     Future<SearchResponse> guarded(
       Future<SearchResponse> Function() search) async {
       try {
@@ -123,9 +125,9 @@ class AurisRepositoryImpl implements AurisRepository {
     }
 
     final List<Future<SearchResponse>> futures = [
-      guarded(() => _searchOn(ApiEndpoints.animeBaseUrl, 'all', query, year: year)),
-      guarded(() => _searchOn(ApiEndpoints.moviesBaseUrl, 'all', query, year: year)),
-      guarded(() => _searchOn(ApiEndpoints.kdramasBaseUrl, 'all', query, year: year)),
+      guarded(() => _searchOn(ApiEndpoints.animeBaseUrl, 'all', query, year: year, phase: phase)),
+      guarded(() => _searchOn(ApiEndpoints.moviesBaseUrl, 'all', query, year: year, phase: phase)),
+      guarded(() => _searchOn(ApiEndpoints.kdramasBaseUrl, 'all', query, year: year, phase: phase)),
     ];
 
     final responses = await Future.wait(futures.map((f) => f.timeout(
@@ -176,12 +178,14 @@ class AurisRepositoryImpl implements AurisRepository {
     String? metadataTitle,
     int? year,
     int? season,
+    String? kind,
   }) async {
     final params = <String, dynamic>{'title': title};
     if (malId != null) params['malId'] = malId;
     if (metadataTitle != null) params['metadataTitle'] = metadataTitle;
     if (year != null) params['year'] = year;
     if (season != null) params['season'] = season;
+    if (kind != null) params['kind'] = kind;
     final response = await _client.get(
       ApiEndpoints.detailAnime,
       queryParameters: params,

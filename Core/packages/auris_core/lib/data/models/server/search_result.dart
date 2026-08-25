@@ -20,6 +20,7 @@ class SearchResult {
   final String? synopsis;
   final String? status;
   final String? kind;
+  final String? type;
   final int? season;
   final int? totalSeasons;
 
@@ -47,6 +48,7 @@ class SearchResult {
     this.synopsis,
     this.status,
     this.kind,
+    this.type,
     this.season,
     this.totalSeasons,
     this.sources = const [],
@@ -74,6 +76,7 @@ class SearchResult {
     String? synopsis,
     String? status,
     String? kind,
+    String? type,
     int? season,
     int? totalSeasons,
     List<SourceItem>? sources,
@@ -100,6 +103,7 @@ class SearchResult {
       synopsis: synopsis ?? this.synopsis,
       status: status ?? this.status,
       kind: kind ?? this.kind,
+      type: type ?? this.type,
       season: season ?? this.season,
       totalSeasons: totalSeasons ?? this.totalSeasons,
       sources: sources ?? this.sources,
@@ -129,6 +133,7 @@ class SearchResult {
       synopsis: json['synopsis'] as String?,
       status: json['status'] as String?,
       kind: json['kind'] as String?,
+      type: json['type'] as String?,
       season: _parseInt(json['season']),
       totalSeasons: _parseInt(json['totalSeasons']),
       sources: (json['sources'] as List<dynamic>?)
@@ -175,6 +180,7 @@ class SearchResult {
     'synopsis': synopsis,
     'status': status,
     'kind': kind,
+    'type': type,
     'season': season,
     'totalSeasons': totalSeasons,
     'sources': sources.map((e) => e.toJson()).toList(),

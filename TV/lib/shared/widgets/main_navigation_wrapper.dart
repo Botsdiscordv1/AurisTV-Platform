@@ -21,7 +21,7 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: Colors.black,
       body: widget.navigationShell,
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +10,7 @@ import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
 import 'providers/search_provider.dart';
 import 'widgets/search_widgets.dart';
+import 'widgets/tv_keyboard.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -32,9 +34,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       setState(() => _isFocused = _focusNode.hasFocus);
     });
     // En móvil, el teclado se abre automático según la spec
+    // En TV/Desktop, el foco inicial debe estar en el teclado virtual
     Future.delayed(Duration.zero, () {
-      if (mounted && ResponsiveUtils.isMobile(context)) {
-        FocusScope.of(context).requestFocus(_focusNode);
+      if (mounted) {
+        if (ResponsiveUtils.isMobile(context)) {
+          FocusScope.of(context).requestFocus(_focusNode);
+        } else {
+          // El primer elemento del teclado virtual tomará el foco automáticamente 
+          // si es el primer FocusNode en el árbol.
+        }
       }
     });
   }
@@ -90,8 +98,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final displayTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
     final metaTitle = result.metadataTitle ?? result.scrapedTitle ?? result.title;
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
+    final openCategory = result.kind?.toLowerCase() == 'movie' ? 'movie' : _selectedCategory;
     context.push(
-      '/content/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(_selectedCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
+      '/content/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(openCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
       extra: result,
     );
   }
@@ -104,96 +113,212 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
     );
 
+    final isMobile = ResponsiveUtils.isMobile(context);
+    
+    // Si es móvil, mantenemos el diseño anterior más optimizado para touch
+    if (isMobile) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: _buildMobileAppBar(),
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _currentQuery.isEmpty 
+              ? _buildPreSearchState() 
+              : _buildResultsState(resultsAsync),
+        ),
+      );
+    }
+
+    // DISEÑO TV / DESKTOP (Basado en la imagen de referencia)
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0B0B0D),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        toolbarHeight: 80,
-        title: Row(
-          children: [
-            // BARRA DE BÚSQUEDA
-            Expanded(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 46,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.05),
-                    width: 1.5,
-                  ),
+      backgroundColor: Colors.black,
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. COLUMNA IZQUIERDA: Teclado y Sugerencias
+          Padding(
+            padding: const EdgeInsets.fromLTRB(60, 46, 0, 20), // Reducido en 40px (86 -> 46)
+            child: SizedBox(
+              width: 250, 
+              child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TVKeyboard(
+                  currentQuery: _currentQuery,
+                  onKeyTap: (key) {
+                    final newQuery = _searchController.text + key;
+                    _searchController.text = newQuery;
+                    _onSearchChanged(newQuery);
+                  },
+                  onBackspace: () {
+                    if (_searchController.text.isNotEmpty) {
+                      final newQuery = _searchController.text.substring(0, _searchController.text.length - 1);
+                      _searchController.text = newQuery;
+                      _onSearchChanged(newQuery);
+                    }
+                  },
+                  onClear: _clearSearch,
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _focusNode,
-                  textAlign: TextAlign.left, // Texto alineado a la izquierda
-                  textAlignVertical: TextAlignVertical.center, // Centrado vertical respecto al icono
-                  style: const TextStyle(fontSize: 15, color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: _dynamicPlaceholder,
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
-                    prefixIcon: Icon(Icons.search_rounded, 
-                        color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
-                        size: 20),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    isDense: true, // Ayuda al centrado vertical real
-                    contentPadding: EdgeInsets.zero, // Eliminamos paddings extra que rompen el centro vertical
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
-                            onPressed: _clearSearch,
-                          )
-                        : null,
-                  ),
-                  onChanged: _onSearchChanged,
-                  onSubmitted: _onSearchSubmitted,
+                const SizedBox(height: 12), // Reducido un poco más
+                Expanded(
+                  child: _buildTVSuggestions(),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: 12),
-            
-            // DROPDOWN DE FILTRO
-            Container(
+          ),
+        ),
+
+          // 2. COLUMNA DERECHA: Query y Resultados
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header con el query actual o "Top Searches"
+                // El texto queda ARRIBA del teclado y de los posters
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 40, 0), // Reducido en 40px (60 -> 20)
+                  child: SizedBox(
+                    height: 40, // Reducimos altura para acercarlo a las cards
+                    child: Text(
+                      _currentQuery.isEmpty ? "Lo más buscado" : _currentQuery,
+                      style: TextStyle(
+                        color: _currentQuery.isEmpty ? Colors.white24 : Colors.white,
+                        fontSize: _currentQuery.isEmpty ? 20 : 28, // Reducido de 36 a 28
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1,
+                        height: 1.0,
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Grid de resultados (Su borde superior coincide con el del teclado)
+                Expanded(
+                  child: _buildResultsState(resultsAsync, isTV: true),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildMobileAppBar() {
+    return AppBar(
+      backgroundColor: const Color(0xFF0B0B0D),
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      toolbarHeight: 80,
+      title: Row(
+        children: [
+          Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               height: 46,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedCategory,
-                  dropdownColor: const Color(0xFF1A1A1A),
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38, size: 20),
-                  borderRadius: BorderRadius.circular(12),
-                  style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Todo')),
-                    DropdownMenuItem(value: 'peliculas', child: Text('Películas')),
-                    DropdownMenuItem(value: 'series', child: Text('Series')),
-                    DropdownMenuItem(value: 'anime', child: Text('Anime')),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) setState(() => _selectedCategory = v);
-                  },
+                border: Border.all(
+                  color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.05),
+                  width: 1.5,
                 ),
               ),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _focusNode,
+                textAlign: TextAlign.left,
+                textAlignVertical: TextAlignVertical.center,
+                style: const TextStyle(fontSize: 15, color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: _dynamicPlaceholder,
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, 
+                      color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
+                      size: 20),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+                          onPressed: _clearSearch,
+                        )
+                      : null,
+                ),
+                onChanged: _onSearchChanged,
+                onSubmitted: _onSearchSubmitted,
+              ),
             ),
+          ),
+          const SizedBox(width: 12),
+          _buildFilterDropdown(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterDropdown() {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedCategory,
+          dropdownColor: const Color(0xFF1A1A1A),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38, size: 20),
+          borderRadius: BorderRadius.circular(12),
+          style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+          items: const [
+            DropdownMenuItem(value: 'all', child: Text('Todo')),
+            DropdownMenuItem(value: 'peliculas', child: Text('Películas')),
+            DropdownMenuItem(value: 'series', child: Text('Series')),
+            DropdownMenuItem(value: 'anime', child: Text('Anime')),
           ],
+          onChanged: (v) {
+            if (v != null) setState(() => _selectedCategory = v);
+          },
         ),
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: _currentQuery.isEmpty 
-            ? _buildPreSearchState() 
-            : _buildResultsState(resultsAsync),
+    );
+  }
+
+  Widget _buildTVSuggestions() {
+    final history = ref.watch(searchHistoryProvider);
+    
+    // Lista base de sugerencias (Historial + Mock data de la imagen para el look & feel)
+    final List<String> baseSuggestions = [
+      ...history.map((e) => e.query),
+      "Ryan Gosling", "Russell Crowe", "Robert Carlyle", "Reese Witherspoon", 
+      "Robin Williams", "Rob Schneider", "Ryan Reynolds"
+    ];
+
+    // Si hay query, filtramos para que parezca que el sistema está sugiriendo en tiempo real
+    final List<String> suggestions = _currentQuery.isEmpty 
+        ? baseSuggestions.take(8).toList()
+        : baseSuggestions
+            .where((s) => s.toLowerCase().startsWith(_currentQuery.toLowerCase()))
+            .take(8)
+            .toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(left: 10), // Alineado exactamente con el padding interno del teclado (10px)
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...suggestions.map((s) => _TVSuggestionItem(
+            label: s,
+            onTap: () => _performSearch(s),
+          )),
+        ],
       ),
     );
   }
@@ -250,7 +375,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Widget _buildResultsState(AsyncValue<SearchResponse> resultsAsync) {
+  Widget _buildResultsState(AsyncValue<SearchResponse> resultsAsync, {bool isTV = false}) {
+    if (isTV && _currentQuery.isEmpty) {
+      final trendingAsync = ref.watch(searchTrendingProvider);
+      return _buildTrendingGrid(trendingAsync);
+    }
+
     return resultsAsync.when(
       data: (response) {
         final results = _deduplicate(response.results);
@@ -260,7 +390,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         final screenWidth = MediaQuery.sizeOf(context).width;
 
         int crossAxisCount = 3;
-        if (!isMobile) {
+        if (isTV) {
+          // En TV usamos 3 columnas de posters horizontales
+          crossAxisCount = 3;
+        } else if (!isMobile) {
           if (screenWidth > 1800) crossAxisCount = 8;
           else if (screenWidth > 1400) crossAxisCount = 7;
           else if (screenWidth > 1000) crossAxisCount = 6;
@@ -270,34 +403,76 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         return GridView.builder(
           key: const ValueKey('results_grid'),
           padding: EdgeInsets.fromLTRB(
-            isMobile ? 16 : 24, 8, isMobile ? 16 : 24, 40
+            isMobile ? 16 : (isTV ? 20 : 40), 0, isMobile ? 16 : 40, 40
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: isMobile ? 0.54 : 0.58, // Senior Fix: Ajustado a 0.58 para eliminar el overflow de 12px
-            crossAxisSpacing: isMobile ? 12 : 20, 
-            mainAxisSpacing: isMobile ? 12 : 16, 
+            childAspectRatio: isTV ? 1.15 : (isMobile ? 0.54 : 0.68), // Mayor espacio vertical para TV
+            crossAxisSpacing: isMobile ? 12 : 16, 
+            mainAxisSpacing: isMobile ? 12 : 24, 
           ),
           itemCount: results.length,
           itemBuilder: (context, index) {
             final result = results[index];
+            final info = _cardInfo(result);
             return FocusablePosterCard(
               title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
               posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
-              subtitle: _cardSubtitle(result),
+              badge: info['format'] as String?,
+              badgeColor: info['formatColor'] as Color?,
+              subtitle: info['status'] as String?,
+              subtitleColor: info['statusColor'] as Color?,
+              activeBorderColor: const Color(0xFFE91E63),
+              showInfo: true, // Títulos activados
+              aspectRatio: isTV ? 1.5 : 2/3,
               onTap: () => _onContentTap(result),
             );
           },
         );
       },
       loading: () => const Center(
-        key: ValueKey('search_loading'),
-        child: CircularProgressIndicator(color: Color(0xFFEF7A1E))
+        child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
       ),
       error: (err, _) => Center(
         key: const ValueKey('search_error'),
         child: Text('Error: $err', style: const TextStyle(color: Colors.white54))
       ),
+    );
+  }
+
+  Widget _buildTrendingGrid(AsyncValue<List<SearchResult>> trendingAsync) {
+    return trendingAsync.when(
+      data: (items) {
+        return GridView.builder(
+          key: const ValueKey('trending_grid'),
+          padding: const EdgeInsets.fromLTRB(20, 0, 40, 40),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            childAspectRatio: 1.15, // Mayor espacio vertical para TV
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 24,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final result = items[index];
+            final info = _cardInfo(result);
+            return FocusablePosterCard(
+              title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
+              posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
+              badge: info['format'] as String?,
+              badgeColor: info['formatColor'] as Color?,
+              subtitle: info['status'] as String?,
+              subtitleColor: info['statusColor'] as Color?,
+              activeBorderColor: const Color(0xFFE91E63),
+              showInfo: true, // Títulos activados
+              aspectRatio: 1.5,
+              onTap: () => _onContentTap(result),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+      error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white24))),
     );
   }
 
@@ -397,25 +572,87 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
   return grouped.values.toList();
 }
 
-String _cardSubtitle(SearchResult result) {
+Map<String, dynamic> _cardInfo(SearchResult result) {
   final raw = result.quality.toUpperCase();
-  // Reemplaza la parte de IDIOMA ("TV ANIME • Sub Español") por el ESTADO de
-  // emisión: "TV ANIME • EN EMISION" / "TV ANIME • FINALIZADO".
-  final format = raw.contains('•') ? raw.split('•').first.trim() : (result.kind == 'movie' ? 'PELÍCULA' : 'TV ANIME');
+  // El formato va arriba a la derecha. Se prioriza el `type` del server
+  // (Película/TV/OVA/ONA/Especial), que es el clasificador fiable, frente a
+  // parsear `quality` (el meta de AV1 puede sobrescribirlo erróneamente).
+  final String typeLabel;
+  if (result.type != null && result.type!.isNotEmpty) {
+    final up = result.type!.toUpperCase();
+    typeLabel = up == 'TV' ? 'TV ANIME' : up;
+  } else {
+    typeLabel = raw.contains('•') ? raw.split('•').first.trim() : (result.kind == 'movie' ? 'PELÍCULA' : 'TV ANIME');
+  }
+  final format = typeLabel;
 
+  // El estado va abajo a la izquierda.
   String? statusLabel;
+  Color? statusColor;
   final s = (result.status ?? '').toLowerCase();
-  // "Próximamente" no se muestra en tarjetas de búsqueda: es contenido no
-  // disponible y una tarjeta de resultado implica reproducible. Si se quiere
-  // destacar, debe ser en una sección aparte de descubrimiento (trailer/metadata).
   if (s.contains('emisi')) {
-    statusLabel = 'EN EMISION';
+    statusLabel = 'EN EMISIÓN';
+    statusColor = const Color(0xFFEF7A1E); // AurisTV Brand Orange
   } else if (s.contains('finaliz') || s.contains('complet')) {
     statusLabel = 'FINALIZADO';
+    statusColor = Colors.black.withOpacity(0.9);
   }
 
-  // Si no hay estado conocido, conserva el texto original (con el idioma).
-  if (statusLabel == null) return raw.isNotEmpty ? raw : '';
-  return '$format • $statusLabel';
+  return {
+    'format': format,
+    'formatColor': const Color(0xFF1976D2), // Azul
+    'status': statusLabel,
+    'statusColor': statusColor,
+  };
 }
+
+class _TVSuggestionItem extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _TVSuggestionItem({required this.label, required this.onTap});
+
+  @override
+  State<_TVSuggestionItem> createState() => _TVSuggestionItemState();
+}
+
+class _TVSuggestionItemState extends State<_TVSuggestionItem> {
+  bool _isFocused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (focused) => setState(() => _isFocused = focused),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.select) {
+            widget.onTap();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 8), // Padding reducido para controlarlo vía height
+          child: Text(
+            widget.label,
+            maxLines: 1, // Una sola línea
+            overflow: TextOverflow.ellipsis, // Puntos suspensivos si es largo
+            style: TextStyle(
+              color: _isFocused ? Colors.white : Colors.white70,
+              fontSize: 15, // Reducido de 16 a 15 para mejor jerarquía
+              height: 1.8, // Interlineado solicitado
+              fontWeight: _isFocused ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 

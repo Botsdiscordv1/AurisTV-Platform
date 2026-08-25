@@ -13,7 +13,7 @@ import '../models/server/gallery.dart';
 import '../models/media_item.dart';
 
 abstract class AurisRepository {
-  Future<SearchResponse> search(String category, String query, {int? year, String? server});
+  Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase});
   Future<SearchResponse> searchAnimeVariants({
     required String q,
     String? display,
@@ -28,6 +28,7 @@ abstract class AurisRepository {
     String? metadataTitle,
     int? year,
     int? season,
+    String? kind,
   });
   Future<MovieDetail?> getMovieDetail({
     required String title,

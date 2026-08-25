@@ -31,6 +31,7 @@ export 'core/playback/media_category.dart';
 export 'core/playback/playback_policy.dart';
 export 'core/playback/playback_policy_resolver.dart';
 export 'data/providers/content_providers.dart';
+export 'data/providers/search_progressive.dart';
 export 'data/providers/auth_provider.dart';
 export 'data/providers/playback_history_provider.dart';
 export 'data/providers/player_provider.dart';

@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_core/auris_core.dart' hide MockData;
 import '../../../data/datasources/mock_data.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/web_utils.dart';

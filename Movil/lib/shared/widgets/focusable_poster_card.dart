@@ -4,33 +4,44 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'marquee_text.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 Color _colorFromString(String s) {
   final hash = s.codeUnits.fold<int>(0, (h, c) => h * 31 + c);
+  // Paleta AurisTV: Naranjas, Grises Pro y Azules Cine
   const colors = [
-    Color(0xFFE57373), Color(0xFFF06292), Color(0xFFBA68C8),
-    Color(0xFF64B5F6), Color(0xFF4FC3F7), Color(0xFF4DD0E1),
-    Color(0xFF81C784), Color(0xFFAED581), Color(0xFFFFD54F),
-    Color(0xFFFF8A65), Color(0xFFA1887F), Color(0xFF90A4AE),
+    Color(0xFFEF7A1E), // Brand Orange
+    Color(0xFF2A2A2A), // Deep Grey
+    Color(0xFF1E1E26), // Blue Tint Grey
+    Color(0xFF3D1D0A), // Dark Orange
+    Color(0xFF1976D2), // Cinema Blue
   ];
   return colors[hash.abs() % colors.length];
 }
 
 Widget _letterPlaceholder(String title) {
-  final letter = title.isNotEmpty ? title[0].toUpperCase() : '?';
-  final color = _colorFromString(title);
+  final baseColor = _colorFromString(title);
+  
   return Container(
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [color, color.withOpacity(0.6)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+      color: const Color(0xFF0D0D0D),
+      gradient: RadialGradient(
+        center: Alignment.center,
+        radius: 1.2,
+        colors: [
+          baseColor.withOpacity(0.15),
+          const Color(0xFF0D0D0D),
+        ],
       ),
     ),
     child: Center(
-      child: Text(
-        letter,
-        style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900),
+      child: Opacity(
+        opacity: 0.15, // Un poco más visible ahora que no hay letra
+        child: SvgPicture.asset(
+          'assets/icons/auris-tv-icon.svg',
+          width: 80, // Tamaño más equilibrado como icono central
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        ),
       ),
     ),
   );
@@ -43,7 +54,9 @@ class FocusablePosterCard extends StatefulWidget {
   final String? badge;
   final Widget? badgeOverlay;
   final String? subtitle;
+  final Color? subtitleColor;
   final String? rating;
+  final Color? badgeColor;
   final bool showInfo;
 
   const FocusablePosterCard({
@@ -54,7 +67,9 @@ class FocusablePosterCard extends StatefulWidget {
     this.badge,
     this.badgeOverlay,
     this.subtitle,
+    this.subtitleColor,
     this.rating,
+    this.badgeColor,
     this.showInfo = true,
   });
 
@@ -130,30 +145,35 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                           Positioned(top: 8, left: 8, child: widget.badgeOverlay!)
                         else if (widget.badge != null)
                           Positioned(
-                            top: 8, left: 8,
+                            top: 0, right: 0,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: const Color(0xFFFFC107), width: 1.2),
+                                color: widget.badgeColor ?? Colors.black.withOpacity(0.8),
+                                borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8)),
+                                border: Border.all(color: Colors.white12, width: 0.5),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.window_rounded, color: Color(0xFFFFC107), size: 10),
-                                  const SizedBox(width: 4),
-                                  Text(widget.badge!, style: const TextStyle(color: Color(0xFFFFC107), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                                ],
+                              child: Text(
+                                widget.badge!, 
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white, 
+                                  fontSize: 10, 
+                                  fontWeight: FontWeight.w800, 
+                                  letterSpacing: 0.5
+                                )
                               ),
                             ),
                           ),
-                        if (widget.rating != null)
+                        if (widget.rating != null && widget.badge == null)
                           Positioned(
                             top: 8, right: 8,
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.8), 
+                                borderRadius: BorderRadius.circular(4), 
+                                border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 0.8)
+                              ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -167,20 +187,23 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                         // Senior Fix: Integrar Subtítulo como Badge en la parte inferior del póster
                         if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
                           Positioned(
-                            bottom: 8, left: 8,
+                            bottom: 0, left: 0,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.75),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.white10, width: 0.5),
+                                color: widget.subtitleColor ?? Colors.black.withOpacity(0.85),
+                                borderRadius: const BorderRadius.only(topRight: Radius.circular(8)),
+                                border: Border.all(color: Colors.white12, width: 0.5),
                               ),
                               child: Text(
                                 widget.subtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.poppins(
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: Colors.white,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.3,
                                 ),
                               ),
                             ),

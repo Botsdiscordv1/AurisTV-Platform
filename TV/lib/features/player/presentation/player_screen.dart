@@ -29,7 +29,7 @@ import '../../../core/utils/web_utils.dart';
 
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
 import '../../remote_control/data/models/remote_device.dart';
-import '../../remote_control/presentation/widgets/device_selector_dialog.dart';
+// import '../../remote_control/presentation/widgets/device_selector_dialog.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final String contentId;
@@ -426,6 +426,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Map<String, String> _lastVideoHeaders = const {};
 
   static const _volumeControlChannel = MethodChannel('auristv/volume');
+
+  /// Activa/desactiva la intercepción nativa de teclas de volumen.
+  /// En TV no hay handler nativo (el volumen lo maneja el sistema o el remoto IR
+  /// de la TV certificada), así que se ignora silenciosamente en vez de lanzar
+  /// MissingPluginException.
+  Future<void> _setVolumeIntercept(bool enabled) async {
+    try {
+      await _volumeControlChannel.invokeMethod('setIntercept', {'enabled': enabled});
+    } catch (_) {
+      // No-op en plataformas sin handler nativo (TV).
+    }
+  }
   
   @override
   void initState() {
@@ -463,7 +475,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       VolumeController.instance.showSystemUI = false;
       
       // Senior Shield: Activar la intercepción nativa inmediatamente al entrar
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true});
+      _setVolumeIntercept(true);
 
       _volumeSubscription = VolumeController.instance.addListener((v) {
         // Senior Elite Sync: Escudo de 1.5s para evitar el "eco" del hardware
@@ -556,11 +568,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       // Senior Shield: Si el usuario minimiza la app o apaga la pantalla, 
       // restauramos la UI del sistema para no "secuestrar" los botones de volumen fuera del player.
       VolumeController.instance.showSystemUI = true;
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      _setVolumeIntercept(false);
     } else if (state == AppLifecycleState.resumed) {
       // Al volver al player, retomamos el control total de la interfaz de volumen.
       VolumeController.instance.showSystemUI = false;
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true});
+      _setVolumeIntercept(true);
     }
   }
 
@@ -867,7 +879,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               title: Text(
                 label,
                 style: TextStyle(
-                  color: isCurrent ? Colors.white : (isAvailable ? Colors.white70 : Colors.white24),
+                  color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white70 : Colors.white24),
                   fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -2513,7 +2525,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     if (_isMobileDevice && _isExiting) {
       VolumeController.instance.showSystemUI = true;
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      _setVolumeIntercept(false);
     }
     _posSubscription?.cancel();
     _bufferingSubscription?.cancel();
@@ -2550,7 +2562,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (kIsWeb) {
       setAppFullscreen(false);
     } else if (_isMobileDevice) {
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      _setVolumeIntercept(false);
     }
     
     _showNextNotifier.dispose();
@@ -2625,7 +2637,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     // 2. Forzar restauración del sistema (Orientación + UI)
     if (_isMobileDevice) {
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      _setVolumeIntercept(false);
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       VolumeController.instance.showSystemUI = true;

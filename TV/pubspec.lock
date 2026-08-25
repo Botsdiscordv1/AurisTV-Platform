@@ -76,7 +76,7 @@ packages:
   auris_core:
     dependency: "direct main"
     description:
-      path: "../AurisTV/packages/auris_core"
+      path: "../Core/packages/auris_core"
       relative: true
     source: path
     version: "0.0.1"
@@ -1591,7 +1591,7 @@ packages:
   youtube_player_iframe_web:
     dependency: "direct overridden"
     description:
-      path: "../AurisTV/packages/youtube_player_iframe_web"
+      path: "../Core/packages/youtube_player_iframe_web"
       relative: true
     source: path
     version: "3.1.3"

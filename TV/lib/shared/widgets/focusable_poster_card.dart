@@ -4,33 +4,44 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'marquee_text.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 Color _colorFromString(String s) {
   final hash = s.codeUnits.fold<int>(0, (h, c) => h * 31 + c);
+  // Paleta AurisTV: Naranjas, Grises Pro y Azules Cine
   const colors = [
-    Color(0xFFE57373), Color(0xFFF06292), Color(0xFFBA68C8),
-    Color(0xFF64B5F6), Color(0xFF4FC3F7), Color(0xFF4DD0E1),
-    Color(0xFF81C784), Color(0xFFAED581), Color(0xFFFFD54F),
-    Color(0xFFFF8A65), Color(0xFFA1887F), Color(0xFF90A4AE),
+    Color(0xFFEF7A1E), // Brand Orange
+    Color(0xFF2A2A2A), // Deep Grey
+    Color(0xFF1E1E26), // Blue Tint Grey
+    Color(0xFF3D1D0A), // Dark Orange
+    Color(0xFF1976D2), // Cinema Blue
   ];
   return colors[hash.abs() % colors.length];
 }
 
 Widget _letterPlaceholder(String title) {
-  final letter = title.isNotEmpty ? title[0].toUpperCase() : '?';
-  final color = _colorFromString(title);
+  final baseColor = _colorFromString(title);
+  
   return Container(
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [color, color.withOpacity(0.6)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+      color: const Color(0xFF0D0D0D),
+      gradient: RadialGradient(
+        center: Alignment.center,
+        radius: 1.2,
+        colors: [
+          baseColor.withOpacity(0.15),
+          const Color(0xFF0D0D0D),
+        ],
       ),
     ),
     child: Center(
-      child: Text(
-        letter,
-        style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900),
+      child: Opacity(
+        opacity: 0.15, // Un poco más visible ahora que no hay letra
+        child: SvgPicture.asset(
+          'assets/icons/auris-tv-icon.svg',
+          width: 80, // Tamaño más equilibrado como icono central
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        ),
       ),
     ),
   );
@@ -43,8 +54,12 @@ class FocusablePosterCard extends StatefulWidget {
   final String? badge;
   final Widget? badgeOverlay;
   final String? subtitle;
+  final Color? subtitleColor;
   final String? rating;
+  final Color? badgeColor;
   final bool showInfo;
+  final Color? activeBorderColor;
+  final double aspectRatio;
 
   const FocusablePosterCard({
     super.key,
@@ -54,8 +69,12 @@ class FocusablePosterCard extends StatefulWidget {
     this.badge,
     this.badgeOverlay,
     this.subtitle,
+    this.subtitleColor,
     this.rating,
+    this.badgeColor,
     this.showInfo = true,
+    this.activeBorderColor,
+    this.aspectRatio = 2 / 3,
   });
 
   @override
@@ -106,98 +125,136 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               AspectRatio(
-                aspectRatio: 2 / 3,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: _isActive
-                        ? Border.all(color: Colors.white, width: 1.5)
-                        : Border.all(color: Colors.white12, width: 1),
-                    boxShadow: _isActive
-                        ? [BoxShadow(color: Colors.white.withOpacity(0.12), blurRadius: 10, spreadRadius: 0)]
-                        : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10.5), // Ajustado para encajar con el borde externo
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        AnimatedScale(
-                          scale: _isActive ? 1.12 : 1.0,
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeOutCubic,
-                          child: CachedNetworkImage(
-                            imageUrl: widget.posterUrl,
-                            fit: BoxFit.cover,
-                            memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
-                            filterQuality: FilterQuality.medium,
-                            placeholder: (context, url) => _letterPlaceholder(widget.title),
-                            errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
-                          ),
-                        ),
-                        if (widget.badgeOverlay != null)
-                          Positioned(top: 8, left: 8, child: widget.badgeOverlay!)
-                        else if (widget.badge != null)
-                          Positioned(
-                            top: 8, left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: const Color(0xFFFFC107), width: 1.2),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.window_rounded, color: Color(0xFFFFC107), size: 10),
-                                  const SizedBox(width: 4),
-                                  Text(widget.badge!, style: const TextStyle(color: Color(0xFFFFC107), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-                                ],
+                aspectRatio: widget.aspectRatio,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 1. EL POSTER (Contenido Base)
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: _isActive
+                            ? [BoxShadow(color: (widget.activeBorderColor ?? Colors.white).withOpacity(0.12), blurRadius: 12, spreadRadius: 1)]
+                            : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            AnimatedScale(
+                              scale: _isActive ? 1.12 : 1.0,
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOutCubic,
+                              child: CachedNetworkImage(
+                                imageUrl: widget.posterUrl,
+                                fit: BoxFit.cover,
+                                memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
+                                filterQuality: FilterQuality.medium,
+                                placeholder: (context, url) => _letterPlaceholder(widget.title),
+                                errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
                               ),
                             ),
-                          ),
-                        if (widget.rating != null)
-                          Positioned(
-                            top: 8, right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.star, color: Color(0xFFFFC107), size: 10),
-                                  const SizedBox(width: 4),
-                                  Text(widget.rating!, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        // Senior Fix: Integrar Subtítulo como Badge en la parte inferior del póster
-                        if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
-                          Positioned(
-                            bottom: 8, left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.75),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.white10, width: 0.5),
-                              ),
-                              child: Text(
-                                widget.subtitle!,
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
+                            // Degradado inferior para legibilidad de subtítulos/badges
+                            Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [Colors.transparent, Colors.black.withOpacity(0.6)],
+                                    stops: const [0.7, 1.0],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    
+                    // 2. EL BORDE (Capa Superior para evitar Shifting)
+                    IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _isActive ? (widget.activeBorderColor ?? Colors.white) : Colors.white12, 
+                            width: _isActive ? 2.0 : 1.0, // Idéntico a Home
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // 3. OVERLAYS (Badges, Ratings, etc)
+                    if (widget.badgeOverlay != null)
+                      Positioned(top: 8, left: 8, child: widget.badgeOverlay!)
+                    else if (widget.badge != null)
+                      Positioned(
+                        top: 0, right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: widget.badgeColor ?? Colors.black.withOpacity(0.8),
+                            borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8), topRight: Radius.circular(11)),
+                            border: Border.all(color: Colors.white12, width: 0.5),
+                          ),
+                          child: Text(
+                            widget.badge!, 
+                            style: GoogleFonts.poppins(
+                              color: Colors.white, 
+                              fontSize: 10, 
+                              fontWeight: FontWeight.w800, 
+                              letterSpacing: 0.5
+                            )
+                          ),
+                        ),
+                      ),
+                    if (widget.rating != null && widget.badge == null)
+                      Positioned(
+                        top: 8, right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.8), 
+                            borderRadius: BorderRadius.circular(4), 
+                            border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 0.8)
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.star, color: Color(0xFFFFC107), size: 10),
+                              const SizedBox(width: 4),
+                              Text(widget.rating!, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
+                      Positioned(
+                        bottom: 0, left: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: widget.subtitleColor ?? Colors.black.withOpacity(0.85),
+                            borderRadius: const BorderRadius.only(topRight: Radius.circular(8), bottomLeft: Radius.circular(11)),
+                            border: Border.all(color: Colors.white12, width: 0.5),
+                          ),
+                          child: Text(
+                            widget.subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               if (widget.showInfo) ...[

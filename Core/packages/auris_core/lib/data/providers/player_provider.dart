@@ -11,6 +11,7 @@ final animeDetailProvider =
     metadataTitle: params.metadataTitle,
     year: params.year,
     season: params.season,
+    kind: params.kind,
   );
 });
 
@@ -34,6 +35,7 @@ class AnimeDetailParams {
   final String? metadataTitle;
   final int? year;
   final int? season;
+  final String? kind;
 
   const AnimeDetailParams({
     required this.title,
@@ -41,6 +43,7 @@ class AnimeDetailParams {
     this.metadataTitle,
     this.year,
     this.season,
+    this.kind,
   });
 
   @override
@@ -51,10 +54,11 @@ class AnimeDetailParams {
           malId == other.malId &&
           metadataTitle == other.metadataTitle &&
           year == other.year &&
-          season == other.season;
+          season == other.season &&
+          kind == other.kind;
 
   @override
-  int get hashCode => Object.hash(title, malId, metadataTitle, year, season);
+  int get hashCode => Object.hash(title, malId, metadataTitle, year, season, kind);
 }
 
 class MovieDetailParams {
