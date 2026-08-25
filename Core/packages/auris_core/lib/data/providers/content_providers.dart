@@ -494,7 +494,13 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
   // Fuentes que no se descubren vía la búsqueda del server (p.ej. AnimeD23: no
   // tiene S1 y su búsqueda apunta a un espejo caído animed2023.com). Se sintetizan
   // derivando la URL desde el slug compartido de las fuentes ya conocidas.
-  if (!isMovieCard && params.season != null && !searchSources.any((s) => s.source == 'AnimeD23')) {
+  // No sintetizar A23 si ya hay una fuente de mayor prioridad (AnimeAV1 /
+  // AnimeJara) para la misma obra: en ese caso A23 no debe quedar como fuente
+  // por defecto y provocar el parpadeo A23 -> AV1 al abrir la ficha (AV1 ya
+  // cubre la temporada pedida, así que no aporta nada como fuente inicial).
+  final hasHigherPrioritySource = searchSources
+      .any((s) => const ['AnimeAV1', 'AnimeJara'].contains(s.source));
+  if (!isMovieCard && params.season != null && !searchSources.any((s) => s.source == 'AnimeD23') && !hasHigherPrioritySource) {
     final seeds = params.initialSources ?? const <SearchResult>[];
     String? sharedSlug;
     for (final s in seeds) {
