@@ -88,7 +88,8 @@ class ApiEndpoints {
   }
 
   /// URL base según la fuente de scraping (p. ej. JKAnime, Cuevana3, Tudorama).
-  /// Soporta fuentes duales (como GnulaHD) usando la categoría como desempate.
+  /// Las fuentes de películas/series (p. ej. GnulaHD) viven en el server de
+  /// Películas/Series (3001) y no se enrutan al server de anime (3000).
   static String baseUrlForSource(String source, [String? category]) {
     final s = source.toLowerCase();
     const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
@@ -97,15 +98,8 @@ class ApiEndpoints {
 
     if (kdramaHints.any(s.contains)) return kdramasBaseUrl;
 
-    // Caso Especial: GnulaHD existe en Anime (3000) y Películas (3001)
-    if (movieHints.any(s.contains)) {
-      final c = category?.toLowerCase() ?? '';
-      // 'all' no trae 'anime', pero la búsqueda Todo ya fusiona resultados del
-      // servidor de anime; GNU anime (el caso común) debe ir a 3000. En el VPS
-      // todos los puertos colapsan al mismo dominio, así que no cambia nada.
-      if (c.contains('anime') || c == 'all') return animeBaseUrl;
-      return moviesSeriesBaseUrl;
-    }
+    // GnulaHD solo existe en el server de Películas/Series (3001).
+    if (movieHints.any(s.contains)) return moviesSeriesBaseUrl;
 
     if (animeHints.any(s.contains)) return animeBaseUrl;
     return moviesSeriesBaseUrl;

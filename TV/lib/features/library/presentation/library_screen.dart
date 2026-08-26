@@ -396,7 +396,7 @@ class _LibraryMediaCard extends StatelessWidget {
     if (kdramaHints.any((h) => source.contains(h))) return 'KDRAMA';
     if (animeHints.any((h) => source.contains(h))) return 'ANIME';
     
-    // Senior Fix para fuentes duales (GnulaHD)
+    // Senior Fix para fuentes de películas/series (GnulaHD)
     if (movieHints.any((h) => source.contains(h))) {
       if (item.category.toLowerCase().contains('anime')) return 'ANIME';
       return 'PELÍCULA';

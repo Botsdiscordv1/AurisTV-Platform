@@ -19,7 +19,7 @@ final scheduleProvider = FutureProvider<ScheduleResponse>((ref) async {
 });
 
 /// Senior: Provider para "Recién añadido a AurisTV".
-/// Usa las fuentes reales scrapeadas (GnulaHD/AnimeJara/AnimeD23/AnimeAV1).
+/// Usa las fuentes reales scrapeadas (AnimeJara/AnimeD23/AnimeAV1).
 /// Si las fuentes fallan, cae back a las tendencias para no romper la UI.
 final recentlyAddedProvider = FutureProvider<List<MediaItem>>((ref) async {
   final repo = ref.watch(homeRepositoryProvider);
