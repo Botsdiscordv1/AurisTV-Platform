@@ -2,24 +2,60 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 
 class ApiEndpoints {
-  // --- CONFIGURACIÓN DE SERVIDORES ---
-  // Usamos el DNS de DuckDNS con HTTPS automático vía Caddy.
-  static String _serverIp = 'auristvanime.duckdns.org';
+  static const Map<String, String> _servers = {
+    'anime':   'anime.auristv.dpdns.org',
+    'movies_series':  'movies-series.auristv.dpdns.org',
+    'kdramas': 'kdramas.auristv.dpdns.org',
+  };
 
-  /// Senior: Permite cambiar la dirección del servidor en tiempo de ejecución para pruebas.
-  static void setServerAddress(String address) {
-    _serverIp = address;
+  static final Map<String, String> _serverOverride = {};
+
+  static void setServerAddress(String address, [String category = 'anime']) {
+    _serverOverride[category.toLowerCase()] = address;
   }
 
-  static String get serverAddress => _serverIp;
+  static void useLocalServer(String ip) {
+    _serverOverride['anime'] = ip;
+    _serverOverride['movies_series'] = ip;
+    _serverOverride['kdramas'] = ip;
+  }
 
-  // Puerto por servidor de backend:
-  //   3000 → Anime
-  //   3001 → Películas y Series
-  //   3002 → Kdramas
+  static String _domainFor(String category) {
+    final key = category.toLowerCase();
+    return _serverOverride[key] ?? _servers[key] ?? _servers['anime']!;
+  }
+
+  static String get serverAddress => _domainFor('anime');
+
+  static String get _defaultDomain => _domainFor('anime');
+
+  static bool _isOurServer(String url) {
+    final all = <String>{..._servers.values, ..._serverOverride.values};
+    return all.any((d) => url.contains(d));
+  }
+
   static const String _animePort = '3000';
-  static const String _moviesPort = '3001';
+  static const String _moviesSeriesPort = '3001';
   static const String _kdramasPort = '3002';
+
+  static String _categoryForPort(String port) {
+    if (port == _moviesSeriesPort) return 'movies_series';
+    if (port == _kdramasPort) return 'kdramas';
+    return 'anime';
+  }
+
+  static String _baseUrlForDomain(String domain, String port) {
+    final bool isLocal = domain == 'localhost' ||
+        domain == '127.0.0.1' ||
+        domain.startsWith('192.168.') ||
+        domain.startsWith('10.');
+    if (isLocal) return 'http://$domain:$port';
+    return 'https://$domain';
+  }
+
+  static String _baseUrlForCategory(String category, String port) {
+    return _baseUrlForDomain(_domainFor(category), port);
+  }
 
   // --- CONFIGURACIÓN SUPABASE ---
   static const String supabaseUrl = 'https://vrxuzquddfegpxjcffvf.supabase.co';
@@ -27,34 +63,14 @@ class ApiEndpoints {
   // ----------------------------------
 
   static String baseUrlForPort(String port) {
-    // Senior: Si estamos en Web, intentamos detectar si el servidor está en la misma IP que el host.
-    if (kIsWeb) {
-      if (_serverIp == 'localhost' || _serverIp == '127.0.0.1') {
-        return 'http://localhost:$port';
-      }
-      
-      // Senior Dynamic Protocol: Si la IP es local (192.168...), usamos HTTP y el puerto.
-      // Si es un dominio (duckdns...), usamos HTTPS sin puerto (manejado por Caddy).
-      final bool isLocalIp = _serverIp.startsWith('192.168.') || _serverIp.startsWith('10.');
-      final protocol = isLocalIp ? 'http' : 'https';
-      final portSuffix = isLocalIp ? ":$port" : "";
-      
-      return '$protocol://$_serverIp$portSuffix';
-    }
-
-    // Para plataformas nativas (Android/Windows):
-    final bool isLocalIp = _serverIp.startsWith('192.168.') || _serverIp.startsWith('10.');
-    final protocol = isLocalIp ? 'http' : 'https';
-    final portSuffix = isLocalIp ? ":$port" : "";
-    
-    return '$protocol://$_serverIp$portSuffix';
+    return _baseUrlForCategory(_categoryForPort(port), port);
   }
 
   /// URL base por defecto (servidor de Anime, puerto 3000).
   static String get baseUrl => baseUrlForPort(_animePort);
 
   static String get animeBaseUrl => baseUrlForPort(_animePort);
-  static String get moviesBaseUrl => baseUrlForPort(_moviesPort);
+  static String get moviesSeriesBaseUrl => baseUrlForPort(_moviesSeriesPort);
   static String get kdramasBaseUrl => baseUrlForPort(_kdramasPort);
 
   /// URL base según la categoría de contenido (sin fan-out para 'all').
@@ -68,7 +84,7 @@ class ApiEndpoints {
         c == 'movie_anime') {
       return animeBaseUrl;
     }
-    return moviesBaseUrl;
+    return moviesSeriesBaseUrl;
   }
 
   /// URL base según la fuente de scraping (p. ej. JKAnime, Cuevana3, Tudorama).
@@ -88,11 +104,11 @@ class ApiEndpoints {
       // servidor de anime; GNU anime (el caso común) debe ir a 3000. En el VPS
       // todos los puertos colapsan al mismo dominio, así que no cambia nada.
       if (c.contains('anime') || c == 'all') return animeBaseUrl;
-      return moviesBaseUrl;
+      return moviesSeriesBaseUrl;
     }
 
     if (animeHints.any(s.contains)) return animeBaseUrl;
-    return moviesBaseUrl;
+    return moviesSeriesBaseUrl;
   }
 
   static String fixUrl(String? url) {
@@ -106,15 +122,15 @@ class ApiEndpoints {
     
     if (kIsWeb) {
       // Si la URL contiene localhost pero hemos configurado una IP manual, la corregimos.
-      if ((url.contains('localhost') || url.contains('127.0.0.1')) && 
-          _serverIp != 'localhost' && _serverIp != '127.0.0.1') {
-        return url.replaceAll('localhost', _serverIp).replaceAll('127.0.0.1', _serverIp);
+      if ((url.contains('localhost') || url.contains('127.0.0.1')) &&
+          _defaultDomain != 'localhost' && _defaultDomain != '127.0.0.1') {
+        return url.replaceAll('localhost', _defaultDomain).replaceAll('127.0.0.1', _defaultDomain);
       }
       return url;
     }
     
     if (Platform.isAndroid && (url.contains('127.0.0.1') || url.contains('localhost'))) {
-      return url.replaceAll('127.0.0.1', _serverIp).replaceAll('localhost', _serverIp);
+      return url.replaceAll('127.0.0.1', _defaultDomain).replaceAll('localhost', _defaultDomain);
     }
     return url;
   }
@@ -124,14 +140,14 @@ class ApiEndpoints {
     if (url == null || url.isEmpty) return '';
     
     // Si la URL ya es local o del proxy, no tocar.
-    if (url.contains('/api/proxy/image') || url.contains(_serverIp)) {
+    if (url.contains('/api/proxy/image') || _isOurServer(url)) {
       return fixUrl(url);
     }
 
     // Senior Web Fix: Solo forzamos proxy en Web por el tema de CORS.
     // En App Nativa (Android/iOS) cargamos directo para máxima velocidad.
     if (kIsWeb) {
-      if (url.startsWith('http') && !url.contains('localhost') && !url.contains(_serverIp)) {
+      if (url.startsWith('http') && !url.contains('localhost') && !_isOurServer(url)) {
         return fixUrl('$baseUrl/api/proxy/image?url=${Uri.encodeComponent(url)}');
       }
       return url;

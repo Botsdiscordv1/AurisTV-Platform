@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -832,8 +833,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   BoxDecoration get _controlCapsuleDecoration => BoxDecoration(
-    color: Colors.black.withValues(alpha: 0.45),
-    borderRadius: BorderRadius.circular(22), // Unificado radio para alto 44
+    color: Colors.black.withValues(alpha: 0.2), // Ultra-transparente estilo YouTube
+    borderRadius: BorderRadius.circular(22),
   );
 
   void _toggleMute() {
@@ -872,10 +873,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
         height: 44,
-        width: _isVolumePillHovered ? 160 : 44, // Senior Fix: Más corto para look idéntico a YouTube
-        clipBehavior: Clip.antiAlias,
+        width: _isVolumePillHovered ? 160 : 44,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.5),
+          color: Colors.black.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(22),
         ),
         padding: const EdgeInsets.all(4), 
@@ -902,18 +902,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     ),
                   ),
                 ),
-                // Contenido expandible (Slider sin porcentaje para look minimalista YouTube)
+                // Contenido expandible
                 Positioned(
                   left: 32,
                   top: 0,
                   bottom: 0,
-                  width: 120, // Ajustado para el nuevo ancho total de 160
+                  width: 120,
                   child: Row(
                     children: [
                       Expanded(
                         child: SliderTheme(
                           data: SliderTheme.of(context).copyWith(
-                            trackHeight: 2.5, // Más fino estilo YT
+                            trackHeight: 2.5,
                             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6, elevation: 3),
                             overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
                             activeTrackColor: isBoost ? const Color(0xFFEF7A1E) : Colors.white,
@@ -930,7 +930,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                                 _volume = v;
                                 _applyVolume();
                               });
-                              _startHideTimer(); // Senior Fix: Reiniciar el temporizador para que no se oculte al interactuar
+                              _startHideTimer();
                             },
                           ),
                         ),
@@ -4102,9 +4102,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }) {
     return Container(
       width: size, height: size,
-      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.black.withValues(alpha: 0.45),
+        color: backgroundColor ?? Colors.black.withValues(alpha: 0.2),
         shape: BoxShape.circle,
       ),
       padding: EdgeInsets.all(padding),
@@ -4157,7 +4156,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return Container(
       height: 44, // Unificado a 44px
       decoration: _controlCapsuleDecoration,
-      clipBehavior: Clip.antiAlias, 
+      clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

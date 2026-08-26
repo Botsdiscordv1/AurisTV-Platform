@@ -126,7 +126,7 @@ class AurisRepositoryImpl implements AurisRepository {
 
     final List<Future<SearchResponse>> futures = [
       guarded(() => _searchOn(ApiEndpoints.animeBaseUrl, 'all', query, year: year, phase: phase)),
-      guarded(() => _searchOn(ApiEndpoints.moviesBaseUrl, 'all', query, year: year, phase: phase)),
+      guarded(() => _searchOn(ApiEndpoints.moviesSeriesBaseUrl, 'all', query, year: year, phase: phase)),
       guarded(() => _searchOn(ApiEndpoints.kdramasBaseUrl, 'all', query, year: year, phase: phase)),
     ];
 
@@ -232,7 +232,7 @@ class AurisRepositoryImpl implements AurisRepository {
   Future<List<SourceInfo>> getSources() async {
     final futures = [
       _fetchSources(ApiEndpoints.animeBaseUrl),
-      _fetchSources(ApiEndpoints.moviesBaseUrl),
+      _fetchSources(ApiEndpoints.moviesSeriesBaseUrl),
       _fetchSources(ApiEndpoints.kdramasBaseUrl),
     ];
     final lists = await Future.wait(futures);
@@ -277,7 +277,7 @@ class AurisRepositoryImpl implements AurisRepository {
 
     final futures = [
       fetchEditorial(ApiEndpoints.animeBaseUrl),
-      fetchEditorial(ApiEndpoints.moviesBaseUrl),
+      fetchEditorial(ApiEndpoints.moviesSeriesBaseUrl),
       fetchEditorial(ApiEndpoints.kdramasBaseUrl),
     ];
 
@@ -414,7 +414,7 @@ class AurisRepositoryImpl implements AurisRepository {
     final response = await _client.get(
       ApiEndpoints.titlesMovie,
       queryParameters: {'q': query},
-      baseUrl: ApiEndpoints.moviesBaseUrl,
+      baseUrl: ApiEndpoints.moviesSeriesBaseUrl,
     );
     return MovieTitleInfo.fromJson(response.data as Map<String, dynamic>);
   }

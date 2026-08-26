@@ -551,11 +551,11 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   if (widget.totalSeasons > 1 && widget.currentSource != null) const SizedBox(width: 12),
                   if (widget.currentSource != null) 
                     Expanded(
-                      child: _ServerSelector(
-                        currentSource: widget.currentSource!, 
+                      child: SourceChipsBar(
                         sources: widget.sources, 
+                        currentSource: widget.currentSource, 
                         onSourceSelected: widget.onSourceSelected, 
-                        compact: true,
+                        unavailableSources: widget.unavailableSources,
                         season: widget.season,
                       ),
                     ),
@@ -1261,6 +1261,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   // disponible al abrir (ruta > fuente > backdrop del detalle) and ya no cambia
   // al switchear temporada, para no re-solicitar banner ni provocar timeouts.
   String? _stableBanner;
+  // Fuente por defecto congelada al abrir (mejor por rank presente en ese
+  // momento) y clave de la fuente elegida manualmente por el usuario. Evitan el
+  // parpadeo A23 -> AV1 cuando AV1/AnimeJara llegan tarde vía búsqueda suplementaria.
+  String? _frozenDefaultKey;
+  String? _userSelectedSourceKey;
 
   @override void initState() {
     super.initState();
@@ -1615,14 +1620,28 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       });
     }
 
-    // No fijar la fuente por defecto hasta que la búsqueda suplementaria (que
-    // trae AV1/AnimeJara) termine: si se hace con la lista parcial, el card abre
-    // con A23/JKA y luego parpadea a AV1 al llegar estas. Esperar el "settle"
-    // evita el parpadeo y abre directo en la mejor fuente disponible.
-    final sourcesSettled = !searchLoading;
-    final rawCurrentSource = (sourcesSettled && activeSources.isNotEmpty)
-        ? activeSources[_selectedSourceIndex % activeSources.length]
-        : null;
+    // Selección de fuente estable: se congela la MEJOR fuente disponible al abrir
+    // (por rank) para que, cuando AV1/AnimeJara lleguen tarde vía la búsqueda
+    // suplementaria, la tarjeta no "parpadee" de A23 -> AV1. Los episodios se
+    // cargan al instante desde esta fuente congelada; AV1 queda en el selector
+    // para elegirla manualmente. La elección del usuario (_userSelectedSourceKey)
+    // siempre tiene prioridad.
+    String? _sourceKeyOf(SearchResult s) => '${s.source}|${s.url}';
+    String? selectedKey = _userSelectedSourceKey ?? _frozenDefaultKey;
+    if (_frozenDefaultKey == null && activeSources.isNotEmpty) {
+      final ranked = [...activeSources]
+        ..sort((a, b) => sourceDisplayRank(a.source).compareTo(sourceDisplayRank(b.source)));
+      _frozenDefaultKey = _sourceKeyOf(ranked.first);
+      selectedKey ??= _frozenDefaultKey;
+    }
+    int selIndex = 0;
+    if (selectedKey != null && activeSources.isNotEmpty) {
+      final found = activeSources.indexWhere((s) => _sourceKeyOf(s) == selectedKey);
+      selIndex = found >= 0 ? found : (_selectedSourceIndex % activeSources.length);
+    } else if (activeSources.isNotEmpty) {
+      selIndex = _selectedSourceIndex % activeSources.length;
+    }
+    final rawCurrentSource = activeSources.isNotEmpty ? activeSources[selIndex] : null;
     final currentSource = _withSeasonUnified(rawCurrentSource, effectiveSeasonForUrl);
     final episodesUrl = currentSource?.url ?? widget.url;
     final episodesSource = currentSource?.source ?? widget.source;
@@ -1726,15 +1745,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ),
             sources: [currentSource ?? SearchResult(title: widget.title, url: episodesUrl, quality: '', thumbnail: initialThumbnail ?? '', source: episodesSource)],
           ))
-        : (!sourcesSettled)
-            // Aún falta la búsqueda suplementaria (AV1/AnimeJara): no scrapear
-            // episodios de la fuente transitoria (A23) para evitar el parpadeo.
+        : isMetadataSource
+            // Fuente de metadatos sin endpoint de episodios: mostrar skeleton
+            // mientras las fuentes de scraping (JKAnime, AnimeAV1, Aniyae) terminan de cargarse.
             ? const AsyncValue<GroupedEpisodesResult?>.loading()
-            : isMetadataSource
-                // Fuente de metadatos sin endpoint de episodios: mostrar skeleton
-                // mientras las fuentes de scraping (JKAnime, AnimeAV1, Aniyae) terminan de cargarse.
-                ? const AsyncValue<GroupedEpisodesResult?>.loading()
-                : ref.watch(groupedEpisodesProvider(GroupedEpisodesParams(
+            : ref.watch(groupedEpisodesProvider(GroupedEpisodesParams(
                 title: seasonSwitched ? (seasonTitle ?? widget.title) : widget.title,
                 metadataTitle: episodeReqMetaTitle,
                 category: widget.category,
@@ -1792,7 +1807,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               isLoadingSources: searchLoading && activeSources.isEmpty,
               totalSeasons: totalSeasons, 
               currentSeason: currentSeason, 
-              onSourceSelected: (index) => setState(() => _selectedSourceIndex = index),
+              onSourceSelected: (index) {
+                if (activeSources.isEmpty) return;
+                setState(() {
+                  _selectedSourceIndex = index;
+                  _userSelectedSourceKey = '${activeSources[index].source}|${activeSources[index].url}';
+                });
+              },
               onSeasonSelected: (s) => setState(() => _selectedSeason = s), 
               inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, 
               latestHistory: ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title), 

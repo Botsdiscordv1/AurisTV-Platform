@@ -37,3 +37,5 @@ export 'data/providers/playback_history_provider.dart';
 export 'data/providers/player_provider.dart';
 export 'data/providers/favorites_provider.dart';
 export 'data/datasources/mock_data.dart';
+export 'presentation/widgets/loading_more_indicator.dart';
+export 'presentation/widgets/source_chips_bar.dart';
