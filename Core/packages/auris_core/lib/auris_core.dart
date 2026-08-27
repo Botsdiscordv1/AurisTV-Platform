@@ -25,6 +25,7 @@ export 'data/models/server/anilist_media.dart';
 export 'data/repositories/auris_repository.dart';
 export 'data/repositories/impl/auris_repository_impl.dart';
 export 'core/utils/source_utils.dart';
+export 'core/utils/category_utils.dart';
 export 'core/utils/content_logic.dart';
 export 'core/utils/synopsis_cleaner.dart';
 export 'core/playback/media_category.dart';

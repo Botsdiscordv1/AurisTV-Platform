@@ -98,12 +98,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final displayTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
     final metaTitle = result.metadataTitle ?? result.scrapedTitle ?? result.title;
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
-    final openCategory = result.kind?.toLowerCase() == 'movie' ? 'movie' : _selectedCategory;
+    final openCategory = inferOpenCategory(result, _selectedCategory);
     context.push(
       '/content/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(openCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
       extra: result,
     );
   }
+
+
 
   @override
   Widget build(BuildContext context) {

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
+import '../../../core/utils/category_utils.dart';
 import '../../models/server/anilist_media.dart';
 import '../../models/server/anime_detail.dart';
 import '../../models/server/episodes_response.dart';
@@ -85,10 +86,40 @@ class AurisRepositoryImpl implements AurisRepository {
     if (server != null) {
       return _searchOn(server, normalized, query, year: year, phase: phase);
     }
-    if (normalized.toLowerCase() == 'all') {
-      return _searchAll(query, year, phase: phase);
+    final targets = _searchTargetsFor(normalized);
+    final filter = normalized.toLowerCase() == 'all' ? null : normalized;
+    return _searchFanout(targets, query, year, phase, filterCategory: filter);
+  }
+
+  List<String> _searchTargetsFor(String category) {
+    final c = category.toLowerCase();
+    if (c == 'anime' || c == 'movie_anime') {
+      return [ApiEndpoints.animeBaseUrl, ApiEndpoints.moviesSeriesBaseUrl];
     }
-    return _searchOn(ApiEndpoints.baseUrlForCategory(normalized), normalized, query, year: year, phase: phase);
+    if (c == 'peliculas' || c == 'movie') {
+      return [ApiEndpoints.moviesSeriesBaseUrl];
+    }
+    if (c == 'series') {
+      return [ApiEndpoints.moviesSeriesBaseUrl, ApiEndpoints.kdramasBaseUrl];
+    }
+    return [
+      ApiEndpoints.animeBaseUrl,
+      ApiEndpoints.moviesSeriesBaseUrl,
+      ApiEndpoints.kdramasBaseUrl,
+    ];
+  }
+
+  bool _matchesCategory(SearchResult result, String category) {
+    final c = category.toLowerCase();
+    final target = (c == 'peliculas' || c == 'movie')
+        ? 'movie'
+        : (c == 'series')
+            ? 'series'
+            : (c == 'anime' || c == 'movie_anime')
+                ? 'anime'
+                : null;
+    if (target == null) return true;
+    return inferOpenCategory(result, '') == target;
   }
 
   Future<SearchResponse> _searchOn(
@@ -114,25 +145,29 @@ class AurisRepositoryImpl implements AurisRepository {
     return SearchResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
-  Future<SearchResponse> _searchAll(String query, int? year, {String? phase}) async {
+  Future<SearchResponse> _searchFanout(
+    List<String> baseUrls,
+    String query,
+    int? year,
+    String? phase, {
+    String? filterCategory,
+  }) async {
     Future<SearchResponse> guarded(
       Future<SearchResponse> Function() search) async {
       try {
         return await search();
       } catch (_) {
-        return SearchResponse(query: query, category: 'all', count: 0, results: const []);
+        return SearchResponse(query: query, category: filterCategory ?? 'all', count: 0, results: const []);
       }
     }
 
-    final List<Future<SearchResponse>> futures = [
-      guarded(() => _searchOn(ApiEndpoints.animeBaseUrl, 'all', query, year: year, phase: phase)),
-      guarded(() => _searchOn(ApiEndpoints.moviesSeriesBaseUrl, 'all', query, year: year, phase: phase)),
-      guarded(() => _searchOn(ApiEndpoints.kdramasBaseUrl, 'all', query, year: year, phase: phase)),
-    ];
+    final futures = baseUrls.map(
+      (b) => guarded(() => _searchOn(b, 'all', query, year: year, phase: phase)),
+    );
 
     final responses = await Future.wait(futures.map((f) => f.timeout(
-      const Duration(seconds: 60),
-      onTimeout: () => SearchResponse(query: query, category: 'all', count: 0, results: const []),
+      const Duration(seconds: 20),
+      onTimeout: () => SearchResponse(query: query, category: filterCategory ?? 'all', count: 0, results: const []),
     )));
 
     final seen = <String>{};
@@ -143,7 +178,17 @@ class AurisRepositoryImpl implements AurisRepository {
         if (seen.add(key)) merged.add(r);
       }
     }
-    return SearchResponse(query: query, category: 'all', count: merged.length, results: merged);
+
+    if (filterCategory != null) {
+      merged.removeWhere((r) => !_matchesCategory(r, filterCategory));
+    }
+
+    return SearchResponse(
+      query: query,
+      category: filterCategory ?? 'all',
+      count: merged.length,
+      results: merged,
+    );
   }
 
   @override
@@ -186,6 +231,7 @@ class AurisRepositoryImpl implements AurisRepository {
     if (year != null) params['year'] = year;
     if (season != null) params['season'] = season;
     if (kind != null) params['kind'] = kind;
+    params['metadataOnly'] = '1';
     final response = await _client.get(
       ApiEndpoints.detailAnime,
       queryParameters: params,
