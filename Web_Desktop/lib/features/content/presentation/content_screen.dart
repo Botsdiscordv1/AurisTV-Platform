@@ -211,9 +211,6 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final int totalSeasons; 
   final int currentSeason; 
   final ValueChanged<int> onSeasonSelected;
-  final int selectedTabIndex;
-  final ValueChanged<int> onTabChanged;
-  final List<String> tabLabels;
   final String? inferredSeasonAirDate;
   final PlaybackHistory? latestHistory;
   final Set<String>? unavailableSources;
@@ -238,9 +235,6 @@ class _ContentHeader extends ConsumerStatefulWidget {
     required this.totalSeasons, 
     required this.currentSeason, 
     required this.onSeasonSelected,
-    required this.selectedTabIndex,
-    required this.onTabChanged,
-    required this.tabLabels,
     this.inferredSeasonAirDate,
     this.latestHistory,
     this.unavailableSources,
@@ -634,8 +628,8 @@ AnimatedOpacity(
                           _buildMainActionButton(context, isCompact: isUltraCompact, width: 320),
                           const SizedBox(height: 8),
                           
-                          // Lista Vertical de Acciones Secundarias (Tabs)
-                          _buildNetflixActionList(context, d, isCompact: isUltraCompact),
+                          // Lista Vertical de Acciones Secundarias (Tráiler, Lista)
+                          _buildNetflixActionList(context),
                         ],
                       ),
                     ),
@@ -709,7 +703,7 @@ AnimatedOpacity(
     );
   }
 
-  Widget _buildNetflixActionList(BuildContext context, dynamic d, {bool isCompact = false}) {
+  Widget _buildNetflixActionList(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final favorites = ref.watch(favoritesProvider);
       final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
@@ -756,28 +750,6 @@ AnimatedOpacity(
               ref.read(favoritesProvider.notifier).toggleFavorite(item);
             },
           ),
-          
-          const SizedBox(height: 24),
-          
-          // GRUPO DE NAVEGACIÓN (Antiguas pestañas)
-          ...List.generate(widget.tabLabels.length, (index) {
-            final label = widget.tabLabels[index];
-            final isActive = widget.selectedTabIndex == index;
-            
-            IconData icon = Icons.info_outline;
-            if (label == 'Episodios') icon = Icons.format_list_numbered_rounded;
-            if (label == 'Relacionado') icon = Icons.grid_view_rounded;
-            if (label == 'Extras') icon = Icons.auto_awesome_rounded;
-            if (label == 'Detalles') icon = Icons.description_outlined;
-            if (label == 'Galería') icon = Icons.collections_outlined;
-
-            return _NetflixNavButton(
-              icon: icon,
-              label: label,
-              isActive: isActive,
-              onPressed: () => widget.onTabChanged(index),
-            );
-          }),
         ],
       );
     });
@@ -1875,74 +1847,7 @@ class _ExpandableTextState extends State<_ExpandableText> {
   }
 }
 
-class _NetflixNavButton extends StatefulWidget {
-  final VoidCallback onPressed;
-  final IconData icon;
-  final String label;
-  final bool isActive;
 
-  const _NetflixNavButton({
-    required this.onPressed,
-    required this.icon,
-    required this.label,
-    this.isActive = false,
-  });
-
-  @override
-  State<_NetflixNavButton> createState() => _NetflixNavButtonState();
-}
-
-class _NetflixNavButtonState extends State<_NetflixNavButton> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onPressed,
-          borderRadius: BorderRadius.circular(4),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            margin: const EdgeInsets.only(bottom: 4),
-            decoration: BoxDecoration(
-              color: widget.isActive ? const Color(0xFFEF7A1E).withValues(alpha: 0.1) : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: Border(
-                left: BorderSide(
-                  color: widget.isActive ? const Color(0xFFEF7A1E) : Colors.transparent,
-                  width: 3,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  widget.icon,
-                  color: widget.isActive ? const Color(0xFFEF7A1E) : (_isHovered ? Colors.white : Colors.white60),
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  widget.label,
-                  style: GoogleFonts.poppins(
-                    color: widget.isActive ? const Color(0xFFEF7A1E) : (_isHovered ? Colors.white : Colors.white60),
-                    fontSize: 16,
-                    fontWeight: widget.isActive ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _NetflixPrimaryButton extends StatefulWidget {
   final VoidCallback onPressed;
@@ -2275,7 +2180,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   // "salte" de pestaña al aparecer/desaparecer. No recrea ningún controlador.
   void _syncExtras(bool desired) {
     if (_hasExtras == desired) return;
-    final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
+    // Permitir pestaña Episodios también para películas (movie/movie_anime) —
+    // usan un "episodio sintético" (la película) con su selector de servidor.
+    final hasEpisodesTab = true;
     final extrasInsertIndex = (hasEpisodesTab ? 1 : 0) + 1;
     int idx = _selectedTabIndex;
     if (_hasExtras && !desired) {
@@ -2537,7 +2444,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     // Tab "Extras" (OP/ED): solo se muestra si el detalle trae openings/endings.
     // _syncExtras actualiza _hasExtras y re-mapea _selectedTabIndex (sin recrear
     // ningún TabController, evitando crashes de lifecycle al ocultar/mostrar el tab).
-    final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
+    // Permitir pestaña Episodios también para películas — usan episodio sintético.
+    final hasEpisodesTab = true;
     final _detailForExtras = displayAnimeDetailAsync.valueOrNull;
     final _desiredExtras = _detailForExtras != null &&
         (_detailForExtras.openings.isNotEmpty || _detailForExtras.endings.isNotEmpty);
@@ -2794,9 +2702,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               isLoadingSources: searchLoading && activeSources.isEmpty,
               totalSeasons: totalSeasons, 
               currentSeason: currentSeason, 
-              selectedTabIndex: selectedTabIndex,
-              onTabChanged: (i) => setState(() => _selectedTabIndex = i),
-              tabLabels: tabLabels,
               onSourceSelected: (index) {
                 if (activeSources.isEmpty) return;
                 setState(() {
@@ -2855,6 +2760,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               const SizedBox(height: 24),
             ]))),
             SliverMainAxisGroup(slivers: [
+              SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _buildTabBar(tabLabels, selectedTabIndex, hPadding, isMobile),
+                const SizedBox(height: 16),
+              ]))),
               if (selectedTabIndex == episodesTabIndex) episodesAsync.when(
                 data: (epBundle) {
                   final epData = epBundle?.response;
