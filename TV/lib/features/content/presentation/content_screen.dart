@@ -369,41 +369,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   void _disposeController() { _delayTimer?.cancel(); _fadeTimer?.cancel(); _titleHideTimer?.cancel(); _ytSubscription?.cancel(); _ytSubscription = null; _ytController?.close(); _ytController = null; }
   @override void dispose() { _disposeController(); super.dispose(); }
 
-  Widget _heroTitleWidget(String title, String? logo, bool logoReady, double maxW, double maxH, TextStyle style) {
-    if (!logoReady) {
-      return SizedBox(width: maxW, height: maxH);
-    }
-    if (logo != null && logo.isNotEmpty) {
-      return SizedBox(
-        width: maxW,
-        height: maxH,
-          child: Align(
-            alignment: Alignment.bottomLeft,
-            child: CachedNetworkImage(
-            imageUrl: logo,
-            height: maxH,
-            fit: BoxFit.contain,
-            fadeInDuration: const Duration(milliseconds: 300),
-            placeholder: (_, __) => const SizedBox.shrink(),
-            errorWidget: (_, __, ___) => Text(
-              title.toUpperCase(), 
-              style: style,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-      );
-    }
-    return Text(
-      title.toUpperCase(), 
-      style: style,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-
-  @override Widget build(BuildContext context) {
+@override Widget build(BuildContext context) {
     final d = widget.category == 'movie_anime'
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
         : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
@@ -505,7 +471,21 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           duration: const Duration(milliseconds: 1200), 
           curve: Curves.easeInOut, 
           opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, 
-          child: _heroTitleWidget(heroTitle, d?.logo, logoReady, isUltraCompact ? width * 0.45 : 500.0, titleSize * 2.2, TextStyle(color: Colors.white, fontSize: titleSize * 1.5, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: isUltraCompact ? 0.5 : 1.5, shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]))
+          child: HeroTitle(
+            title: heroTitle,
+            logo: d?.logo,
+            logoReady: logoReady,
+            maxWidth: isUltraCompact ? width * 0.45 : 500.0,
+            maxHeight: titleSize * 2.2,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: titleSize * 1.5,
+              fontWeight: FontWeight.w900,
+              height: 1.0,
+              letterSpacing: isUltraCompact ? 0.5 : 1.5,
+              shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
+            ),
+          )
         ),
         SizedBox(height: contentSpacing * 1.5),
 

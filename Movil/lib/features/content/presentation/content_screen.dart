@@ -470,45 +470,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     );
   }
 
-  Widget _heroTitleWidget(String title, String? logo, bool logoReady, double maxW, double maxH, TextStyle style) {
-    // Mientras el detalle carga y aún no sabemos si hay logo, no mostramos nada
-    // (ni el texto del título) para evitar el parpadeo de texto antes del logo.
-    if (!logoReady) {
-      return SizedBox(width: maxW, height: maxH);
-    }
-    if (logo != null && logo.isNotEmpty) {
-      return SizedBox(
-        width: maxW,
-        height: maxH,
-          child: Align(
-            alignment: Alignment.bottomLeft,
-            child: CachedNetworkImage(
-            imageUrl: logo,
-            height: maxH,
-            fit: BoxFit.contain,
-            fadeInDuration: const Duration(milliseconds: 300),
-            // Vacío mientras descarga; si nunca llega/falla, caemos al texto.
-            placeholder: (_, __) => const SizedBox.shrink(),
-            errorWidget: (_, __, ___) => Text(
-              title.toUpperCase(), 
-              style: style,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-      );
-    }
-    // El detalle cargó pero no hay logo: mostramos el título como respaldo.
-    return Text(
-      title.toUpperCase(), 
-      style: style,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-
-  @override Widget build(BuildContext context) {
+@override Widget build(BuildContext context) {
     final d = widget.category == 'movie_anime'
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
         : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
@@ -552,7 +514,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   ),
                 )),
                 if (_ytController != null) Positioned.fill(child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9))))))),
-                Positioned(left: 20, bottom: 16, right: 20, child: AnimatedOpacity(duration: const Duration(milliseconds: 1200), curve: Curves.easeInOut, opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, child: _heroTitleWidget(heroTitle, d?.logo, logoReady, double.infinity, 80, const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)])))),
+                Positioned(left: 20, bottom: 16, right: 20, child: AnimatedOpacity(duration: const Duration(milliseconds: 1200), curve: Curves.easeInOut, opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)])))),
               ]);
             })),
             Positioned.fill(child: _buildUpperButtons(context)),

@@ -41,3 +41,4 @@ export 'data/datasources/mock_data.dart';
 export 'presentation/widgets/loading_more_indicator.dart';
 export 'presentation/widgets/source_chips_bar.dart';
 export 'presentation/widgets/active_source_badge.dart';
+export 'presentation/widgets/hero_title.dart';
