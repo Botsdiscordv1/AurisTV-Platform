@@ -69,7 +69,7 @@ String sourceSignature(SearchResult source) {
 }
 
 bool isMovieResult(SearchResult r) {
-  final movieUrlRe = RegExp(r'\b(movie|película|film)\b', caseSensitive: false);
+  final movieUrlRe = RegExp(r'\b(movie|pel[ií]cula|film)\b', caseSensitive: false);
   return r.kind?.toLowerCase() == 'movie' ||
       movieUrlRe.hasMatch(r.url) ||
       (r.slug != null && movieUrlRe.hasMatch(r.slug!));
