@@ -516,10 +516,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final b = (widget.banner?.isNotEmpty == true)
         ? widget.banner!
         : (d?.backdrop?.isNotEmpty == true ? d!.backdrop! : widget.poster);
-    final _openedSeasonN = _extractSeason(widget.title) ?? 1;
-    final heroTitle = (widget.currentSeason != _openedSeasonN)
-        ? _seasonTitleFor(_stripSeasonSuffix(widget.title), widget.currentSeason)
-        : widget.title;
+    final heroTitle = _stripSeasonSuffix(widget.title);
 
     return MouseRegion(
       onHover: (_) => _handleInteraction(),

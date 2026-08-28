@@ -411,10 +411,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final b = (widget.banner?.isNotEmpty == true)
         ? widget.banner!
         : (d?.backdrop?.isNotEmpty == true ? d!.backdrop! : widget.poster);
-    final _openedSeasonN = extractSeason(widget.title) ?? 1;
-    final heroTitle = (widget.currentSeason != _openedSeasonN)
-        ? seasonTitleFor(stripSeasonSuffix(widget.title ?? ''), widget.currentSeason)
-        : widget.title;
+    final heroTitle = stripSeasonSuffix(widget.title ?? '');
     final width = MediaQuery.sizeOf(context).width;
 
     return MouseRegion(

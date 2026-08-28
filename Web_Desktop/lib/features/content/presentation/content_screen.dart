@@ -433,13 +433,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final b = (widget.banner?.isNotEmpty == true)
         ? widget.banner!
         : (d?.backdrop?.isNotEmpty == true ? d!.backdrop! : widget.poster);
-    // título mostrado en el hero: refleja la temporada seleccionada en el
-    // selector (igual criterio que `seasonTitle` al abrir el player), para no
-    // quedar con el título de la temporada con la que se abrió el detalle.
-    final _openedSeasonN = _extractSeason(widget.title) ?? 1;
-    final heroTitle = (widget.currentSeason != _openedSeasonN)
-        ? _seasonTitleFor(_stripSeasonSuffix(widget.title), widget.currentSeason)
-        : widget.title;
+    // Título del hero sin sufijo de temporada ("2nd Season") al cambiar de season.
+    final heroTitle = _stripSeasonSuffix(widget.title);
     final width = MediaQuery.sizeOf(context).width;
     final isMobile = ResponsiveUtils.isMobile(context);
     if (isMobile) {
