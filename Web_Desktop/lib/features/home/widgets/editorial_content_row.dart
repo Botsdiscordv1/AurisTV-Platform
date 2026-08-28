@@ -117,8 +117,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
 
   Widget _buildStandardRow(bool isMobile, double horizontalPadding) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
       child: Stack(
         children: [
           SizedBox(
@@ -179,8 +179,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
           ),
           SizedBox(height: isMobile ? 12 : 24),
           MouseRegion(
-            onEnter: (_) => setState(() => _isHovered = true),
-            onExit: (_) => setState(() => _isHovered = false),
+            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
             child: Stack(
               children: [
                 SizedBox(

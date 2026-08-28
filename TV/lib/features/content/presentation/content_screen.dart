@@ -19,11 +19,14 @@ import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../../shared/widgets/nav_arrow.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
+import 'episodes_detail_overlay.dart';
 
 // --- Galería Local Helpers ---
 final _galleryLocalProvider = FutureProvider.family<GalleryResponse, GalleryParams>((ref, params) async {
   return ref.watch(galleryProvider(params).future);
 });
+
+String _getWarningText(String? certification) => getWarningText(certification);
 
 String? _pickDisplayDate(String? primary, String? fallback) {
   if (primary != null && primary.isNotEmpty) return primary;
@@ -70,22 +73,59 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
   if (text == null || text.isEmpty) return const SizedBox.shrink();
   return Container(
     padding: EdgeInsets.symmetric(
+      horizontal: ResponsiveUtils.sp(context, small ? 6 : 10), 
+      vertical: ResponsiveUtils.sp(context, small ? 2 : 4)
+    ),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.3),
+      border: Border.all(
+        color: Colors.white.withValues(alpha: 0.5), 
+        width: 1.5
+      ),
+      borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, 3)),
+    ),
+    child: Text(
+      text.toUpperCase(),
+      style: GoogleFonts.poppins(
+        color: Colors.white, 
+        fontSize: ResponsiveUtils.sp(context, small ? 11 : 14), 
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.5,
+      ),
+    ),
+  );
+}
+
+Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) {
+  if (text == null || text.isEmpty) return const SizedBox.shrink();
+  return Container(
+    padding: EdgeInsets.symmetric(
       horizontal: ResponsiveUtils.sp(context, small ? 5 : 8), 
       vertical: ResponsiveUtils.sp(context, small ? 1.5 : 3)
     ),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.1),
-      border: Border.all(color: Colors.white10, width: 1),
+      color: Colors.white.withValues(alpha: 0.1),
+      border: Border.all(
+        color: Colors.white10, 
+        width: 1.0
+      ),
       borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, small ? 3 : 4)),
     ),
     child: Text(
       text,
       style: TextStyle(
         color: Colors.white, 
-        fontSize: ResponsiveUtils.sp(context, small ? 9 : 12), 
-        fontWeight: FontWeight.w900
+        fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
+        fontWeight: FontWeight.w900,
       ),
     ),
+  );
+}
+
+Widget _buildDotSeparator() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 10),
+    child: Text('•', style: TextStyle(color: Colors.white.withValues(alpha: 0.3))),
   );
 }
 
@@ -180,6 +220,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final PlaybackHistory? latestHistory;
   final Set<String>? unavailableSources;
   final int? season;
+  final VoidCallback? onShowEpisodes;
 
   const _ContentHeader({
     required this.title, 
@@ -204,6 +245,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
     this.latestHistory,
     this.unavailableSources,
     this.season,
+    this.onShowEpisodes,
   });
 
   @override ConsumerState<_ContentHeader> createState() => _ContentHeaderState();
@@ -382,135 +424,131 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         onPointerMove: (_) => _handleInteraction(),
         onPointerHover: (_) => _handleInteraction(),
         child: Stack(clipBehavior: Clip.hardEdge, children: [
-          AspectRatio(aspectRatio: 3.2 / 1, child: LayoutBuilder(builder: (context, constraints) {
-            final h = constraints.maxHeight; final ph = h * 1.35; final pw = ph * (16 / 9);
-            return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
-              Container(color: const Color(0xFF0B0B0D)),
-              if (b != null) Positioned(top: 0, left: 0, right: 0, bottom: -1, child: ShaderMask(
-                shaderCallback: (rect) => const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
-                  stops: [0.0, 0.3, 0.6, 1.0],
-                ).createShader(rect),
-                blendMode: BlendMode.dstIn,
-                child: TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 800), 
-                  tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
-                  builder: (context, blur, child) => ImageFiltered(
-                    imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 800), 
-                      foregroundDecoration: BoxDecoration(color: Colors.black.withOpacity(_showPlayer ? 0.45 : 0.0)), 
-                      child: CachedNetworkImage(imageUrl: b, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
+          // FONDO INMERSIVO (Netflix Style) - Define el tamaño del Header
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: LayoutBuilder(builder: (context, constraints) {
+              final h = constraints.maxHeight; 
+              final ph = h; 
+              final pw = ph * (16 / 9);
+              return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
+                Container(color: const Color(0xFF0B0B0D)),
+                if (b != null) Positioned(top: 0, left: 0, right: 0, bottom: 0, child: ShaderMask(
+                  shaderCallback: (rect) => const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
+                    stops: [0.0, 0.3, 0.6, 1.0],
+                  ).createShader(rect),
+                  blendMode: BlendMode.dstIn,
+                  child: TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 800), 
+                    tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
+                    builder: (context, blur, child) => ImageFiltered(
+                      imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 800), 
+                        foregroundDecoration: BoxDecoration(color: Colors.black.withOpacity(_showPlayer ? 0.45 : 0.0)), 
+                        child: CachedNetworkImage(imageUrl: b, fit: BoxFit.cover, alignment: Alignment.centerRight, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
+                      )
                     )
-                  )
-                ),
-              )),
-              if (_ytController != null) Positioned(top: 0, left: 0, right: 0, bottom: 0, child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9))))))),
-              PointerInterceptor(child: Stack(fit: StackFit.expand, children: [
+                  ),
+                )),
+                if (_ytController != null) Positioned(top: 0, left: 0, right: 0, bottom: 0, child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9))))))),
+                
+                // GRADIENTE LATERAL REFORZADO PARA TEXTO (Integrado aquí)
                 DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                       colors: [
-                        const Color(0xFF0B0B0D).withOpacity(0.85),
-                        const Color(0xFF0B0B0D).withOpacity(0.4),
-                        const Color(0xFF0B0B0D).withOpacity(0.1),
+                        const Color(0xFF0B0B0D).withOpacity(0.98),
+                        const Color(0xFF0B0B0D).withOpacity(0.90),
+                        const Color(0xFF0B0B0D).withOpacity(0.40),
+                        const Color(0xFF0B0B0D).withOpacity(0.10),
                         Colors.transparent,
                       ],
-                      stops: const [0.0, 0.3, 0.5, 0.8],
+                      stops: const [0.0, 0.25, 0.45, 0.65, 1.0],
                     ),
                   ),
                 ),
+                
+                // BLOQUE DE CONTENIDO VERTICAL
+                Positioned(
+                  left: ResponsiveUtils.horizontalPadding(context), 
+                  top: h * 0.12,
+                  bottom: 20, 
+                  child: SizedBox(
+                    width: 520 * (width / 1600.0).clamp(0.8, 1.2),
+                    child: _buildNetflixContentColumn(context, d, width, heroTitle, logoReady),
+                  ),
+                ),
+
                 DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.center, colors: [const Color(0xFF0B0B0D).withOpacity(0.5), Colors.transparent], stops: const [0.0, 0.4]))),
-              ])),
-            ]);
-          })),
-          _buildDesktopOverlay(context, d, width, heroTitle, logoReady),
+              ]);
+            }),
+          ),
           Positioned.fill(child: _buildUpperButtons(context)),
         ]),
       ),
     );
   }
 
-  Widget _buildDesktopOverlay(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
+  Widget _buildNetflixContentColumn(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
     final isUltraCompact = width < 1050; final isCompact = width >= 1050 && width < 1250;
-    final hPadding = ResponsiveUtils.horizontalPadding(context); 
     final titleSize = ResponsiveUtils.sp(context, isUltraCompact ? 22.0 : (isCompact ? 28.0 : 36.0)); 
-    final contentSpacing = ResponsiveUtils.sp(context, 12.0);
+    final contentSpacing = ResponsiveUtils.sp(context, 14.0);
     
-    return PointerInterceptor(child: SizedBox(height: width / 3.2, child: Stack(children: [
-      Positioned.fill(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [
-                const Color(0xFF0B0B0D).withOpacity(0.95),
-                const Color(0xFF0B0B0D).withOpacity(0.6),
-                const Color(0xFF0B0B0D).withOpacity(0.2),
-                Colors.transparent,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start, 
+      children: [
+        // 1. TÍTULO / LOGO
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 1200), 
+          curve: Curves.easeInOut, 
+          opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, 
+          child: _heroTitleWidget(heroTitle, d?.logo, logoReady, isUltraCompact ? width * 0.45 : 500.0, titleSize * 2.2, TextStyle(color: Colors.white, fontSize: titleSize * 1.5, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: isUltraCompact ? 0.5 : 1.5, shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]))
+        ),
+        SizedBox(height: contentSpacing * 1.5),
+
+        // 2. METADATOS (Año, Rating, Duración)
+        _buildNetflixMetaRow(d),
+        SizedBox(height: contentSpacing),
+
+        // 3. SINOPSIS
+        _buildSynopsis(d, isCompact: false),
+        SizedBox(height: contentSpacing),
+
+        // 4. CAST (REPARTO)
+        _buildCastInfo(d),
+        SizedBox(height: contentSpacing * 1.5),
+
+        // 5. ACCIONES RÁPIDAS (Pequeñas)
+        _buildCircularActions(context, isCompact: true),
+        SizedBox(height: contentSpacing * 2),
+
+        // 6. LISTA DE ACCIONES VERTICALES (Estilo Netflix)
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildNetflixActionList(context),
+                if (widget.totalSeasons > 1) ...[
+                  SizedBox(height: contentSpacing),
+                  _SeasonSelector(title: widget.title, currentSeason: widget.currentSeason, totalSeasons: widget.totalSeasons, onSeasonSelected: widget.onSeasonSelected, compact: false),
+                ],
+                if (widget.currentSource != null) ...[
+                  SizedBox(height: contentSpacing),
+                  SourceChipsBar(sources: widget.sources, currentSource: widget.currentSource, onSourceSelected: widget.onSourceSelected, unavailableSources: widget.unavailableSources, season: widget.season),
+                ],
               ],
-              stops: const [0.0, 0.4, 0.7, 1.0],
             ),
           ),
         ),
-      ),
-      
-      // BLOQUE DE CONTENIDO (Logo integrado en columna)
-      Positioned(
-        left: hPadding, 
-        right: hPadding, 
-        bottom: ResponsiveUtils.sp(context, 10), 
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end, 
-          children: [
-            // 1. COLUMNA DE ACCIONES
-            SizedBox(
-              width: ResponsiveUtils.sp(context, isUltraCompact ? 280 : 320),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, 
-                mainAxisSize: MainAxisSize.min, 
-                children: [
-                  AnimatedOpacity(
-                    duration: const Duration(milliseconds: 1200), 
-                    curve: Curves.easeInOut, 
-                    opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, 
-                    child: _heroTitleWidget(heroTitle, d?.logo, logoReady, isUltraCompact ? width * 0.45 : 500.0, titleSize * 2.0, TextStyle(color: Colors.white, fontSize: titleSize, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: isUltraCompact ? 0.5 : 1.5, shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4)]))
-                  ),
-                  SizedBox(height: contentSpacing),
-                  _buildCircularActions(context, isCompact: true), 
-                  SizedBox(height: contentSpacing),
-                  _buildMainActionButton(context, isCompact: true), 
-                  SizedBox(height: contentSpacing),
-                  Row(children: [
-                    if (widget.totalSeasons > 1) _SeasonSelector(title: widget.title, currentSeason: widget.currentSeason, totalSeasons: widget.totalSeasons, onSeasonSelected: widget.onSeasonSelected, compact: true),
-                    if (widget.totalSeasons > 1) SizedBox(width: ResponsiveUtils.sp(context, 8)),
-                    if (widget.currentSource != null) Expanded(child: SourceChipsBar(sources: widget.sources, currentSource: widget.currentSource, onSourceSelected: widget.onSourceSelected, unavailableSources: widget.unavailableSources, season: widget.season)),
-                  ]),
-                ]
-              ),
-            ),
-            
-            SizedBox(width: contentSpacing),
-            
-            // 2. SINOPSIS
-            Expanded(
-              flex: 4,
-              child: _buildSynopsis(d, isCompact: true),
-            ),
-            
-            SizedBox(width: contentSpacing),
-            
-            // 3. METADATOS
-            _buildMetaRow(d, isCompact: true),
-          ]
-        )
-      ),
-    ])));
+      ]
+    );
   }
 
   Widget _buildCircularActions(BuildContext context, {bool isCompact = false}) {
@@ -518,118 +556,266 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final iconSize = ResponsiveUtils.sp(context, isCompact ? 20.0 : 24.0); 
     final spacing = ResponsiveUtils.sp(context, isCompact ? 10.0 : 14.0);
     
-    return Consumer(builder: (context, ref, _) {
-      final favorites = ref.watch(favoritesProvider);
-      final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
-      final bool isFav = favorites.any((f) => f.id == currentId);
-      final user = ref.watch(authProvider);
-      final profileId = user?.activeProfileId ?? 'guest_profile';
-
-      return Row(
+    return Padding(
+      padding: const EdgeInsets.only(left: 0), // Sin padding externo, controlaremos el inicio con el widget interno
+      child: Row(
         mainAxisSize: MainAxisSize.min, 
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_lastTrailerKey != null) ...[
-            _DetailIconButton(
-              icon: _showPlayer ? Icons.videocam_off_outlined : Icons.movie_outlined, 
-              label: _showPlayer ? 'Quitar tráiler' : 'Tr\u00E1iler', 
-              onPressed: () {
-                if (_showPlayer) {
-                  _disposeController();
-                  setState(() {
-                    _showPlayer = false;
-                    _isPlayedOnce = true;
-                    _showTitle = true;
-                  });
-                  _titleHideTimer?.cancel();
-                } else {
-                  _initTrailer(_lastTrailerKey!, immediate: true);
-                }
-              },
-              size: size, 
-              iconSize: iconSize
-            ), 
-            SizedBox(width: spacing)
-          ],
           _DetailIconButton(
-            icon: isFav ? Icons.check : Icons.add, 
-            label: 'Mi lista', 
-            color: isFav ? const Color(0xFFEF7A1E) : null,
+            icon: Icons.thumb_down_off_alt, 
+            label: 'No es para m\u00ED', 
             onPressed: () {
-              final item = FavoriteItem(
-                id: currentId,
-                title: widget.title,
-                posterUrl: widget.poster ?? '',
-                bannerUrl: widget.banner ?? '',
-                category: widget.category,
-                source: widget.source,
-                url: widget.url,
-                addedAt: DateTime.now(),
-                profileId: profileId,
-              );
-              ref.read(favoritesProvider.notifier).toggleFavorite(item);
-            }, 
-            size: size, iconSize: iconSize
+              // TODO: Lógica de No me gusta
+            },
+            size: size, 
+            iconSize: iconSize
+          ), 
+          SizedBox(width: spacing),
+          _DetailIconButton(
+            icon: Icons.thumb_up_off_alt, 
+            label: 'Me gusta', 
+            onPressed: () {
+              // TODO: Lógica de Like
+            },
+            size: size, 
+            iconSize: iconSize
+          ), 
+          SizedBox(width: spacing),
+          _DetailIconButton(
+            icon: Icons.heart_broken_outlined, // Simulación de "Me encanta" (Double Like en la captura)
+            label: 'Me encanta', 
+            onPressed: () {
+              // TODO: Lógica de Love
+            },
+            size: size, 
+            iconSize: iconSize
           ),
+        if (_ytController != null && _showPlayer) ...[
           SizedBox(width: spacing),
-          _DetailIconButton(icon: Icons.thumb_up_off_alt, label: 'Me gusta', onPressed: () {}, size: size, iconSize: iconSize), 
-          SizedBox(width: spacing),
-          _DetailIconButton(icon: Icons.thumb_down_off_alt, label: 'No es para m\u00ED', onPressed: () {}, size: size, iconSize: iconSize),
-          if (_ytController != null && _showPlayer) ...[
-            SizedBox(width: spacing),
-            _DetailIconButton(
-              icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, 
-              label: _isMuted ? 'Activar audio' : 'Silenciar', 
-              onPressed: () { 
-                setState(() { 
-                  _isMuted = !_isMuted; 
-                  if (_isMuted) _ytController?.mute(); 
-                  else { _ytController?.unMute(); _ytController!.setVolume(100); } 
-                }); 
-              }, 
-              size: size, 
-              iconSize: iconSize
-            )
-          ],
-        ]
-      );
-    });
-  }
+          _DetailIconButton(
+            icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, 
+            label: _isMuted ? 'Activar audio' : 'Silenciar', 
+            onPressed: () { 
+              setState(() { 
+                _isMuted = !_isMuted; 
+                if (_isMuted) _ytController?.mute(); 
+                else { _ytController?.unMute(); _ytController!.setVolume(100); } 
+              }); 
+            }, 
+            size: size, 
+            iconSize: iconSize
+          )
+        ],
+      ],
+    ),
+  );
+}
 
-  Widget _buildMainActionButton(BuildContext context, {bool isCompact = false}) {
-    return ValueListenableBuilder(valueListenable: Hive.box('playback_history').listenable(), builder: (ctx, box, _) {
-      return Consumer(builder: (context, ref, child) {
-        final historyManager = ref.watch(playbackHistoryStateProvider.notifier);
-        final latestHistory = historyManager.getLatestWatched(widget.title);
-        String label = 'Reproducir';
-        if (latestHistory != null) {
-          if (latestHistory.isFinished) { label = 'Siguiente: EP ${(int.tryParse(latestHistory.episode ?? '0') ?? 0) + 1}'; }
-          else { label = latestHistory.season != null ? 'Reanudar T${latestHistory.season}:EP ${latestHistory.episode}' : 'Reanudar EP ${latestHistory.episode}'; }
-        }
-        return _DetailButton(
-          onPressed: widget.onPlay, 
-          icon: Icons.play_arrow, 
-          label: label, 
-          isPrimary: true, 
-          compact: isCompact,
-          isLoading: widget.isLoadingSources,
-        );
-      });
-    });
-  }
 
-  Widget _buildMetaRow(dynamic detail, {bool isCompact = false}) {
+  Widget _buildNetflixMetaRow(dynamic detail) {
     final r = (detail?.rating ?? widget.sourceRating) as double?;
     final rawDate = (detail is AnimeDetail) ? detail.firstAirDate : (detail is MovieDetail ? detail.releaseDate : null);
     final d = _pickDisplayDate(rawDate, widget.inferredSeasonAirDate); 
-    final g = detail?.genres as List<dynamic>?; 
     final cert = (detail is MovieDetail ? detail.certification : (detail is AnimeDetail ? detail.certification : null)) ?? 'NR';
+    final runtime = _getRuntime(detail);
+    final isMovie = _isMovieContent(detail);
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-      Row(mainAxisSize: MainAxisSize.min, children: [ if (widget.showRatingSkeleton && r == null) ...[_RatingSkeleton(width: ResponsiveUtils.sp(context, isCompact ? 38 : 44), height: ResponsiveUtils.sp(context, isCompact ? 16 : 18)), SizedBox(width: ResponsiveUtils.sp(context, 10))] else if (r != null && r > 0) ...[Icon(Icons.star_rounded, color: Colors.amber, size: ResponsiveUtils.sp(context, isCompact ? 18 : 22)), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: ResponsiveUtils.sp(context, isCompact ? 16 : 18))), SizedBox(width: ResponsiveUtils.sp(context, 10))], if (g != null && g.isNotEmpty) Wrap(spacing: 8, children: g.take(3).map<Widget>((genre) => _buildBadge(context, genre.toString().toUpperCase(), small: isCompact)).toList()) ]),
-      SizedBox(height: ResponsiveUtils.sp(context, 10)),
-      Row(mainAxisSize: MainAxisSize.min, children: [ if (d != null && d.length >= 4) ...[Icon(Icons.calendar_today_rounded, color: const Color(0xFFA5A5AA), size: ResponsiveUtils.sp(context, 12)), const SizedBox(width: 6), Text(d.substring(0, 4), style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 15))), SizedBox(width: ResponsiveUtils.sp(context, 10))], _buildBadge(context, cert, small: isCompact), const SizedBox(width: 8), _buildBadge(context, 'CC', small: isCompact) ]),
-    ]);
+    final List<String> genres = (detail?.genres as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DefaultTextStyle(
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: ResponsiveUtils.sp(context, 17),
+            fontWeight: FontWeight.w600,
+          ),
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            children: [
+              if (d != null && d.length >= 4) Text(d.substring(0, 4)),
+              if (isMovie) ...[
+                if (runtime != null) Text(_formatRuntime(runtime)),
+              ] else if (widget.totalSeasons > 1) ...[
+                Text('${widget.totalSeasons} Temporadas'),
+              ] else if (detail?.episodes != null) ...[
+                Text('${detail.episodes} Episodios'),
+              ],
+              if (genres.isNotEmpty) ...[
+                ...genres.take(2).map((g) => _buildBadge(context, g.toUpperCase(), small: true)),
+              ],
+              if (r != null && r > 0) ...[
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.star_rounded, color: Colors.amber, size: ResponsiveUtils.sp(context, 20)),
+                    const SizedBox(width: 4),
+                    Text(formatRating(r) ?? 'N/A'),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _buildAgeBadge(context, cert, small: true),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _getWarningText(cert),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFFA5A5AA),
+                  fontSize: ResponsiveUtils.sp(context, 14),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCastInfo(dynamic d) {
+    String castText = '';
+    if (d is AnimeDetail) {
+      castText = d.characters.take(3).map((c) => c.name).join(', ');
+    } else if (d is MovieDetail) {
+      castText = d.cast.take(3).map((c) => c.name).join(', ');
+    }
+
+    if (castText.isEmpty) return const SizedBox.shrink();
+
+    return RichText(
+      text: TextSpan(
+        style: GoogleFonts.poppins(
+          color: Colors.white70,
+          fontSize: ResponsiveUtils.sp(context, 16),
+          fontWeight: FontWeight.w500,
+        ),
+        children: [
+          const TextSpan(text: 'Cast: ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+          TextSpan(text: castText),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNetflixActionList(BuildContext context) {
+    return ValueListenableBuilder(
+      valueListenable: Hive.box('playback_history').listenable(), 
+      builder: (ctx, box, _) {
+        return Consumer(builder: (context, ref, child) {
+          final historyManager = ref.watch(playbackHistoryStateProvider.notifier);
+          final latestHistory = historyManager.getLatestWatched(widget.title);
+          
+          final favorites = ref.watch(favoritesProvider);
+          final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
+          final bool isFav = favorites.any((f) => f.id == currentId);
+          
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. REANUDAR (Con barra de progreso)
+              if (latestHistory != null && !latestHistory.isFinished)
+                _NetflixListButton(
+                  icon: Icons.play_arrow,
+                  label: latestHistory.season != null 
+                    ? 'Reanudar T${latestHistory.season}:EP ${latestHistory.episode}' 
+                    : 'Reanudar Episodio ${latestHistory.episode}',
+                  progress: latestHistory.progress,
+                  isPrimary: true,
+                  autofocus: true,
+                  onPressed: widget.onPlay,
+                )
+              else
+                _NetflixListButton(
+                  icon: Icons.play_arrow,
+                  label: 'Reproducir',
+                  isPrimary: true,
+                  autofocus: true,
+                  onPressed: widget.onPlay,
+                ),
+              
+              const SizedBox(height: 10),
+
+              // 2. REPRODUCIR DESDE EL INICIO
+              _NetflixListButton(
+                icon: Icons.replay,
+                label: 'Reproducir desde el inicio',
+                onPressed: () {
+                  // TODO: Lógica para forzar inicio desde 0
+                  widget.onPlay();
+                },
+              ),
+
+              const SizedBox(height: 10),
+
+              // 3. TRÁILER
+              if (_lastTrailerKey != null)
+                _NetflixListButton(
+                  icon: Icons.movie_outlined,
+                  label: 'Ver tráiler',
+                  onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true),
+                ),
+
+              const SizedBox(height: 10),
+
+              // 4. EPISODIOS Y MÁS
+              if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime'))
+                _NetflixListButton(
+                  icon: Icons.layers_outlined,
+                  label: 'Episodios y m\u00E1s',
+                  onPressed: () => widget.onShowEpisodes?.call(),
+                ),
+
+              const SizedBox(height: 10),
+
+              // 5. MI LISTA
+              _NetflixListButton(
+                icon: isFav ? Icons.check : Icons.add,
+                label: isFav ? 'En mi lista' : 'Añadir a mi lista',
+                onPressed: () {
+                  final user = ref.read(authProvider);
+                  final profileId = user?.activeProfileId ?? 'guest_profile';
+                  final item = FavoriteItem(
+                    id: currentId,
+                    title: widget.title,
+                    posterUrl: widget.poster ?? '',
+                    bannerUrl: widget.banner ?? '',
+                    category: widget.category,
+                    source: widget.source,
+                    url: widget.url,
+                    addedAt: DateTime.now(),
+                    profileId: profileId,
+                  );
+                  ref.read(favoritesProvider.notifier).toggleFavorite(item);
+                },
+              ),
+
+              const SizedBox(height: 10),
+
+              // 5. ELIMINAR DE SEGUIR VIENDO
+              if (latestHistory != null)
+                _NetflixListButton(
+                  icon: Icons.close,
+                  label: 'Eliminar de seguir viendo',
+                  onPressed: () {
+                    ref.read(playbackHistoryStateProvider.notifier).clearContentHistory(widget.title);
+                  },
+                ),
+            ],
+          );
+        });
+      }
+    );
   }
 
   Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) => Text(
@@ -638,7 +824,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     overflow: TextOverflow.ellipsis, 
     style: TextStyle(
       color: Colors.white.withOpacity(0.9), 
-      fontSize: ResponsiveUtils.sp(context, 13), // Reducido para calcar WEB en TV
+      fontSize: ResponsiveUtils.sp(context, 18), // Aumentado para mejor legibilidad en TV
       height: 1.3, 
       fontWeight: FontWeight.w500, 
       letterSpacing: -0.1
@@ -682,10 +868,10 @@ class _SeasonSelectorState extends State<_SeasonSelector> {
               width: ResponsiveUtils.sp(context, widget.compact ? 130 : 180), 
               height: ResponsiveUtils.sp(context, widget.compact ? 38 : 48), 
               decoration: BoxDecoration(
-                color: isActive ? const Color(0xFF454652) : const Color(0xFF32333E), 
+                color: isActive ? const Color(0xFF454652) : Colors.transparent, 
                 borderRadius: BorderRadius.circular(8), 
                 border: Border.all(
-                  color: isActive ? Colors.white : Colors.transparent, 
+                  color: isActive ? Colors.white : Colors.white24, 
                   width: isActive ? 2.0 : 1.5
                 ),
               ), 
@@ -785,10 +971,10 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
               width: ResponsiveUtils.sp(context, widget.compact ? 130 : 180), 
               height: ResponsiveUtils.sp(context, widget.compact ? 38 : 48), 
               decoration: BoxDecoration(
-                color: isActive ? const Color(0xFF454652) : const Color(0xFF32333E), 
+                color: isActive ? const Color(0xFF454652) : Colors.transparent, 
                 borderRadius: BorderRadius.circular(8), 
                 border: Border.all(
-                  color: isActive ? Colors.white : Colors.transparent, 
+                  color: isActive ? Colors.white : Colors.white24, 
                   width: isActive ? 2.0 : 1.5
                 ),
               ), 
@@ -844,14 +1030,8 @@ class _EpisodeCard extends ConsumerStatefulWidget {
 }
 
 class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
-  static _EpisodeCardState? _activeState;
   bool _isHovered = false;
-  OverlayEntry? _overlayEntry;
-  bool _isOverlayShown = false;
-  bool _isMouseInside = false;
-  final LayerLink _layerLink = LayerLink();
-  Timer? _showTimer;
-  Timer? _hideTimer;
+  bool _focused = false;
 
   String get _displayTitle {
     if (widget.episodeType != null) {
@@ -892,257 +1072,26 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
     return isDub ? 'DUB' : 'SUB';
   }
 
-  bool _focused = false;
-
-  void _showOverlay(BuildContext context) {
-    _hideTimer?.cancel();
-    if (_isOverlayShown || _overlayEntry != null) return;
-    
-    _showTimer?.cancel();
-    // Debounce de 300ms para TV: equilibrio entre rapidez y evitar ruido
-    _showTimer = Timer(const Duration(milliseconds: 300), () {
-      if (mounted && (_focused || _isHovered)) {
-        _performShow(context);
-      }
-    });
-  }
-
-  void _performShow(BuildContext context) {
-    if (!mounted || (!_focused && !_isHovered) || _overlayEntry != null) return;
-
-    final oldActiveState = _activeState;
-    _activeState = this;
-    _isOverlayShown = true;
-    
-    final overlay = Overlay.of(context);
-    final RenderBox renderBox = context.findRenderObject() as RenderBox;
-    final Size cardSize = renderBox.size;
-    final Offset position = renderBox.localToGlobal(Offset.zero);
-    final double screenWidth = MediaQuery.of(context).size.width;
-
-    final double popupWidth = cardSize.width + 48;
-    const double edgePadding = 24.0;
-    
-    double cardCenterX = position.dx + cardSize.width / 2;
-    double popupHalfWidth = popupWidth / 2;
-    
-    double targetCenterX = cardCenterX;
-    if (targetCenterX - popupHalfWidth < edgePadding) {
-      targetCenterX = edgePadding + popupHalfWidth;
-    } else if (targetCenterX + popupHalfWidth > screenWidth - edgePadding) {
-      targetCenterX = screenWidth - edgePadding - popupHalfWidth;
-    }
-    
-    double offsetX = targetCenterX - cardCenterX; 
-    double offsetY = -27; // Senior Fix: Anclaje cinemático para imagen Edge-to-Edge (WEB Exact)
-
-    _overlayEntry = OverlayEntry(
-      builder: (context) => Stack(
-        children: [
-          CompositedTransformFollower(
-            link: _layerLink,
-            showWhenUnlinked: false,
-            targetAnchor: Alignment.topCenter,
-            followerAnchor: Alignment.topCenter,
-            offset: Offset(offsetX, offsetY),
-            child: TweenAnimationBuilder<double>(
-              duration: const Duration(milliseconds: 150),
-              tween: Tween(begin: 0.0, end: 1.0),
-              builder: (context, opacity, child) => Opacity(opacity: opacity, child: child),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: widget.onTap,
-                  borderRadius: BorderRadius.circular(12),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    width: popupWidth,
-                    padding: EdgeInsets.zero, 
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF191E25),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.6),
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                          child: Stack(
-                            children: [
-                              AspectRatio(
-                                aspectRatio: 16 / 9,
-                                child: CachedNetworkImage(
-                                  imageUrl: widget.imageUrl,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => CachedNetworkImage(
-                                    imageUrl: widget.fallbackImageUrl,
-                                    fit: BoxFit.cover,
-                                    errorWidget: (_, __, ___) => _episodePlaceholder(widget.episodeNumber),
-                                  ),
-                                ),
-                              ),
-                              if (widget.progress != null && widget.progress! > 0)
-                                Positioned(
-                                  bottom: 0, left: 0, right: 0,
-                                  child: Container(
-                                    height: 3,
-                                    color: Colors.black26,
-                                    child: FractionallySizedBox(
-                                      alignment: Alignment.centerLeft,
-                                      widthFactor: widget.progress,
-                                      child: Container(color: const Color(0xFFEF7A1E)),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.only(
-                            left: 24, 
-                            right: 24, 
-                            bottom: 24, 
-                            top: ResponsiveUtils.sp(context, 12)
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _displayTitle,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: ResponsiveUtils.sp(context, 16),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: ResponsiveUtils.sp(context, 6)),
-                              Text(
-                                widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
-                                maxLines: 8,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: const Color(0xFFA5A5AA),
-                                  fontSize: ResponsiveUtils.sp(context, 13),
-                                  height: 1.5,
-                                  fontWeight: FontWeight.normal,
-                                ),
-                              ),
-                              SizedBox(height: ResponsiveUtils.sp(context, 8)),
-                              Row(
-                                children: [
-                                  if (widget.certification != null && widget.certification != 'NR') ...[
-                                    _buildBadge(context, widget.certification!, small: true),
-                                    SizedBox(width: ResponsiveUtils.sp(context, 8)),
-                                  ],
-                                  if (_typeBadge != null) ...[
-                                    _buildBadge(context, _typeBadge!, small: true),
-                                    SizedBox(width: ResponsiveUtils.sp(context, 8)),
-                                  ],
-                                  _buildBadge(context, _languageBadge, small: true),
-                                  SizedBox(width: ResponsiveUtils.sp(context, 10)),
-                                  if (!_isSpecial && widget.duration != null) ...[
-                                    Text(
-                                      widget.duration!,
-                                      style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
-                                    ),
-                                    SizedBox(width: ResponsiveUtils.sp(context, 10)),
-                                  ],
-                                  if (!_isSpecial && widget.releaseDate != null)
-                                    Text(
-                                      _formatDate(widget.releaseDate),
-                                      style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    overlay.insert(_overlayEntry!);
-    
-    if (oldActiveState != null && oldActiveState != this) {
-      oldActiveState._performHide();
-    }
-
-    if (mounted) setState(() {});
-  }
-
-  void _hideOverlay({bool immediate = false}) {
-    _showTimer?.cancel();
-    if (immediate) {
-      _performHide();
-    } else {
-      _hideTimer?.cancel();
-      _hideTimer = Timer(const Duration(milliseconds: 100), () {
-        if (mounted && !_focused && !_isHovered) {
-          _performHide();
-        }
-      });
-    }
-  }
-
-  void _performHide() {
-    _isOverlayShown = false;
-    if (_overlayEntry != null) {
-      _overlayEntry?.remove();
-      _overlayEntry = null;
-    }
-    if (_activeState == this) _activeState = null;
-    if (mounted) setState(() {});
-  }
-
   @override
   void dispose() {
-    _showTimer?.cancel();
-    _hideTimer?.cancel();
-    if (_activeState == this) _activeState = null;
-    _overlayEntry?.remove();
     super.dispose();
   }
 
   @override Widget build(BuildContext context) {
-    final bool isActive = _isHovered || _focused;
-    final bool isOverlayActive = _isOverlayShown || _overlayEntry != null;
     final double padding = ResponsiveUtils.sp(context, 6); 
 
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: Focus(
-        onFocusChange: (focused) {
-          setState(() => _focused = focused);
-          if (focused) {
-            Scrollable.ensureVisible(
-              context,
-              alignment: 0.5,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            _showOverlay(context);
-          } else {
-            _hideOverlay();
-          }
-        },
+    return Focus(
+      onFocusChange: (focused) {
+        setState(() => _focused = focused);
+        if (focused) {
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+      },
         onKeyEvent: (node, event) {
           if (event is KeyDownEvent) {
             if (event.logicalKey == LogicalKeyboardKey.enter || 
@@ -1154,15 +1103,9 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
           }
           return KeyEventResult.ignored;
         },
-        child: MouseRegion(
-          onEnter: (_) {
-            setState(() => _isHovered = true);
-            _showOverlay(context);
-          },
-          onExit: (_) {
-            setState(() => _isHovered = false);
-            _hideOverlay();
-          },
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
           child: InkWell(
             onTap: widget.onTap,
             borderRadius: BorderRadius.circular(12),
@@ -1242,15 +1185,15 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                   Row(
                     children: [
                       if (widget.certification != null && widget.certification != 'NR') ...[
-                        _buildBadge(context, widget.certification!, small: true),
+                        _buildAgeBadge(context, widget.certification!, small: true),
                         SizedBox(width: ResponsiveUtils.sp(context, 6)),
                       ],
                       if (_typeBadge != null) ...[
-                        _buildBadge(context, _typeBadge!, small: true),
+                        _buildAgeBadge(context, _typeBadge!, small: true),
                         SizedBox(width: ResponsiveUtils.sp(context, 6)),
                       ],
                       if (_languageBadge != null) ...[
-                        _buildBadge(context, _languageBadge, small: true),
+                        _buildAgeBadge(context, _languageBadge, small: true),
                         SizedBox(width: ResponsiveUtils.sp(context, 8)),
                       ],
                       if (!_isSpecial && widget.duration != null) ...[
@@ -1275,7 +1218,6 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                   ),
                 ],
               ),
-            ),
           ),
         ),
       ),
@@ -1561,20 +1503,13 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
               duration: const Duration(milliseconds: 200),
               height: widget.size ?? ResponsiveUtils.sp(context, 48), 
               width: widget.size ?? ResponsiveUtils.sp(context, 48), 
-              decoration: BoxDecoration(
-                color: isActive ? Colors.white.withOpacity(0.2) : Colors.white10, 
-                shape: BoxShape.circle, 
-                border: Border.all(color: widget.color ?? (isActive ? Colors.white : Colors.white24)),
-                boxShadow: _isFocused ? [
-                  BoxShadow(
-                    color: Colors.white.withOpacity(0.2),
-                    blurRadius: 15,
-                    spreadRadius: 2,
-                  )
-                ] : [],
-              ), 
+              decoration: const BoxDecoration(), 
               child: IconButton(
-                icon: Icon(widget.icon, color: widget.color ?? Colors.white, size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)), 
+                icon: Icon(
+                  widget.icon, 
+                  color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), 
+                  size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)
+                ), 
                 onPressed: widget.onPressed,
                 style: IconButton.styleFrom(
                   focusColor: Colors.transparent, 
@@ -1713,7 +1648,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final episodesAspectRatio = (width < 1000 ? 0.82 : 0.8); 
 
     final isAnimeCatFetch = widget.category == 'anime';
-    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie';
+    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'series' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie' || widget.result?.kind?.toLowerCase() == 'series';
     final fetchAnimeDetail = isAnimeCatFetch || widget.category == 'movie_anime' || widget.category == 'all';
 
     const metadataSourceHints = {'anilist', 'tmdb', 'trakt', 'mal', 'jikan'};
@@ -1991,145 +1926,91 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         key: const ValueKey('content'), 
         opacity: 1.0, 
         duration: const Duration(milliseconds: 400), 
-        child: CustomScrollView(
-          controller: _scrollController, 
-          physics: const ClampingScrollPhysics(), 
-          slivers: [
-            SliverToBoxAdapter(child: _ContentHeader(
-              title: widget.title, 
-              source: widget.source, 
-              url: widget.url, 
-              category: widget.category,
-              poster: initialThumbnail, 
-              banner: heroBanner, 
-              animeDetailAsync: displayAnimeDetailAsync, 
-              movieDetailAsync: movieDetailAsync, 
-              currentSource: currentSource, 
-              sources: activeSources, 
-              season: currentSeason, 
-              sourceRating: currentSource?.score, 
-              showRatingSkeleton: currentSource?.score == null && detailLoading, 
-              isLoadingSources: searchLoading && activeSources.isEmpty,
-              totalSeasons: totalSeasons, 
-              currentSeason: currentSeason, 
-              onSourceSelected: (index) {
-                if (activeSources.isEmpty) return;
-                setState(() {
-                  _selectedSourceIndex = index;
-                  _userSelectedSourceKey = '${activeSources[index].source}|${activeSources[index].url}';
-                });
-              },
-              onSeasonSelected: (s) => setState(() => _selectedSeason = s), 
-              inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, 
-              latestHistory: ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title), 
-              unavailableSources: isMovieCategory ? _movieAvail.entries.where((e) => e.value == false).map((e) => e.key).toSet() : null, 
-              onPlay: () {
-                SearchResult? playSource = currentSource;
-                if (isMovieCategory && playSource != null && _movieAvail[simplifySourceName(playSource.source)] == false) {
-                  playSource = activeSources.firstWhereOrNull((s) => _movieAvail[simplifySourceName(s.source)] == true) ?? playSource;
-                }
-                final src = playSource?.source ?? widget.source;
-                final playEpisodesUrl = playSource?.url ?? widget.url;
-                if (isMovieCategory) {
-                  final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Pel\u00EDcula', thumbnail: initialThumbnail);
-                  final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                  context.push('/player/${Uri.encodeComponent(widget.title)}?source=${src}&url=${_episodeUrlFor(ep, playEpisodesUrl, src, 1)}&episode=1&serverName=${simplifySourceName(src)}&language=${((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&totalEpisodes=1$posterParam');
-                  return;
-                }
-                final latest = ref.read(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title);
-                int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
-                final epData = episodesAsync.valueOrNull?.response;
-                final epSource = episodeSourceForLocal(epNum) ?? currentSource;
-                final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
-                
-                final episodeThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
-                final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(episodeThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? src}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? src, epNum)}&episode=$epNum&season=${latest?.season ?? currentSeason}&serverName=${simplifySourceName(epSource?.source ?? src)}&language=${(epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB'}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}$posterParam');
-              }
-            )),
-            SliverMainAxisGroup(slivers: [
-              SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _buildTabBar(tabLabels, selectedTabIndex, hPadding),
-                SizedBox(height: ResponsiveUtils.sp(context, 12)),
-              ]))),
-              if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex) episodesAsync.when(
-                data: (epBundle) {
-                  final epData = epBundle?.response;
-                  if (epData == null) return const SliverToBoxAdapter(child: SizedBox.shrink());
-                  final omdbEpisodes = omdbSeasonAsync.valueOrNull ?? [];
-                  return SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverMainAxisGroup(slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 32),
-                        child: Text(
-                          '${epData.total} episodios', 
-                          style: TextStyle(
-                            color: const Color(0xFFA5A5A5), 
-                            fontSize: ResponsiveUtils.sp(context, 15),
-                          )
-                        )
-                      )
-                    ),
-                    SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: ResponsiveUtils.sp(context, 8), crossAxisSpacing: ResponsiveUtils.sp(context, 8), childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
-                      final ep = index < epData.episodes.length ? epData.episodes[index] : null; final omdb = index < omdbEpisodes.length ? omdbEpisodes[index] : null;
-                      final epNum = (ep?.number ?? index + 1).toString();
-                      final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                      final epSource = epBundle?.sourceForNumber(ep?.number ?? index + 1) ?? currentSource;
-                      final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? omdb?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? omdb?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? omdb?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate ?? omdb?.released, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : omdb?.duration), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
-                        final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                        final tapSource = epBundle?.sourceForNumber(ep?.number ?? index + 1) ?? currentSource;
-                        final epThumb = ep?.thumbnail ?? omdb?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&language=${(epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
-                      });
-                    }, childCount: epData.total)),
-                      if (epData.specials.isNotEmpty) ...[
-                      SliverToBoxAdapter(
-                        child: const Padding(
-                          padding: EdgeInsets.only(top: 40, bottom: 32),
-                          child: Text(
-                            'Temporada 0',
-                            style: TextStyle(
-                              color: Color(0xFFA5A5A5),
-                              fontSize: 20,
-                            ),
-                          ),
-                        ),
-                      ),
-                      SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: ResponsiveUtils.sp(context, 8), crossAxisSpacing: ResponsiveUtils.sp(context, 8), childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
-                        final sp = epData.specials[index];
-                        final spSource = currentSource;
-                        final spQuality = sp.quality ?? spSource?.quality ?? '';
-                        return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, onTap: () {
-                          final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                          final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=${sp.number}&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&language=${(spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
-                        });
-                      }, childCount: epData.specials.length)),
-                    ],
-                    const SliverToBoxAdapter(child: SizedBox(height: 150)),
-                  ]));
+        child: _ContentHeader(
+          title: widget.title, 
+          source: widget.source, 
+          url: widget.url, 
+          category: widget.category,
+          poster: initialThumbnail, 
+          banner: heroBanner, 
+          animeDetailAsync: displayAnimeDetailAsync, 
+          movieDetailAsync: movieDetailAsync, 
+          currentSource: currentSource, 
+          sources: activeSources, 
+          season: currentSeason, 
+          sourceRating: currentSource?.score, 
+          showRatingSkeleton: currentSource?.score == null && detailLoading, 
+          isLoadingSources: searchLoading && activeSources.isEmpty,
+          totalSeasons: totalSeasons, 
+          currentSeason: currentSeason, 
+          onSourceSelected: (index) {
+            if (activeSources.isEmpty) return;
+            setState(() {
+              _selectedSourceIndex = index;
+              _userSelectedSourceKey = '${activeSources[index].source}|${activeSources[index].url}';
+            });
+          },
+          onSeasonSelected: (s) => setState(() => _selectedSeason = s), 
+          onShowEpisodes: () {
+            Navigator.of(context).push(
+              PageRouteBuilder(
+                opaque: false,
+                barrierColor: Colors.black.withOpacity(0.5),
+                pageBuilder: (context, _, __) => EpisodesDetailOverlay(
+                  detailData: displayDetail,
+                  sources: activeSources,
+                  currentSource: currentSource,
+                  totalSeasons: totalSeasons,
+                  currentSeason: currentSeason,
+                  onSeasonSelected: (s) => setState(() => _selectedSeason = s),
+                  episodesAsync: episodesAsync,
+                  category: widget.category,
+                  title: widget.title,
+                  bannerUrl: heroBanner,
+                  onPlayEpisode: (ep, epSource, total) {
+                    final epNum = ep.number;
+                    final src = epSource?.source ?? widget.source;
+                    final playEpisodesUrl = epSource?.url ?? widget.url;
+                    final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum.toString());
+                    
+                    final epThumb = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
+                    final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
+                    
+                    context.push('/player/${Uri.encodeComponent(widget.title)}?source=${src}&url=${_episodeUrlFor(ep, playEpisodesUrl, src, epNum)}&episode=$epNum&season=$currentSeason&serverName=${simplifySourceName(src)}&language=${(epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=$total$posterParam');
+                  },
+                ),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
                 },
-                loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: const _EpisodesSkeleton()),
-                error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: Color(0xFFA5A5AA))))),
               ),
-              if (selectedTabIndex == relatedTabIndex) ..._buildRelatedTab(
-                hPadding, 
-                unifiedRelations: unifiedRelationsAsync.valueOrNull,
-                currentSource: currentSource,
-              ),
-    if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(displayAnimeDetailAsync.valueOrNull, hPadding),
-    if (selectedTabIndex == detailsTabIndex) ..._buildDetailsTab(displayDetail, hPadding, inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, sourceRating: currentSource?.score, showRatingSkeleton: currentSource?.score == null && detailLoading),
-    if (selectedTabIndex == galleryTabIndex) ..._buildGalleryTab(
-      hPadding,
-      isMovieCategory ? 'movie' : 'tv',
-      episodeReqMetaTitle,
-      episodeReqYear,
-    ),
-              SliverToBoxAdapter(child: SizedBox(height: ResponsiveUtils.sp(context, 24))),
-            ]),
-          ],
+            );
+          },
+          inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, 
+          latestHistory: ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title), 
+          unavailableSources: isMovieCategory ? _movieAvail.entries.where((e) => e.value == false).map((e) => e.key).toSet() : null, 
+          onPlay: () {
+            SearchResult? playSource = currentSource;
+            if (isMovieCategory && playSource != null && _movieAvail[simplifySourceName(playSource.source)] == false) {
+              playSource = activeSources.firstWhereOrNull((s) => _movieAvail[simplifySourceName(s.source)] == true) ?? playSource;
+            }
+            final src = playSource?.source ?? widget.source;
+            final playEpisodesUrl = playSource?.url ?? widget.url;
+            if (isMovieCategory) {
+              final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Pel\u00EDcula', thumbnail: initialThumbnail);
+              final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
+              context.push('/player/${Uri.encodeComponent(widget.title)}?source=${src}&url=${_episodeUrlFor(ep, playEpisodesUrl, src, 1)}&episode=1&serverName=${simplifySourceName(src)}&language=${((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&totalEpisodes=1$posterParam');
+              return;
+            }
+            final latest = ref.read(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title);
+            int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
+            final epData = episodesAsync.valueOrNull?.response;
+            final epSource = episodeSourceForLocal(epNum) ?? currentSource;
+            final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
+            
+            final episodeThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
+            final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(episodeThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
+            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? src}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? src, epNum)}&episode=$epNum&season=${latest?.season ?? currentSeason}&serverName=${simplifySourceName(epSource?.source ?? src)}&language=${(epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB'}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}$posterParam');
+          }
         ),
       ),
     );
@@ -2294,8 +2175,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final ops = detail.openings; final eds = detail.endings;
     if (ops.isEmpty && eds.isEmpty) return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay temas musicales disponibles', style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 18)))))];
     return [
-      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: const Text('Openings', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: detail.backdrop), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
-      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: const Text('Endings', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: detail.backdrop), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: const Text('Openings', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: detail.banner ?? detail.backdrop), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: const Text('Endings', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: detail.banner ?? detail.backdrop), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
     ];
   }
 
@@ -2320,6 +2201,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             Text(detail.title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)), const SizedBox(height: 10),
             Wrap(spacing: 8, children: [ Text(detail is AnimeDetail ? 'Jap\u00F3n' : 'Internacional', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 17)), const Text('•', style: TextStyle(color: Colors.white24)), Text(detail is AnimeDetail ? 'Anime' : 'Pel\u00EDcula', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 17)) ]), const SizedBox(height: 10),
             Row(children: [ const Text('IMDb ', style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 17, fontWeight: FontWeight.w900)), if (showRatingSkeleton && rating == null) const _RatingSkeleton(width: 36, height: 18) else Text(rating ?? 'N/A', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 17)), const Text('/10', style: TextStyle(color: Color(0xFFA5A5AA))), const SizedBox(width: 16), Text(year, style: const TextStyle(color: Color(0xFFA5A5AA))), if (sInfo.isNotEmpty) ...[const SizedBox(width: 16), Text(sInfo, style: const TextStyle(color: Color(0xFFA5A5AA)))] ]), const SizedBox(height: 16),
+            if (detail.genres is List) ...[
+              Wrap(spacing: 8, runSpacing: 8, children: (detail.genres as List).map<Widget>((g) => _buildBadge(context, g.toString().toUpperCase())).toList()),
+              const SizedBox(height: 20),
+            ],
             _ExpandableText(text: detail.overview ?? '', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 20), maxLines: 4)
           ])),
           const SizedBox(height: 24), if (dir.isNotEmpty || cast.isNotEmpty || std.isNotEmpty || status != null || languages.isNotEmpty) _DetailInfoCard(child: Column(children: [ 
@@ -2332,7 +2217,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ])),
         const SizedBox(width: 24), Expanded(flex: 10, child: Column(
           children: [
-            _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ const Text('Advertencias de contenido', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)), const SizedBox(height: 16), _buildBadge(context, cert), const SizedBox(height: 16), Text('${getWarningText(cert)} Las luces intermitentes pueden afectar a espectadores fotosensibles', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 20)) ])),
+            _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ const Text('Advertencias de contenido', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)), const SizedBox(height: 16), _buildAgeBadge(context, cert), const SizedBox(height: 16), Text('${getWarningText(cert)} Las luces intermitentes pueden afectar a espectadores fotosensibles', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 20)) ])),
             if (platforms.isNotEmpty) ...[
               const SizedBox(height: 24),
               _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3021,6 +2906,125 @@ class _GalleryItemLocalState extends State<_GalleryItemLocal> {
                     if (_isHovered) Container(color: Colors.black26),
                     Positioned(top: 6, left: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)), child: Text(_getTypeLabelLocal(widget.image.type), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)))),
                     Positioned(bottom: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)), child: Text(widget.image.source.toUpperCase(), style: const TextStyle(color: Color(0xFF9AA0FF), fontSize: 10, fontWeight: FontWeight.bold)))),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NetflixListButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+  final double? progress;
+  final bool isPrimary;
+  final bool autofocus;
+
+  const _NetflixListButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.progress,
+    this.isPrimary = false,
+    this.autofocus = false,
+  });
+
+  @override
+  State<_NetflixListButton> createState() => _NetflixListButtonState();
+}
+
+class _NetflixListButtonState extends State<_NetflixListButton> {
+  bool _focused = false;
+  bool _hovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focused = widget.autofocus;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isActive = _focused || _hovered;
+    final Color bgColor = isActive ? Colors.white : Colors.transparent;
+    final Color fgColor = isActive ? Colors.black : const Color(0xFFC8C8CE);
+
+    return Focus(
+      autofocus: widget.autofocus,
+      onFocusChange: (f) => setState(() => _focused = f),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedScale(
+          scale: isActive ? 1.02 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            width: ResponsiveUtils.sp(context, 480),
+            height: ResponsiveUtils.sp(context, 52),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(4), // Redondeo sutil exacto de la captura
+            ),
+            clipBehavior: Clip.antiAlias, // Obligatorio para que se vea la curva en blanco sólido
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(4),
+              child: InkWell(
+                onTap: widget.onPressed,
+                borderRadius: BorderRadius.circular(4),
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                splashColor: isActive ? Colors.black.withOpacity(0.1) : Colors.white.withOpacity(0.1),
+                child: Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6, right: 20), // Padding izquierdo ajustado a 6
+                      child: Row(
+                        children: [
+                          Icon(widget.icon, color: fgColor, size: 28),
+                          const SizedBox(width: 10), // Más apegado como en la captura
+                          Expanded(
+                            child: Text(
+                              widget.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: fgColor,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w500, // Peso medio como en la captura
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.progress != null && widget.progress! > 0)
+                      Positioned(
+                        right: 20,
+                        child: Container(
+                          width: 80,
+                          height: 6,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            color: isActive ? Colors.black.withOpacity(0.15) : Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: widget.progress!.clamp(0.0, 1.0),
+                            child: Container(
+                              color: const Color(0xFFE50914), // Netflix Red
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

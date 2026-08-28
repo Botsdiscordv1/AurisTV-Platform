@@ -476,14 +476,14 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
         for (final lang in ['SUB', 'LATINO']) {
           final uniqueKey = '${simplifySourceName(s.source)}_${lang}_${r.slug ?? s.url}'.toLowerCase();
           if (seenSources.add(uniqueKey)) {
-            searchSources.add(SearchResult(title: r.title, url: s.url, quality: lang, thumbnail: r.thumbnail, banner: r.banner, source: s.source, slug: r.slug, romaji: r.romaji, english: r.english, year: r.year, score: r.score));
+            searchSources.add(SearchResult(title: r.title, url: s.url, quality: lang, thumbnail: r.thumbnail, banner: r.banner, source: s.source, slug: r.slug, romaji: r.romaji, english: r.english, year: r.year, score: r.score, status: r.status, type: r.type, kind: r.kind));
           }
         }
       } else {
         final displayQuality = cleanQuality(s.quality);
         final uniqueKey = '${simplifySourceName(s.source)}_${displayQuality}_${r.slug ?? s.url}'.toLowerCase();
         if (seenSources.add(uniqueKey)) {
-          searchSources.add(SearchResult(title: r.title, url: s.url, quality: displayQuality, thumbnail: r.thumbnail, banner: r.banner, source: s.source, slug: r.slug, romaji: r.romaji, english: r.english, year: r.year, score: r.score));
+          searchSources.add(SearchResult(title: r.title, url: s.url, quality: displayQuality, thumbnail: r.thumbnail, banner: r.banner, source: s.source, slug: r.slug, romaji: r.romaji, english: r.english, year: r.year, score: r.score, status: r.status, type: r.type, kind: r.kind));
         }
       }
     }
@@ -502,7 +502,7 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
       final hasUnified = isSeasonUnified(r.source) || r.sources.any((s) => isSeasonUnified(s.source));
       if (seenUrls.add(key) && hasUnified && familyMatch(r) && (isMovieCard || !movieMarker.hasMatch(r.title))) {
         final unified = r.sources.where((s) => isSeasonUnified(s.source)).toList();
-        if (unified.isNotEmpty) { extras.add(r.copyWith(source: unified.first.source, url: unified.first.url, quality: unified.first.quality, sources: unified)); }
+        if (unified.isNotEmpty) { extras.add(r.copyWith(source: unified.first.source, url: unified.first.url, quality: unified.first.quality, sources: unified, status: r.status, type: r.type, kind: r.kind)); }
       }
     }
     if (extras.isNotEmpty) mergedResults = [...mergedResults, ...extras];

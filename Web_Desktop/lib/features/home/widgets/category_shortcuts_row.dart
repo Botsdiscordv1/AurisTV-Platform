@@ -97,8 +97,8 @@ class _ShortcutCardState extends State<_ShortcutCard> {
     return Focus(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
+        onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+        onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
         child: GestureDetector(
           onTap: widget.onTap,
           child: AnimatedScale(

@@ -139,8 +139,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
                           // Formateo de Título
                           String displayTitle = h.title ?? 'Contenido';
-                          if (h.episode != null && h.episode!.isNotEmpty) {
-                            displayTitle = 'Ep ${h.episode} . $displayTitle';
+                          final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
+                          if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+                            displayTitle = 'Ep ${h.episode} • $displayTitle';
                           }
 
                           // Tiempo restante

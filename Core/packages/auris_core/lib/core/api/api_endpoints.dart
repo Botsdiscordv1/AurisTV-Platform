@@ -10,10 +10,6 @@ class ApiEndpoints {
 
   static final Map<String, String> _serverOverride = {};
 
-  static void setServerAddress(String address, [String category = 'anime']) {
-    _serverOverride[category.toLowerCase()] = address;
-  }
-
   static void useLocalServer(String ip) {
     _serverOverride['anime'] = ip;
     _serverOverride['movies_series'] = ip;
@@ -93,7 +89,7 @@ class ApiEndpoints {
   static String baseUrlForSource(String source, [String? category]) {
     final s = source.toLowerCase();
     const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
-    const animeHints = ['jkanime', 'animeav1', 'animeflv', 'aniyae', 'animelatino', 'fiuzidragon', 'tioanime', 'animed23', 'animejara', 'katanime', 'animegratis', 'veranime'];
+    const animeHints = ['jkanime', 'animeav1', 'aniyae', 'animelatino', 'fiuzidragon', 'animed23', 'animejara', 'katanime'];
     const movieHints = ['gnula', 'gnulahd'];
 
     if (kdramaHints.any(s.contains)) return kdramasBaseUrl;

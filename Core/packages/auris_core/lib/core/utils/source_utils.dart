@@ -81,7 +81,10 @@ int sourceDisplayRank(String source) {
 
 String cleanQuality(String quality) {
   final l = quality.toLowerCase();
-  if (l.contains('latino') || l.contains('dub') || l.contains('doblado')) {
+  if (l.contains('cast')) {
+    return 'CAST';
+  }
+  if (l.contains('latino') || l.contains('dub') || l.contains('doblado') || l.contains('lat')) {
     return 'LATINO';
   }
   if (l.contains('sub') || l.contains('vose') || l.contains('jap')) {
@@ -91,6 +94,67 @@ String cleanQuality(String quality) {
       .replaceAll('FULLHD', '1080P')
       .replaceAll('HD', '720P')
       .trim();
+}
+
+/// Mapa de códigos de idioma → bandera (emoji). El servidor envía calidad en
+/// formato `TIPO-IDIOMA` (p.ej. `SUB-EN`, `DUB-MX`, `CAST-ES`, `SUB-ES`).
+const Map<String, String> _langFlags = {
+  'MX': '🇲🇽', // Latino (español latinoamericano)
+  'ES': '🇪🇸', // Castellano (español de España)
+  'EN': '🇬🇧', // Inglés (audio original con subtítulos)
+  'US': '🇺🇸',
+  'JP': '🇯🇵',
+  'KO': '🇰🇷',
+  'PT': '🇵🇹',
+  'BR': '🇧🇷',
+  'FR': '🇫🇷',
+  'IT': '🇮🇹',
+  'DE': '🇩🇪',
+  'CN': '🇨🇳',
+  'RU': '🇷🇺',
+};
+
+/// Tipo de pista según la calidad: 'DUB' (doblaje), 'CAST' (castellano),
+/// 'SUB' (subtitulado) o '' si es resolución/desconocido.
+String trackQualityType(String quality) {
+  final up = quality.toUpperCase();
+  if (up.contains('CAST')) return 'CAST';
+  if (up.contains('SUB')) return 'SUB';
+  if (up.contains('DUB') || up.contains('LAT')) return 'DUB';
+  return '';
+}
+
+/// Idioma (código ISO-ish) inferido de la calidad, p.ej. `SUB-EN` → 'EN'.
+String trackQualityLang(String quality) {
+  final up = quality.toUpperCase();
+  final parts = up.split('-');
+  if (parts.length == 2 && parts[1].length >= 2 && parts[1].length <= 3) {
+    final candidate = parts[1];
+    if (_langFlags.containsKey(candidate)) return candidate;
+  }
+  final type = trackQualityType(quality);
+  if (type == 'DUB' || type == 'CAST') return 'ES';
+  if (type == 'SUB') return 'EN';
+  return '';
+}
+
+/// Etiqueta corta de tipo para UI: 'DUB', 'CAST' o 'SUB'.
+String trackQualityShortLabel(String quality) {
+  final type = trackQualityType(quality);
+  return type.isNotEmpty ? type : cleanQuality(quality);
+}
+
+/// Código de idioma en TEXTO para la UI (estilo Netflix, sin banderas).
+/// p.ej. `SUB-ES` -> 'ES', `DUB-MX` -> 'MX', `SUB-EN` -> 'EN', `SUB-JP` -> 'JP'.
+/// Si no hay código de idioma, cae al tipo: 'SUB'/'CAST'/'LAT'.
+String languageCodeText(String quality) {
+  final lang = trackQualityLang(quality);
+  if (lang.isNotEmpty) return lang;
+  final type = trackQualityType(quality);
+  if (type == 'SUB') return 'SUB';
+  if (type == 'CAST') return 'CAST';
+  if (type == 'DUB') return 'LAT';
+  return '';
 }
 
 String cleanTitleForDisplay(String title) {

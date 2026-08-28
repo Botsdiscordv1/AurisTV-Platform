@@ -76,8 +76,8 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
     final isMythical = widget.badge == EditorialBadge.mythical;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedScale(

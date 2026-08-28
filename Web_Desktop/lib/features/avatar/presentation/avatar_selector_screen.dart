@@ -543,8 +543,8 @@ class _PillNavItemState extends State<_PillNavItem> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }),
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
@@ -630,8 +630,8 @@ class _AvatarFranchiseRowState extends ConsumerState<_AvatarFranchiseRow> {
     final isTactic = ResponsiveUtils.isTactic(context);
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -100,8 +100,8 @@ class _FullScreenViewerState extends State<FullScreenViewer> {
           ],
         ),
         body: MouseRegion(
-          onEnter: (_) => setState(() => _showArrows = true),
-          onExit: (_) => setState(() => _showArrows = false),
+          onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _showArrows = true); }),
+          onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _showArrows = false); }),
           child: Stack(
             children: [
               // Capa de Blur cinemático

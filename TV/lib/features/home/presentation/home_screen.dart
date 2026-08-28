@@ -152,7 +152,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             final String finalImageUrl = useEpisodeThumb ? (h.posterUrl ?? '') : (h.bannerUrl ?? h.posterUrl ?? '');
 
             String displayTitle = h.title ?? 'Contenido';
-            if (h.episode != null && h.episode!.isNotEmpty) {
+            final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
+            if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
               displayTitle = 'Ep ${h.episode} • $displayTitle';
             }
 

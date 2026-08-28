@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:collection/collection.dart';
@@ -71,12 +72,42 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
   if (text == null || text.isEmpty) return const SizedBox.shrink();
   return Container(
     padding: EdgeInsets.symmetric(
+      horizontal: ResponsiveUtils.sp(context, small ? 6 : 10), 
+      vertical: ResponsiveUtils.sp(context, small ? 2 : 4)
+    ),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.3),
+      border: Border.all(
+        color: Colors.white.withValues(alpha: 0.5), 
+        width: 1.5
+      ),
+      borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, 3)),
+    ),
+    child: Text(
+      text.toUpperCase(),
+      style: GoogleFonts.poppins(
+        color: Colors.white, 
+        fontSize: ResponsiveUtils.sp(context, small ? 11 : 14), 
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.5,
+      ),
+    ),
+  );
+}
+
+Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) {
+  if (text == null || text.isEmpty) return const SizedBox.shrink();
+  return Container(
+    padding: EdgeInsets.symmetric(
       horizontal: ResponsiveUtils.sp(context, small ? 5 : 8), 
       vertical: ResponsiveUtils.sp(context, small ? 1.5 : 3)
     ),
     decoration: BoxDecoration(
       color: Colors.white.withValues(alpha: 0.1),
-      border: Border.all(color: Colors.white10, width: 1),
+      border: Border.all(
+        color: Colors.white10, 
+        width: 1.0
+      ),
       borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, small ? 3 : 4)),
     ),
     child: Text(
@@ -84,7 +115,7 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
       style: TextStyle(
         color: Colors.white, 
         fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
-        fontWeight: FontWeight.w900
+        fontWeight: FontWeight.w900,
       ),
     ),
   );
@@ -180,6 +211,9 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final int totalSeasons; 
   final int currentSeason; 
   final ValueChanged<int> onSeasonSelected;
+  final int selectedTabIndex;
+  final ValueChanged<int> onTabChanged;
+  final List<String> tabLabels;
   final String? inferredSeasonAirDate;
   final PlaybackHistory? latestHistory;
   final Set<String>? unavailableSources;
@@ -204,6 +238,9 @@ class _ContentHeader extends ConsumerStatefulWidget {
     required this.totalSeasons, 
     required this.currentSeason, 
     required this.onSeasonSelected,
+    required this.selectedTabIndex,
+    required this.onTabChanged,
+    required this.tabLabels,
     this.inferredSeasonAirDate,
     this.latestHistory,
     this.unavailableSources,
@@ -231,7 +268,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   void _handleInteraction() {
     if (!mounted) return;
     if (!_showTitle) {
-      setState(() => _showTitle = true);
+      // Senior Fix: Deferimos el setState para evitar Assertion failed en Web
+      Future.microtask(() {
+        if (mounted) setState(() => _showTitle = true);
+      });
     }
     _startTitleHideTimer();
   }
@@ -404,7 +444,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final isMobile = ResponsiveUtils.isMobile(context);
     if (isMobile) {
       return MouseRegion(
-        onHover: (_) => _handleInteraction(),
+        onHover: (_) { if (!_showTitle) _handleInteraction(); },
         child: Listener(
           onPointerDown: (_) => _handleInteraction(),
           onPointerMove: (_) => _handleInteraction(),
@@ -481,7 +521,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       );
     }
     return MouseRegion(
-      onHover: (_) => _handleInteraction(),
+      onHover: (_) { if (!_showTitle) _handleInteraction(); },
       child: Listener(
         onPointerDown: (_) => _handleInteraction(),
         onPointerMove: (_) => _handleInteraction(),
@@ -543,56 +583,176 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 
   Widget _buildDesktopOverlay(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
-    final isUltraCompact = width < 1050; final isCompact = width >= 1050 && width < 1250;
+    final isUltraCompact = width < 1050; 
+    final isCompact = width >= 1050 && width < 1250;
     final hPadding = ResponsiveUtils.horizontalPadding(context); 
     final titleSize = isUltraCompact ? 32.0 : (isCompact ? 40.0 : 64.0);
-    // Senior UI: Bajamos el título significativamente para dar espacio a la navegación
-    final titleTop = isUltraCompact ? 115.0 : 165.0; final contentSpacing = isUltraCompact ? 12.0 : 40.0;
-    return PointerInterceptor(child: SizedBox(height: width / 2.8, child: Stack(children: [
-      // Nueva degradación localizada Estilo Prime Video
-      Positioned.fill(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [
-                const Color(0xFF0B0B0D).withValues(alpha: 0.85),
-                const Color(0xFF0B0B0D).withValues(alpha: 0.4),
-                const Color(0xFF0B0B0D).withValues(alpha: 0.1),
-                Colors.transparent,
-              ],
-              stops: const [0.0, 0.3, 0.5, 0.8],
+    final titleTop = isUltraCompact ? 80.0 : 100.0;
+    
+    return PointerInterceptor(
+      child: SizedBox(
+        height: width / 2.8,
+        child: Stack(
+          children: [
+            // Gradiente Cinematográfico Profundo (Estilo Netflix)
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      const Color(0xFF0B0B0D),
+                      const Color(0xFF0B0B0D).withValues(alpha: 0.95),
+                      const Color(0xFF0B0B0D).withValues(alpha: 0.8),
+                      const Color(0xFF0B0B0D).withValues(alpha: 0.4),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.25, 0.4, 0.55, 0.85],
+                  ),
+                ),
+              ),
             ),
-          ),
+            
+            // Contenido Vertical Alineado a la Izquierda
+            Positioned(
+              left: hPadding,
+              top: titleTop,
+              bottom: 20,
+              width: width * 0.42, 
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Logo de Marca AurisTV
+                  SvgPicture.asset(
+                    'assets/icons/auris-logo-web-flat.svg',
+                    height: 24,
+                    fit: BoxFit.contain,
+                    colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Logo de la serie/película
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 1200),
+                    curve: Curves.easeInOut,
+                    opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0,
+                    child: _heroTitleWidget(
+                      heroTitle, 
+                      d?.logo, 
+                      logoReady, 
+                      width * 0.4, 
+                      titleSize * 2.2, 
+                      TextStyle(
+                        color: Colors.white, 
+                        fontSize: titleSize, 
+                        fontWeight: FontWeight.w900, 
+                        height: 1.0, 
+                        letterSpacing: isUltraCompact ? 1 : 4, 
+                        shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4)]
+                      )
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Metadata (Año, Géneros, Duración, Rating)
+                  _buildMetaRow(d, isMobile: false, isCompact: isUltraCompact),
+                  const SizedBox(height: 16),
+                  
+                  // ÁREA SCROLLABLE: Sinopsis y Acciones (Para evitar overflow en pantallas bajas)
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSynopsis(d, isCompact: isUltraCompact),
+                          const SizedBox(height: 24),
+                          
+                          // Acciones Rápidas (Likes)
+                          _buildQuickFeedbackActions(context, isCompact: isUltraCompact),
+                          const SizedBox(height: 12),
+                          
+                          // Botón Principal de Reproducción
+                          _buildMainActionButton(context, isCompact: isUltraCompact, width: 320),
+                          const SizedBox(height: 8),
+                          
+                          // Lista Vertical de Acciones Secundarias (Tabs)
+                          _buildNetflixActionList(context, d, isCompact: isUltraCompact),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // Selectores de Temporada y Servidor (Fijos al fondo del Hero)
+                  if (widget.totalSeasons > 1 || widget.currentSource != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Row(
+                        children: [
+                          if (widget.totalSeasons > 1)
+                            _SeasonSelector(
+                              title: widget.title, 
+                              currentSeason: widget.currentSeason, 
+                              totalSeasons: widget.totalSeasons, 
+                              onSeasonSelected: widget.onSeasonSelected, 
+                              compact: true,
+                              width: 140,
+                            ),
+                          const SizedBox(width: 12),
+                          if (widget.currentSource != null)
+                            _ServerSelector(
+                              currentSource: widget.currentSource!, 
+                              sources: widget.sources, 
+                              onSourceSelected: widget.onSourceSelected, 
+                              compact: true,
+                              unavailableSources: widget.unavailableSources,
+                              season: widget.season,
+                              width: 180,
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            
+            // Botones Superiores (Volver)
+            Positioned.fill(child: _buildUpperButtons(context)),
+          ],
         ),
       ),
-      Positioned(left: hPadding, top: titleTop, child: AnimatedOpacity(duration: const Duration(milliseconds: 1200), curve: Curves.easeInOut, opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, child: SizedBox(width: isUltraCompact ? width * 0.7 : 800.0, child: _heroTitleWidget(heroTitle, d?.logo, logoReady, isUltraCompact ? width * 0.7 : 800.0, titleSize * 2.6, TextStyle(color: Colors.white, fontSize: titleSize, fontWeight: FontWeight.w900, height: 1.0, letterSpacing: isUltraCompact ? 1 : 4, shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4)]))))),
-      Positioned(left: hPadding, right: hPadding, bottom: isUltraCompact ? 10 : 24, child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-          _buildCircularActions(context, isCompact: isUltraCompact), SizedBox(height: contentSpacing),
-          _buildMainActionButton(context, isCompact: isUltraCompact), SizedBox(height: contentSpacing),
-          Row(children: [
-            if (widget.totalSeasons > 1) _SeasonSelector(title: widget.title, currentSeason: widget.currentSeason, totalSeasons: widget.totalSeasons, onSeasonSelected: widget.onSeasonSelected, compact: isUltraCompact),
-            if (widget.totalSeasons > 1) SizedBox(width: isUltraCompact ? 8 : 16),
-            if (widget.currentSource != null) Expanded(child: SourceChipsBar(sources: widget.sources, currentSource: widget.currentSource, onSourceSelected: widget.onSourceSelected, unavailableSources: widget.unavailableSources, season: widget.season)),
-          ]),
-        ]),
-        if (!isUltraCompact) ...[
-          SizedBox(width: contentSpacing), 
-          Expanded(
-            child: _buildSynopsis(d, isCompact: isCompact),
-          ),
-          SizedBox(width: contentSpacing),
-        ],
-        _buildMetaRow(d, isMobile: false, isCompact: isUltraCompact || isCompact),
-      ])),
-    ])));
+    );
   }
 
-  Widget _buildCircularActions(BuildContext context, {bool isMobile = false, bool isCompact = false}) {
-    final size = isCompact ? 48.0 : 56.0; final iconSize = isCompact ? 24.0 : 28.0; final spacing = isCompact ? 12.0 : 16.0;
+  Widget _buildQuickFeedbackActions(BuildContext context, {bool isCompact = false}) {
+    final size = isCompact ? 36.0 : 42.0;
+    final iconSize = isCompact ? 18.0 : 22.0;
     
+    return Row(
+      children: [
+        _DetailIconButton(
+          icon: Icons.thumb_up_off_alt, 
+          label: 'Me gusta', 
+          onPressed: () {}, 
+          isMobile: false, 
+          size: size, 
+          iconSize: iconSize
+        ),
+        const SizedBox(width: 12),
+        _DetailIconButton(
+          icon: Icons.thumb_down_off_alt, 
+          label: 'No es para mí', 
+          onPressed: () {}, 
+          isMobile: false, 
+          size: size, 
+          iconSize: iconSize
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNetflixActionList(BuildContext context, dynamic d, {bool isCompact = false}) {
     return Consumer(builder: (context, ref, _) {
       final favorites = ref.watch(favoritesProvider);
       final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
@@ -600,14 +760,13 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       final user = ref.watch(authProvider);
       final profileId = user?.activeProfileId ?? 'guest_profile';
 
-      return Row(
-        mainAxisSize: MainAxisSize.min, 
-        crossAxisAlignment: CrossAxisAlignment.start, // Senior Fix: Alineación superior para evitar saltos con 2 líneas
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_lastTrailerKey != null) ...[
-            _DetailIconButton(
-              icon: _showPlayer ? Icons.videocam_off_outlined : Icons.movie_outlined, 
-              label: _showPlayer ? 'Quitar tráiler' : 'Tr\u00E1iler', 
+          if (_lastTrailerKey != null)
+            _NetflixListButton(
+              icon: _showPlayer ? Icons.videocam_off_outlined : Icons.movie_outlined,
+              label: _showPlayer ? 'Quitar tráiler' : 'Ver tráiler',
               onPressed: () {
                 if (_showPlayer) {
                   _disposeController();
@@ -621,16 +780,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   _initTrailer(_lastTrailerKey!, immediate: true);
                 }
               },
-              isMobile: isMobile, 
-              size: isMobile ? null : size, 
-              iconSize: isMobile ? null : iconSize
-            ), 
-            SizedBox(width: spacing)
-          ],
-          _DetailIconButton(
-            icon: isFav ? Icons.check : Icons.add, 
-            label: 'Mi lista', 
-            color: isFav ? const Color(0xFFEF7A1E) : null,
+            ),
+          _NetflixListButton(
+            icon: isFav ? Icons.check : Icons.add,
+            label: isFav ? 'En mi lista' : 'Agregar a mi lista',
             onPressed: () {
               final item = FavoriteItem(
                 id: currentId,
@@ -644,36 +797,36 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 profileId: profileId,
               );
               ref.read(favoritesProvider.notifier).toggleFavorite(item);
-            }, 
-            isMobile: isMobile, size: isMobile ? null : size, iconSize: isMobile ? null : iconSize
+            },
           ),
-          SizedBox(width: spacing),
-          _DetailIconButton(icon: Icons.thumb_up_off_alt, label: 'Me gusta', onPressed: () {}, isMobile: isMobile, size: isMobile ? null : size, iconSize: isMobile ? null : iconSize), 
-          SizedBox(width: spacing),
-          _DetailIconButton(icon: Icons.thumb_down_off_alt, label: 'No es para m\u00ED', onPressed: () {}, isMobile: isMobile, size: isMobile ? null : size, iconSize: isMobile ? null : iconSize),
-          if (_ytController != null && _showPlayer) ...[
-            SizedBox(width: spacing),
-            _DetailIconButton(
-              icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, 
-              label: _isMuted ? 'Activar audio' : 'Silenciar', 
-              onPressed: () { 
-                setState(() { 
-                  _isMuted = !_isMuted; 
-                  if (_isMuted) _ytController?.mute(); 
-                  else { _ytController?.unMute(); _ytController!.setVolume(100); } 
-                }); 
-              }, 
-              isMobile: isMobile, 
-              size: isMobile ? null : size, 
-              iconSize: isMobile ? null : iconSize
-            )
-          ],
-        ]
+          
+          const SizedBox(height: 24),
+          
+          // GRUPO DE NAVEGACIÓN (Antiguas pestañas)
+          ...List.generate(widget.tabLabels.length, (index) {
+            final label = widget.tabLabels[index];
+            final isActive = widget.selectedTabIndex == index;
+            
+            IconData icon = Icons.info_outline;
+            if (label == 'Episodios') icon = Icons.format_list_numbered_rounded;
+            if (label == 'Relacionado') icon = Icons.grid_view_rounded;
+            if (label == 'Extras') icon = Icons.auto_awesome_rounded;
+            if (label == 'Detalles') icon = Icons.description_outlined;
+            if (label == 'Galería') icon = Icons.collections_outlined;
+
+            return _NetflixNavButton(
+              icon: icon,
+              label: label,
+              isActive: isActive,
+              onPressed: () => widget.onTabChanged(index),
+            );
+          }),
+        ],
       );
     });
   }
 
-  Widget _buildMainActionButton(BuildContext context, {bool isMobile = false, bool isCompact = false}) {
+  Widget _buildMainActionButton(BuildContext context, {bool isMobile = false, bool isCompact = false, double? width}) {
     return ValueListenableBuilder(valueListenable: Hive.box('playback_history').listenable(), builder: (ctx, box, _) {
       return Consumer(builder: (context, ref, child) {
         final historyManager = ref.watch(playbackHistoryStateProvider.notifier);
@@ -683,14 +836,30 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           if (latestHistory.isFinished) { label = 'Siguiente: EP ${(int.tryParse(latestHistory.episode ?? '0') ?? 0) + 1}'; }
           else { label = latestHistory.season != null ? 'Reanudar T${latestHistory.season}:EP ${latestHistory.episode}' : 'Reanudar EP ${latestHistory.episode}'; }
         }
+        
+        final progress = latestHistory?.progressPercentage;
+
+        if (isMobile) {
+          return SizedBox(
+            width: double.infinity,
+            child: _DetailButton(
+              onPressed: widget.onPlay, 
+              icon: Icons.play_arrow, 
+              label: label, 
+              isPrimary: true, 
+              compact: isCompact,
+              isLoading: widget.isLoadingSources,
+            ),
+          );
+        }
+
         return SizedBox(
-          width: isMobile ? double.infinity : null, 
-          child: _DetailButton(
+          width: width ?? (isCompact ? 280 : 320), 
+          child: _NetflixPrimaryButton(
             onPressed: widget.onPlay, 
             icon: Icons.play_arrow, 
             label: label, 
-            isPrimary: true, 
-            compact: isCompact,
+            progress: progress,
             isLoading: widget.isLoadingSources,
           )
         );
@@ -698,27 +867,197 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     });
   }
 
+  Widget _buildCircularActions(BuildContext context, {bool isMobile = false}) {
+    return Consumer(builder: (context, ref, _) {
+      final favorites = ref.watch(favoritesProvider);
+      final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
+      final bool isFav = favorites.any((f) => f.id == currentId);
+      final user = ref.watch(authProvider);
+      final profileId = user?.activeProfileId ?? 'guest_profile';
+
+      return Row(
+        children: [
+          _DetailIconButton(
+            icon: isFav ? Icons.check : Icons.add,
+            label: isFav ? 'En mi lista' : 'Mi lista',
+            onPressed: () {
+              final item = FavoriteItem(
+                id: currentId,
+                title: widget.title,
+                posterUrl: widget.poster ?? '',
+                bannerUrl: widget.banner ?? '',
+                category: widget.category,
+                source: widget.source,
+                url: widget.url,
+                addedAt: DateTime.now(),
+                profileId: profileId,
+              );
+              ref.read(favoritesProvider.notifier).toggleFavorite(item);
+            },
+            isMobile: isMobile,
+          ),
+          _DetailIconButton(
+            icon: Icons.thumb_up_off_alt,
+            label: 'Calificar',
+            onPressed: () {},
+            isMobile: isMobile,
+          ),
+          _DetailIconButton(
+            icon: Icons.share_outlined,
+            label: 'Compartir',
+            onPressed: () {},
+            isMobile: isMobile,
+          ),
+        ],
+      );
+    });
+  }
+
+
   Widget _buildMetaRow(dynamic detail, {bool isMobile = false, bool isCompact = false}) {
     final r = (detail?.rating ?? widget.sourceRating) as double?;
     final rawDate = (detail is AnimeDetail) ? detail.firstAirDate : (detail is MovieDetail ? detail.releaseDate : null);
     final d = _pickDisplayDate(rawDate, widget.inferredSeasonAirDate); 
     final g = detail?.genres as List<dynamic>?; 
     final cert = (detail is MovieDetail ? detail.certification : (detail is AnimeDetail ? detail.certification : null)) ?? 'NR';
+    final runtime = _getRuntime(detail);
+    final isMovie = _isMovieContent(detail);
+
     if (isMobile) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [ _buildBadge(context, cert), const SizedBox(width: 10), if (g != null && g.isNotEmpty) Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: g.map<Widget>((genre) => Padding(padding: const EdgeInsets.only(right: 6), child: _buildBadge(context, genre.toString().toUpperCase()))).toList()))) ]),
-        const SizedBox(height: 8),
-        Row(children: [ if (widget.showRatingSkeleton && r == null) ...[const _RatingSkeleton(width: 44, height: 18, mobile: true), const SizedBox(width: 12)] else if (r != null && r > 0) ...[const Icon(Icons.star_rounded, color: Colors.amber, size: 18), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)), const SizedBox(width: 12)], if (d != null && d.length >= 4) Text(d.substring(0, 4), style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 15)) ]),
-      ]);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start, 
+        children: [
+          // Fila 1: Géneros
+          if (g != null && g.isNotEmpty) 
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal, 
+                child: Row(
+                  children: g.map<Widget>((genre) => Padding(
+                    padding: const EdgeInsets.only(right: 6), 
+                    child: _buildBadge(context, genre.toString().toUpperCase())
+                  )).toList()
+                )
+              ),
+            ),
+          // Fila 2: Año, Rating, Duración/Temporadas
+          Row(
+            children: [
+              if (d != null && d.length >= 4) ...[
+                Text(d.substring(0, 4), style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)),
+                const SizedBox(width: 12),
+              ],
+              if (widget.showRatingSkeleton && r == null) ...[
+                const _RatingSkeleton(width: 44, height: 18, mobile: true), 
+                const SizedBox(width: 12)
+              ] else if (r != null && r > 0) ...[
+                const Icon(Icons.star_rounded, color: Colors.amber, size: 18), 
+                const SizedBox(width: 4), 
+                Text(formatRating(r) ?? 'N/A', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)), 
+                const SizedBox(width: 12)
+              ],
+              if (isMovie) ...[
+                if (runtime != null) Text(_formatRuntime(runtime), style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)),
+              ] else if (widget.totalSeasons > 1) ...[
+                Text('${widget.totalSeasons} temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)),
+              ],
+            ]
+          ),
+          const SizedBox(height: 8),
+          // Fila 3: Edad y Advertencia (Nueva línea solicitada)
+          Row(
+            children: [
+              _buildAgeBadge(context, cert),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _getWarningText(cert),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+        ]
+      );
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-      Row(mainAxisSize: MainAxisSize.min, children: [ if (widget.showRatingSkeleton && r == null) ...[_RatingSkeleton(width: isCompact ? 44 : 52, height: isCompact ? 18 : 20), SizedBox(width: 12)] else if (r != null && r > 0) ...[Icon(Icons.star_rounded, color: Colors.amber, size: isCompact ? 20 : 24), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: isCompact ? 18 : 20)), SizedBox(width: 12)], if (g != null && g.isNotEmpty) Wrap(spacing: 8, children: g.take(3).map<Widget>((genre) => _buildBadge(context, genre.toString().toUpperCase(), small: isCompact)).toList()) ]),
-      const SizedBox(height: 12),
-      Row(mainAxisSize: MainAxisSize.min, children: [ if (d != null && d.length >= 4) ...[Icon(Icons.calendar_today_rounded, color: const Color(0xFFA5A5AA), size: 14), const SizedBox(width: 6), Text(d.substring(0, 4), style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 16)), SizedBox(width: 12)], _buildBadge(context, cert, small: isCompact), const SizedBox(width: 8), _buildBadge(context, 'CC', small: isCompact) ]),
-    ]);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DefaultTextStyle(
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: isCompact ? 15 : 17,
+            fontWeight: FontWeight.w600,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (d != null && d.length >= 4) ...[
+                Text(d.substring(0, 4)),
+                _buildDotSeparator(),
+              ],
+              if (g != null && g.isNotEmpty) ...[
+                ...g.take(2).map((genre) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _buildBadge(context, genre.toString().toUpperCase(), small: isCompact),
+                )),
+                _buildDotSeparator(),
+              ],
+              // [Senior Logic] Duración para películas, Temporadas para series
+              if (isMovie) ...[
+                if (runtime != null) ...[
+                  Text(_formatRuntime(runtime)),
+                  _buildDotSeparator(),
+                ],
+              ] else if (widget.totalSeasons > 1) ...[
+                Text('${widget.totalSeasons} temporadas'),
+                _buildDotSeparator(),
+              ],
+              if (r != null && r > 0) ...[
+                const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
+                const SizedBox(width: 4),
+                Text(formatRating(r) ?? 'N/A'),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Línea aparte para Edad y Advertencia de contenido (Solicitud usuario)
+        Row(
+          children: [
+            _buildAgeBadge(context, cert, small: isCompact),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _getWarningText(cert),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFFA5A5AA),
+                  fontSize: isCompact ? 14 : 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
-  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) => Text(detail?.overview ?? '', maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: isCompact ? 16 : 19, height: 1.5, fontWeight: FontWeight.w700, letterSpacing: -0.2));
+  Widget _buildDotSeparator() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Text('•', style: TextStyle(color: Colors.white.withValues(alpha: 0.3))),
+    );
+  }
+
+  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) => Text(detail?.overview ?? '', maxLines: 4, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.9), fontSize: isCompact ? 15 : 17, height: 1.5, fontWeight: FontWeight.w500));
+  
   Widget _buildUpperButtons(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
     return Stack(children: [
@@ -729,19 +1068,19 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 }
 
 class _SeasonSelector extends StatefulWidget {
-  final String title; final int currentSeason; final int totalSeasons; final Function(int) onSeasonSelected; final bool compact;
-  const _SeasonSelector({required this.title, required this.currentSeason, required this.totalSeasons, required this.onSeasonSelected, this.compact = false});
+  final String title; final int currentSeason; final int totalSeasons; final Function(int) onSeasonSelected; final bool compact; final double? width;
+  const _SeasonSelector({required this.title, required this.currentSeason, required this.totalSeasons, required this.onSeasonSelected, this.compact = false, this.width});
   @override State<_SeasonSelector> createState() => _SeasonSelectorState();
 }
 
 class _SeasonSelectorState extends State<_SeasonSelector> {
   bool _isHovered = false;
-  @override Widget build(BuildContext context) => Theme(data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E26)), child: PopupMenuButton<int>(onSelected: widget.onSeasonSelected, offset: const Offset(0, 56), constraints: const BoxConstraints(minWidth: 220), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.white12)), itemBuilder: (context) => List.generate(widget.totalSeasons, (i) => PopupMenuItem(value: i + 1, height: 56, child: Text('Temporada ${i + 1}', style: TextStyle(color: (i + 1) == widget.currentSeason ? Colors.white : const Color(0xFFA5A5AA), fontWeight: (i + 1) == widget.currentSeason ? FontWeight.bold : FontWeight.normal, fontSize: 18)))), child: MouseRegion(onEnter: (_) => setState(() => _isHovered = true), onExit: (_) => setState(() => _isHovered = false), child: AnimatedContainer(duration: const Duration(milliseconds: 200), width: widget.compact ? 160 : 220, height: widget.compact ? 44 : 56, decoration: BoxDecoration(color: _isHovered ? const Color(0xFF454652) : const Color(0xFF32333E), borderRadius: BorderRadius.circular(8), border: Border.all(color: _isHovered ? const Color(0xFFA5A5AA) : Colors.transparent, width: 1.5)), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('T ${widget.currentSeason}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))]))))));
+  @override Widget build(BuildContext context) => Theme(data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E26)), child: PopupMenuButton<int>(onSelected: widget.onSeasonSelected, offset: const Offset(0, 56), constraints: const BoxConstraints(minWidth: 220), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.white12)), itemBuilder: (context) => List.generate(widget.totalSeasons, (i) => PopupMenuItem(value: i + 1, height: 56, child: Text('Temporada ${i + 1}', style: TextStyle(color: (i + 1) == widget.currentSeason ? Colors.white : const Color(0xFFA5A5AA), fontWeight: (i + 1) == widget.currentSeason ? FontWeight.bold : FontWeight.normal, fontSize: 18)))), child: MouseRegion(onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }), onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }), child: AnimatedContainer(duration: const Duration(milliseconds: 200), width: widget.width ?? (widget.compact ? 160 : 220), height: widget.compact ? 44 : 56, decoration: BoxDecoration(color: _isHovered ? const Color(0xFF454652) : const Color(0xFF32333E), borderRadius: BorderRadius.circular(8), border: Border.all(color: _isHovered ? const Color(0xFFA5A5AA) : Colors.transparent, width: 1.5)), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('T ${widget.currentSeason}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))]))))));
 }
 
 class _ServerSelector extends ConsumerStatefulWidget {
-  final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season;
-  const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources, this.season});
+  final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season; final double? width;
+  const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources, this.season, this.width});
   @override ConsumerState<_ServerSelector> createState() => _ServerSelectorState();
 }
 
@@ -812,11 +1151,11 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
           );
         }).toList(),
         child: MouseRegion(
-          onEnter: (_) => setState(() => _isHovered = true), 
-          onExit: (_) => setState(() => _isHovered = false), 
+          onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }), 
+          onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }), 
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200), 
-            width: widget.compact ? 160 : 220, 
+            width: widget.width ?? (widget.compact ? 160 : 220), 
             height: widget.compact ? 44 : 56, 
             decoration: BoxDecoration(
               color: _isHovered ? const Color(0xFF454652) : const Color(0xFF32333E), 
@@ -989,7 +1328,6 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
     const double edgePadding = 24.0;
     
     double cardCenterX = position.dx + cardSize.width / 2;
-    
     double popupHalfWidth = popupWidth / 2;
     
     double targetCenterX = cardCenterX;
@@ -1000,7 +1338,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
     }
     
     double offsetX = targetCenterX - cardCenterX; 
-    double offsetY = -27; // Senior Fix: Anclaje cinemático para imagen Edge-to-Edge
+    double offsetY = -27; 
 
     _overlayEntry = OverlayEntry(
       builder: (context) => Stack(
@@ -1018,8 +1356,8 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
               child: Material(
                 color: Colors.transparent,
                 child: MouseRegion(
-                  onEnter: (_) => _hideTimer?.cancel(),
-                  onExit: (_) => _hideOverlay(),
+                  onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { _hideTimer?.cancel(); }),
+                  onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { _hideOverlay(); }),
                   child: Listener(
                     onPointerSignal: (pointerSignal) {
                       if (pointerSignal is PointerScrollEvent && widget.scrollController != null) {
@@ -1124,14 +1462,14 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                                   Row(
                                     children: [
                                       if (widget.certification != null && widget.certification != 'NR') ...[
-                                        _buildBadge(context, widget.certification!, small: true),
+                                        _buildAgeBadge(context, widget.certification!, small: true),
                                         SizedBox(width: ResponsiveUtils.sp(context, 8)),
                                       ],
                                       if (_typeBadge != null) ...[
-                                        _buildBadge(context, _typeBadge!, small: true),
+                                        _buildAgeBadge(context, _typeBadge!, small: true),
                                         SizedBox(width: ResponsiveUtils.sp(context, 8)),
                                       ],
-                                      _buildBadge(context, _languageBadge, small: true),
+                                      _buildAgeBadge(context, _languageBadge, small: true),
                                       SizedBox(width: ResponsiveUtils.sp(context, 10)),
                                       if (!_isSpecial && widget.duration != null) ...[
                                         Text(
@@ -1280,14 +1618,14 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                             Row(
                               children: [
                                 if (widget.certification != null && widget.certification != 'NR') ...[
-                                  _buildBadge(context, widget.certification!, small: true),
+                                  _buildAgeBadge(context, widget.certification!, small: true),
                                   SizedBox(width: ResponsiveUtils.sp(context, 8)),
                                 ],
                                 if (_typeBadge != null) ...[
-                                  _buildBadge(context, _typeBadge!, small: true),
+                                  _buildAgeBadge(context, _typeBadge!, small: true),
                                   SizedBox(width: ResponsiveUtils.sp(context, 8)),
                                 ],
-                                _buildBadge(context, _languageBadge, small: true),
+                                _buildAgeBadge(context, _languageBadge, small: true),
                               ],
                             ),
                           ],
@@ -1314,8 +1652,8 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
     return CompositedTransformTarget(
       link: _layerLink,
       child: MouseRegion(
-        onEnter: (_) => _showOverlay(context),
-        onExit: (_) => _hideOverlay(),
+        onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { _showOverlay(context); }),
+        onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { _hideOverlay(); }),
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 150),
           opacity: (_isOverlayShown || _overlayEntry != null) ? 0.1 : 1.0,
@@ -1393,14 +1731,14 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                   Row(
                     children: [
                       if (widget.certification != null && widget.certification != 'NR') ...[
-                        _buildBadge(context, widget.certification!, small: true),
+                        _buildAgeBadge(context, widget.certification!, small: true),
                         SizedBox(width: ResponsiveUtils.sp(context, 8)),
                       ],
                       if (_typeBadge != null) ...[
-                        _buildBadge(context, _typeBadge!, small: true),
+                        _buildAgeBadge(context, _typeBadge!, small: true),
                         SizedBox(width: ResponsiveUtils.sp(context, 8)),
                       ],
-                      _buildBadge(context, _languageBadge, small: true),
+                      _buildAgeBadge(context, _languageBadge, small: true),
                       SizedBox(width: ResponsiveUtils.sp(context, 10)),
                       if (!_isSpecial && widget.duration != null) ...[
                         Text(
@@ -1454,8 +1792,8 @@ class _ThemeCardState extends State<_ThemeCard> {
     final bool isSelected = !isMobile && _isHovered;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true), 
-      onExit: (_) => setState(() => _isHovered = false), 
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }), 
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }), 
       child: GestureDetector(
         onTap: () {
           String url = widget.theme.videoUrl; final typeLabel = widget.isOP ? 'OP' : 'ED';
@@ -1580,6 +1918,221 @@ class _ExpandableTextState extends State<_ExpandableText> {
   }
 }
 
+class _NetflixNavButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  final IconData icon;
+  final String label;
+  final bool isActive;
+
+  const _NetflixNavButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+    this.isActive = false,
+  });
+
+  @override
+  State<_NetflixNavButton> createState() => _NetflixNavButtonState();
+}
+
+class _NetflixNavButtonState extends State<_NetflixNavButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onPressed,
+          borderRadius: BorderRadius.circular(4),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            margin: const EdgeInsets.only(bottom: 4),
+            decoration: BoxDecoration(
+              color: widget.isActive ? const Color(0xFFEF7A1E).withValues(alpha: 0.1) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border(
+                left: BorderSide(
+                  color: widget.isActive ? const Color(0xFFEF7A1E) : Colors.transparent,
+                  width: 3,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  widget.icon,
+                  color: widget.isActive ? const Color(0xFFEF7A1E) : (_isHovered ? Colors.white : Colors.white60),
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  widget.label,
+                  style: GoogleFonts.poppins(
+                    color: widget.isActive ? const Color(0xFFEF7A1E) : (_isHovered ? Colors.white : Colors.white60),
+                    fontSize: 16,
+                    fontWeight: widget.isActive ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NetflixPrimaryButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  final IconData icon;
+  final String label;
+  final double? progress;
+  final bool isLoading;
+
+  const _NetflixPrimaryButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+    this.progress,
+    this.isLoading = false,
+  });
+
+  @override
+  State<_NetflixPrimaryButton> createState() => _NetflixPrimaryButtonState();
+}
+
+class _NetflixPrimaryButtonState extends State<_NetflixPrimaryButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 52,
+        decoration: BoxDecoration(
+          color: _isHovered ? Colors.white.withValues(alpha: 0.9) : Colors.white,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.isLoading ? null : widget.onPressed,
+            borderRadius: BorderRadius.circular(4),
+            child: Stack(
+              children: [
+                Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (widget.isLoading)
+                        const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 3, color: Colors.black),
+                        )
+                      else ...[
+                        Icon(widget.icon, color: Colors.black, size: 32),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        widget.isLoading ? 'Cargando...' : widget.label,
+                        style: GoogleFonts.poppins(
+                          color: Colors.black,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (widget.progress != null && widget.progress! > 0)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 4,
+                      color: Colors.black12,
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: widget.progress,
+                        child: Container(color: const Color(0xFFEF7A1E)),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NetflixListButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  final IconData icon;
+  final String label;
+
+  const _NetflixListButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  State<_NetflixListButton> createState() => _NetflixListButtonState();
+}
+
+class _NetflixListButtonState extends State<_NetflixListButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onPressed,
+          borderRadius: BorderRadius.circular(4),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  widget.icon,
+                  color: _isHovered ? Colors.white70 : Colors.white,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  widget.label,
+                  style: GoogleFonts.poppins(
+                    color: _isHovered ? Colors.white70 : Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DetailButton extends StatelessWidget {
   final VoidCallback? onPressed; final IconData icon; final String label; final bool isPrimary; final bool compact; final bool isLoading;
   const _DetailButton({required this.onPressed, required this.icon, required this.label, this.isPrimary = false, this.compact = false, this.isLoading = false});
@@ -1615,13 +2168,17 @@ class _DetailButton extends StatelessWidget {
                 else
                   Icon(icon, color: isPrimary ? Colors.black : Colors.white, size: isMobile ? 24 : 30),
                 const SizedBox(width: 12), 
-                Text(
-                  isLoading ? 'Buscando fuentes...' : label, 
-                  style: TextStyle(
-                    color: isPrimary ? Colors.black : Colors.white, 
-                    fontSize: isMobile ? 18 : 20, 
-                    fontWeight: FontWeight.bold
-                  )
+                Flexible(
+                  child: Text(
+                    isLoading ? 'Buscando fuentes...' : label, 
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isPrimary ? Colors.black : Colors.white, 
+                      fontSize: isMobile ? 18 : 20, 
+                      fontWeight: FontWeight.bold
+                    )
+                  ),
                 )
               ]
             )
@@ -1673,8 +2230,8 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
       );
     }
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true), 
-      onExit: (_) => setState(() => _isHovered = false), 
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }), 
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }), 
       child: Tooltip(
         message: widget.label, 
         child: AnimatedScale(
@@ -1847,7 +2404,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     // Clasificación pre-carga (solo categoría, porque aún no tenemos el payload).
     final isAnimeCatFetch = widget.category == 'anime';
-    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie';
+    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'series' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie' || widget.result?.kind?.toLowerCase() == 'series';
     // Una movie_anime es una Pel\u00EDcula de anime: tambi\u00E9n queremos el detalle de
     // anime (AniList) para mostrar la franquicia en "Relacionado" + sus OP/ED.
     // 'all' (b\u00FAsqueda global) tambi\u00E9n incluye anime, as\u00ED que lo pedimos igual.
@@ -2277,12 +2834,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               season: currentSeason,
               sourceRating: currentSource?.score, 
               showRatingSkeleton: currentSource?.score == null && detailLoading, 
-              // El spinner del botón "Reproducir" se detiene en cuanto llega el
-              // primer servidor (activeSources no vacío); el resto sigue cargando
-              // en segundo plano mientras searchLoading sigue true.
               isLoadingSources: searchLoading && activeSources.isEmpty,
               totalSeasons: totalSeasons, 
               currentSeason: currentSeason, 
+              selectedTabIndex: selectedTabIndex,
+              onTabChanged: (i) => setState(() => _selectedTabIndex = i),
+              tabLabels: tabLabels,
               onSourceSelected: (index) {
                 if (activeSources.isEmpty) return;
                 setState(() {
@@ -2341,11 +2898,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               const SizedBox(height: 24),
             ]))),
             SliverMainAxisGroup(slivers: [
-              SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _buildTabBar(tabLabels, selectedTabIndex, hPadding, isMobile),
-                const SizedBox(height: 16),
-              ]))),
-              if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex) episodesAsync.when(
+              if (selectedTabIndex == episodesTabIndex) episodesAsync.when(
                 data: (epBundle) {
                   final epData = epBundle?.response;
                   if (epData == null) return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -2703,8 +3256,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final isMobile = ResponsiveUtils.isMobile(context); final ops = detail.openings; final eds = detail.endings;
     if (ops.isEmpty && eds.isEmpty) return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay temas musicales disponibles', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
     return [
-      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: detail.backdrop), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
-      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: detail.backdrop), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: detail.banner ?? detail.backdrop), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: detail.banner ?? detail.backdrop), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
     ];
   }
 
@@ -2723,7 +3276,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final languages = detail is MovieDetail ? detail.languages : <String>[];
 
     if (isMobile) return [ 
-      SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 10), sliver: SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ 
+      SliverPadding(padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 0, bottom: 10), sliver: SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ 
         const Text('M\u00E1s informaci\u00F3n', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), 
         const SizedBox(height: 20), 
         if (detail.genres is List) Wrap(spacing: 8, runSpacing: 8, children: (detail.genres as List).map<Widget>((g) => _buildBadge(context, g.toString().toUpperCase())).toList()), 
@@ -2751,7 +3304,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     ];
 
     return [ 
-      SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 20), sliver: SliverToBoxAdapter(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SliverPadding(padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 8, bottom: 20), sliver: SliverToBoxAdapter(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(flex: 15, child: Column(children: [
           _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(detail.title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)), const SizedBox(height: 10),
@@ -2769,7 +3322,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ])),
         const SizedBox(width: 24), Expanded(flex: 10, child: Column(
           children: [
-            _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ const Text('Advertencias de contenido', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)), const SizedBox(height: 16), _buildBadge(context, cert), const SizedBox(height: 16), Text('${_getWarningText(cert)} Las luces intermitentes pueden afectar a espectadores fotosensibles', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 20)) ])),
+            _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ const Text('Advertencias de contenido', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)), const SizedBox(height: 16), _buildAgeBadge(context, cert), const SizedBox(height: 16), Text('${_getWarningText(cert)} Las luces intermitentes pueden afectar a espectadores fotosensibles', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 20)) ])),
             if (platforms.isNotEmpty) ...[
               const SizedBox(height: 24),
               _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2913,7 +3466,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: isMobile ? 16 : 24),
+          SizedBox(height: isMobile ? 0 : 8),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
             child: Text(
@@ -2928,8 +3481,8 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
           ),
           SizedBox(height: isMobile ? 12 : 16),
           MouseRegion(
-            onEnter: (_) => setState(() => _isHovered = true),
-            onExit: (_) => setState(() => _isHovered = false),
+            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
             child: Stack(
               children: [
                 SizedBox(
@@ -3058,8 +3611,8 @@ class _CharacterCarouselState extends State<_CharacterCarousel> {
     final carouselHeight = isMobile ? 220.0 : 320.0;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
       child: Stack(
         children: [
           SizedBox(
@@ -3190,8 +3743,8 @@ class _CastCarouselState extends State<_CastCarousel> {
     final carouselHeight = isMobile ? 220.0 : 320.0;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
       child: Stack(
         children: [
           SizedBox(
@@ -3422,7 +3975,12 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: widget.hPadding, vertical: 16),
+                padding: EdgeInsets.only(
+                  left: widget.hPadding, 
+                  right: widget.hPadding, 
+                  top: isMobile ? 0 : 8, 
+                  bottom: 16
+                ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -3593,8 +4151,8 @@ class _GalleryItemState extends State<_GalleryItem> {
     final isMobile = ResponsiveUtils.isMobile(context);
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
       child: GestureDetector(
         onTap: widget.onTap,
         child: Hero(

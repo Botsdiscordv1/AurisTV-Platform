@@ -428,8 +428,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
     ref.listen(heroBannerMutedProvider, (_, next) => _syncMute(next));
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
       child: Focus(
         autofocus: widget.autofocus,
         onFocusChange: (focused) {
@@ -1166,8 +1166,8 @@ class _BannerButtonState extends State<_BannerButton> {
     return Focus(
       onFocusChange: (focused) => setState(() => _focused = focused),
       child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }),
+        onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           height: widget.compact ? 44 : 50, 
@@ -1241,8 +1241,8 @@ class _BannerIconButtonState extends State<_BannerIconButton> {
     return Focus(
       onFocusChange: (focused) => setState(() => _focused = focused),
       child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }),
+        onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }),
         child: Tooltip(
           message: widget.label,
           preferBelow: false,

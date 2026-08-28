@@ -282,8 +282,8 @@ class _ScheduleRowState extends State<ScheduleRow> {
           ),
           SizedBox(height: isMobile ? 8 : 24),
           MouseRegion(
-            onEnter: (_) => setState(() => _isHovered = true),
-            onExit: (_) => setState(() => _isHovered = false),
+            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
             child: Stack(
               children: [
                 SizedBox(

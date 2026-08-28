@@ -117,8 +117,8 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
           ),
           const SizedBox(height: 8), 
           MouseRegion(
-            onEnter: (_) => setState(() => _isHovered = true),
-            onExit: (_) => setState(() => _isHovered = false),
+            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
             child: Stack(
               children: [
                 LayoutBuilder(

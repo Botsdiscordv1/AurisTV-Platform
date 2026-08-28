@@ -89,8 +89,8 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
     final double normalWidth = isMobile ? ResponsiveUtils.sp(context, 125) : 200;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }),
       child: Focus(
         onFocusChange: (focused) => setState(() => _focused = focused),
         onKeyEvent: (node, event) {

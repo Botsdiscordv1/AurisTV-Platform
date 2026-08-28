@@ -9,6 +9,7 @@ class AnimeDetail {
   final String? overview;
   final String? poster;
   final String? backdrop;
+  final String? banner;
   final String? logo;
   final double? rating;
   final int? episodes;
@@ -39,6 +40,7 @@ class AnimeDetail {
     this.overview,
     this.poster,
     this.backdrop,
+    this.banner,
     this.logo,
     this.rating,
     this.episodes,
@@ -97,6 +99,7 @@ class AnimeDetail {
       overview: SynopsisCleaner.clean(visuals?['overview'] as String? ?? anime['description'] as String?),
       poster: visuals?['poster'] as String?,
       backdrop: visuals?['backdrop'] as String?,
+      banner: visuals?['banner'] as String?,
       logo: visuals?['logo'] as String?,
       rating: (anime['score'] as num?)?.toDouble(),
       episodes: anime['episodes'] as int?,

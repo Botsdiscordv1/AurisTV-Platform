@@ -152,7 +152,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             final String finalImageUrl = useEpisodeThumb ? (h.posterUrl ?? '') : (h.bannerUrl ?? h.posterUrl ?? '');
 
             String displayTitle = h.title ?? 'Contenido';
-            if (h.episode != null && h.episode!.isNotEmpty) {
+            final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
+            if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
               displayTitle = 'Ep ${h.episode} • $displayTitle';
             }
 
@@ -793,8 +794,8 @@ class _AuthButtonState extends State<_AuthButton> {
         if (isLoggedIn) return const SizedBox.shrink();
 
         return MouseRegion(
-          onEnter: (_) => setState(() => _isHovered = true),
-          onExit: (_) => setState(() => _isHovered = false),
+          onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+          onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
@@ -858,8 +859,8 @@ class _CategoryChipState extends State<_CategoryChip> {
     final bool isSelected = widget.isActive;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(12),
@@ -1050,8 +1051,8 @@ class _PillNavItemState extends State<_PillNavItem> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }),
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
@@ -1105,8 +1106,8 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
     return Focus(
       onFocusChange: (focused) => setState(() => _focused = focused),
       child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }),
+        onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }),
         child: InkWell(
           onTap: widget.onPressed,
           customBorder: const CircleBorder(),
@@ -1155,8 +1156,8 @@ class _LanguageSelectorState extends State<_LanguageSelector> {
           showWhenUnlinked: false,
           offset: const Offset(-120, 48), // Senior Fix: Centrado dinámico respecto al botón ES
           child: MouseRegion(
-            onEnter: (_) => _showOverlay(),
-            onExit: (_) => _hideOverlay(),
+            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { _showOverlay(); }),
+            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { _hideOverlay(); }),
             child: Material(
               color: Colors.transparent,
               child: Container(
@@ -1258,8 +1259,8 @@ class _FocusTextButtonState extends State<_FocusTextButton> {
     return Focus(
       onFocusChange: (focused) => setState(() => _focused = focused),
       child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }),
+        onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }),
         child: InkWell(
           onTap: widget.onPressed,
           borderRadius: BorderRadius.circular(12),
@@ -1313,8 +1314,8 @@ class _LanguageItemState extends State<_LanguageItem> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
       child: InkWell(
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(8),

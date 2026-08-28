@@ -153,21 +153,6 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
 
-              // SECCIÓN: SERVIDOR
-              const _SectionHeader(title: 'Servidor'),
-              _SettingsCard(
-                child: Consumer(builder: (context, ref, child) {
-                  final settings = ref.watch(appSettingsProvider);
-                  return _SettingsTile(
-                    icon: Icons.dns_outlined,
-                    title: 'URL del servidor',
-                    subtitle: settings.serverAddress,
-                    trailing: const Icon(Icons.edit_outlined, size: 18, color: Colors.white38),
-                    onTap: () => _showEditServerDialog(context, ref, settings.serverAddress),
-                  );
-                }),
-              ),
-
               // SECCIÓN: FUENTES
               const _SectionHeader(title: 'Fuentes de contenido'),
               _SettingsCard(
@@ -237,64 +222,6 @@ class SettingsScreen extends ConsumerWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _showEditServerDialog(BuildContext context, WidgetRef ref, String currentAddress) {
-    final controller = TextEditingController(text: currentAddress);
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        title: const Text('Editar Servidor', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Ingresa la IP o dominio de tu servidor local. '
-              'Ejemplo: 192.168.1.50 o local.host',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Dirección IP / Dominio',
-                labelStyle: TextStyle(color: Colors.white54),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFEF7A1E))),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
-          ),
-          TextButton(
-            onPressed: () {
-              final newAddress = controller.text.trim();
-              if (newAddress.isNotEmpty) {
-                ref.read(appSettingsProvider.notifier).updateServerAddress(newAddress);
-                Navigator.pop(context);
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Servidor actualizado a: $newAddress. Reinicia la app si es necesario.'),
-                    backgroundColor: const Color(0xFFEF7A1E),
-                  ),
-                );
-              }
-            },
-            child: const Text('Guardar', style: TextStyle(color: Color(0xFFEF7A1E), fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }

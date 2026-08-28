@@ -282,7 +282,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           itemCount: results.length,
           itemBuilder: (context, index) {
             final result = results[index];
-            final info = _cardInfo(result);
+            final info = _cardInfo(result, _selectedCategory);
             return FocusablePosterCard(
               title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
               posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
@@ -389,6 +389,9 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
         fromDiscovery: better.fromDiscovery,
         score: better.score,
         fullDate: better.fullDate,
+        status: better.status,
+        kind: better.kind,
+        type: better.type,
         sources: mergedSources,
       );
     }
@@ -396,17 +399,19 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
   return grouped.values.toList();
 }
 
-Map<String, dynamic> _cardInfo(SearchResult result) {
-  final raw = result.quality.toUpperCase();
-  // El formato va arriba a la derecha. Se prioriza el `type` del server
-  // (Película/TV/OVA/ONA/Especial), que es el clasificador fiable, frente a
-  // parsear `quality` (el meta de AV1 puede sobrescribirlo erróneamente).
-  final String typeLabel;
-  if (result.type != null && result.type!.isNotEmpty) {
-    final up = result.type!.toUpperCase();
-    typeLabel = up == 'TV' ? 'TV ANIME' : up;
+Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
+  // El badge debe reflejar la categoría que llega desde el server actual.
+  // Si `quality` ya trae Película/Serie/Dorama, eso manda; `type` queda como fallback.
+  String? typeLabel;
+  final qualityCategory = _categoryFromQuality(result.quality);
+  if (qualityCategory != null) {
+    typeLabel = qualityCategory;
+  } else if (result.type != null && result.type!.isNotEmpty) {
+    typeLabel = _labelFromType(result.type!, selectedCategory);
+  } else if (result.kind != null && result.kind!.isNotEmpty) {
+    typeLabel = _labelFromKind(result.kind!);
   } else {
-    typeLabel = raw.contains('•') ? raw.split('•').first.trim() : (result.kind == 'movie' ? 'PELÍCULA' : 'TV ANIME');
+    typeLabel = _labelFromSearchCategory(selectedCategory);
   }
   final format = typeLabel;
 
@@ -428,5 +433,55 @@ Map<String, dynamic> _cardInfo(SearchResult result) {
     'status': statusLabel,
     'statusColor': statusColor,
   };
+}
+
+String? _categoryFromQuality(String quality) {
+  final q = quality.toLowerCase();
+  if (q.contains('pelicula') || q.contains('película') || q.contains('movie') || q.contains('film')) {
+    return 'PELICULA';
+  }
+  if (q.contains('dorama') || q.contains('drama')) {
+    return 'DORAMA';
+  }
+  if (q.contains('serie') || q.contains('series') || q.contains('tv')) {
+    return 'SERIE';
+  }
+  if (q.contains('anime')) {
+    return 'ANIME';
+  }
+  return null;
+}
+
+String _labelFromType(String type, String selectedCategory) {
+  final up = type.toUpperCase();
+  if (up.contains('MOVIE') || up.contains('FILM') || up.contains('PELICULA') || up.contains('PELÍCULA')) return 'PELÍCULA';
+  if (up.contains('DORAMA') || up.contains('DRAMA')) return 'DORAMA';
+  if (up.contains('SERIE') || up == 'TV' || up.contains('TV')) {
+    return selectedCategory.toLowerCase() == 'anime' ? 'TV ANIME' : 'SERIE';
+  }
+  if (up.contains('ANIME')) return 'TV ANIME';
+  return up;
+}
+
+String _labelFromKind(String kind) {
+  final k = kind.toLowerCase();
+  if (k.contains('movie') || k.contains('film')) return 'PELÍCULA';
+  if (k.contains('drama') || k.contains('dorama')) return 'DORAMA';
+  if (k.contains('anime')) return 'TV ANIME';
+  if (k.contains('series') || k.contains('tv')) return 'SERIE';
+  return 'SERIE';
+}
+
+String? _labelFromSearchCategory(String category) {
+  switch (category.toLowerCase()) {
+    case 'peliculas':
+      return 'PELÍCULA';
+    case 'series':
+      return 'SERIE';
+    case 'anime':
+      return 'TV ANIME';
+    default:
+      return null;
+  }
 }
 

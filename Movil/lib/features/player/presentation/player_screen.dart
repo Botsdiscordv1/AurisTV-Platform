@@ -81,9 +81,17 @@ class PlayerScreen extends ConsumerStatefulWidget {
 enum PlayerOverlay { none, language, server, quality }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBindingObserver {
+  bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime';
   Player? _player;
   VideoController? _controller;
   int _selectedTrackIndex = 0;
+
+  String get _currentTrackQuality {
+    if (_allTracks.isEmpty) return '';
+    final i = _selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0;
+    return _allTracks[i].quality;
+  }
+
   StreamSubscription<Tracks>? _tracksSubscription;
   WebViewController? _webViewController;
   bool _hasInitialized = false;
@@ -148,6 +156,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   DateTime? _lastManualVolumeTime;
 
   List<VideoTrackOption> _extractTracks = [];
+  List<VideoTrackOption> _allTracks = [];
 
   /// Calidades disponibles de la pista actual (parseadas del master HLS).
   List<QualityOption> _qualityOptions = [];
@@ -281,7 +290,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final now = DateTime.now().millisecondsSinceEpoch;
     // Throttling: solo cada 3 segundos para comandos fluidos pero eficientes
     // EXCEPCIÓN: Si los tracks acaban de cargar, forzamos reporte.
-    final bool tracksLoaded = _extractTracks.isNotEmpty;
+    final bool tracksLoaded = _allTracks.isNotEmpty;
     
     if (now - _lastRemoteUpdateMs < 3000 && !tracksLoaded) return;
     _lastRemoteUpdateMs = now;
@@ -299,7 +308,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       durationMs: _player!.state.duration.inMilliseconds,
       isPlaying: _player!.state.playing,
       volume: _volume,
-      availableTracks: _extractTracks.map((t) => {
+      availableTracks: _allTracks.map((t) => {
         'label': t.label,
         'url': t.url,
         'quality': t.quality,
@@ -529,6 +538,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (widget.sourceUrl.isNotEmpty && widget.source.isEmpty) {
       _hasInitialized = true;
       _initPlayer(widget.sourceUrl);
+      _findAlternatives();
     } else {
       _findAlternatives();
     }
@@ -538,10 +548,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _findAlternatives() {
     final sources = ref.read(activeContentSourcesProvider);
-    if (sources.isEmpty) return;
+    List<SearchResult> effective = sources;
+
+    // Senior Fix: Si no hay fuentes en el provider (abierto desde "Continuar Viendo"
+    // o deep link) pero conocemos el servidor actual, al menos mostramos ese para
+    // que la lista de servidores no quede vacía.
+    if (effective.isEmpty && widget.source.isNotEmpty) {
+      effective = [
+        SearchResult(
+          title: widget.title ?? widget.serverName ?? widget.source,
+          url: widget.sourceUrl,
+          quality: widget.language ?? '',
+          thumbnail: '',
+          source: widget.source,
+        ),
+      ];
+    }
+
+    if (effective.isEmpty) return;
 
     final Map<String, List<SearchResult>> grouped = {};
-    for (final r in sources) {
+    for (final r in effective) {
       final sName = simplifySourceName(r.source);
       grouped.putIfAbsent(sName, () => []).add(r);
     }
@@ -568,7 +595,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _switchTrack(int index) {
-    if (index >= _extractTracks.length) return;
+    if (index >= _allTracks.length) return;
     
     // Senior Hybrid Fix: Obtener posición actual según el motor activo
     final int currentPosMs = (_player?.state.position.inMilliseconds ?? 0);
@@ -586,11 +613,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Stability Fix: Parar el reproductor INMEDIATAMENTE
     _player?.stop();
 
-    final track = _extractTracks[index];
+    final track = _allTracks[index];
 
     setState(() {
       _selectedTrackIndex = index; // Senior Fix: Actualizamos el índice para marcarlo como seleccionado
-      _currentLanguage = ['DUB', 'LAT'].contains(track.quality.toUpperCase()) ? 'LAT' : 'SUB';
+      _currentLanguage = trackQualityType(track.quality) == 'SUB' ? 'SUB' : 'LAT';
       _resumePosition = currentPosMs;
       _isAutoplayResume = false;
       _hasResetPosition = false;
@@ -624,14 +651,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Stability Fix: Parar el reproductor INMEDIATAMENTE
     _player?.stop();
 
-    // Para fuentes que necesitan resolución de URL (Aniyae, AnimeFLV),
-    // resolver la URL del episodio ANTES de resetear _hasInitialized
-    // para evitar que el extract provider se dispare con la URL de detalles.
     String resolvedUrl = _activeEpisode != null
         ? buildEpisodeUrl(newSource.url, newSource.source, epNum)
         : newSource.url;
 
-    if (_activeEpisode != null && (newSource.source == 'AnimeFLV' || newSource.source == 'Aniyae' || newSource.source == 'TioAnime')) {
+    if (_activeEpisode != null && newSource.source == 'Aniyae') {
       try {
         final repo = ref.read(aurisRepositoryProvider);
         final episodeUrl = await repo.resolveEpisodeUrl(newSource.url, newSource.source, epNum, category: widget.category);
@@ -653,7 +677,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       // _indexForLanguage al inicializar el extract. Si no hay idioma previo,
       // derivarlo de la calidad declarada por la fuente.
       if (_currentLanguage == null) {
-        _currentLanguage = (qualityLower.contains('latino') || qualityLower.contains('dub')) ? 'LAT' : 'SUB';
+        _currentLanguage = trackQualityType(newSource.quality) == 'SUB' ? 'SUB' : 'LAT';
       }
       _hasInitialized = false;
       _resumePosition = currentPosMs;
@@ -1006,9 +1030,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final baseOptions = _groupedSources[currentSName] ?? [];
     final sourceOptions = <({String server, SearchResult result, bool isTrack, int trackIndex})>[];
 
-    if (_extractTracks.isNotEmpty) {
-      for (int i = 0; i < _extractTracks.length; i++) {
-        final t = _extractTracks[i];
+    if (_allTracks.isNotEmpty) {
+      for (int i = 0; i < _allTracks.length; i++) {
+        final t = _allTracks[i];
         final labelLower = t.label.toLowerCase();
 
         final String quality;
@@ -1035,14 +1059,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ));
       }
 
-      final hasLatino = sourceOptions.any((o) =>
-          o.result.quality == 'LAT' || o.result.quality == 'DUB' || o.result.quality.contains('LATINO'));
-      final hasSub = sourceOptions.any((o) => o.result.quality == 'SUB');
+      final hasLatino = sourceOptions.any((o) => trackQualityType(o.result.quality) != 'SUB');
+      final hasSub = sourceOptions.any((o) => trackQualityType(o.result.quality) == 'SUB');
       final seenUrls = sourceOptions.map((o) => o.result.url).toSet();
       for (final s in baseOptions) {
         if (s.url.isEmpty) continue;
         final qLower = s.quality.toLowerCase();
-        final isLat = qLower.contains('latino') || qLower.contains('dub') || qLower.contains('castellano');
+        final isLat = trackQualityType(s.quality) != 'SUB';
         final isMissingLang = isLat ? !hasLatino : !hasSub;
         if (isMissingLang && !seenUrls.contains(s.url)) {
           sourceOptions.add((
@@ -1061,9 +1084,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Orden de idiomas en el selector: DUB (Latino) -> CAST (Castellano) -> SUB
     int langRank(String q) {
-      final u = q.toUpperCase();
-      if (u == 'DUB' || u == 'LAT' || u.contains('LATINO')) return 0;
-      if (u == 'CAST' || u.contains('CASTELLANO')) return 1;
+      final type = trackQualityType(q);
+      if (type == 'DUB') return 0;
+      if (type == 'CAST') return 1;
       return 2; // SUB y demás
     }
     sourceOptions.sort((a, b) {
@@ -1095,12 +1118,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final s = entry.result;
         final serverName = entry.server;
         final quality = s.quality.toUpperCase();
-        final isLatino = quality == 'LAT' || quality == 'DUB' || quality.contains('LATINO');
-        final isCastellano = quality == 'CAST' || quality.contains('CASTELLANO');
-        
-        final flag = isLatino ? '🇲🇽' : (isCastellano ? '🇪🇸' : '🇯🇵');
-        final accentColor = isLatino 
-            ? Colors.greenAccent 
+        final type = trackQualityType(s.quality);
+        final isLatino = type != 'SUB';
+        final isCastellano = type == 'CAST';
+
+
+        final accentColor = isLatino
+            ? Colors.greenAccent
             : (isCastellano ? Colors.orangeAccent : Colors.blueAccent);
         
         // Senior Logic: Identificación precisa de la fuente actual
@@ -1111,7 +1135,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             : s.url == _currentSourceUrl;
 
         final String? trackBadge = entry.isTrack
-            ? _extractTracks[entry.trackIndex].label.toUpperCase()
+            ? _allTracks[entry.trackIndex].label.toUpperCase()
             : null;
 
         return Padding(
@@ -1140,12 +1164,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 Container(
                   width: 44, height: 44,
                   decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.1),
+                    color: accentColor,
                     shape: BoxShape.circle,
-                    border: isCurrent ? Border.all(color: accentColor, width: 2) : null,
-                  ),
-                  child: Center(
-                    child: Text(flag, style: const TextStyle(fontSize: 20)),
+                    border: isCurrent ? Border.all(color: Colors.white, width: 2) : null,
                   ),
                 ),
                 if (isCurrent)
@@ -1198,7 +1219,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: (quality.toUpperCase() == 'SUB' || quality.toUpperCase().contains('SUB'))
+                      color: (trackQualityType(s.quality) == 'SUB')
                           ? Colors.blueAccent.withOpacity(0.14)
                           : const Color(0xFFEF7A1E).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
@@ -1206,7 +1227,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     child: Text(
                       quality,
                       style: TextStyle(
-                        color: (quality.toUpperCase() == 'SUB' || quality.toUpperCase().contains('SUB'))
+                        color: (trackQualityType(s.quality) == 'SUB')
                             ? Colors.blueAccent
                             : const Color(0xFFEF7A1E),
                         fontSize: 9,
@@ -1407,7 +1428,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _autoplayCountdown = -1;
       });
 
-      if (baseSource.source == 'AnimeFLV' || baseSource.source == 'Aniyae' || baseSource.source == 'TioAnime') {
+      if (baseSource.source == 'Aniyae') {
         _resolveEpisodeUrl(baseSource, nextNum);
       }
     }
@@ -1420,10 +1441,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (tracks.isEmpty) return 0;
     final isLat = language == 'LAT' || language == 'DUB';
     final isCast = language == 'CAST';
-    
-    final latIdx = tracks.indexWhere((t) => ['DUB', 'LAT'].contains(t.quality.toUpperCase()) || t.label.toLowerCase().contains('latino') || t.label.toLowerCase().contains('dub'));
-    final castIdx = tracks.indexWhere((t) => t.quality.toUpperCase() == 'CAST' || t.label.toLowerCase().contains('castellano'));
-    final subIdx = tracks.indexWhere((t) => (['SUB'].contains(t.quality.toUpperCase()) || t.label.toLowerCase().contains('sub') || t.label.toLowerCase().contains('japones') || t.label.toLowerCase().contains('jap')) && !['DUB', 'LAT', 'CAST'].contains(t.quality.toUpperCase()) && !t.label.toLowerCase().contains('latino') && !t.label.toLowerCase().contains('castellano'));
+
+    final latIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'DUB');
+    final castIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'CAST');
+    final subIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'SUB');
 
     if (isLat && latIdx >= 0) return latIdx;
     if (isCast && castIdx >= 0) return castIdx;
@@ -2670,7 +2691,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 if (initialTrack.isEmbed) _initEmbedPlayer(initialTrack.url, initialTrack.headers);
                 else _initPlayer(initialTrack.url, initialTrack.headers);
               } else if (result.url.isNotEmpty) _initPlayer(result.url, result.headers);
-              if (mounted) setState(() => _extractTracks = playableTracks.where((t) => !t.isEmbed).toList());
+              if (mounted) {
+              _allTracks = playableTracks;
+              setState(() => _extractTracks = playableTracks.where((t) => !t.isEmbed).toList());
+            }
             });
           }
           return _playerView(tracks: tracks);
@@ -2861,7 +2885,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           textAlign: TextAlign.center,
           style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
         ),
-        if (_activeEpisode != null)
+        if (_activeEpisode != null && !_isMovie)
           Text(
             _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 18, fontWeight: FontWeight.bold),
@@ -2880,7 +2904,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _displayTitle,
           style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900),
         ),
-        if (_activeEpisode != null)
+        if (_activeEpisode != null && !_isMovie)
           Text(
             _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 16, fontWeight: FontWeight.bold),
@@ -2980,7 +3004,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 onTap: () => _showRemoteLanguageSelector(target),
               ),
             ],
-            if (!_isOpEd) ...[
+            if (!_isOpEd && !_isMovie) ...[
               const SizedBox(width: 16),
               _RemoteMandoActionButton(
                 icon: Symbols.video_library,
@@ -3017,7 +3041,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   final bool isCurrent = index == target.selectedTrackIndex;
                   final label = track['label'] as String? ?? 'Desconocido';
                   final q = (track['quality'] as String? ?? '').toUpperCase();
-                  final isLatino = ['DUB', 'LAT'].contains(q) || label.toLowerCase().contains('latino') || label.toLowerCase().contains('dub');
+                  final isLatino = trackQualityType(q) != 'SUB';
                   
                   return ListTile(
                     onTap: () {
@@ -3027,10 +3051,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     leading: Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(
-                        color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.white10,
+                        color: trackQualityType(q) == 'SUB'
+                            ? Colors.blueAccent
+                            : (trackQualityType(q) == 'CAST'
+                                ? Colors.orangeAccent
+                                : Colors.greenAccent),
                         shape: BoxShape.circle,
                       ),
-                      child: Center(child: Text(isLatino ? '🇲🇽' : '🇯🇵', style: const TextStyle(fontSize: 16))),
                     ),
                     title: Text(label, style: TextStyle(color: isCurrent ? Colors.white : Colors.white70, fontWeight: isCurrent ? FontWeight.w900 : FontWeight.normal)),
                     trailing: isCurrent ? const Icon(Icons.check_circle_rounded, color: Color(0xFFEF7A1E)) : null,
@@ -4064,7 +4091,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             ),
                           ],
                         )
-                      else if (_activeEpisode != null)
+                      else if (_activeEpisode != null && !_isMovie)
                         Text(
                           _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
                           style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
@@ -4074,14 +4101,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 },
               ),
             ),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(simplifySourceName(_currentServerName ?? widget.serverName ?? widget.source), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)), Row(mainAxisSize: MainAxisSize.min, children: [if (_currentLanguage == 'LAT') const Text('🇲🇽 LAT', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.w900)) else const Text('🇯🇵 SUB', style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.w900))])]),
-                  const SizedBox(width: 12),
-                  const Icon(Symbols.dns, color: Colors.white70, size: 18),
-                ])),
+            ActiveSourceBadge(serverName: _currentServerName ?? widget.serverName ?? widget.source, quality: _currentTrackQuality),
             const SizedBox(width: 16),
-            if (_isMobileDevice)
-              _buildCastIcon(iconSize),
           ])));
   }
 
@@ -4370,7 +4391,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           iconSize: iconSize,
                           icon: Icon(
                             _useVideoFitCycle 
-                              ? Symbols.fit_screen
+                              ? (_videoFit == BoxFit.contain ? Symbols.aspect_ratio : (_videoFit == BoxFit.fill ? Symbols.fit_screen : Symbols.fullscreen))
                               : (_isFullscreen ? Symbols.close_fullscreen : Symbols.open_in_full),
                             color: Colors.white,
                             weight: 300,
@@ -4466,7 +4487,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           IconButton(iconSize: iconSize, icon: const Icon(Symbols.subtitles, color: Colors.white), onPressed: _showLanguageSelector),
                           SizedBox(width: spacing),
                         ],
-                        if (!_isOpEd)
+                        if (!_isOpEd && !_isMovie)
                         IconButton(
                           iconSize: iconSize, 
                           icon: const Icon(Symbols.video_library, color: Colors.white), 
@@ -4474,7 +4495,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         ),
                         SizedBox(width: spacing),
                         _buildCastIcon(iconSize),
-                        if (!_isOpEd) ...[
+                        if (!_isOpEd && !_isMovie) ...[
                           SizedBox(width: spacing),
                           _PlayerTextButton(onPressed: _skipOpEd, icon: Symbols.fast_forward, label: 'OP / ED', useBackground: true),
                         ],

@@ -44,10 +44,12 @@ class _LoadingMoreIndicatorState extends State<LoadingMoreIndicator> {
     final dotStr = '.' * _dots;
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Row(children: [
-        SizedBox(
-          width: widget.spinnerSize,
-          height: widget.spinnerSize,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: widget.spinnerSize,
+            height: widget.spinnerSize,
           child: CircularProgressIndicator(
             strokeWidth: widget.spinnerSize * 0.16,
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),

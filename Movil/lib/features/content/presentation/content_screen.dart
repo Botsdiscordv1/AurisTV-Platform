@@ -91,8 +91,38 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
       vertical: ResponsiveUtils.sp(context, small ? 1.5 : 3)
     ),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.1),
-      border: Border.all(color: Colors.white10, width: 1),
+      color: Colors.black.withValues(alpha: 0.3),
+      border: Border.all(
+        color: Colors.white.withValues(alpha: 0.5), 
+        width: 1.5
+      ),
+      borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, 3)),
+    ),
+    child: Text(
+      text.toUpperCase(),
+      style: GoogleFonts.poppins(
+        color: Colors.white, 
+        fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.5,
+      ),
+    ),
+  );
+}
+
+Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) {
+  if (text == null || text.isEmpty) return const SizedBox.shrink();
+  return Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: ResponsiveUtils.sp(context, small ? 5 : 8), 
+      vertical: ResponsiveUtils.sp(context, small ? 1.5 : 3)
+    ),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.1),
+      border: Border.all(
+        color: Colors.white10, 
+        width: 1.0
+      ),
       borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, small ? 3 : 4)),
     ),
     child: Text(
@@ -100,7 +130,7 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
       style: TextStyle(
         color: Colors.white, 
         fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
-        fontWeight: FontWeight.w900
+        fontWeight: FontWeight.w900,
       ),
     ),
   );
@@ -381,7 +411,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               child: Row(
                 children: [
                   if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
-                    _buildBadge(context, cert.toUpperCase(), small: false),
+                    _buildAgeBadge(context, cert.toUpperCase(), small: false),
                     const SizedBox(width: 8),
                   ],
                   ...genres.take(5).map((g) => Padding(
@@ -883,14 +913,14 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                           Row(
                             children: [
                               if (widget.certification != null && widget.certification != 'NR') ...[
-                                _buildBadge(context, widget.certification!, small: true),
+                                _buildAgeBadge(context, widget.certification!, small: true),
                                 SizedBox(width: ResponsiveUtils.sp(context, 8)),
                               ],
                               if (_typeBadge != null) ...[
-                                _buildBadge(context, _typeBadge!, small: true),
+                                _buildAgeBadge(context, _typeBadge!, small: true),
                                 SizedBox(width: ResponsiveUtils.sp(context, 8)),
                               ],
-                              _buildBadge(context, _languageBadge, small: true),
+                              _buildAgeBadge(context, _languageBadge, small: true),
                             ],
                           ),
                         ],
@@ -1371,7 +1401,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     // Clasificación pre-carga (solo categoría, porque aún no tenemos el payload).
     final isAnimeCatFetch = widget.category == 'anime';
-    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie';
+    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'series' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie' || widget.result?.kind?.toLowerCase() == 'series';
     // Una movie_anime es una Pel\u00EDcula de anime: tambi\u00E9n queremos el detalle de
     // anime (AniList) para mostrar la franquicia en "Relacionado" + sus OP/ED.
     // 'all' (b\u00FAsqueda global) tambi\u00E9n incluye anime, as\u00ED que lo pedimos igual.
@@ -2227,8 +2257,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final isMobile = ResponsiveUtils.isMobile(context); final ops = detail.openings; final eds = detail.endings;
     if (ops.isEmpty && eds.isEmpty) return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay temas musicales disponibles', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
     return [
-      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: detail.backdrop), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
-      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: detail.backdrop), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: detail.banner ?? detail.backdrop), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: detail.banner ?? detail.backdrop), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
     ];
   }
 
@@ -2247,7 +2277,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final languages = detail is MovieDetail ? detail.languages : <String>[];
 
     if (isMobile) return [ 
-      SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 10), sliver: SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ 
+      SliverPadding(padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 0, bottom: 10), sliver: SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ 
         const Text('M\u00E1s informaci\u00F3n', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), 
         const SizedBox(height: 20), 
         if (detail.genres is List) Wrap(spacing: 8, runSpacing: 8, children: (detail.genres as List).map<Widget>((g) => _buildBadge(context, g.toString().toUpperCase())).toList()), 
@@ -2275,7 +2305,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     ];
 
     return [ 
-      SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 20), sliver: SliverToBoxAdapter(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SliverPadding(padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 8, bottom: 20), sliver: SliverToBoxAdapter(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(flex: 15, child: Column(children: [
           _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(detail.title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)), const SizedBox(height: 10),
@@ -2293,7 +2323,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ])),
         const SizedBox(width: 24), Expanded(flex: 10, child: Column(
           children: [
-            _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ const Text('Advertencias de contenido', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)), const SizedBox(height: 16), _buildBadge(context, cert), const SizedBox(height: 16), Text('${_getWarningText(cert)} Las luces intermitentes pueden afectar a espectadores fotosensibles', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 20)) ])),
+            _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ const Text('Advertencias de contenido', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)), const SizedBox(height: 16), _buildAgeBadge(context, cert), const SizedBox(height: 16), Text('${_getWarningText(cert)} Las luces intermitentes pueden afectar a espectadores fotosensibles', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 20)) ])),
             if (platforms.isNotEmpty) ...[
               const SizedBox(height: 24),
               _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2314,7 +2344,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     if (detail is! AnimeDetail || detail.characters.isEmpty) return [];
     final width = MediaQuery.of(context).size.width;
     final isMobile = ResponsiveUtils.isMobile(context);
-    final isCompactDesktop = width >= 800 && width < 1100;
+    final isTabletOrFoldable = width >= 800 && width < 1100;
     
     return [
       SliverToBoxAdapter(
@@ -2340,7 +2370,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     if (detail is! MovieDetail || detail.cast.isEmpty) return [];
     final width = MediaQuery.of(context).size.width;
     final isMobile = ResponsiveUtils.isMobile(context);
-    final isCompactDesktop = width >= 800 && width < 1100;
+    final isTabletOrFoldable = width >= 800 && width < 1100;
 
     return [
       SliverToBoxAdapter(
@@ -2428,7 +2458,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = ResponsiveUtils.isMobile(context);
-    final isCompactDesktop = width >= 800 && width < 1100;
+    final isTabletOrFoldable = width >= 800 && width < 1100;
     
     final cardWidth = isMobile ? 140.0 : 200.0;
     final carouselHeight = isMobile ? 290.0 : 400.0; // Senior Fix: Ajustado para ser más compacto sin overflow
@@ -2437,7 +2467,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: isMobile ? 16 : 24),
+          SizedBox(height: isMobile ? 0 : 8),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
             child: Text(
@@ -2946,7 +2976,12 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: widget.hPadding, vertical: 16),
+                padding: EdgeInsets.only(
+                  left: widget.hPadding, 
+                  right: widget.hPadding, 
+                  top: isMobile ? 0 : 8, 
+                  bottom: 16
+                ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(

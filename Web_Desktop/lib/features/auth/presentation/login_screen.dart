@@ -50,8 +50,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 MouseRegion(
-                  onEnter: (_) => setState(() => _isLogoHovered = true),
-                  onExit: (_) => setState(() => _isLogoHovered = false),
+                  onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isLogoHovered = true); }),
+                  onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isLogoHovered = false); }),
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: () => context.go('/'),
