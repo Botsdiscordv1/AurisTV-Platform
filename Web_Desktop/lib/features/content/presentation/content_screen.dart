@@ -620,16 +620,12 @@ AnimatedOpacity(
                           _buildSynopsis(d, isCompact: isUltraCompact),
                           const SizedBox(height: 24),
                           
-                          // Acciones Rápidas (Likes)
-                          _buildQuickFeedbackActions(context, isCompact: isUltraCompact),
-                          const SizedBox(height: 12),
+                          // Acciones Rápidas (Tráiler, Lista, Likes)
+                          _buildCircularActions(context, isCompact: isUltraCompact),
+                          const SizedBox(height: 20),
                           
                           // Botón Principal de Reproducción
                           _buildMainActionButton(context, isCompact: isUltraCompact, width: 320),
-                          const SizedBox(height: 8),
-                          
-                          // Lista Vertical de Acciones Secundarias (Tráiler, Lista)
-                          _buildNetflixActionList(context),
                         ],
                       ),
                     ),
@@ -676,34 +672,7 @@ AnimatedOpacity(
     );
   }
 
-  Widget _buildQuickFeedbackActions(BuildContext context, {bool isCompact = false}) {
-    final size = isCompact ? 36.0 : 42.0;
-    final iconSize = isCompact ? 18.0 : 22.0;
-    
-    return Row(
-      children: [
-        _DetailIconButton(
-          icon: Icons.thumb_up_off_alt, 
-          label: 'Me gusta', 
-          onPressed: () {}, 
-          isMobile: false, 
-          size: size, 
-          iconSize: iconSize
-        ),
-        const SizedBox(width: 12),
-        _DetailIconButton(
-          icon: Icons.thumb_down_off_alt, 
-          label: 'No es para mí', 
-          onPressed: () {}, 
-          isMobile: false, 
-          size: size, 
-          iconSize: iconSize
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNetflixActionList(BuildContext context) {
+  Widget _buildCircularActions(BuildContext context, {bool isMobile = false, bool isCompact = false}) {
     return Consumer(builder: (context, ref, _) {
       final favorites = ref.watch(favoritesProvider);
       final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
@@ -711,101 +680,34 @@ AnimatedOpacity(
       final user = ref.watch(authProvider);
       final profileId = user?.activeProfileId ?? 'guest_profile';
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      final size = isMobile ? null : (isCompact ? 44.0 : 56.0);
+      final iconSize = isMobile ? null : (isCompact ? 22.0 : 28.0);
+      final spacing = isMobile ? 0.0 : 12.0;
+
+      return Row(
+        mainAxisSize: isMobile ? MainAxisSize.max : MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          if (_lastTrailerKey != null)
-            _NetflixListButton(
+          // TRÁILER (Solo Desktop)
+          if (!isMobile && _lastTrailerKey != null) ...[
+            _DetailIconButton(
               icon: _showPlayer ? Icons.videocam_off_outlined : Icons.movie_outlined,
               label: _showPlayer ? 'Quitar tráiler' : 'Ver tráiler',
               onPressed: () {
                 if (_showPlayer) {
                   _disposeController();
-                  setState(() {
-                    _showPlayer = false;
-                    _isPlayedOnce = true;
-                    _showTitle = true;
-                  });
+                  setState(() { _showPlayer = false; _isPlayedOnce = true; _showTitle = true; });
                   _titleHideTimer?.cancel();
                 } else {
                   _initTrailer(_lastTrailerKey!, immediate: true);
                 }
               },
+              isMobile: false, size: size, iconSize: iconSize,
             ),
-          _NetflixListButton(
-            icon: isFav ? Icons.check : Icons.add,
-            label: isFav ? 'En mi lista' : 'Agregar a mi lista',
-            onPressed: () {
-              final item = FavoriteItem(
-                id: currentId,
-                title: widget.title,
-                posterUrl: widget.poster ?? '',
-                bannerUrl: widget.banner ?? '',
-                category: widget.category,
-                source: widget.source,
-                url: widget.url,
-                addedAt: DateTime.now(),
-                profileId: profileId,
-              );
-              ref.read(favoritesProvider.notifier).toggleFavorite(item);
-            },
-          ),
-        ],
-      );
-    });
-  }
+            SizedBox(width: spacing),
+          ],
 
-  Widget _buildMainActionButton(BuildContext context, {bool isMobile = false, bool isCompact = false, double? width}) {
-    return ValueListenableBuilder(valueListenable: Hive.box('playback_history').listenable(), builder: (ctx, box, _) {
-      return Consumer(builder: (context, ref, child) {
-        final historyManager = ref.watch(playbackHistoryStateProvider.notifier);
-        final latestHistory = historyManager.getLatestWatched(widget.title);
-        String label = 'Reproducir';
-        if (latestHistory != null) {
-          if (latestHistory.isFinished) { label = 'Siguiente: EP ${(int.tryParse(latestHistory.episode ?? '0') ?? 0) + 1}'; }
-          else { label = latestHistory.season != null ? 'Reanudar T${latestHistory.season}:EP ${latestHistory.episode}' : 'Reanudar EP ${latestHistory.episode}'; }
-        }
-        
-        final progress = latestHistory?.progressPercentage;
-
-        if (isMobile) {
-          return SizedBox(
-            width: double.infinity,
-            child: _DetailButton(
-              onPressed: widget.onPlay, 
-              icon: Icons.play_arrow, 
-              label: label, 
-              isPrimary: true, 
-              compact: isCompact,
-              isLoading: widget.isLoadingSources,
-            ),
-          );
-        }
-
-        return SizedBox(
-          width: width ?? (isCompact ? 280 : 320), 
-          child: _NetflixPrimaryButton(
-            onPressed: widget.onPlay, 
-            icon: Icons.play_arrow, 
-            label: label, 
-            progress: progress,
-            isLoading: widget.isLoadingSources,
-          )
-        );
-      });
-    });
-  }
-
-  Widget _buildCircularActions(BuildContext context, {bool isMobile = false}) {
-    return Consumer(builder: (context, ref, _) {
-      final favorites = ref.watch(favoritesProvider);
-      final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
-      final bool isFav = favorites.any((f) => f.id == currentId);
-      final user = ref.watch(authProvider);
-      final profileId = user?.activeProfileId ?? 'guest_profile';
-
-      return Row(
-        children: [
+          // MI LISTA (Ambos)
           _DetailIconButton(
             icon: isFav ? Icons.check : Icons.add,
             label: isFav ? 'En mi lista' : 'Mi lista',
@@ -823,23 +725,88 @@ AnimatedOpacity(
               );
               ref.read(favoritesProvider.notifier).toggleFavorite(item);
             },
-            isMobile: isMobile,
+            isMobile: isMobile, size: size, iconSize: iconSize,
           ),
+          if (!isMobile) SizedBox(width: spacing),
+
+          // CALIFICAR / ME GUSTA
           _DetailIconButton(
             icon: Icons.thumb_up_off_alt,
-            label: 'Calificar',
+            label: isMobile ? 'Calificar' : 'Me gusta',
             onPressed: () {},
-            isMobile: isMobile,
+            isMobile: isMobile, size: size, iconSize: iconSize,
           ),
-          _DetailIconButton(
-            icon: Icons.share_outlined,
-            label: 'Compartir',
-            onPressed: () {},
-            isMobile: isMobile,
-          ),
+          
+          // NO ES PARA MÍ (Solo Desktop)
+          if (!isMobile) ...[
+            SizedBox(width: spacing),
+            _DetailIconButton(
+              icon: Icons.thumb_down_off_alt,
+              label: 'No es para mí',
+              onPressed: () {},
+              isMobile: false, size: size, iconSize: iconSize,
+            ),
+          ],
+
+          // COMPARTIR (Solo Mobile)
+          if (isMobile) ...[
+            _DetailIconButton(
+              icon: Icons.share_outlined,
+              label: 'Compartir',
+              onPressed: () {},
+              isMobile: true,
+            ),
+          ]
         ],
       );
     });
+  }
+
+  Widget _buildMainActionButton(BuildContext context, {bool isMobile = false, bool isCompact = false, double? width}) {
+    final history = ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title);
+    final hasHistory = history != null;
+    final String label = hasHistory ? 'Continuar viendo' : 'Reproducir ahora';
+    final IconData icon = hasHistory ? Icons.play_arrow_rounded : Icons.play_arrow_rounded;
+
+    if (isMobile) {
+      return SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: ElevatedButton.icon(
+          onPressed: widget.onPlay,
+          icon: Icon(icon, color: Colors.black, size: 28),
+          label: Text(label, style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: width ?? 320,
+      height: isCompact ? 56 : 64,
+      child: ElevatedButton.icon(
+        onPressed: widget.onPlay,
+        icon: Icon(icon, color: Colors.black, size: 32),
+        label: Text(
+          label.toUpperCase(),
+          style: GoogleFonts.poppins(
+            color: Colors.black,
+            fontSize: isCompact ? 16 : 18,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.2,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 8,
+          shadowColor: Colors.black.withValues(alpha: 0.2),
+        ),
+      ),
+    );
   }
 
 
@@ -1939,61 +1906,7 @@ class _NetflixPrimaryButtonState extends State<_NetflixPrimaryButton> {
   }
 }
 
-class _NetflixListButton extends StatefulWidget {
-  final VoidCallback onPressed;
-  final IconData icon;
-  final String label;
 
-  const _NetflixListButton({
-    required this.onPressed,
-    required this.icon,
-    required this.label,
-  });
-
-  @override
-  State<_NetflixListButton> createState() => _NetflixListButtonState();
-}
-
-class _NetflixListButtonState extends State<_NetflixListButton> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.onPressed,
-          borderRadius: BorderRadius.circular(4),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Row(
-              children: [
-                Icon(
-                  widget.icon,
-                  color: _isHovered ? Colors.white70 : Colors.white,
-                  size: 28,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  widget.label,
-                  style: GoogleFonts.poppins(
-                    color: _isHovered ? Colors.white70 : Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _DetailButton extends StatelessWidget {
   final VoidCallback? onPressed; final IconData icon; final String label; final bool isPrimary; final bool compact; final bool isLoading;
@@ -2180,9 +2093,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   // "salte" de pestaña al aparecer/desaparecer. No recrea ningún controlador.
   void _syncExtras(bool desired) {
     if (_hasExtras == desired) return;
-    // Permitir pestaña Episodios también para películas (movie/movie_anime) —
-    // usan un "episodio sintético" (la película) con su selector de servidor.
-    final hasEpisodesTab = true;
+    final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
     final extrasInsertIndex = (hasEpisodesTab ? 1 : 0) + 1;
     int idx = _selectedTabIndex;
     if (_hasExtras && !desired) {
@@ -2444,8 +2355,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     // Tab "Extras" (OP/ED): solo se muestra si el detalle trae openings/endings.
     // _syncExtras actualiza _hasExtras y re-mapea _selectedTabIndex (sin recrear
     // ningún TabController, evitando crashes de lifecycle al ocultar/mostrar el tab).
-    // Permitir pestaña Episodios también para películas — usan episodio sintético.
-    final hasEpisodesTab = true;
+    final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
     final _detailForExtras = displayAnimeDetailAsync.valueOrNull;
     final _desiredExtras = _detailForExtras != null &&
         (_detailForExtras.openings.isNotEmpty || _detailForExtras.endings.isNotEmpty);
@@ -3332,7 +3242,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: isMobile ? 0 : 8),
+          const SizedBox.shrink(),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
             child: Text(

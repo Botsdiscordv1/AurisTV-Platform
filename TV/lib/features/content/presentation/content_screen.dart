@@ -1549,8 +1549,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   void _syncExtras(bool desired) {
     if (_hasExtras == desired) return;
-    // Permitir pestaña Episodios también para películas — usan episodio sintético.
-    final hasEpisodesTab = true;
+    final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
     final extrasInsertIndex = (hasEpisodesTab ? 1 : 0) + 1;
     int idx = _selectedTabIndex;
     if (_hasExtras && !desired) {
@@ -1706,7 +1705,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ? (movieDetailAsync.valueOrNull ?? displayAnimeDetailAsync.valueOrNull)
         : displayAnimeDetailAsync.valueOrNull;
 
-    final hasEpisodesTab = true;
+    final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
     final _detailForExtras = displayAnimeDetailAsync.valueOrNull;
     final _desiredExtras = _detailForExtras != null &&
         (_detailForExtras.openings.isNotEmpty || _detailForExtras.endings.isNotEmpty);
