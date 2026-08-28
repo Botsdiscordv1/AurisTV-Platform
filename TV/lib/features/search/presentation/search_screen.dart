@@ -578,16 +578,14 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
 }
 
 Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
-  // El badge debe reflejar la categoría que llega desde el server actual.
-  // Si `quality` ya trae Película/Serie/Dorama, eso manda; `type` queda como fallback.
+  // Prioridad: kind (movie/anime real) > quality > type > filtro.
   String? typeLabel;
-  final qualityCategory = _categoryFromQuality(result.quality);
-  if (qualityCategory != null) {
-    typeLabel = qualityCategory;
+  if (result.kind != null && result.kind!.isNotEmpty) {
+    typeLabel = _labelFromKind(result.kind!);
+  } else if (result.quality != null && result.quality!.isNotEmpty) {
+    typeLabel = _categoryFromQuality(result.quality!);
   } else if (result.type != null && result.type!.isNotEmpty) {
     typeLabel = _labelFromType(result.type!, selectedCategory);
-  } else if (result.kind != null && result.kind!.isNotEmpty) {
-    typeLabel = _labelFromKind(result.kind!);
   } else {
     typeLabel = _labelFromSearchCategory(selectedCategory);
   }
