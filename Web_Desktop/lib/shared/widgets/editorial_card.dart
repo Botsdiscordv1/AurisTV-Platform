@@ -94,7 +94,7 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                   borderRadius: BorderRadius.circular(4),
                   boxShadow: [
                     BoxShadow(
-                      color: theme.primary.withValues(alpha: _isHovered ? 0.35 : 0.15),
+                      color: theme.primary.withOpacity(_isHovered ? 0.35 : 0.15),
                       blurRadius: _isHovered ? 30 : 15,
                       spreadRadius: _isHovered ? 2 : 0,
                     ),
@@ -110,7 +110,7 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                           color: darkBg,
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
-                            color: theme.primary.withValues(alpha: 0.3),
+                            color: theme.primary.withOpacity(0.3),
                             width: 1.0,
                           ),
                         ),
@@ -124,7 +124,7 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                         child: Container(
                           decoration: BoxDecoration(
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.05),
+                              color: Colors.white.withOpacity(0.05),
                               width: 0.5,
                             ),
                             borderRadius: BorderRadius.circular(2),
@@ -183,7 +183,7 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                                               center: const Alignment(0.7, -0.8), // Luz desde la esquina superior derecha
                                               radius: 1.2,
                                               colors: [
-                                                theme.primary.withValues(alpha: 0.08 * (1.0 + _pulseController.value * 0.5)),
+                                                theme.primary.withOpacity(0.08 * (1.0 + _pulseController.value * 0.5)),
                                                 Colors.transparent,
                                               ],
                                             ),
@@ -201,9 +201,9 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
                                               colors: [
-                                                Colors.white.withValues(alpha: 0.0),
-                                                Colors.white.withValues(alpha: 0.1),
-                                                Colors.white.withValues(alpha: 0.0),
+                                                Colors.white.withOpacity(0.0),
+                                                Colors.white.withOpacity(0.1),
+                                                Colors.white.withOpacity(0.0),
                                               ],
                                               stops: [
                                                 (_shimmerController.value - 0.1).clamp(0.0, 1.0),
@@ -263,7 +263,7 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                     text: widget.media.title,
                     animate: isMobile ? true : _isHovered,
                     style: TextStyle(
-                      color: _isHovered ? Colors.white : Colors.white.withValues(alpha: 0.9),
+                      color: _isHovered ? Colors.white : Colors.white.withOpacity(0.9),
                       fontSize: isMobile ? 12 : 15,
                       fontWeight: _isHovered ? FontWeight.w900 : FontWeight.bold,
                       height: 1.1,
@@ -410,7 +410,7 @@ class TripleArcCornerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = color.withValues(alpha: 0.9)
+      ..color = color.withOpacity(0.9)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
@@ -455,8 +455,8 @@ class _CornerPulsar extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  Colors.white.withValues(alpha: 0.8 * (1 - animation.value)),
-                  color.withValues(alpha: 0.4 * (1 - animation.value)),
+                  Colors.white.withOpacity(0.8 * (1 - animation.value)),
+                  color.withOpacity(0.4 * (1 - animation.value)),
                   Colors.transparent,
                 ],
               ),

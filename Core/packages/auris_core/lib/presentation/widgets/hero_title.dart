@@ -38,23 +38,22 @@ class _HeroTitleState extends State<HeroTitle> {
   Widget build(BuildContext context) {
     // Logo siempre gana si existe (llegó del detalle).
     if (widget.logo != null && widget.logo!.isNotEmpty) {
-      return SizedBox(
-        width: widget.maxWidth,
-        height: widget.maxHeight,
-        child: Align(
+      return ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: widget.maxWidth,
+          maxHeight: widget.maxHeight,
+        ),
+        child: CachedNetworkImage(
+          imageUrl: widget.logo!,
+          fit: BoxFit.contain,
           alignment: Alignment.bottomLeft,
-          child: CachedNetworkImage(
-            imageUrl: widget.logo!,
-            height: widget.maxHeight,
-            fit: BoxFit.contain,
-            fadeInDuration: const Duration(milliseconds: 300),
-            placeholder: (_, __) => const SizedBox.shrink(),
-            errorWidget: (_, __, ___) => Text(
-              widget.title.toUpperCase(),
-              style: widget.style,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+          fadeInDuration: const Duration(milliseconds: 300),
+          placeholder: (_, __) => const SizedBox.shrink(),
+          errorWidget: (_, __, ___) => Text(
+            widget.title.toUpperCase(),
+            style: widget.style,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       );
@@ -72,6 +71,6 @@ class _HeroTitleState extends State<HeroTitle> {
     }
 
     // Sin logo y timeout no vencido -> nada (esperando logo).
-    return SizedBox(width: widget.maxWidth, height: widget.maxHeight);
+    return SizedBox(width: widget.maxWidth, height: widget.maxHeight / 2);
   }
 }

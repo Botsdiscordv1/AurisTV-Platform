@@ -1077,24 +1077,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           trackIndex: i,
         ));
       }
-
-      final hasLatino = sourceOptions.any((o) => trackQualityType(o.result.quality) != 'SUB');
-      final hasSub = sourceOptions.any((o) => trackQualityType(o.result.quality) == 'SUB');
-      final seenUrls = sourceOptions.map((o) => o.result.url).toSet();
-      for (final s in baseOptions) {
-        if (s.url.isEmpty) continue;
-        final qLower = s.quality.toLowerCase();
-        final isLat = trackQualityType(s.quality) != 'SUB';
-        final isMissingLang = isLat ? !hasLatino : !hasSub;
-        if (isMissingLang && !seenUrls.contains(s.url)) {
-          sourceOptions.add((
-            server: currentSName,
-            result: s,
-            isTrack: false,
-            trackIndex: -1,
-          ));
-        }
-      }
     } else {
       for (final s in baseOptions) {
         sourceOptions.add((server: currentSName, result: s, isTrack: false, trackIndex: -1));

@@ -119,8 +119,8 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                         ? Border.all(color: Colors.white, width: 3)
                         : Border.all(color: Colors.white12, width: 1),
                     boxShadow: _isActive
-                        ? [BoxShadow(color: Colors.white.withValues(alpha: 0.2), blurRadius: 15, spreadRadius: 1)]
-                        : [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))],
+                        ? [BoxShadow(color: Colors.white.withOpacity(0.2), blurRadius: 15, spreadRadius: 1)]
+                        : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: ClipRRect(
@@ -149,7 +149,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: widget.badgeColor ?? Colors.black.withValues(alpha: 0.8),
+                                color: widget.badgeColor ?? Colors.black.withOpacity(0.8),
                                 borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8)),
                                 border: Border.all(color: Colors.white12, width: 0.5),
                               ),
@@ -170,9 +170,9 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.8), 
+                                color: Colors.black.withOpacity(0.8), 
                                 borderRadius: BorderRadius.circular(4), 
-                                border: Border.all(color: const Color(0xFFFFC107).withValues(alpha: 0.3), width: 0.8)
+                                border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 0.8)
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -191,7 +191,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: widget.subtitleColor ?? Colors.black.withValues(alpha: 0.85),
+                                color: widget.subtitleColor ?? Colors.black.withOpacity(0.85),
                                 borderRadius: const BorderRadius.only(topRight: Radius.circular(8)),
                                 border: Border.all(color: Colors.white12, width: 0.5),
                               ),
@@ -228,7 +228,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                       text: widget.title,
                       animate: isMobile ? true : _isActive,
                       style: GoogleFonts.poppins(
-                        color: _isActive ? Colors.white : Colors.white.withValues(alpha: 0.95),
+                        color: _isActive ? Colors.white : Colors.white.withOpacity(0.95),
                         fontSize: isMobile ? ResponsiveUtils.sp(context, 13) : 16,
                         fontWeight: FontWeight.w700,
                         height: 1.2,

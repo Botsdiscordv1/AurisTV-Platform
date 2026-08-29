@@ -25,9 +25,9 @@ class EditorialBadgeTheme {
           icon: Icons.star_rounded,
           label: 'MÍTICO',
           shimmerColors: [
-            Colors.white.withValues(alpha: 0.0),
-            const Color(0xFFFFECB3).withValues(alpha: 0.2),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withOpacity(0.0),
+            const Color(0xFFFFECB3).withOpacity(0.2),
+            Colors.white.withOpacity(0.0),
           ],
         );
       case EditorialBadge.masterpiece:
@@ -37,9 +37,9 @@ class EditorialBadgeTheme {
           icon: Icons.workspace_premium_rounded,
           label: 'OBRA MAESTRA',
           shimmerColors: [
-            Colors.white.withValues(alpha: 0.0),
-            const Color(0xFFE9D5FF).withValues(alpha: 0.15),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withOpacity(0.0),
+            const Color(0xFFE9D5FF).withOpacity(0.15),
+            Colors.white.withOpacity(0.0),
           ],
         );
       case EditorialBadge.hiddenGem:
@@ -49,9 +49,9 @@ class EditorialBadgeTheme {
           icon: Icons.diamond_rounded,
           label: 'JOYA OCULTA',
           shimmerColors: [
-            Colors.white.withValues(alpha: 0.0),
-            const Color(0xFFCFFAFE).withValues(alpha: 0.3),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withOpacity(0.0),
+            const Color(0xFFCFFAFE).withOpacity(0.3),
+            Colors.white.withOpacity(0.0),
           ],
         );
       case EditorialBadge.essential:
@@ -61,9 +61,9 @@ class EditorialBadgeTheme {
           icon: Icons.local_fire_department_rounded,
           label: 'IMPRESCINDIBLE',
           shimmerColors: [
-            Colors.white.withValues(alpha: 0.0),
-            const Color(0xFFFECACA).withValues(alpha: 0.4),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withOpacity(0.0),
+            const Color(0xFFFECACA).withOpacity(0.4),
+            Colors.white.withOpacity(0.0),
           ],
         );
       case EditorialBadge.favorite:
@@ -73,9 +73,9 @@ class EditorialBadgeTheme {
           icon: Icons.favorite_rounded,
           label: 'FAVORITO',
           shimmerColors: [
-            Colors.white.withValues(alpha: 0.0),
-            const Color(0xFFFCE7F3).withValues(alpha: 0.3),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withOpacity(0.0),
+            const Color(0xFFFCE7F3).withOpacity(0.3),
+            Colors.white.withOpacity(0.0),
           ],
         );
       case EditorialBadge.awardWinner:
@@ -85,9 +85,9 @@ class EditorialBadgeTheme {
           icon: Icons.emoji_events_rounded,
           label: 'PREMIADO',
           shimmerColors: [
-            Colors.white.withValues(alpha: 0.0),
-            const Color(0xFFDBEAFE).withValues(alpha: 0.3),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withOpacity(0.0),
+            const Color(0xFFDBEAFE).withOpacity(0.3),
+            Colors.white.withOpacity(0.0),
           ],
         );
       case EditorialBadge.classic:
@@ -97,9 +97,9 @@ class EditorialBadgeTheme {
           icon: Icons.auto_awesome_rounded,
           label: 'CLÁSICO',
           shimmerColors: [
-            Colors.white.withValues(alpha: 0.0),
-            const Color(0xFFD1FAE5).withValues(alpha: 0.3),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withOpacity(0.0),
+            const Color(0xFFD1FAE5).withOpacity(0.3),
+            Colors.white.withOpacity(0.0),
           ],
         );
       case EditorialBadge.starter:
@@ -109,9 +109,9 @@ class EditorialBadgeTheme {
           icon: Icons.rocket_launch_rounded,
           label: 'PARA EMPEZAR',
           shimmerColors: [
-            Colors.white.withValues(alpha: 0.0),
-            const Color(0xFFF7FEE7).withValues(alpha: 0.4),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withOpacity(0.0),
+            const Color(0xFFF7FEE7).withOpacity(0.4),
+            Colors.white.withOpacity(0.0),
           ],
         );
       case EditorialBadge.movieEssential:
@@ -121,9 +121,9 @@ class EditorialBadgeTheme {
           icon: Icons.movie_filter_rounded,
           label: 'CINE CULTO',
           shimmerColors: [
-            Colors.white.withValues(alpha: 0.0),
-            Colors.white.withValues(alpha: 0.5),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withOpacity(0.0),
+            Colors.white.withOpacity(0.5),
+            Colors.white.withOpacity(0.0),
           ],
         );
     }

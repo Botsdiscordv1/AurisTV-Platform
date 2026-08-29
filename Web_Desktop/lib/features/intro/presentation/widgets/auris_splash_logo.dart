@@ -209,7 +209,7 @@ class _StreaksPainter extends CustomPainter {
     ];
 
     for (var i = 0; i < 4; i++) {
-      paint.color = colors[i].withValues(alpha: 0.85);
+      paint.color = colors[i].withOpacity(0.85);
       final startAngle = (math.pi / 2) * i - math.pi / 2;
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),

@@ -250,7 +250,7 @@ class _ProfileItemState extends State<_ProfileItem> {
                           height: 120,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            color: Colors.black.withValues(alpha: 0.5),
+                            color: Colors.black.withOpacity(0.5),
                           ),
                           child: const Icon(Icons.edit, color: Colors.white, size: 40),
                         ),
@@ -316,7 +316,7 @@ class _AddProfileItemState extends State<_AddProfileItem> {
                   color: _isHovered ? Colors.white : Colors.white10,
                   width: 2,
                 ),
-                color: Colors.white.withValues(alpha: _isHovered ? 0.1 : 0.05),
+                color: Colors.white.withOpacity(_isHovered ? 0.1 : 0.05),
               ),
               child: Icon(
                 Icons.add, 

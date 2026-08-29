@@ -110,7 +110,7 @@ class _ShortcutCardState extends State<_ShortcutCard> {
                   width: size,
                   height: size * 0.75,
                   decoration: BoxDecoration(
-                    color: isSelected ? widget.color : Colors.white.withValues(alpha: 0.05),
+                    color: isSelected ? widget.color : Colors.white.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: isSelected ? Colors.white : Colors.white10,
@@ -118,7 +118,7 @@ class _ShortcutCardState extends State<_ShortcutCard> {
                     ),
                     boxShadow: isSelected ? [
                       BoxShadow(
-                        color: widget.color.withValues(alpha: 0.4),
+                        color: widget.color.withOpacity(0.4),
                         blurRadius: 15,
                         spreadRadius: 2,
                       )
@@ -127,7 +127,7 @@ class _ShortcutCardState extends State<_ShortcutCard> {
                   child: Center(
                     child: Icon(
                       widget.icon,
-                      color: isSelected ? Colors.white : widget.color.withValues(alpha: 0.8),
+                      color: isSelected ? Colors.white : widget.color.withOpacity(0.8),
                       size: isMobile ? 32 : 44,
                     ),
                   ),

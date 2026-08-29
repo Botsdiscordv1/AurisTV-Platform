@@ -542,11 +542,11 @@ else if (currentCategory == 'películas') ...[
             duration: const Duration(milliseconds: 300),
             decoration: BoxDecoration(
               color: _isScrolled 
-                  ? const Color(0xFF0B0B0D).withValues(alpha: 0.6) 
+                  ? const Color(0xFF0B0B0D).withOpacity(0.6) 
                   : const Color(0xFF0B0B0D), 
               border: Border(
                 bottom: BorderSide(
-                  color: _isScrolled ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
+                  color: _isScrolled ? Colors.white.withOpacity(0.08) : Colors.transparent,
                   width: 0.5,
                 ),
               ),
@@ -626,7 +626,7 @@ else if (currentCategory == 'películas') ...[
                                     child: Container(
                                       padding: const EdgeInsets.all(7),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.1),
+                                        color: Colors.white.withOpacity(0.1),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
@@ -673,11 +673,11 @@ else if (currentCategory == 'películas') ...[
           margin: EdgeInsets.zero,
           decoration: BoxDecoration(
             color: _isScrolled 
-                ? const Color(0xFF0B0B0D).withValues(alpha: 0.4) 
+                ? const Color(0xFF0B0B0D).withOpacity(0.4) 
                 : Colors.transparent,
             border: Border(
               bottom: BorderSide(
-                color: _isScrolled ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
+                color: _isScrolled ? Colors.white.withOpacity(0.1) : Colors.transparent,
                 width: 0.5,
               ),
             ),
@@ -802,7 +802,7 @@ class _AuthButtonState extends State<_AuthButton> {
               borderRadius: BorderRadius.circular(4),
               boxShadow: _isHovered ? [
                 BoxShadow(
-                  color: const Color(0xFFEF7A1E).withValues(alpha: 0.5),
+                  color: const Color(0xFFEF7A1E).withOpacity(0.5),
                   blurRadius: 15,
                   spreadRadius: 2,
                 )
@@ -870,11 +870,11 @@ class _CategoryChipState extends State<_CategoryChip> {
           decoration: BoxDecoration(
             color: isSelected 
                 ? const Color(0xFF505459) 
-                : (_isHovered ? Colors.white.withValues(alpha: 0.05) : Colors.transparent),
+                : (_isHovered ? Colors.white.withOpacity(0.05) : Colors.transparent),
             borderRadius: BorderRadius.circular(12),
             boxShadow: isSelected ? [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.18),
+                color: Colors.black.withOpacity(0.18),
                 blurRadius: 12,
                 offset: const Offset(0, 3),
               ),
@@ -889,7 +889,7 @@ class _CategoryChipState extends State<_CategoryChip> {
                   top: 0, left: 0, right: 0,
                   child: Container(
                     height: 1,
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: Colors.white.withOpacity(0.08),
                   ),
                 ),
                 // Borde Inferior (Sombra)
@@ -897,7 +897,7 @@ class _CategoryChipState extends State<_CategoryChip> {
                   bottom: 0, left: 0, right: 0,
                   child: Container(
                     height: 1,
-                    color: Colors.black.withValues(alpha: 0.20),
+                    color: Colors.black.withOpacity(0.20),
                   ),
                 ),
               ],
@@ -996,7 +996,7 @@ class _PillNavBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
+                      color: Colors.black.withOpacity(0.2),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1061,7 +1061,7 @@ class _PillNavItemState extends State<_PillNavItem> {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            color: (!widget.isActive && _hovered) ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
+            color: (!widget.isActive && _hovered) ? Colors.white.withOpacity(0.1) : Colors.transparent,
           ),
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
@@ -1165,7 +1165,7 @@ class _LanguageSelectorState extends State<_LanguageSelector> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
+                      color: Colors.black.withOpacity(0.4),
                       blurRadius: 25,
                       spreadRadius: 2,
                       offset: const Offset(0, 8),
@@ -1179,9 +1179,9 @@ class _LanguageSelectorState extends State<_LanguageSelector> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A222B).withValues(alpha: 0.55), // Senior: Blur más claro y transparente
+                        color: const Color(0xFF1A222B).withOpacity(0.55), // Senior: Blur más claro y transparente
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                        border: Border.all(color: Colors.white.withOpacity(0.12)),
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -1323,13 +1323,13 @@ class _LanguageItemState extends State<_LanguageItem> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: _isHovered ? Colors.white.withValues(alpha: 0.05) : Colors.transparent,
+            color: _isHovered ? Colors.white.withOpacity(0.05) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
             widget.label,
             style: GoogleFonts.poppins(
-              color: _isHovered ? Colors.white : Colors.white.withValues(alpha: 0.7),
+              color: _isHovered ? Colors.white : Colors.white.withOpacity(0.7),
               fontSize: 14,
               fontWeight: _isHovered ? FontWeight.w700 : FontWeight.w500,
             ),

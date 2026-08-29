@@ -692,9 +692,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    const Color(0xFF0B0B0D).withValues(alpha: 0.85), 
-                    const Color(0xFF0B0B0D).withValues(alpha: 0.4),
-                    const Color(0xFF0B0B0D).withValues(alpha: 0.1),
+                    const Color(0xFF0B0B0D).withOpacity(0.85), 
+                    const Color(0xFF0B0B0D).withOpacity(0.4),
+                    const Color(0xFF0B0B0D).withOpacity(0.1),
                     Colors.transparent,
                   ],
                   stops: const [0.0, 0.3, 0.5, 0.8],
@@ -712,7 +712,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                   colors: [
                     const Color(0xFF0B0B0D),
                     const Color(0xFF0B0B0D),
-                    const Color(0xFF0B0B0D).withValues(alpha: 0.9),
+                    const Color(0xFF0B0B0D).withOpacity(0.9),
                     Colors.transparent,
                   ],
                   stops: const [0.0, 0.38, 0.45, 1.0],
@@ -728,7 +728,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    const Color(0xFF0B0B0D).withValues(alpha: 0.6),
+                    const Color(0xFF0B0B0D).withOpacity(0.6),
                     Colors.transparent,
                   ],
                   stops: const [0.0, 0.3], // Solo oscurecemos la parte superior
@@ -795,7 +795,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                   imageFilter: ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
                   child: ColorFiltered(
                     colorFilter: ColorFilter.mode(
-                      Colors.black.withValues(alpha: 0.7),
+                      Colors.black.withOpacity(0.7),
                       BlendMode.srcIn,
                     ),
                     child: CachedNetworkImage(
@@ -882,7 +882,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(2),
                   ),
                   child: const Text(
@@ -921,7 +921,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                     letterSpacing: 0.1,
                     shadows: [
                       Shadow(
-                        color: Colors.black.withValues(alpha: 0.5),
+                        color: Colors.black.withOpacity(0.5),
                         offset: const Offset(0, 2),
                         blurRadius: 4,
                       ),
@@ -1028,7 +1028,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
   Widget _buildMetadataSeparator() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Text('•', style: TextStyle(color: Colors.white.withValues(alpha: 0.3))),
+      child: Text('•', style: TextStyle(color: Colors.white.withOpacity(0.3))),
     );
   }
 
@@ -1062,7 +1062,7 @@ class _BannerContent extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 800),
               foregroundDecoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: overlayOpacity),
+                color: Colors.black.withOpacity(overlayOpacity),
               ),
               child: CachedNetworkImage(
                 imageUrl: item.bannerUrl!,
@@ -1097,7 +1097,7 @@ class _BannerContent extends StatelessWidget {
         ),
         AnimatedContainer(
           duration: const Duration(milliseconds: 800),
-          color: Colors.black.withValues(alpha: showTrailer ? 0.75 : 0.55),
+          color: Colors.black.withOpacity(showTrailer ? 0.75 : 0.55),
         ),
       ],
     );
@@ -1159,8 +1159,8 @@ class _BannerButtonState extends State<_BannerButton> {
   Widget build(BuildContext context) {
     final bool isSelected = _focused || _hovered;
     final Color bgColor = widget.isPrimary 
-        ? (isSelected ? Colors.white.withValues(alpha: 0.85) : Colors.white)
-        : (isSelected ? Colors.grey.withValues(alpha: 0.5) : const Color(0xFF6D6D6EB3));
+        ? (isSelected ? Colors.white.withOpacity(0.85) : Colors.white)
+        : (isSelected ? Colors.grey.withOpacity(0.5) : const Color(0xFF6D6D6EB3));
     final Color fgColor = widget.isPrimary ? Colors.black : Colors.white;
 
     return Focus(
@@ -1270,7 +1270,7 @@ class _BannerIconButtonState extends State<_BannerIconButton> {
                   width: isSelected ? 2 : 1
                 ),
                 boxShadow: _focused ? [
-                  BoxShadow(color: Colors.white.withValues(alpha: 0.3), blurRadius: 12, spreadRadius: 1)
+                  BoxShadow(color: Colors.white.withOpacity(0.3), blurRadius: 12, spreadRadius: 1)
                 ] : [],
               ),
               child: Material(

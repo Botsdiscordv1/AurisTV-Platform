@@ -283,7 +283,7 @@ class _SettingsCard extends StatelessWidget {
         color: const Color(0xFF1A1D24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+          side: BorderSide(color: Colors.white.withOpacity(0.05)),
         ),
         clipBehavior: Clip.antiAlias,
         child: child,

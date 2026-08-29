@@ -109,7 +109,7 @@ class _FullScreenViewerState extends State<FullScreenViewer> {
                 child: BackdropFilter(
                   filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                   child: Container(
-                    color: Colors.black.withValues(alpha: 0.6),
+                    color: Colors.black.withOpacity(0.6),
                   ),
                 ),
               ),

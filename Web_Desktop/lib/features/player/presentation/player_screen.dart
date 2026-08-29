@@ -681,7 +681,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
           child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withValues(alpha: 0.1) : Colors.transparent,
+            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
@@ -698,7 +698,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               leading: Container(
                 width: 44, height: 44, // Senior Fix: Unificado tamaño con selector de idiomas
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
+                  color: Colors.white.withOpacity(0.1),
                   shape: BoxShape.circle,
                   border: isCurrent ? Border.all(color: const Color(0xFFEF7A1E), width: 2) : null,
                 ),
@@ -709,7 +709,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               title: Text(
                 sName,
                 style: TextStyle(
-                  color: isCurrent ? Colors.white : Colors.white.withValues(alpha: 0.9),
+                  color: isCurrent ? Colors.white : Colors.white.withOpacity(0.9),
                   fontSize: 15,
                   fontWeight: isCurrent ? FontWeight.w900 : FontWeight.bold,
                 ),
@@ -717,7 +717,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               subtitle: Text(
                 '${_groupedSources[sName]!.length} opciones disponibles',
                 style: TextStyle(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withValues(alpha: 0.8) : Colors.white38,
+                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.8) : Colors.white38,
                   fontSize: 12,
                 ),
               ),
@@ -808,7 +808,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
           child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withValues(alpha: 0.1) : Colors.transparent,
+            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
@@ -826,7 +826,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               leading: Container(
                 width: 44, height: 44,
                 decoration: BoxDecoration(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.05),
+                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.white.withOpacity(0.05),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -845,7 +845,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               subtitle: Text(
                 isAvailable ? sub : 'No disponible para este tema',
                 style: TextStyle(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withValues(alpha: 0.7) : Colors.white38,
+                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.7) : Colors.white38,
                   fontSize: 12,
                 ),
               ),
@@ -857,7 +857,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   BoxDecoration get _controlCapsuleDecoration => BoxDecoration(
-    color: Colors.black.withValues(alpha: 0.2), // Ultra-transparente estilo YouTube
+    color: Colors.black.withOpacity(0.2), // Ultra-transparente estilo YouTube
     borderRadius: BorderRadius.circular(22),
   );
 
@@ -903,7 +903,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         height: 44,
         width: _isVolumePillHovered ? 160 : 44,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.2),
+          color: Colors.black.withOpacity(0.2),
           borderRadius: BorderRadius.circular(22),
         ),
         padding: const EdgeInsets.all(4), 
@@ -912,8 +912,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           child: InkWell(
             onTap: _toggleMute,
             borderRadius: BorderRadius.circular(18), 
-            hoverColor: Colors.white.withValues(alpha: 0.1),
-            splashColor: Colors.white.withValues(alpha: 0.1),
+            hoverColor: Colors.white.withOpacity(0.1),
+            splashColor: Colors.white.withOpacity(0.1),
             child: Stack(
               children: [
                 // Icono (Anclado al inicio)
@@ -945,9 +945,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6, elevation: 3),
                             overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
                             activeTrackColor: isBoost ? const Color(0xFFEF7A1E) : Colors.white,
-                            inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
+                            inactiveTrackColor: Colors.white.withOpacity(0.2),
                             thumbColor: isBoost ? const Color(0xFFEF7A1E) : Colors.white,
-                            overlayColor: (isBoost ? const Color(0xFFEF7A1E) : Colors.white).withValues(alpha: 0.15),
+                            overlayColor: (isBoost ? const Color(0xFFEF7A1E) : Colors.white).withOpacity(0.15),
                           ),
                           child: Slider(
                             value: _volume,
@@ -1020,24 +1020,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           trackIndex: i,
         ));
       }
-
-      final hasLatino = sourceOptions.any((o) => trackQualityType(o.result.quality) != 'SUB');
-      final hasSub = sourceOptions.any((o) => trackQualityType(o.result.quality) == 'SUB');
-      final seenUrls = sourceOptions.map((o) => o.result.url).toSet();
-      for (final s in baseOptions) {
-        if (s.url.isEmpty) continue;
-        final qLower = s.quality.toLowerCase();
-        final isLat = trackQualityType(s.quality) != 'SUB';
-        final isMissingLang = isLat ? !hasLatino : !hasSub;
-        if (isMissingLang && !seenUrls.contains(s.url)) {
-          sourceOptions.add((
-            server: currentSName,
-            result: s,
-            isTrack: false,
-            trackIndex: -1,
-          ));
-        }
-      }
     } else {
       for (final s in baseOptions) {
         sourceOptions.add((server: currentSName, result: s, isTrack: false, trackIndex: -1));
@@ -1103,7 +1085,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
           child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withValues(alpha: 0.1) : Colors.transparent,
+            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
@@ -1150,7 +1132,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
+                      color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -1163,9 +1145,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFC107).withValues(alpha: 0.15),
+                      color: const Color(0xFFFFC107).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFFFC107).withValues(alpha: 0.3), width: 1),
+                      border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 1),
                     ),
                     child: Text(
                       trackBadge,
@@ -1182,8 +1164,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: (trackQualityType(s.quality) == 'SUB')
-                          ? Colors.blueAccent.withValues(alpha: 0.14)
-                          : const Color(0xFFEF7A1E).withValues(alpha: 0.1),
+                          ? Colors.blueAccent.withOpacity(0.14)
+                          : const Color(0xFFEF7A1E).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -1205,7 +1187,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ? Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEF7A1E).withValues(alpha: 0.2),
+                    color: const Color(0xFFEF7A1E).withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.play_arrow_rounded, color: Color(0xFFEF7A1E), size: 20),
@@ -2681,7 +2663,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     Text(
                       'El enlace guardado en tu historial ya no es válido. Esto es común en fuentes como Zilla o JKAnime.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
+                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
                     ),
                     const SizedBox(height: 32),
                     Row(
@@ -2812,9 +2794,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFEF7A1E).withValues(alpha: 0.1),
+              color: const Color(0xFFEF7A1E).withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFEF7A1E).withValues(alpha: 0.3)),
+              border: Border.all(color: const Color(0xFFEF7A1E).withOpacity(0.3)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -2852,7 +2834,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         if (_activeEpisode != null && !_isMovie)
           Text(
             _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 18, fontWeight: FontWeight.bold),
           ),
         const SizedBox(height: 60),
         _buildRemoteControls(target),
@@ -2871,7 +2853,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         if (_activeEpisode != null && !_isMovie)
           Text(
             _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 16, fontWeight: FontWeight.bold),
           ),
         const SizedBox(height: 32),
         _buildRemoteControls(target),
@@ -2904,7 +2886,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               decoration: BoxDecoration(
                 color: Colors.white, 
                 shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: const Color(0xFFEF7A1E).withValues(alpha: 0.3), blurRadius: 15)]
+                boxShadow: [BoxShadow(color: const Color(0xFFEF7A1E).withOpacity(0.3), blurRadius: 15)]
               ),
               child: IconButton(
                 iconSize: 44,
@@ -3084,7 +3066,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             leading: Container(
                               width: 40, height: 40,
                               decoration: BoxDecoration(
-                                color: isCurrent ? const Color(0xFFEF7A1E).withValues(alpha: 0.1) : Colors.white10,
+                                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.white10,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Center(
@@ -3281,7 +3263,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               decoration: BoxDecoration(
                 color: Colors.black54,
                 shape: BoxShape.circle,
-                border: Border.all(color: isBoost ? Colors.orangeAccent.withValues(alpha: 0.5) : Colors.white10),
+                border: Border.all(color: isBoost ? Colors.orangeAccent.withOpacity(0.5) : Colors.white10),
               ),
               child: Icon(icon, color: isBoost ? Colors.orangeAccent : Colors.white, size: 28),
             ),
@@ -3335,7 +3317,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         height: double.infinity,
         // Solo mostramos un fondo sutil en móvil para delimitar la zona táctil
         decoration: isMobile ? BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.only(
             topLeft: isRight ? const Radius.circular(500) : Radius.zero,
             bottomLeft: isRight ? const Radius.circular(500) : Radius.zero,
@@ -3647,7 +3629,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           child: Container(
                             width: 100, height: 100,
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.5),
+                              color: Colors.black.withOpacity(0.5),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -3678,7 +3660,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                                      gradient: LinearGradient(
                                        begin: Alignment.topCenter, 
                                        end: Alignment.bottomCenter, 
-                                       colors: [Colors.black.withValues(alpha: 0.7), Colors.transparent, Colors.transparent, Colors.black.withValues(alpha: 0.8)], 
+                                       colors: [Colors.black.withOpacity(0.7), Colors.transparent, Colors.transparent, Colors.black.withOpacity(0.8)], 
                                        stops: const [0.0, 0.2, 0.7, 1.0],
                                      ),
                                    ),
@@ -3850,7 +3832,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
            if (_playbackError != null) 
              Positioned.fill(
                child: Container(
-                 color: Colors.black.withValues(alpha: 0.92), 
+                 color: Colors.black.withOpacity(0.92), 
                  child: Center(
                    child: SingleChildScrollView(
                      child: Padding(
@@ -3948,7 +3930,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   borderRadius: BorderRadius.circular(8), 
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: isVisible ? 0.3 : 0.0),
+                      color: Colors.black.withOpacity(isVisible ? 0.3 : 0.0),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     )
@@ -4110,7 +4092,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               _startHideTimer();
             }
           },
-          backgroundColor: _isMobileDevice ? Colors.black.withValues(alpha: 0.15) : null,
+          backgroundColor: _isMobileDevice ? Colors.black.withOpacity(0.15) : null,
           iconSize: _isMobileDevice ? null : 30, // Unificado a 30px para Desktop
         );
       }
@@ -4130,7 +4112,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return Container(
       width: size, height: size,
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.black.withValues(alpha: 0.2),
+        color: backgroundColor ?? Colors.black.withOpacity(0.2),
         shape: BoxShape.circle,
       ),
       padding: EdgeInsets.all(padding),
@@ -4139,8 +4121,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(size / 2 - padding),
-          hoverColor: Colors.white.withValues(alpha: 0.12),
-          splashColor: Colors.white.withValues(alpha: 0.08),
+          hoverColor: Colors.white.withOpacity(0.12),
+          splashColor: Colors.white.withOpacity(0.08),
           child: Center(
             child: Icon(
               icon, 
@@ -4169,8 +4151,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(18), // Forma de cápsula interna refinada (Radio 18 para alto 36)
-          hoverColor: Colors.white.withValues(alpha: 0.12),
-          splashColor: Colors.white.withValues(alpha: 0.08),
+          hoverColor: Colors.white.withOpacity(0.12),
+          splashColor: Colors.white.withOpacity(0.08),
           child: Center(
             child: Icon(icon, color: Colors.white, size: size, fill: fill ? 1.0 : 0.0),
           ),
@@ -4194,7 +4176,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             size: 30, // Unificado a 30px
             minWidth: 48,
           ),
-          Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.05)),
+          Container(width: 1, height: 16, color: Colors.white.withOpacity(0.05)),
           _buildCapsuleIconButton(
             icon: Symbols.forward_10,
             onTap: _skipForward,
@@ -4226,7 +4208,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               minWidth: 48,
             ),
           if (hasPrevious && hasNext) 
-            Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.05)),
+            Container(width: 1, height: 16, color: Colors.white.withOpacity(0.05)),
           if (hasNext)
             _buildCapsuleIconButton(
               icon: Symbols.skip_next,
@@ -4293,7 +4275,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       onTap: onTap,
       size: size + 20, // Ajuste para el padding del contenedor circular
       fill: true,
-      backgroundColor: _isMobileDevice ? Colors.black.withValues(alpha: 0.15) : Colors.transparent,
+      backgroundColor: _isMobileDevice ? Colors.black.withOpacity(0.15) : Colors.transparent,
       iconSize: size,
     );
   }
@@ -4550,7 +4532,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             child: LinearProgressIndicator(
                               value: bufferValue,
                               backgroundColor: Colors.transparent,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.25)),
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.25)),
                             ),
                           ),
                         );
@@ -4563,7 +4545,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         activeTrackColor: const Color(0xFFEF7A1E),
                         inactiveTrackColor: Colors.white10,
                         thumbColor: Colors.white,
-                        overlayColor: const Color(0xFFEF7A1E).withValues(alpha: 0.2),
+                        overlayColor: const Color(0xFFEF7A1E).withOpacity(0.2),
                       ),
                       child: Slider(
                         value: currentMs,
@@ -4605,7 +4587,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.85),
+                                color: Colors.black.withOpacity(0.85),
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(color: Colors.white10),
                               ),
@@ -4775,9 +4757,9 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
           colors: [
-            Colors.black.withValues(alpha: 0.98),
-            Colors.black.withValues(alpha: 0.85),
-            Colors.black.withValues(alpha: 0.4),
+            Colors.black.withOpacity(0.98),
+            Colors.black.withOpacity(0.85),
+            Colors.black.withOpacity(0.4),
             Colors.transparent,
           ],
           stops: const [0.0, 0.4, 0.7, 1.0],
@@ -4938,8 +4920,8 @@ class _CarouselArrowState extends State<_CarouselArrow> {
                 begin: widget.isRight ? Alignment.centerLeft : Alignment.centerRight,
                 end: widget.isRight ? Alignment.centerRight : Alignment.centerLeft,
                 colors: [
-                  Colors.black.withValues(alpha: 0.0),
-                  Colors.black.withValues(alpha: 0.8),
+                  Colors.black.withOpacity(0.0),
+                  Colors.black.withOpacity(0.8),
                 ],
               ),
             ),
@@ -5014,12 +4996,12 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(isMobile ? 10 : 16),
                         border: Border.all(
-                          color: widget.isCurrent ? const Color(0xFFEF7A1E) : (isActive ? Colors.white : Colors.white.withValues(alpha: 0.1)), 
+                          color: widget.isCurrent ? const Color(0xFFEF7A1E) : (isActive ? Colors.white : Colors.white.withOpacity(0.1)), 
                           width: widget.isCurrent ? (isMobile ? 3 : 5) : (isActive ? 3 : 1)
                         ),
                         boxShadow: (widget.isCurrent || isActive) ? [
                           BoxShadow(
-                            color: (widget.isCurrent ? const Color(0xFFEF7A1E) : Colors.white).withValues(alpha: 0.4), 
+                            color: (widget.isCurrent ? const Color(0xFFEF7A1E) : Colors.white).withOpacity(0.4), 
                             blurRadius: isMobile ? 15 : 30, 
                             spreadRadius: 1
                           )
@@ -5034,16 +5016,16 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                               CachedNetworkImage(
                                 imageUrl: ApiEndpoints.proxyImage(widget.thumbnail!),
                                 fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(color: Colors.white.withValues(alpha: 0.05)),
+                                placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
                                 errorWidget: (context, url, error) => Container(color: Colors.black26),
                               )
                             else
-                              Container(color: Colors.white.withValues(alpha: 0.05), child: Icon(Icons.movie_outlined, color: Colors.white10, size: isMobile ? 48 : 72)),
+                              Container(color: Colors.white.withOpacity(0.05), child: Icon(Icons.movie_outlined, color: Colors.white10, size: isMobile ? 48 : 72)),
                             
                             if (widget.isCurrent)
                               Positioned.fill(
                                 child: Container(
-                                  color: const Color(0xFFEF7A1E).withValues(alpha: 0.15), // Senior: Tinte sutil en lugar de icono play
+                                  color: const Color(0xFFEF7A1E).withOpacity(0.15), // Senior: Tinte sutil en lugar de icono play
                                 ),
                               ),
                             
@@ -5081,7 +5063,7 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: widget.isCurrent || isActive ? Colors.white : Colors.white.withValues(alpha: 0.9),
+                          color: widget.isCurrent || isActive ? Colors.white : Colors.white.withOpacity(0.9),
                           fontSize: isMobile ? 14 : 22, 
                           fontWeight: widget.isCurrent || isActive ? FontWeight.w900 : FontWeight.bold,
                         ),
@@ -5094,7 +5076,7 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                     maxLines: isMobile ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55), 
+                      color: Colors.white.withOpacity(0.55), 
                       fontSize: isMobile ? 11 : 17, 
                       height: 1.4,
                       fontWeight: FontWeight.w500
@@ -5141,7 +5123,7 @@ class _PlayerSidePanel extends StatelessWidget {
           color: const Color(0xFF16161C),
           borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
           elevation: 10,
-          shadowColor: Colors.black.withValues(alpha: 0.6),
+          shadowColor: Colors.black.withOpacity(0.6),
           clipBehavior: Clip.antiAlias,
           child: Container(
             width: panelWidth,
@@ -5254,7 +5236,7 @@ class _RemoteMandoActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white10),
         ),

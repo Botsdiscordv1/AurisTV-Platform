@@ -30,10 +30,10 @@ class _NavArrowState extends State<NavArrow> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: widget.useBackground ? Colors.black.withValues(alpha: 0.4) : Colors.transparent,
+        color: widget.useBackground ? Colors.black.withOpacity(0.4) : Colors.transparent,
         boxShadow: (widget.useBackground && _isHovered) ? [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 10,
             spreadRadius: 2,
           )

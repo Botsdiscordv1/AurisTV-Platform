@@ -60,7 +60,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      boxShadow: isSelected ? [BoxShadow(color: Colors.white.withValues(alpha: 0.15), blurRadius: 15, spreadRadius: 1)] : [],
+                      boxShadow: isSelected ? [BoxShadow(color: Colors.white.withOpacity(0.15), blurRadius: 15, spreadRadius: 1)] : [],
                       border: Border.all(color: isSelected ? Colors.white : Colors.white12, width: isSelected ? 2.5 : 1),
                     ),
                     child: ClipRRect(
@@ -86,7 +86,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                                    colors: [Colors.transparent, Colors.black.withValues(alpha: isSelected ? 0.7 : 0.5)],
+                                    colors: [Colors.transparent, Colors.black.withOpacity(isSelected ? 0.7 : 0.5)],
                                     stops: const [0.6, 1.0],
                                   ),
                                 ),
@@ -104,11 +104,11 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                   child: Container(
                                     padding: const EdgeInsets.all(6),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: isSelected ? 0.8 : 0.4),
+                                      color: Colors.black.withOpacity(isSelected ? 0.8 : 0.4),
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white.withValues(alpha: isSelected ? 0.4 : 0.1)),
+                                      border: Border.all(color: Colors.white.withOpacity(isSelected ? 0.4 : 0.1)),
                                     ),
-                                    child: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: isSelected ? 1.0 : 0.7), size: isMobile ? 14 : 16),
+                                    child: Icon(Icons.close_rounded, color: Colors.white.withOpacity(isSelected ? 1.0 : 0.7), size: isMobile ? 14 : 16),
                                   ),
                                 ),
                               ),
@@ -119,7 +119,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                               top: 10, right: 10,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
+                                decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -161,7 +161,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                           text: widget.title,
                           animate: isMobile ? true : isSelected,
                           style: GoogleFonts.poppins(
-                            color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.95),
+                            color: isSelected ? Colors.white : Colors.white.withOpacity(0.95),
                             fontSize: isMobile ? ResponsiveUtils.sp(context, 14) : 17,
                             fontWeight: FontWeight.w700,
                             height: 1.2,
@@ -178,7 +178,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
+                              color: Colors.white.withOpacity(0.6),
                               fontSize: isMobile ? ResponsiveUtils.sp(context, 13) : 15,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.2,

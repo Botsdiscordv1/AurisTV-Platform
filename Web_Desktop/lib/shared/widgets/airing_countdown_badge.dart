@@ -66,7 +66,7 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
 
     if (aired) {
       label = 'Emitido · ${formatAiringTime(widget.airingAt)}';
-      bg = const Color(0xFFEF7A1E).withValues(alpha: 0.85);
+      bg = const Color(0xFFEF7A1E).withOpacity(0.85);
       fg = Colors.white;
     } else {
       final diff = _airing.difference(now);
@@ -76,7 +76,7 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
         final h = diff.inHours;
         final m = inMinutes % 60;
         label = h > 0 ? 'EN ${h}H${m > 0 ? ' ${m}M' : ''}' : 'EN ${inMinutes}M';
-        bg = Colors.redAccent.withValues(alpha: 0.85);
+        bg = Colors.redAccent.withOpacity(0.85);
         fg = Colors.white;
         urgent = true;
       } else {
@@ -86,15 +86,15 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
         final time = formatAiringTime(widget.airingAt);
         if (dayDiff == 0) {
           label = 'HOY $time';
-          bg = const Color(0xFFEF7A1E).withValues(alpha: 0.9);
+          bg = const Color(0xFFEF7A1E).withOpacity(0.9);
           fg = Colors.white;
         } else if (dayDiff == 1) {
           label = 'MAÑANA $time';
-          bg = Colors.black.withValues(alpha: 0.6);
+          bg = Colors.black.withOpacity(0.6);
           fg = Colors.white;
         } else {
           label = time;
-          bg = Colors.black.withValues(alpha: 0.6);
+          bg = Colors.black.withOpacity(0.6);
           fg = Colors.white;
         }
       }

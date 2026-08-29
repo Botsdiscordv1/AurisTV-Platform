@@ -1102,22 +1102,27 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             ]
           ),
           const SizedBox(height: 8),
-          // Fila 3: Edad y Advertencia (Nueva línea solicitada)
-          Row(
-            children: [
-              if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
-                _buildAgeBadge(context, cert),
-                const SizedBox(width: 10),
-              ],
-              Expanded(
-                child: Text(
-                  _getWarningText(cert),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 13, fontWeight: FontWeight.w500),
+          // Fila 3: Edad y Advertencia (Ocultable durante el trailer)
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 1200),
+            curve: Curves.easeInOut,
+            opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0,
+            child: Row(
+              children: [
+                if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
+                  _buildAgeBadge(context, cert),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Text(
+                    _getWarningText(cert),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ]
       );
@@ -1165,26 +1170,31 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           ),
         ),
         const SizedBox(height: 12),
-        // Línea aparte para Edad y Advertencia de contenido (Solicitud usuario)
-        Row(
-          children: [
-            if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
-              _buildAgeBadge(context, cert, small: isCompact),
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              child: Text(
-                _getWarningText(cert),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                  color: const Color(0xFFA5A5AA),
-                  fontSize: isCompact ? 14 : 16,
-                  fontWeight: FontWeight.w500,
+        // Línea aparte para Edad y Advertencia de contenido (Ocultable durante el trailer)
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 1200),
+          curve: Curves.easeInOut,
+          opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0,
+          child: Row(
+            children: [
+              if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
+                _buildAgeBadge(context, cert, small: isCompact),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Text(
+                  _getWarningText(cert),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    color: const Color(0xFFA5A5AA),
+                    fontSize: isCompact ? 14 : 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

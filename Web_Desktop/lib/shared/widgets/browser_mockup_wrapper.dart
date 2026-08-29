@@ -26,7 +26,7 @@ class BrowserMockupWrapper extends StatelessWidget {
             child: Image.network(
               'https://images.alphacoders.com/605/605592.png', // Wallpaper de Bleach/Aizen como el de la captura
               fit: BoxFit.cover,
-              color: Colors.black.withValues(alpha: 0.6),
+              color: Colors.black.withOpacity(0.6),
               colorBlendMode: BlendMode.darken,
             ),
           ),
@@ -41,7 +41,7 @@ class BrowserMockupWrapper extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.8),
+                    color: Colors.black.withOpacity(0.8),
                     blurRadius: 50,
                     spreadRadius: 10,
                   ),
@@ -126,7 +126,7 @@ class BrowserMockupWrapper extends StatelessWidget {
     return Container(
       width: 12,
       height: 12,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.5)),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(0.5)),
     );
   }
 }

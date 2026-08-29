@@ -79,7 +79,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      boxShadow: _isActive ? [BoxShadow(color: const Color(0xFF6C32FF).withValues(alpha: 0.3), blurRadius: 15, spreadRadius: 1)] : [],
+                      boxShadow: _isActive ? [BoxShadow(color: const Color(0xFF6C32FF).withOpacity(0.3), blurRadius: 15, spreadRadius: 1)] : [],
                     ),
                     child: Stack(
                       fit: StackFit.expand,
@@ -106,7 +106,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                                      colors: [Colors.black.withValues(alpha: 0.6), Colors.transparent],
+                                      colors: [Colors.black.withOpacity(0.6), Colors.transparent],
                                       stops: const [0.0, 0.4],
                                     ),
                                   ),
@@ -117,7 +117,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
                                   top: 8, right: 8,
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
+                                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -151,7 +151,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
                         text: widget.media.title,
                         animate: isMobileDevice ? true : _isActive,
                           style: GoogleFonts.poppins(
-                            color: Colors.white.withValues(alpha: 0.95), 
+                            color: Colors.white.withOpacity(0.95), 
                             fontSize: isMobileDevice ? ResponsiveUtils.sp(context, 13) : 16, 
                             fontWeight: FontWeight.w700, 
                             height: 1.2, 

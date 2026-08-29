@@ -90,7 +90,7 @@ class _ScheduleBody extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
+                              color: Colors.white.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: Colors.white12),
                             ),
@@ -257,9 +257,9 @@ class _ScheduleRowState extends State<ScheduleRow> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withValues(alpha: 0.15),
+                      color: Colors.redAccent.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                      border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
                     ),
                     child: const Row(
                       children: [
@@ -429,7 +429,7 @@ class _LocalTimeWidgetState extends State<_LocalTimeWidget> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white10),
       ),

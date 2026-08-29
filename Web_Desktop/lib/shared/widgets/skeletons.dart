@@ -54,9 +54,9 @@ class _SkeletonContainerState extends State<SkeletonContainer> with SingleTicker
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withValues(alpha: 0.05),
-                Colors.white.withValues(alpha: 0.12),
-                Colors.white.withValues(alpha: 0.05),
+                Colors.white.withOpacity(0.05),
+                Colors.white.withOpacity(0.12),
+                Colors.white.withOpacity(0.05),
               ],
               stops: [
                 (_animation.value - 0.3).clamp(0.0, 1.0),

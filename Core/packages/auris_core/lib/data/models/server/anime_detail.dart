@@ -67,9 +67,13 @@ class AnimeDetail {
   String? get firstAirDate => year?.toString();
 
   factory AnimeDetail.fromJson(Map<String, dynamic> json) {
-    final anime = (json['anime'] as Map<String, dynamic>?) ?? json;
-    final visuals = json['visuals'] as Map<String, dynamic>?;
-    final themes = (json['themes'] as List<dynamic>?) ?? [];
+    final root = (json.containsKey('data') && json['data'] is Map)
+        ? json['data'] as Map<String, dynamic>
+        : json;
+
+    final anime = (root['anime'] as Map<String, dynamic>?) ?? root;
+    final visuals = (root['visuals'] as Map<String, dynamic>?) ?? root;
+    final themes = (root['themes'] as List<dynamic>?) ?? [];
 
     final trailerData =
         anime['trailer'] is Map<String, dynamic>
@@ -96,11 +100,19 @@ class AnimeDetail {
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      overview: SynopsisCleaner.clean(visuals?['overview'] as String? ?? anime['description'] as String?),
-      poster: visuals?['poster'] as String?,
-      backdrop: visuals?['backdrop'] as String?,
-      banner: visuals?['banner'] as String?,
-      logo: visuals?['logo'] as String?,
+      overview: SynopsisCleaner.clean(
+        visuals?['overview'] as String? ??
+            anime['description'] as String? ??
+            root['overview'] as String?,
+      ),
+      poster: visuals?['poster'] as String? ??
+          root['poster'] as String? ??
+          root['thumbnail'] as String?,
+      backdrop: visuals?['backdrop'] as String? ??
+          root['backdrop'] as String? ??
+          root['banner'] as String?,
+      banner: visuals?['banner'] as String? ?? root['banner'] as String?,
+      logo: visuals?['logo'] as String? ?? root['logo'] as String?,
       rating: (anime['score'] as num?)?.toDouble(),
       episodes: anime['episodes'] as int?,
       genres: (anime['genres'] as List<dynamic>?)
@@ -133,9 +145,11 @@ class AnimeDetail {
           [],
       openings: openings,
       endings: endings,
-      certification: json['certification'] as String? ?? visuals?['certification'] as String? ?? anime['certification'] as String?,
-      kind: json['kind'] as String?,
-      characters: (json['characters'] as List<dynamic>?)
+      certification: root['certification'] as String? ??
+          visuals?['certification'] as String? ??
+          anime['certification'] as String?,
+      kind: root['kind'] as String?,
+      characters: (root['characters'] as List<dynamic>?)
               ?.map((e) => CharacterInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],

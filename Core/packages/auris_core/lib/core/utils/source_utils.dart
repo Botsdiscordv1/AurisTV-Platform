@@ -59,6 +59,8 @@ String simplifySourceName(String name) {
   if (l.contains('animejara')) return 'AJR';
   if (l.contains('gnula')) return 'GNU';
   if (l.contains('katanime')) return 'KAT';
+  if (l.contains('onlypelis')) return 'OPS';
+  if (l.contains('pelispedia')) return 'PPA';
   return name.toUpperCase();
 }
 
@@ -200,4 +202,28 @@ String? formatRating(double? r) {
   if (r == null || r <= 0) return null;
   final double normalized = r > 10 ? r / 10.0 : r;
   return normalized.toStringAsFixed(1);
+}
+
+/// Builds language options from tracks only, without adding phantom/synthetic tracks.
+/// Each entry represents a real available stream from the server.
+typedef LanguageOption = ({String server, String url, String quality, bool isTrack, int trackIndex});
+
+List<LanguageOption> buildLanguageOptions({
+  required List<({String label, String quality, String url, bool isDownload})> tracks,
+  required String currentServer,
+}) {
+  final sourceOptions = <LanguageOption>[];
+  for (int i = 0; i < tracks.length; i++) {
+    final t = tracks[i];
+    if (t.isDownload) continue;
+    final quality = t.quality.isNotEmpty ? t.quality.toUpperCase() : 'SUB';
+    sourceOptions.add((
+      server: currentServer,
+      url: t.url,
+      quality: quality,
+      isTrack: true,
+      trackIndex: i,
+    ));
+  }
+  return sourceOptions;
 }

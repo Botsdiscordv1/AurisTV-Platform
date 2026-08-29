@@ -84,7 +84,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             child: AppBar(
               title: Text('Mi biblioteca', 
                 style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20)),
-              backgroundColor: _isScrolled ? const Color(0xFF0B0B0D).withValues(alpha: 0.5) : Colors.transparent,
+              backgroundColor: _isScrolled ? const Color(0xFF0B0B0D).withOpacity(0.5) : Colors.transparent,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               centerTitle: false,
@@ -275,7 +275,7 @@ class _CategoryFilters extends StatelessWidget {
               label: Text(f['label']!),
               selected: isSelected,
               onSelected: (_) => onFilterChanged(f['id']!),
-              backgroundColor: Colors.white.withValues(alpha: 0.05),
+              backgroundColor: Colors.white.withOpacity(0.05),
               selectedColor: const Color(0xFFEF7A1E),
               labelStyle: TextStyle(
                 color: isSelected ? Colors.black : Colors.white70,
@@ -427,7 +427,7 @@ class _LibraryMediaCard extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: ClipRRect(

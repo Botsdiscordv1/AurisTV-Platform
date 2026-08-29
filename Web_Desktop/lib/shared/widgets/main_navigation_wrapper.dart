@@ -229,9 +229,9 @@ class _RemoteMiniPlayer extends ConsumerWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEF7A1E).withValues(alpha: 0.3)),
+          border: Border.all(color: const Color(0xFFEF7A1E).withOpacity(0.3)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 15, offset: const Offset(0, 4))
+            BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, offset: const Offset(0, 4))
           ],
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8),

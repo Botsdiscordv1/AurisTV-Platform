@@ -121,7 +121,7 @@ class _DeviceTile extends ConsumerWidget {
       leading: Container(
         width: 40, height: 40,
         decoration: BoxDecoration(
-          color: isOnline ? Colors.green.withValues(alpha: 0.1) : Colors.white10,
+          color: isOnline ? Colors.green.withOpacity(0.1) : Colors.white10,
           shape: BoxShape.circle,
         ),
         child: Icon(
@@ -133,7 +133,7 @@ class _DeviceTile extends ConsumerWidget {
       title: Text(device.name, style: const TextStyle(color: Colors.white, fontSize: 15)),
       subtitle: Text(
         isOnline ? (device.mediaTitle ?? 'En espera') : 'Offline',
-        style: TextStyle(color: isOnline ? Colors.greenAccent.withValues(alpha: 0.7) : Colors.white24, fontSize: 12),
+        style: TextStyle(color: isOnline ? Colors.greenAccent.withOpacity(0.7) : Colors.white24, fontSize: 12),
       ),
       trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white10, size: 14),
     );

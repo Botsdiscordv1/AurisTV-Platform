@@ -80,11 +80,11 @@ class AppTheme {
       ],
 
       // FocusTheme más visible para navegación con control remoto (Android TV)
-      focusColor: brand.withValues(alpha: 0.3),
+      focusColor: brand.withOpacity(0.3),
       
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: brand,
-        selectionColor: brand.withValues(alpha: 0.3),
+        selectionColor: brand.withOpacity(0.3),
         selectionHandleColor: brand,
       ),
 
@@ -138,7 +138,7 @@ class AppTheme {
         activeTrackColor: brand,
         inactiveTrackColor: progressTrack,
         thumbColor: brand,
-        overlayColor: brand.withValues(alpha: 0.2),
+        overlayColor: brand.withOpacity(0.2),
         trackHeight: 4.0,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),

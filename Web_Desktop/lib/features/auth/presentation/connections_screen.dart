@@ -68,7 +68,7 @@ class _ConnectionTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white10),
       ),
@@ -77,7 +77,7 @@ class _ConnectionTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: (isConnected ? Colors.greenAccent : Colors.blueAccent).withValues(alpha: 0.1),
+              color: (isConnected ? Colors.greenAccent : Colors.blueAccent).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: isConnected ? Colors.greenAccent : Colors.blueAccent),

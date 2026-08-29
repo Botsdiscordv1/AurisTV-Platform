@@ -103,14 +103,14 @@ class SearchGenresGrid extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: genre['color'] as Color,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  border: Border.all(color: Colors.white.withOpacity(0.05)),
                 ),
                 child: Stack(
                   children: [
                     Positioned(
                       right: -5,
                       bottom: -5,
-                      child: Icon(genre['icon'] as IconData, size: 48, color: Colors.white.withValues(alpha: 0.12)),
+                      child: Icon(genre['icon'] as IconData, size: 48, color: Colors.white.withOpacity(0.12)),
                     ),
                     Align(
                       alignment: Alignment.centerLeft,
@@ -252,7 +252,7 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
             gradient: LinearGradient(
               begin: isRight ? Alignment.centerLeft : Alignment.centerRight,
               end: isRight ? Alignment.centerRight : Alignment.centerLeft,
-              colors: [Colors.black.withValues(alpha: 0), Colors.black.withValues(alpha: 0.7)],
+              colors: [Colors.black.withOpacity(0), Colors.black.withOpacity(0.7)],
             ),
           ),
           child: Center(
@@ -377,7 +377,7 @@ class _TrendingPosterCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.9),
+                      color: Colors.black.withOpacity(0.9),
                       blurRadius: 18,
                       spreadRadius: 3,
                       offset: const Offset(-8, 0),
@@ -389,7 +389,7 @@ class _TrendingPosterCard extends StatelessWidget {
                   child: CachedNetworkImage(
                     imageUrl: ApiEndpoints.proxyImage(item.thumbnail),
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(color: Colors.white.withValues(alpha: 0.05)),
+                    placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
                     errorWidget: (context, url, error) => Container(
                       color: Colors.white10,
                       child: const Icon(Icons.movie_outlined, color: Colors.white24),
