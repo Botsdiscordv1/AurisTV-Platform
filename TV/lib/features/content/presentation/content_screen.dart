@@ -350,10 +350,11 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
         : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
     final logoReady = widget.animeDetailAsync.hasValue || widget.movieDetailAsync.hasValue;
-    // Priority: TMDB backdrop > banner param > poster
-    final b = (d?.backdrop?.isNotEmpty == true)
-        ? d!.backdrop!
-        : (widget.banner?.isNotEmpty == true ? widget.banner! : widget.poster);
+    final b = DetailBackdropResolver.resolve(
+      detail: d,
+      bannerParam: widget.banner,
+      poster: widget.poster,
+    );
     final heroTitle = stripSeasonSuffix(widget.title ?? '');
     final width = MediaQuery.sizeOf(context).width;
 
@@ -1776,21 +1777,21 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final episodesUrl = currentSource?.url ?? widget.url;
     final episodesSource = currentSource?.source ?? widget.source;
     final initialThumbnail = ApiEndpoints.proxyImage(currentSource?.thumbnail);
-    final initialBanner = ApiEndpoints.proxyImage(widget.banner?.isNotEmpty == true ? widget.banner : (activeSources.isNotEmpty ? activeSources.first.banner : null));
+    final initialBanner = ApiEndpoints.proxyImage(
+      DetailBackdropResolver.resolve(
+        detail: detailData,
+        bannerParam: widget.banner,
+        sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
+      ),
+    );
     
     if (_stableBanner == null) {
-      final detailBackdrop = detailData is MovieDetail
-          ? (detailData as MovieDetail).backdrop
-          : (detailData is AnimeDetail ? (detailData as AnimeDetail).backdrop : null);
-      // Priority: TMDB backdrop > banner param > source banner
-      final candidate = detailBackdrop?.isNotEmpty == true
-          ? detailBackdrop
-          : (widget.banner?.isNotEmpty == true
-              ? widget.banner
-              : (activeSources.isNotEmpty && activeSources.first.banner?.isNotEmpty == true
-                  ? activeSources.first.banner
-                  : null));
-      if (candidate?.isNotEmpty == true) {
+      final candidate = DetailBackdropResolver.resolve(
+        detail: detailData,
+        bannerParam: widget.banner,
+        sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
+      );
+      if (candidate.isNotEmpty) {
         _stableBanner = ApiEndpoints.proxyImage(candidate);
       }
     }

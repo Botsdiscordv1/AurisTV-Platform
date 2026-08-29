@@ -22,6 +22,7 @@ export 'data/models/server/extract_result.dart';
 export 'data/models/server/source_info.dart';
 export 'data/models/server/title_info.dart';
 export 'data/models/server/anilist_media.dart';
+export 'data/models/server/detail_backdrop_resolver.dart';
 export 'data/repositories/auris_repository.dart';
 export 'data/repositories/impl/auris_repository_impl.dart';
 export 'core/utils/source_utils.dart';
