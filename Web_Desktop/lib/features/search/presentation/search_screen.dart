@@ -125,7 +125,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   color: const Color(0xFF1A1A1A),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.05),
+                    color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.05),
                     width: 1.5,
                   ),
                 ),
@@ -137,7 +137,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   style: const TextStyle(fontSize: 15, color: Colors.white),
                   decoration: InputDecoration(
                     hintText: _dynamicPlaceholder,
-                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontSize: 14),
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
                     prefixIcon: Icon(Icons.search_rounded, 
                         color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
                         size: 20),
@@ -168,7 +168,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -224,7 +224,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
           
           // DIVISOR SUTIL
-          Container(width: 1, color: Colors.white.withValues(alpha: 0.05), margin: const EdgeInsets.symmetric(vertical: 24)),
+          Container(width: 1, color: Colors.white.withOpacity(0.05), margin: const EdgeInsets.symmetric(vertical: 24)),
           
           // COLUMNA DERECHA (SIDEBAR HISTORIAL)
           SizedBox(
@@ -400,10 +400,18 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
 }
 
 Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
-  // El badge debe reflejar el tipo REAL del contenido (kind del server).
-  // Prioridad: kind (movie/anime) > quality > type > filtro.
+  // Prioridad: type específico (Especial/OVA/ONA/Película desde AV1) > kind > quality > filtro.
+  // El type del server es más granular que kind (que solo distingue anime/movie),
+  // así que lo usamos cuando es un tipo concreto y no el genérico "ANIME"/"TV".
   String? typeLabel;
-  if (result.kind != null && result.kind!.isNotEmpty) {
+  final typeUp = (result.type ?? '').toUpperCase();
+  final hasSpecificType = result.type != null &&
+      result.type!.isNotEmpty &&
+      !typeUp.contains('ANIME') &&
+      !typeUp.contains('TV');
+  if (hasSpecificType) {
+    typeLabel = _labelFromType(result.type!, selectedCategory);
+  } else if (result.kind != null && result.kind!.isNotEmpty) {
     typeLabel = _labelFromKind(result.kind!);
   } else if (result.quality != null && result.quality!.isNotEmpty) {
     typeLabel = _categoryFromQuality(result.quality!);
@@ -423,7 +431,7 @@ Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
     statusColor = const Color(0xFFEF7A1E); // AurisTV Brand Orange
   } else if (s.contains('finaliz') || s.contains('complet')) {
     statusLabel = 'FINALIZADO';
-    statusColor = Colors.black.withValues(alpha: 0.9);
+    statusColor = Colors.black.withOpacity(0.9);
   }
 
   return {

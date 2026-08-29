@@ -578,9 +578,18 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
 }
 
 Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
-  // Prioridad: kind (movie/anime real) > quality > type > filtro.
+  // Prioridad: type específico (Especial/OVA/ONA/Película desde AV1) > kind > quality > filtro.
+  // El type del server es más granular que kind (que solo distingue anime/movie),
+  // así que lo usamos cuando es un tipo concreto y no el genérico "ANIME"/"TV".
   String? typeLabel;
-  if (result.kind != null && result.kind!.isNotEmpty) {
+  final typeUp = (result.type ?? '').toUpperCase();
+  final hasSpecificType = result.type != null &&
+      result.type!.isNotEmpty &&
+      !typeUp.contains('ANIME') &&
+      !typeUp.contains('TV');
+  if (hasSpecificType) {
+    typeLabel = _labelFromType(result.type!, selectedCategory);
+  } else if (result.kind != null && result.kind!.isNotEmpty) {
     typeLabel = _labelFromKind(result.kind!);
   } else if (result.quality != null && result.quality!.isNotEmpty) {
     typeLabel = _categoryFromQuality(result.quality!);
