@@ -492,7 +492,16 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 _buildNetflixActionList(context),
                 if (widget.totalSeasons > 1) ...[
                   SizedBox(height: contentSpacing),
-                  _SeasonSelector(title: widget.title, currentSeason: widget.currentSeason, totalSeasons: widget.totalSeasons, onSeasonSelected: widget.onSeasonSelected, compact: false),
+                  SeasonSelector(
+                    data: SeasonSelectorData(
+                      currentSeason: widget.currentSeason,
+                      totalSeasons: widget.totalSeasons,
+                      onSeasonSelected: widget.onSeasonSelected,
+                      compact: false,
+                      enableFocus: true,
+                      scale: ResponsiveUtils.sp,
+                    ),
+                  ),
                 ],
                 if (widget.currentSource != null) ...[
                   SizedBox(height: contentSpacing),
@@ -792,61 +801,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 }
 
-class _SeasonSelector extends StatefulWidget {
-  final String title; final int currentSeason; final int totalSeasons; final Function(int) onSeasonSelected; final bool compact;
-  const _SeasonSelector({required this.title, required this.currentSeason, required this.totalSeasons, required this.onSeasonSelected, this.compact = false});
-  @override State<_SeasonSelector> createState() => _SeasonSelectorState();
-}
-
-class _SeasonSelectorState extends State<_SeasonSelector> {
-  bool _isHovered = false;
-  bool _isFocused = false;
-
-  @override Widget build(BuildContext context) {
-    final bool isActive = _isHovered || _isFocused;
-    
-    return Theme(
-      data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E26)), 
-      child: PopupMenuButton<int>(
-        onSelected: widget.onSeasonSelected, 
-        offset: Offset(0, ResponsiveUtils.sp(context, 50)), 
-        constraints: BoxConstraints(minWidth: ResponsiveUtils.sp(context, 180)), 
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.white12)), 
-        itemBuilder: (context) => List.generate(widget.totalSeasons, (i) => PopupMenuItem(value: i + 1, height: ResponsiveUtils.sp(context, 48), child: Text('Temporada ${i + 1}', style: TextStyle(color: (i + 1) == widget.currentSeason ? Colors.white : const Color(0xFFA5A5AA), fontWeight: (i + 1) == widget.currentSeason ? FontWeight.bold : FontWeight.normal, fontSize: ResponsiveUtils.sp(context, 16))))), 
-        child: Focus(
-          onFocusChange: (focused) => setState(() => _isFocused = focused),
-          child: MouseRegion(
-            onEnter: (_) => setState(() => _isHovered = true), 
-            onExit: (_) => setState(() => _isHovered = false), 
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200), 
-              width: ResponsiveUtils.sp(context, widget.compact ? 130 : 180), 
-              height: ResponsiveUtils.sp(context, widget.compact ? 38 : 48), 
-              decoration: BoxDecoration(
-                color: isActive ? const Color(0xFF454652) : Colors.transparent, 
-                borderRadius: BorderRadius.circular(8), 
-                border: Border.all(
-                  color: isActive ? Colors.white : Colors.white24, 
-                  width: isActive ? 2.0 : 1.5
-                ),
-              ), 
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: ResponsiveUtils.sp(context, 16)), 
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween, 
-                  children: [
-                    Text('T ${widget.currentSeason}', style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 18), fontWeight: FontWeight.bold)), 
-                    Icon(Icons.keyboard_arrow_down, color: isActive ? Colors.white : const Color(0xFFA5A5AA), size: ResponsiveUtils.sp(context, 20))
-                  ]
-                )
-              )
-            )
-          ),
-        )
-      )
-    );
-  }
-}
+// _SeasonSelector removed - using SeasonSelector from auris_core
 
 class _ServerSelector extends ConsumerStatefulWidget {
   final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season;

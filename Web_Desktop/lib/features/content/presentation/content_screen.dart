@@ -560,12 +560,13 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                         child: Row(
                           children: [
                             if (widget.totalSeasons > 1) ...[
-                              _SeasonSelector(
-                                title: widget.title, 
-                                currentSeason: widget.currentSeason, 
-                                totalSeasons: widget.totalSeasons, 
-                                onSeasonSelected: widget.onSeasonSelected, 
-                                compact: true
+                              SeasonSelector(
+                                data: SeasonSelectorData(
+                                  currentSeason: widget.currentSeason,
+                                  totalSeasons: widget.totalSeasons,
+                                  onSeasonSelected: widget.onSeasonSelected,
+                                  compact: true,
+                                ),
                               ), 
                               const SizedBox(width: 12)
                             ],
@@ -756,7 +757,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         children: [
           // Contenido Vertical Alineado a la Izquierda (Define el tamaño)
           Padding(
-            padding: EdgeInsets.fromLTRB(hPadding, titleTop, hPadding, 40),
+            padding: EdgeInsets.fromLTRB(hPadding, titleTop, hPadding, 8),
             child: SizedBox(
               width: width * 0.42,
               child: Column(
@@ -818,33 +819,31 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   
                   // Selectores de Temporada y Servidor
                   if (widget.totalSeasons > 1 || widget.currentSource != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Row(
-                        children: [
-                          if (widget.totalSeasons > 1) ...[
-                            _SeasonSelector(
-                              title: widget.title, 
-                              currentSeason: widget.currentSeason, 
-                              totalSeasons: widget.totalSeasons, 
-                              onSeasonSelected: widget.onSeasonSelected, 
+                    Row(
+                      children: [
+                        if (widget.totalSeasons > 1) ...[
+                          SeasonSelector(
+                            data: SeasonSelectorData(
+                              currentSeason: widget.currentSeason,
+                              totalSeasons: widget.totalSeasons,
+                              onSeasonSelected: widget.onSeasonSelected,
                               compact: true,
                               width: 140,
                             ),
-                            const SizedBox(width: 12),
-                          ],
-                          if (widget.currentSource != null)
-                            _ServerSelector(
-                              currentSource: widget.currentSource!, 
-                              sources: widget.sources, 
-                              onSourceSelected: widget.onSourceSelected, 
-                              compact: true,
-                              unavailableSources: widget.unavailableSources,
-                              season: widget.season,
-                              width: 140,
-                            ),
+                          ),
+                          const SizedBox(width: 12),
                         ],
-                      ),
+                        if (widget.currentSource != null)
+                          _ServerSelector(
+                            currentSource: widget.currentSource!, 
+                            sources: widget.sources, 
+                            onSourceSelected: widget.onSourceSelected, 
+                            compact: true,
+                            unavailableSources: widget.unavailableSources,
+                            season: widget.season,
+                            width: 140,
+                          ),
+                      ],
                     ),
                 ],
               ),
@@ -1285,16 +1284,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 }
 
-class _SeasonSelector extends StatefulWidget {
-  final String title; final int currentSeason; final int totalSeasons; final Function(int) onSeasonSelected; final bool compact; final double? width;
-  const _SeasonSelector({required this.title, required this.currentSeason, required this.totalSeasons, required this.onSeasonSelected, this.compact = false, this.width});
-  @override State<_SeasonSelector> createState() => _SeasonSelectorState();
-}
-
-class _SeasonSelectorState extends State<_SeasonSelector> {
-  bool _isHovered = false;
-  @override Widget build(BuildContext context) => Theme(data: Theme.of(context).copyWith(canvasColor: const Color(0xFF1E1E26)), child: PopupMenuButton<int>(onSelected: widget.onSeasonSelected, offset: const Offset(0, 56), constraints: const BoxConstraints(minWidth: 220), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.white12)), itemBuilder: (context) => List.generate(widget.totalSeasons, (i) => PopupMenuItem(value: i + 1, height: 56, child: Text('Temporada ${i + 1}', style: TextStyle(color: (i + 1) == widget.currentSeason ? Colors.white : const Color(0xFFA5A5AA), fontWeight: (i + 1) == widget.currentSeason ? FontWeight.bold : FontWeight.normal, fontSize: 18)))), child: MouseRegion(onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }), onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }), child: AnimatedContainer(duration: const Duration(milliseconds: 200), width: widget.width ?? (widget.compact ? 160 : 220), height: widget.compact ? 44 : 56, decoration: BoxDecoration(color: _isHovered ? const Color(0xFF454652) : const Color(0xFF32333E), borderRadius: BorderRadius.circular(8), border: Border.all(color: _isHovered ? const Color(0xFFA5A5AA) : Colors.transparent, width: 1.5)), child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('T ${widget.currentSeason}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), Icon(Icons.keyboard_arrow_down, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))]))))));
-}
+// _SeasonSelector removed - using SeasonSelector from auris_core
 
 class _ServerSelector extends ConsumerStatefulWidget {
   final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season; final double? width;

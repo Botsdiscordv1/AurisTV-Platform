@@ -43,3 +43,6 @@ export 'presentation/widgets/loading_more_indicator.dart';
 export 'presentation/widgets/source_chips_bar.dart';
 export 'presentation/widgets/active_source_badge.dart';
 export 'presentation/widgets/hero_title.dart';
+export 'presentation/widgets/season_selector.dart';
+export 'presentation/widgets/season_selector_data.dart';
+export 'presentation/widgets/season_resolver.dart';
