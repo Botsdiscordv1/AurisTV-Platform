@@ -7,7 +7,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import '../../player/presentation/youtube_trailer_player.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -252,7 +252,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
 }
 
 class _ContentHeaderState extends ConsumerState<_ContentHeader> {
-  YoutubePlayerController? _ytController; StreamSubscription? _ytSubscription; Timer? _fadeTimer; String? _lastTrailerKey; bool _isMuted = true; bool _showPlayer = false; bool _isPlayedOnce = false; Timer? _delayTimer;
+  YouTubeTrailerPlayerController? _trailerController; Timer? _fadeTimer; String? _lastTrailerKey; bool _isMuted = true; bool _showPlayer = false; bool _isPlayedOnce = false; Timer? _delayTimer;
   bool _showTitle = true; Timer? _titleHideTimer;
 
   void _startTitleHideTimer() {
@@ -286,10 +286,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     _delayTimer?.cancel();
     void start() {
       if (!mounted || key != _lastTrailerKey) return;
-      if (_ytController != null) {
-        _fadeTimer?.cancel(); _ytController!.pauseVideo(); _ytController!.seekTo(seconds: 0);
-        if (!_isMuted) { _ytController!.unMute(); _ytController!.setVolume(100); } else { _ytController!.mute(); }
-        _ytController!.playVideo();
+      if (_trailerController != null && _trailerController!.isReady) {
+        _fadeTimer?.cancel(); _trailerController!.pauseVideo(); _trailerController!.seekTo(0);
+        if (!_isMuted) { _trailerController!.unmute(); _trailerController!.setVolume(100); } else { _trailerController!.mute(); }
+        _trailerController!.playVideo();
         setState(() { _showPlayer = false; _isPlayedOnce = false; _showTitle = true; });
         _titleHideTimer?.cancel();
         Future.delayed(const Duration(milliseconds: 600), () { 
@@ -300,43 +300,19 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         });
         return;
       }
-      final ctrl = YoutubePlayerController.fromVideoId(videoId: key, autoPlay: true, params: const YoutubePlayerParams(showControls: false, showFullscreenButton: false, mute: true, loop: false, showVideoAnnotations: false, playsInline: true, strictRelatedVideos: true, enableKeyboard: false));
-      ctrl.listen((state) {
-        if (state.playerState == PlayerState.cued && mounted) { ctrl.playVideo(); }
-        if (state.playerState == PlayerState.playing && mounted && !_showPlayer) { 
+      _trailerController = YouTubeTrailerPlayerController();
+      _trailerController!.addListener(() {
+        if (_trailerController!.isReady && mounted && !_showPlayer) {
           setState(() { _showPlayer = true; _showTitle = true; }); 
           _startTitleHideTimer();
-        }
-        if (state.playerState == PlayerState.ended && mounted) { 
-          setState(() { _showPlayer = false; _isPlayedOnce = true; _showTitle = true; }); 
-          _titleHideTimer?.cancel();
-        }
-      });
-      _ytSubscription = ctrl.videoStateStream.listen((state) {
-        final d = ctrl.value.metaData.duration.inSeconds; final p = state.position.inSeconds;
-        if (p > 0 && !_showPlayer && mounted) { 
-          setState(() { _showPlayer = true; _showTitle = true; }); 
-          _startTitleHideTimer();
-        }
-        
-        if (p > 5 && d > 30 && (d - p) < 12) { 
-          if (_showPlayer && mounted) { 
-            setState(() { 
-              _showPlayer = false; 
-              _isPlayedOnce = true; 
-              _showTitle = true;
-            }); 
-            _titleHideTimer?.cancel();
-            _fadeOutAudio(ctrl); 
-          } 
         }
       });
       if (mounted) {
-        setState(() { _ytController = ctrl; _showPlayer = false; _isPlayedOnce = false; _showTitle = true; });
+        setState(() { _showPlayer = false; _isPlayedOnce = false; _showTitle = true; _lastTrailerKey = key; });
         _titleHideTimer?.cancel();
         Future.delayed(const Duration(milliseconds: 400), () { 
           if (mounted) { 
-            ctrl.playVideo(); 
+            _trailerController!.playVideo(); 
             Future.delayed(const Duration(milliseconds: 1100), () { 
               if (mounted && !_showPlayer) {
                 setState(() { _showPlayer = true; _showTitle = true; }); 
@@ -349,7 +325,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     }
     if (immediate) start(); else _delayTimer = Timer(const Duration(seconds: 3), start);
   }
-  void _fadeOutAudio(YoutubePlayerController ctrl) {
+  void _fadeOutAudio(YouTubeTrailerPlayerController ctrl) {
     _fadeTimer?.cancel(); 
     if (_isMuted) { 
       ctrl.pauseVideo(); 
@@ -366,7 +342,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       });
     });
   }
-  void _disposeController() { _delayTimer?.cancel(); _fadeTimer?.cancel(); _titleHideTimer?.cancel(); _ytSubscription?.cancel(); _ytSubscription = null; _ytController?.close(); _ytController = null; }
+  void _disposeController() { _delayTimer?.cancel(); _fadeTimer?.cancel(); _titleHideTimer?.cancel(); _trailerController?.dispose(); _trailerController = null; }
   @override void dispose() { _disposeController(); super.dispose(); }
 
 @override Widget build(BuildContext context) {
@@ -417,7 +393,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                     )
                   ),
                 )),
-                if (_ytController != null) Positioned(top: 0, left: 0, right: 0, bottom: 0, child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9))))))),
+                if (_trailerController != null && _lastTrailerKey != null) Positioned(top: 0, left: 0, right: 0, bottom: 0, child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YouTubeTrailerPlayer(key: ValueKey(_lastTrailerKey), controller: _trailerController!, videoId: _lastTrailerKey!, autoPlay: true, mute: true, aspectRatio: 16 / 9))))))),
                 
                 // GRADIENTE LATERAL REFORZADO PARA TEXTO (Integrado aquí)
                 DecoratedBox(
@@ -568,7 +544,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             size: size, 
             iconSize: iconSize
           ),
-        if (_ytController != null && _showPlayer) ...[
+        if (_trailerController != null && _showPlayer) ...[
           SizedBox(width: spacing),
           _DetailIconButton(
             icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, 
@@ -576,8 +552,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             onPressed: () { 
               setState(() { 
                 _isMuted = !_isMuted; 
-                if (_isMuted) _ytController?.mute(); 
-                else { _ytController?.unMute(); _ytController!.setVolume(100); } 
+                if (_isMuted) _trailerController?.mute(); 
+                else { _trailerController?.unmute(); _trailerController!.setVolume(100); } 
               }); 
             }, 
             size: size, 

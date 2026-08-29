@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:flutter/foundation.dart'; 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
@@ -15,6 +14,7 @@ import '../../../core/router/app_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/nav_arrow.dart';
 import '../presentation/providers/home_provider.dart';
+import '../../player/presentation/youtube_trailer_player.dart';
 
 class HeroBanner extends ConsumerStatefulWidget {
   final List<MediaItem> items;
@@ -49,8 +49,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
 
 
   // Player state
-  YoutubePlayerController? _ytController;
-  StreamSubscription? _ytSubscription;
+  YouTubeTrailerPlayerController? _trailerController;
   Timer? _fadeTimer;
   Timer? _delayTimer;
 
@@ -242,81 +241,25 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
 
     _disposeController();
 
-    final ctrl = YoutubePlayerController(
-      params: YoutubePlayerParams(
-        showControls: false,
-        showFullscreenButton: false,
-        mute: ref.read(heroBannerMutedProvider),
-        loop: false,
-        showVideoAnnotations: false,
-        playsInline: true,
-        strictRelatedVideos: true,
-        enableKeyboard: false,
-        // Senior Fix Final: Definir el origen como el dominio de YouTube y usar un UserAgent
-        // de navegador móvil para evitar el bloqueo 152-4 por parte de Google.
-        origin: 'https://www.youtube.com',
-        userAgent: 'Mozilla/5.0 (Android 13; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0',
-      ),
-    );
-
-    // Cargamos el video por ID de forma limpia
-    ctrl.loadVideoById(videoId: key);
-
-    ctrl.listen((state) {
-      // Intentamos reproducir siempre que esté listo
-      if (state.playerState == PlayerState.cued && mounted) {
-        ctrl.playVideo();
-      }
-      
-      // Si el video está reproduciéndose, lo preparamos para mostrarlo
-      if (state.playerState == PlayerState.playing && mounted && !_videoReady) {
-        // Un pequeño delay para saltar el frame inicial/logo
+    _trailerController = YouTubeTrailerPlayerController();
+    _trailerController!.addListener(() {
+      if (_trailerController!.isReady && mounted && !_videoReady) {
         Future.delayed(const Duration(milliseconds: 400), () {
           if (mounted) {
             setState(() => _videoReady = true);
           }
         });
       }
-
-      if (state.playerState == PlayerState.ended && mounted) {
-        setState(() {
-          _showTrailerLayer = false;
-          _videoReady = false;
-        });
-      }
-    });
-
-    _ytSubscription = ctrl.videoStateStream.listen((state) {
-      final duration = ctrl.value.metaData.duration.inSeconds;
-      final position = state.position.inSeconds;
-      
-      // Si detectamos progreso real, el video DEFINITIVAMENTE está listo
-      if (position > 0.5 && !_videoReady && mounted) {
-        setState(() => _videoReady = true);
-      }
-
-      if (position > 5 && duration > 30 && (duration - position) < 12) {
-        if (_showTrailerLayer && mounted) {
-          setState(() {
-            _showTrailerLayer = false;
-            _videoReady = false;
-          });
-          _fadeOutAudio(ctrl);
-        }
-      }
     });
 
     if (mounted) {
       setState(() {
-        _ytController = ctrl;
         _showTrailerLayer = true; 
       });
       
-      // Refuerzo de reproducción para navegadores
       Future.delayed(const Duration(milliseconds: 600), () {
-        if (mounted) {
-          ctrl.playVideo();
-          // Fallback final: si en 3 segundos no ha cargado pero el usuario está activo, mostramos igual
+        if (mounted && _trailerController != null) {
+          _trailerController!.playVideo();
           Future.delayed(const Duration(seconds: 3), () {
             if (mounted && !_videoReady && _showTrailerLayer && _isAppActive) {
               setState(() => _videoReady = true);
@@ -327,7 +270,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
     }
   }
 
-  void _fadeOutAudio(YoutubePlayerController ctrl) {
+  void _fadeOutAudio(YouTubeTrailerPlayerController ctrl) {
     if (ref.read(heroBannerMutedProvider)) return;
     _fadeTimer?.cancel();
     int volume = 100;
@@ -344,16 +287,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
 
   void _disposeController() {
     _fadeTimer?.cancel();
-    _ytSubscription?.cancel();
-    _ytSubscription = null;
-    _ytController?.close();
-    _ytController = null;
+    _trailerController?.dispose();
+    _trailerController = null;
   }
 
   void _syncMute(bool isMuted) {
-    if (_ytController != null) {
-      if (isMuted) _ytController!.mute();
-      else { _ytController!.unMute(); _ytController!.setVolume(100); }
+    if (_trailerController != null) {
+      if (isMuted) _trailerController!.mute();
+      else { _trailerController!.unmute(); _trailerController!.setVolume(100); }
     }
   }
 
@@ -531,7 +472,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                         ),
 
                         // CAPA 2: Trailer overlay
-                        if (_ytController != null && _showTrailerLayer)
+                        if (_trailerController != null && _showTrailerLayer)
                           Positioned(
                             top: 0, bottom: 12, right: 0,
                             width: isMobile ? width : width * 0.72,
@@ -550,9 +491,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                                         maxWidth: isMobile ? playerWidth : width * 0.72,
                                         minHeight: playerHeight,
                                         maxHeight: playerHeight,
-                                        child: YoutubePlayer(
+                                        child: YouTubeTrailerPlayer(
                                           key: ValueKey('yt_${bgItem.trailerKey}'),
-                                          controller: _ytController!,
+                                          controller: _trailerController,
+                                          videoId: bgItem.trailerKey!,
+                                          autoPlay: true,
+                                          mute: ref.read(heroBannerMutedProvider),
                                           aspectRatio: 16 / 9,
                                         ),
                                       ),
