@@ -694,7 +694,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                     Colors.black54,
                                     Colors.transparent,
                                   ],
-                                  stops: [0.0, 0.3, 0.8, 0.96], // Fusión mucho más baja y discreta
+                                  stops: [0.0, 0.4, 0.88, 0.98], // Bajada para compensar la expansión del Blur
                                 ).createShader(rect);
                               },
                               blendMode: BlendMode.dstIn,
