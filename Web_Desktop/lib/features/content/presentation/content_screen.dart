@@ -694,32 +694,34 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                     Colors.black54,
                                     Colors.transparent,
                                   ],
-                                  stops: [0.0, 0.15, 0.55, 0.85], 
+                                  stops: [0.0, 0.3, 0.8, 0.96], // Fusión mucho más baja y discreta
                                 ).createShader(rect);
                               },
                               blendMode: BlendMode.dstIn,
                               child: Container(
-                                color: const Color(0xFF0B0B0D), // Fondo negro base para sellar micro-gaps
-                                child: TweenAnimationBuilder<double>(
-                                  duration: const Duration(milliseconds: 800),
-                                  tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0),
-                                  builder: (context, blur, child) => AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 1200),
-                                    curve: Curves.easeInOut,
-                                    opacity: _revealed ? 1.0 : 0.0,
-                                    child: ImageFiltered(
-                                      imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-                                      child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 800),
-                                        foregroundDecoration: BoxDecoration(
-                                          color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0),
-                                        ),
-                                        child: CachedNetworkImage(
-                                          imageUrl: b!,
-                                          fit: BoxFit.cover,
-                                          alignment: Alignment.topCenter,
-                                          fadeInDuration: const Duration(milliseconds: 300),
-                                          errorWidget: (_, __, ___) => Container(color: Colors.black12),
+                                color: const Color(0xFF0B0B0D),
+                                child: ClipRect( // Senior: Forzamos el recorte del desenfoque para que no sangre hacia abajo
+                                  child: TweenAnimationBuilder<double>(
+                                    duration: const Duration(milliseconds: 800),
+                                    tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0),
+                                    builder: (context, blur, child) => AnimatedOpacity(
+                                      duration: const Duration(milliseconds: 1200),
+                                      curve: Curves.easeInOut,
+                                      opacity: _revealed ? 1.0 : 0.0,
+                                      child: ImageFiltered(
+                                        imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 800),
+                                          foregroundDecoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0),
+                                          ),
+                                          child: CachedNetworkImage(
+                                            imageUrl: b!,
+                                            fit: BoxFit.cover,
+                                            alignment: Alignment.topCenter,
+                                            fadeInDuration: const Duration(milliseconds: 300),
+                                            errorWidget: (_, __, ___) => Container(color: Colors.black12),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -756,7 +758,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                     Colors.black54,
                                     Colors.transparent,
                                   ],
-                                  stops: [0.0, 0.15, 0.55, 0.9], 
+                                  stops: [0.0, 0.3, 0.8, 0.96], // Sincronizado con el Backdrop
                                 ).createShader(rect);
                               },
                               blendMode: BlendMode.dstIn,
