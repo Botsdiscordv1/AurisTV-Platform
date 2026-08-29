@@ -1,3 +1,5 @@
+import '../../../core/api/api_endpoints.dart';
+
 class SearchResult {
   final String title;
   final String url;
@@ -115,9 +117,9 @@ class SearchResult {
       title: json['title'] as String? ?? '',
       url: json['url'] as String? ?? '',
       quality: json['quality'] as String? ?? '',
-      thumbnail: json['thumbnail'] as String? ?? '',
-      banner: json['banner'] as String?,
-      logo: json['logo'] as String?,
+      thumbnail: ApiEndpoints.proxyImage(json['thumbnail'] as String?),
+      banner: ApiEndpoints.proxyImage(json['banner'] as String?),
+      logo: ApiEndpoints.proxyImage(json['logo'] as String?),
       source: json['source'] as String? ?? '',
       romaji: json['romaji'] as String?,
       english: json['english'] as String?,

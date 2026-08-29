@@ -61,6 +61,10 @@ String simplifySourceName(String name) {
   if (l.contains('katanime')) return 'KAT';
   if (l.contains('onlypelis')) return 'OPS';
   if (l.contains('pelispedia')) return 'PPA';
+  if (l.contains('cuevana3')) return 'CV3';
+  if (l.contains('gnulahd')) return 'GHD';
+  if (l.contains('lamovie')) return 'LMV';
+  if (l.contains('pelis24blog')) return 'P24';
   return name.toUpperCase();
 }
 
@@ -74,6 +78,12 @@ const Map<String, int> _sourceDisplayOrder = {
   'TIO': 8,
   'FLV': 9,
   'ANY': 10,
+  'OPS': 11,
+  'PPA': 12,
+  'CV3': 13,
+  'GHD': 14,
+  'LMV': 15,
+  'P24': 16,
 };
 
 int sourceDisplayRank(String source) {

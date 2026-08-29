@@ -19,6 +19,7 @@ import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../../shared/widgets/nav_arrow.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
+import '../../../shared/widgets/skeletons.dart';
 
 // --- Galería Local Helpers ---
 
@@ -248,6 +249,8 @@ class _ContentHeader extends ConsumerStatefulWidget {
 class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   YoutubePlayerController? _ytController; StreamSubscription? _ytSubscription; StreamSubscription? _playerSubscription; Timer? _fadeTimer; String? _lastTrailerKey; bool _isMuted = true; bool _showPlayer = false; bool _isPlayedOnce = false; Timer? _delayTimer;
   bool _showTitle = true; Timer? _titleHideTimer;
+  bool _revealed = false;
+  Timer? _revealTimeout;
   bool _isSynopsisExpanded = false;
 
   void _startTitleHideTimer() {
@@ -270,13 +273,28 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     _startTitleHideTimer();
   }
   @override void didChangeDependencies() { super.didChangeDependencies(); _checkAndInitTrailer(); }
-  @override void didUpdateWidget(covariant _ContentHeader oldWidget) { super.didUpdateWidget(oldWidget); _checkAndInitTrailer(); }
+  @override void didUpdateWidget(covariant _ContentHeader oldWidget) { 
+    super.didUpdateWidget(oldWidget); 
+    _checkAndInitTrailer(); 
+    // Si llegan los detalles enriquecidos (logo, etc), revelamos inmediatamente
+    final hasDetails = widget.animeDetailAsync.hasValue || widget.movieDetailAsync.hasValue;
+    if (hasDetails && !_revealed) {
+      setState(() => _revealed = true);
+    }
+  }
   void _checkAndInitTrailer() {
     final d = widget.category == 'movie_anime'
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
         : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
     final k = (d is AnimeDetail) ? d.trailerKey : (d is MovieDetail ? d.trailerKey : null);
-    if (k != null && k.isNotEmpty) { if (k != _lastTrailerKey) { _lastTrailerKey = k; } } else if (_lastTrailerKey != null) { _lastTrailerKey = null; _disposeController(); }
+    if (k != null && k.isNotEmpty) { 
+      if (k != _lastTrailerKey) { 
+        _lastTrailerKey = k; 
+        _initTrailer(k);
+      } 
+    } else if (_lastTrailerKey != null) { 
+      _lastTrailerKey = null; _disposeController(); 
+    }
   }
   void _initTrailer(String key, {bool immediate = false}) {
     _delayTimer?.cancel();
@@ -373,6 +391,14 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       });
     });
   }
+
+  void _syncMute(bool isMuted) {
+    if (_ytController != null) {
+      if (isMuted) _ytController!.mute();
+      else { _ytController!.unMute(); _ytController!.setVolume(100); }
+    }
+  }
+
   void _disposeController() { 
     _delayTimer?.cancel(); 
     _fadeTimer?.cancel(); 
@@ -387,7 +413,19 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       _ytController = null;
     }
   }
-  @override void dispose() { _disposeController(); super.dispose(); }
+  @override void initState() {
+    super.initState();
+    // Timeout de seguridad: Si en 4 segundos no hay enriquecimiento, mostramos fallbacks
+    _revealTimeout = Timer(const Duration(seconds: 4), () {
+      if (mounted && !_revealed) setState(() => _revealed = true);
+    });
+  }
+
+  @override void dispose() { 
+    _revealTimeout?.cancel();
+    _disposeController(); 
+    super.dispose(); 
+  }
 
   @override Widget build(BuildContext context) {
     try {
@@ -445,19 +483,18 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                   if (b != null || _ytController != null) Positioned(
                                     top: 0, left: 0, right: 0,
                                     height: ph, 
-                                    child: ShaderMask(
-                                      shaderCallback: (rect) {
-                                        final headerH = constraints.maxHeight;
-                                        // Aseguramos que la transparencia total llegue al final del header actual
-                                        final stopEnd = (headerH / ph).clamp(0.0, 1.0);
-                                        final stopStart = (stopEnd * 0.7);
-                                        return LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
-                                          stops: [0.0, stopStart, (stopStart + stopEnd) / 2, stopEnd],
-                                        ).createShader(rect);
-                                      },
+                                        child: ShaderMask(
+                                          shaderCallback: (rect) {
+                                            final headerH = constraints.maxHeight;
+                                            final stopEnd = (headerH / ph).clamp(0.0, 1.0);
+                                            final stopStart = (stopEnd * 0.75); // Más margen de visibilidad
+                                            return LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
+                                              stops: [0.0, stopStart, (stopStart + stopEnd) / 2, stopEnd],
+                                            ).createShader(rect);
+                                          },
                                       blendMode: BlendMode.dstIn,
                                       child: Stack(
                                         children: [
@@ -470,13 +507,18 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                                 child: TweenAnimationBuilder<double>(
                                                   duration: const Duration(milliseconds: 800), 
                                                   tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
-                                                  builder: (context, blur, child) => ImageFiltered(
-                                                    imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
-                                                    child: AnimatedContainer(
-                                                      duration: const Duration(milliseconds: 800), 
-                                                      foregroundDecoration: BoxDecoration(color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0)), 
-                                                      child: CachedNetworkImage(imageUrl: b!, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
-                                                    )
+                                                  builder: (context, blur, child) => AnimatedOpacity(
+                                                    duration: const Duration(milliseconds: 1200),
+                                                    curve: Curves.easeInOut,
+                                                    opacity: _revealed ? 1.0 : 0.0,
+                                                    child: ImageFiltered(
+                                                      imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
+                                                      child: AnimatedContainer(
+                                                        duration: const Duration(milliseconds: 800), 
+                                                        foregroundDecoration: BoxDecoration(color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0)), 
+                                                        child: CachedNetworkImage(imageUrl: b!, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
+                                                      )
+                                                    ),
                                                   )
                                                 ),
                                               ),
@@ -527,11 +569,16 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                             ),
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 100, 20, 16),
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 1200), 
-                                curve: Curves.easeInOut, 
-                                opacity: 1.0, 
-                                child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)]))
+                              child: Stack(
+                                children: [
+                                  if (!_revealed) const SkeletonContainer(width: 180, height: 40),
+                                  AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 1200), 
+                                    curve: Curves.easeInOut, 
+                                    opacity: _revealed ? 1.0 : 0.0, 
+                                    child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)]))
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -603,10 +650,11 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         onPointerMove: (_) { if (mounted) _handleInteraction(); },
         onPointerHover: (_) { if (mounted) _handleInteraction(); },
         child: Stack(
-          clipBehavior: Clip.hardEdge, 
+          clipBehavior: Clip.none, // Senior: Permitimos que el sello inferior sobresalga para cerrar gaps en Web
           children: [
             Positioned.fill(
-              child: LayoutBuilder(
+              child: ClipRect( // Senior: Mantenemos el recorte horizontal para el backdrop
+                child: LayoutBuilder(
                 builder: (context, constraints) {
                   final hStable = width / 2.8;
                   final headerH = constraints.maxHeight;
@@ -620,64 +668,127 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                       Container(color: const Color(0xFF0B0B0D)),
                       
                       // 1. Capa de Imagen/Tráiler: Se mantiene con altura FIJA (ph)
-                      if (b != null || _ytController != null) Positioned(
-                        top: 0, left: 0, right: 0, 
-                        height: ph, 
-                        child: ShaderMask(
-                          shaderCallback: (rect) {
-                            // Dinamismo: La transparencia total SIEMPRE ocurre al final del header visible
-                            final stopEnd = (headerH / ph).clamp(0.0, 1.0);
-                            final stopStart = (stopEnd * 0.6);
-                            return LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
-                              stops: [0.0, stopStart, (stopStart + stopEnd) / 2, stopEnd],
-                            ).createShader(rect);
-                          },
-                          blendMode: BlendMode.dstIn,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              if (b != null) TweenAnimationBuilder<double>(
-                                duration: const Duration(milliseconds: 800), 
-                                tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
-                                builder: (context, blur, child) => ImageFiltered(
-                                  imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 800), 
-                                    foregroundDecoration: BoxDecoration(color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0)), 
-                                    child: CachedNetworkImage(
-                                      imageUrl: b!, 
-                                      fit: BoxFit.cover, 
-                                      alignment: Alignment.topCenter, 
-                                      fadeInDuration: const Duration(milliseconds: 300), 
-                                      errorWidget: (_, __, ___) => Container(color: Colors.black12)
-                                    )
-                                  )
-                                )
+                      // 1. Capa de Imagen (Backdrop): Desplazamiento al 18%
+                      if (b != null)
+                        Positioned(
+                          top: 0,
+                          left: width * 0.18,
+                          right: 0,
+                          height: headerH - 5, 
+                          child: ShaderMask(
+                            shaderCallback: (rect) => const LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [Colors.transparent, Colors.black, Colors.black],
+                              stops: [0.0, 0.45, 1.0],
+                            ).createShader(rect),
+                            blendMode: BlendMode.dstIn,
+                            child: ShaderMask(
+                              shaderCallback: (rect) {
+                                return const LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.black,
+                                    Colors.black,
+                                    Colors.black54,
+                                    Colors.transparent,
+                                  ],
+                                  stops: [0.0, 0.15, 0.55, 0.85], 
+                                ).createShader(rect);
+                              },
+                              blendMode: BlendMode.dstIn,
+                              child: Container(
+                                color: const Color(0xFF0B0B0D), // Fondo negro base para sellar micro-gaps
+                                child: TweenAnimationBuilder<double>(
+                                  duration: const Duration(milliseconds: 800),
+                                  tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0),
+                                  builder: (context, blur, child) => AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 1200),
+                                    curve: Curves.easeInOut,
+                                    opacity: _revealed ? 1.0 : 0.0,
+                                    child: ImageFiltered(
+                                      imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 800),
+                                        foregroundDecoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0),
+                                        ),
+                                        child: CachedNetworkImage(
+                                          imageUrl: b!,
+                                          fit: BoxFit.cover,
+                                          alignment: Alignment.topCenter,
+                                          fadeInDuration: const Duration(milliseconds: 300),
+                                          errorWidget: (_, __, ___) => Container(color: Colors.black12),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                              if (_ytController != null) AnimatedOpacity(
-                                duration: const Duration(milliseconds: 500), 
-                                opacity: _showPlayer ? 1.0 : 0.0, 
-                                child: PointerInterceptor(
-                                  child: IgnorePointer(
-                                    ignoring: true, 
-                                    child: ClipRect(
-                                      child: OverflowBox(
-                                        alignment: Alignment.centerRight, 
-                                        minWidth: pw, maxWidth: pw, 
-                                        minHeight: ph, maxHeight: ph, 
-                                        child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9)
-                                      )
-                                    )
-                                  )
-                                )
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
+
+                      // 2. Capa de Tráiler: Desplazamiento al 35%
+                      if (_ytController != null)
+                        Positioned(
+                          top: 0,
+                          left: width * 0.35,
+                          right: 0,
+                          height: headerH - 5, 
+                          child: ShaderMask(
+                            shaderCallback: (rect) => const LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [Colors.transparent, Colors.black, Colors.black],
+                              stops: [0.0, 0.55, 1.0],
+                            ).createShader(rect),
+                            blendMode: BlendMode.dstIn,
+                            child: ShaderMask(
+                              shaderCallback: (rect) {
+                                return const LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.black,
+                                    Colors.black,
+                                    Colors.black54,
+                                    Colors.transparent,
+                                  ],
+                                  stops: [0.0, 0.15, 0.55, 0.9], 
+                                ).createShader(rect);
+                              },
+                              blendMode: BlendMode.dstIn,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 500),
+                                opacity: _showPlayer ? 1.0 : 0.0,
+                                child: PointerInterceptor(
+                                  child: IgnorePointer(
+                                    ignoring: true,
+                                    child: Container(
+                                      color: const Color(0xFF0B0B0D),
+                                      child: ClipRect(
+                                      child: OverflowBox(
+                                        alignment: Alignment.center, 
+                                        minWidth: pw * 1.15, // Zoom optimizado (1.15x es suficiente para ocultar UI)
+                                        maxWidth: pw * 1.15,
+                                        minHeight: ph * 1.15,
+                                        maxHeight: ph * 1.15,
+                                        child: YoutubePlayer(
+                                          key: ValueKey(_lastTrailerKey),
+                                          controller: _ytController!,
+                                          aspectRatio: 16 / 9,
+                                        ),
+                                      )
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       
                       // 2. Capa de Gradientes: Estos SIEMPRE llenan el 100% (Positioned.fill)
                       PointerInterceptor(
@@ -701,24 +812,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                 ),
                               ),
                             ),
-                            // Gradiente Inferior Atmosférico (Dinámico al alto visible)
-                            Positioned.fill(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.transparent,
-                                      const Color(0xFF0B0B0D).withValues(alpha: 0.0),
-                                      const Color(0xFF0B0B0D).withValues(alpha: 0.8),
-                                      const Color(0xFF0B0B0D),
-                                    ],
-                                    stops: const [0.0, 0.5, 0.85, 1.0],
-                                  ),
-                                ),
-                              ),
-                            ),
                             // Gradiente Superior (Original Suave)
                             DecoratedBox(
                               decoration: BoxDecoration(
@@ -730,6 +823,52 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                 )
                               )
                             ),
+                            
+                            // 3. MÁSCARA CINEMATOGRÁFICA TRAILER (Overlay para iframe)
+                            if (_showPlayer) ...[
+                              // Fusión Lateral: Cubre el borde izquierdo del trailer (35%)
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                    colors: [
+                                      const Color(0xFF0B0B0D),
+                                      const Color(0xFF0B0B0D),
+                                      const Color(0xFF0B0B0D).withValues(alpha: 0.6),
+                                      Colors.transparent,
+                                    ],
+                                    stops: const [0.0, 0.35, 0.42, 0.6], // Negro sólido hasta el inicio del trailer
+                                  ),
+                                ),
+                              ),
+                              // Fusión Inferior: Sella el borde sin oscurecer el contenido
+                              Positioned(
+                                bottom: -1, left: 0, right: 0, // Sangrado de 1px hacia abajo
+                                height: ph * 0.25, 
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                      colors: [
+                                        const Color(0xFF0B0B0D),
+                                        const Color(0xFF0B0B0D), // Doble parada para asegurar negro puro en la base
+                                        const Color(0xFF0B0B0D).withValues(alpha: 0.6),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.0, 0.08, 0.3, 1.0], // Negro sólido en el primer 8% de la máscara
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Sello Hermético de Seguridad (Gasket)
+                              Positioned(
+                                bottom: -2, left: 0, right: 0,
+                                height: 6, // Aumentado para mayor margen de error en Web
+                                child: Container(color: const Color(0xFF0B0B0D)),
+                              ),
+                            ],
                           ]
                         )
                       ),
@@ -737,6 +876,13 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   );
                 },
               ),
+            ),
+          ),
+            // Sello Hermético Invisible: Solape de 8px que físicamente tapa cualquier gap de scroll
+            Positioned(
+              bottom: -8, left: 0, right: 0,
+              height: 8, 
+              child: Container(color: const Color(0xFF0B0B0D)),
             ),
             _buildDesktopOverlay(context, d, width, heroTitle, logoReady),
             Positioned.fill(child: _buildUpperButtons(context, desktopTop: desktopBackTop)),
@@ -749,7 +895,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final isCompact = width >= 1050 && width < 1250;
     final hPadding = ResponsiveUtils.horizontalPadding(context); 
     final titleSize = isUltraCompact ? 32.0 : (isCompact ? 40.0 : 56.0);
-    final titleTop = isUltraCompact ? 40.0 : 45.0;
+    final titleTop = isUltraCompact ? 50.0 : 64.0; // Senior Spacing (más aire arriba)
     
     final Widget overlay = Container(
       constraints: BoxConstraints(minHeight: width / 2.8),
@@ -769,34 +915,43 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                     padding: const EdgeInsets.only(left: 56), 
                     child: SvgPicture.asset(
                       'assets/icons/auris-logo-web-flat.svg',
-                      height: 24,
+                      height: 20, // Más discreto
                       fit: BoxFit.contain,
                       colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24), // Más espacio entre logo y título
                   
                   // Logo de la serie/película
-                  AnimatedOpacity(
-                    duration: const Duration(milliseconds: 1200),
-                    curve: Curves.easeInOut,
-                    opacity: 1.0,
-                    child: HeroTitle(
-                      title: heroTitle,
-                      logo: d?.logo,
-                      logoReady: logoReady,
-                      maxWidth: width * 0.45,
-                      maxHeight: titleSize * 3.5,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: titleSize,
-                        fontWeight: FontWeight.w600,
-                        height: 1.0,
-                        letterSpacing: isUltraCompact ? 1 : 4,
-                        shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4)]
-                      )
-                    ),
+                  Stack(
+                    children: [
+                      if (!_revealed) SkeletonContainer(width: width * 0.3, height: titleSize * 2),
+                      AnimatedOpacity(
+                        duration: const Duration(milliseconds: 1200),
+                        curve: Curves.easeInOut,
+                        opacity: _revealed ? 1.0 : 0.0,
+                        child: HeroTitle(
+                          title: heroTitle,
+                          logo: d?.logo,
+                          logoReady: logoReady,
+                          maxWidth: width * 0.45,
+                          maxHeight: titleSize * 3.5,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: titleSize,
+                            fontWeight: FontWeight.w700, // Más impacto
+                            height: 1.0,
+                            letterSpacing: isUltraCompact ? 1 : 2, // Moderno
+                            shadows: const [
+                              Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4),
+                              Shadow(color: Colors.black54, offset: Offset(4, 4), blurRadius: 10),
+                            ]
+                          )
+                        ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 28), // Senior Spacing
                   const SizedBox(height: 20),
                   
                   // Metadata (Año, Géneros, Duración, Rating)
@@ -890,6 +1045,22 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               },
               isMobile: false, size: size, iconSize: iconSize,
             ),
+            if (_showPlayer) ...[
+              SizedBox(width: spacing),
+              _DetailIconButton(
+                icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                label: _isMuted ? 'Activar audio' : 'Silenciar',
+                onPressed: () {
+                  setState(() {
+                    _isMuted = !_isMuted;
+                    _syncMute(_isMuted);
+                  });
+                },
+                isMobile: false,
+                size: size,
+                iconSize: iconSize,
+              ),
+            ],
             SizedBox(width: spacing),
           ],
 
@@ -1084,20 +1255,40 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               if (d != null && d.length >= 4) ...[
                 Text(d.substring(0, 4), style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)),
                 const SizedBox(width: 12),
+              ] else if (!_revealed) ...[
+                const SkeletonContainer(width: 40, height: 18),
+                const SizedBox(width: 12),
               ],
-              if (widget.showRatingSkeleton && r == null) ...[
-                const _RatingSkeleton(width: 44, height: 18, mobile: true), 
-                const SizedBox(width: 12)
-              ] else if (r != null && r > 0) ...[
-                const Icon(Icons.star_rounded, color: Colors.amber, size: 18), 
-                const SizedBox(width: 4), 
-                Text(formatRating(r) ?? 'N/A', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)), 
-                const SizedBox(width: 12)
-              ],
+              Stack(
+                children: [
+                  if (!_revealed) const SkeletonContainer(width: 60, height: 18),
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 1200),
+                    curve: Curves.easeInOut,
+                    opacity: _revealed ? 1.0 : 0.0,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (widget.showRatingSkeleton && r == null) ...[
+                          const SkeletonContainer(width: 44, height: 18), 
+                          const SizedBox(width: 12)
+                        ] else if (r != null && r > 0) ...[
+                          const Icon(Icons.star_rounded, color: Colors.amber, size: 18), 
+                          const SizedBox(width: 4), 
+                          Text(formatRating(r) ?? 'N/A', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)), 
+                          const SizedBox(width: 12)
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               if (isMovie) ...[
                 if (runtime != null) Text(_formatRuntime(runtime), style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)),
               ] else if (widget.totalSeasons > 1) ...[
                 Text('${widget.totalSeasons} temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)),
+              ] else if (!_revealed) ...[
+                const SkeletonContainer(width: 80, height: 18),
               ],
             ]
           ),
@@ -1106,7 +1297,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           AnimatedOpacity(
             duration: const Duration(milliseconds: 1200),
             curve: Curves.easeInOut,
-            opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0,
+            opacity: _revealed ? 1.0 : 0.0,
             child: Row(
               children: [
                 if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
@@ -1133,9 +1324,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       children: [
         DefaultTextStyle(
           style: GoogleFonts.poppins(
-            color: Colors.white,
+            color: const Color(0xFFD1D1D6), // Gris más vibrante
             fontSize: isCompact ? 15 : 17,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.5, // Aire entre letras
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1143,12 +1335,18 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               if (d != null && d.length >= 4) ...[
                 Text(d.substring(0, 4)),
                 _buildDotSeparator(),
+              ] else if (!_revealed) ...[
+                const SkeletonContainer(width: 50, height: 20),
+                _buildDotSeparator(),
               ],
               if (g != null && g.isNotEmpty) ...[
                 ...g.take(2).map((genre) => Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: _buildBadge(context, genre.toString().toUpperCase(), small: isCompact),
                 )),
+                _buildDotSeparator(),
+              ] else if (!_revealed) ...[
+                const SkeletonContainer(width: 80, height: 20),
                 _buildDotSeparator(),
               ],
               // [Senior Logic] Duración para películas, Temporadas para series
@@ -1160,12 +1358,33 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               ] else if (widget.totalSeasons > 1) ...[
                 Text('${widget.totalSeasons} temporadas'),
                 _buildDotSeparator(),
+              ] else if (!_revealed) ...[
+                const SkeletonContainer(width: 100, height: 20),
+                _buildDotSeparator(),
               ],
-              if (r != null && r > 0) ...[
-                const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
-                const SizedBox(width: 4),
-                Text(formatRating(r) ?? 'N/A'),
-              ],
+              Stack(
+                children: [
+                  if (!_revealed) const SkeletonContainer(width: 60, height: 20),
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 1200),
+                    curve: Curves.easeInOut,
+                    opacity: _revealed ? 1.0 : 0.0,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (r != null && r > 0) ...[
+                          const Icon(Icons.star_rounded, color: Color(0xFFFACC15), size: 22), // Estrella más vibrante y grande
+                          const SizedBox(width: 4),
+                          Text(
+                            formatRating(r) ?? 'N/A',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -1174,7 +1393,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         AnimatedOpacity(
           duration: const Duration(milliseconds: 1200),
           curve: Curves.easeInOut,
-          opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0,
+          opacity: _revealed ? 1.0 : 0.0,
           child: Row(
             children: [
               if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
@@ -1209,6 +1428,20 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) {
     final text = detail?.overview ?? '';
+    
+    if (!_revealed && text.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          SkeletonContainer(width: double.infinity, height: 16),
+          SizedBox(height: 8),
+          SkeletonContainer(width: double.infinity, height: 16),
+          SizedBox(height: 8),
+          SkeletonContainer(width: 250, height: 16),
+        ],
+      );
+    }
+    
     if (text.isEmpty) return const SizedBox.shrink();
 
     return LayoutBuilder(

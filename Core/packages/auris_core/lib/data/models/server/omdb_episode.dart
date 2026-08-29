@@ -1,3 +1,5 @@
+import '../../../core/api/api_endpoints.dart';
+
 class OmdbEpisode {
   final String title;
   final String description;
@@ -23,7 +25,7 @@ class OmdbEpisode {
     return OmdbEpisode(
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? 'Sin descripción disponible.',
-      thumbnail: json['thumbnail'] as String? ?? '',
+      thumbnail: ApiEndpoints.proxyImage(json['thumbnail'] as String?),
       rating: json['rating']?.toString(),
       released: json['released'] as String?,
       duration: json['duration'] as String?,

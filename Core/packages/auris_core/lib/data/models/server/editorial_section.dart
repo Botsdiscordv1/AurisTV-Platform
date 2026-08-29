@@ -1,4 +1,5 @@
 import '../editorial_badge.dart';
+import '../../../core/api/api_endpoints.dart';
 
 class EditorialSection {
   final String id;
@@ -74,8 +75,8 @@ class EditorialItem {
       title: json['title'] as String? ?? '',
       romaji: json['romaji'] as String?,
       english: json['english'] as String?,
-      posterUrl: json['posterUrl'] as String? ?? '',
-      bannerUrl: json['bannerUrl'] as String?,
+      posterUrl: ApiEndpoints.proxyImage(json['posterUrl'] as String?),
+      bannerUrl: ApiEndpoints.proxyImage(json['bannerUrl'] as String?),
       trailerKey: json['trailerKey'] as String?,
       synopsis: json['synopsis'] as String?,
       rating: switch (json['rating']) {

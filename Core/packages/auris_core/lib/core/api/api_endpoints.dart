@@ -26,8 +26,10 @@ class ApiEndpoints {
   static String get _defaultDomain => _domainFor('anime');
 
   static bool _isOurServer(String url) {
+    final lower = url.toLowerCase();
     final all = <String>{..._servers.values, ..._serverOverride.values};
-    return all.any((d) => url.contains(d));
+    return all.any((d) => lower.contains(d.toLowerCase())) || 
+           lower.contains('auristv.dpdns.org');
   }
 
   static const String _animePort = '3000';
@@ -126,36 +128,71 @@ class ApiEndpoints {
   }
 
   /// Pasa una imagen por el proxy del servidor si es necesario.
+  /// Implementación Senior: Auto-limpieza de recursión infinita (Unwrapping).
   static String proxyImage(String? url) {
     if (url == null || url.isEmpty) return '';
-    
-    // Si la URL ya es local o del proxy, no tocar.
-    if (url.contains('/api/proxy/image') || _isOurServer(url)) {
-      return fixUrl(url);
-    }
 
-    // Senior Web Fix: Solo forzamos proxy en Web por el tema de CORS.
-    // En App Nativa (Android/iOS) cargamos directo para máxima velocidad.
-    if (kIsWeb) {
-      if (url.startsWith('http') && !url.contains('localhost') && !_isOurServer(url)) {
-        return fixUrl('$baseUrl/api/proxy/image?url=${Uri.encodeComponent(url)}');
+    String workingUrl = url;
+
+    // 1. DESENVOLVER (Unwrap): Eliminar capas de proxy previas si existen.
+    // Esto previene el error 414 Request-URI Too Large.
+    while (workingUrl.contains('/api/proxy/image?url=')) {
+      try {
+        final uri = Uri.parse(workingUrl);
+        final nestedUrl = uri.queryParameters['url'];
+        if (nestedUrl != null && nestedUrl != workingUrl) {
+          workingUrl = nestedUrl;
+        } else {
+          break;
+        }
+      } catch (_) {
+        break;
       }
-      return url;
     }
-    
-    // SENIOR OPTIMIZATION (Mobile/Desktop Nativo): 
-    // Solo proxeamos dominios que bloquean activamente el acceso móvil.
-    // Esto reduce la carga del servidor y evita bloqueos de rate-limit.
-    final bool needsProxy = url.contains('animeav1.com') || 
-                            url.contains('zilla-networks.com') ||
-                            url.contains('jkanime') ||
-                            url.contains('gnula');
 
-    if (needsProxy && url.startsWith('http')) {
-       return fixUrl('$baseUrl/api/proxy/image?url=${Uri.encodeComponent(url)}');
+    final String lowerUrl = workingUrl.toLowerCase();
+
+    // 2. Si es una ruta relativa o ya apunta a nuestro servidor, corregir (fixUrl) y retornar.
+    if (workingUrl.startsWith('/') || _isOurServer(workingUrl) || 
+        lowerUrl.contains('localhost') || lowerUrl.contains('127.0.0.1')) {
+      return fixUrl(workingUrl);
     }
-    
-    return url;
+
+    // 3. Evaluar necesidad de proxy para URLs externas.
+    if (workingUrl.startsWith('http')) {
+      // SENIOR OPTIMIZATION: Dominios que permiten CORS y no bloquean móviles.
+      // Cargar estos directamente ahorra ancho de banda en tu servidor y evita errores 502.
+      const bypassDomains = [
+        'tmdb.org', 
+        'themoviedb.org', 
+        'googleusercontent.com',
+        'cloudinary.com',
+        'fbcdn.net'
+      ];
+      
+      if (bypassDomains.any((d) => lowerUrl.contains(d))) {
+        return workingUrl;
+      }
+
+      // En Web intentamos proxy para el resto (por CORS).
+      bool shouldProxy = kIsWeb;
+      
+      // En Mobile/Nativo/TV solo para dominios conflictivos conocidos.
+      if (!shouldProxy) {
+        const proxyDomains = [
+          'animeav1.com', 'zilla-networks.com', 'jkanime', 
+          'gnula', 'animeflv', 'jk-anime', 'idmwp.com',
+          'discordapp.com'
+        ];
+        shouldProxy = proxyDomains.any((d) => lowerUrl.contains(d));
+      }
+
+      if (shouldProxy) {
+        return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+      }
+    }
+
+    return workingUrl;
   }
 
   // Search

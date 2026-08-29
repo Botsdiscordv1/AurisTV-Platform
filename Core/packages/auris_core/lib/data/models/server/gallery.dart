@@ -1,3 +1,5 @@
+import '../../../core/api/api_endpoints.dart';
+
 class GalleryImage {
   final String url;
   final String type; // poster | backdrop | logo | banner
@@ -12,7 +14,7 @@ class GalleryImage {
   });
 
   factory GalleryImage.fromJson(Map<String, dynamic> j) => GalleryImage(
-        url: j['url']?.toString() ?? '',
+        url: ApiEndpoints.proxyImage(j['url']?.toString()),
         type: j['type']?.toString() ?? '',
         source: j['source']?.toString() ?? '',
         lang: j['lang']?.toString(),

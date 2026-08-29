@@ -1,4 +1,5 @@
 import '../../../core/utils/synopsis_cleaner.dart';
+import '../../../core/api/api_endpoints.dart';
 
 class MovieDetail {
   final String tmdbId;
@@ -70,9 +71,9 @@ class MovieDetail {
       title: json['title'] as String? ?? '',
       originalTitle: json['originalTitle'] as String?,
       overview: SynopsisCleaner.clean(json['overview'] as String?),
-      poster: json['poster'] as String?,
-      backdrop: json['backdrop'] as String?,
-      logo: json['logo'] as String?,
+      poster: ApiEndpoints.proxyImage(json['poster'] as String?),
+      backdrop: ApiEndpoints.proxyImage(json['backdrop'] as String?),
+      logo: ApiEndpoints.proxyImage(json['logo'] as String?),
       rating: (json['rating'] as num?)?.toDouble(),
       voteCount: json['voteCount'] as int?,
       releaseDate: json['releaseDate'] as String?,
@@ -156,7 +157,7 @@ class SeasonInfo {
       name: json['name'] as String?,
       episodeCount: json['episodeCount'] as int?,
       airDate: json['airDate'] as String?,
-      poster: json['poster'] as String?,
+      poster: ApiEndpoints.proxyImage(json['poster'] as String?),
     );
   }
 }
@@ -170,7 +171,7 @@ class PlatformInfo {
   factory PlatformInfo.fromJson(Map<String, dynamic> json) {
     return PlatformInfo(
       providerName: json['providerName'] as String? ?? '',
-      logo: json['logo'] as String?,
+      logo: ApiEndpoints.proxyImage(json['logo'] as String?),
     );
   }
 }

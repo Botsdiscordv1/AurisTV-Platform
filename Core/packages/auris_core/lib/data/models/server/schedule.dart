@@ -1,3 +1,5 @@
+import '../../../core/api/api_endpoints.dart';
+
 class ScheduleResponse {
   final String season;
   final int year;
@@ -109,8 +111,8 @@ class ScheduleItem {
               .toList() ??
           [],
       description: json['description'] as String?,
-      coverImage: json['coverImage'] as String?,
-      banner: json['banner'] as String?,
+      coverImage: ApiEndpoints.proxyImage(json['coverImage'] as String?),
+      banner: ApiEndpoints.proxyImage(json['banner'] as String?),
       genres: (json['genres'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/api/api_endpoints.dart';
 
 class HeroTitle extends StatefulWidget {
   final String title;
@@ -44,7 +45,7 @@ class _HeroTitleState extends State<HeroTitle> {
           maxHeight: widget.maxHeight,
         ),
         child: CachedNetworkImage(
-          imageUrl: widget.logo!,
+          imageUrl: ApiEndpoints.proxyImage(widget.logo),
           fit: BoxFit.contain,
           alignment: Alignment.bottomLeft,
           fadeInDuration: const Duration(milliseconds: 300),

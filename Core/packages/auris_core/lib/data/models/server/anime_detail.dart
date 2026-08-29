@@ -1,4 +1,5 @@
 import '../../../core/utils/synopsis_cleaner.dart';
+import '../../../core/api/api_endpoints.dart';
 
 class AnimeDetail {
   final String id;
@@ -105,14 +106,14 @@ class AnimeDetail {
             anime['description'] as String? ??
             root['overview'] as String?,
       ),
-      poster: visuals?['poster'] as String? ??
+      poster: ApiEndpoints.proxyImage(visuals?['poster'] as String? ??
           root['poster'] as String? ??
-          root['thumbnail'] as String?,
-      backdrop: visuals?['backdrop'] as String? ??
+          root['thumbnail'] as String?),
+      backdrop: ApiEndpoints.proxyImage(visuals?['backdrop'] as String? ??
           root['backdrop'] as String? ??
-          root['banner'] as String?,
-      banner: visuals?['banner'] as String? ?? root['banner'] as String?,
-      logo: visuals?['logo'] as String? ?? root['logo'] as String?,
+          root['banner'] as String?),
+      banner: ApiEndpoints.proxyImage(visuals?['banner'] as String? ?? root['banner'] as String?),
+      logo: ApiEndpoints.proxyImage(visuals?['logo'] as String? ?? root['logo'] as String?),
       rating: (anime['score'] as num?)?.toDouble(),
       episodes: anime['episodes'] as int?,
       genres: (anime['genres'] as List<dynamic>?)
@@ -176,7 +177,7 @@ class CharacterInfo {
     return CharacterInfo(
       id: json['id']?.toString(),
       name: json['name'] as String? ?? 'Unknown',
-      image: json['image'] as String?,
+      image: ApiEndpoints.proxyImage(json['image'] as String?),
       role: json['role'] as String?,
       voiceActors: (json['voiceActors'] as List<dynamic>?)
               ?.map((e) => VoiceActorInfo.fromJson(e as Map<String, dynamic>))
@@ -204,7 +205,7 @@ class VoiceActorInfo {
       id: json['id']?.toString(),
       name: json['name'] as String? ?? 'Unknown',
       language: json['language'] as String?,
-      image: json['image'] as String?,
+      image: ApiEndpoints.proxyImage(json['image'] as String?),
     );
   }
 }
@@ -226,7 +227,7 @@ class TrailerInfo {
     return TrailerInfo(
       site: json['site'] as String? ?? 'youtube',
       videoId: json['videoId'] as String?,
-      thumbnail: json['thumbnail'] as String?,
+      thumbnail: ApiEndpoints.proxyImage(json['thumbnail'] as String?),
       url: json['url'] as String?,
     );
   }
@@ -245,7 +246,7 @@ class RelationInfo {
       id: json['id']?.toString(),
       title: json['title'] as String? ?? '',
       relation: json['relation'] as String? ?? 'UNKNOWN',
-      poster: json['poster'] as String?,
+      poster: ApiEndpoints.proxyImage(json['poster'] as String?),
     );
   }
 }
@@ -262,7 +263,7 @@ class RecommendationInfo {
     return RecommendationInfo(
       id: json['id']?.toString(),
       title: json['title'] as String? ?? '',
-      poster: json['poster'] as String?,
+      poster: ApiEndpoints.proxyImage(json['poster'] as String?),
       score: (json['score'] as num?)?.toDouble(),
     );
   }
@@ -299,7 +300,7 @@ class AnimeThemeInfo {
       video720: json['video_720'] as String?,
       video1080: json['video_1080'] as String?,
       audioUrl: json['audio'] as String?,
-      imageUrl: json['image'] as String?,
+      imageUrl: ApiEndpoints.proxyImage(json['image'] as String?),
       type: json['type'] as String? ?? '',
       sequence: json['sequence'] as int? ?? 0,
     );
