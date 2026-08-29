@@ -351,7 +351,12 @@ String _fuseKey(SearchResult r) {
   final typeRe = RegExp(r'\b(movie|pel[íi]cula|film|ova|special|oav)\b');
   final isMovieish = typeRe.hasMatch(t);
   final franchise = t.replaceAll(typeRe, '').replaceAll(RegExp(r'[^a-z0-9]'), '');
-  return '$franchise#${isMovieish ? 'm' : 't'}';
+  // La categoría (anime/series/movie) distingue resultados que comparten
+  // título pero son contenido distinto (p.ej. "One Piece" anime vs "One Piece"
+  // serie). Antes solo se separaba movie/no-movie, así que anime y serie
+  // colapsaban en la misma tarjeta.
+  final cat = inferOpenCategory(r, isMovieish ? 'movie' : 'tv');
+  return '$franchise#$cat';
 }
 
 List<SearchResult> _deduplicate(List<SearchResult> results) {

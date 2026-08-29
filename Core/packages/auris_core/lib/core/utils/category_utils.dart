@@ -39,5 +39,14 @@ String inferOpenCategory(SearchResult result, [String fallback = 'all']) {
   if (q.contains('anime') || type.contains('anime') || kind == 'anime') {
     return 'anime';
   }
+  // Algunos servidores (movies-series) no envían kind/type/category, pero la
+  // URL revela la categoría (p.ej. onlypelis.com/serie/... vs /pelicula/...).
+  final url = (result.url ?? '').toLowerCase();
+  if (url.contains('serie') || url.contains('series') || url.contains('dorama')) {
+    return 'series';
+  }
+  if (url.contains('pelicula') || url.contains('película') || url.contains('movie') || url.contains('film')) {
+    return 'movie';
+  }
   return fallback;
 }
