@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -73,21 +74,21 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
   return Container(
     padding: EdgeInsets.symmetric(
       horizontal: ResponsiveUtils.sp(context, small ? 6 : 10), 
-      vertical: ResponsiveUtils.sp(context, small ? 2 : 4)
+      vertical: ResponsiveUtils.sp(context, small ? 1.5 : 3)
     ),
     decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: 0.3),
+      color: Colors.black.withOpacity(0.3),
       border: Border.all(
-        color: Colors.white.withValues(alpha: 0.5), 
-        width: 1.5
+        color: Colors.white.withOpacity(0.5), 
+        width: 1.0
       ),
-      borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, 3)),
+      borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, small ? 3 : 4)),
     ),
     child: Text(
       text.toUpperCase(),
       style: GoogleFonts.poppins(
         color: Colors.white, 
-        fontSize: ResponsiveUtils.sp(context, small ? 11 : 14), 
+        fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
         fontWeight: FontWeight.w800,
         letterSpacing: 0.5,
       ),
@@ -103,7 +104,7 @@ Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) 
       vertical: ResponsiveUtils.sp(context, small ? 1.5 : 3)
     ),
     decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.1),
+      color: Colors.white.withOpacity(0.1),
       border: Border.all(
         color: Colors.white10, 
         width: 1.0
@@ -112,10 +113,10 @@ Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) 
     ),
     child: Text(
       text,
-      style: TextStyle(
+      style: GoogleFonts.poppins(
         color: Colors.white, 
         fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w600,
       ),
     ),
   );
@@ -152,7 +153,7 @@ class _RatingSkeleton extends StatelessWidget {
             width: width,
             height: height,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
+              color: Colors.white.withOpacity(0.12),
               borderRadius: BorderRadius.circular(base / 2),
             ),
           ),
@@ -180,7 +181,7 @@ class _SkeletonBox extends StatelessWidget {
             width: width,
             height: height,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: Colors.white.withOpacity(0.08),
               borderRadius: BorderRadius.circular(borderRadius),
             ),
           ),
@@ -245,10 +246,12 @@ class _ContentHeader extends ConsumerStatefulWidget {
 }
 
 class _ContentHeaderState extends ConsumerState<_ContentHeader> {
-  YoutubePlayerController? _ytController; StreamSubscription? _ytSubscription; Timer? _fadeTimer; String? _lastTrailerKey; bool _isMuted = true; bool _showPlayer = false; bool _isPlayedOnce = false; Timer? _delayTimer;
+  YoutubePlayerController? _ytController; StreamSubscription? _ytSubscription; StreamSubscription? _playerSubscription; Timer? _fadeTimer; String? _lastTrailerKey; bool _isMuted = true; bool _showPlayer = false; bool _isPlayedOnce = false; Timer? _delayTimer;
   bool _showTitle = true; Timer? _titleHideTimer;
+  bool _isSynopsisExpanded = false;
 
   void _startTitleHideTimer() {
+    if (!mounted) return;
     _titleHideTimer?.cancel();
     if (_showPlayer) {
       _titleHideTimer = Timer(const Duration(seconds: 5), () {
@@ -262,10 +265,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   void _handleInteraction() {
     if (!mounted) return;
     if (!_showTitle) {
-      // Senior Fix: Deferimos el setState para evitar Assertion failed en Web
-      Future.microtask(() {
-        if (mounted) setState(() => _showTitle = true);
-      });
+      setState(() => _showTitle = true);
     }
     _startTitleHideTimer();
   }
@@ -297,18 +297,20 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         return;
       }
       final ctrl = YoutubePlayerController.fromVideoId(videoId: key, autoPlay: true, params: const YoutubePlayerParams(showControls: false, showFullscreenButton: false, mute: true, loop: false, showVideoAnnotations: false, playsInline: true, strictRelatedVideos: true, enableKeyboard: false));
-      ctrl.listen((state) {
-        if (state.playerState == PlayerState.cued && mounted) { ctrl.playVideo(); }
-        if (state.playerState == PlayerState.playing && mounted && !_showPlayer) { 
+      _playerSubscription = ctrl.listen((state) {
+        if (!mounted) return;
+        if (state.playerState == PlayerState.cued) { ctrl.playVideo(); }
+        if (state.playerState == PlayerState.playing && !_showPlayer) { 
           setState(() { _showPlayer = true; _showTitle = true; }); 
           _startTitleHideTimer();
         }
-        if (state.playerState == PlayerState.ended && mounted) { 
+        if (state.playerState == PlayerState.ended) { 
           setState(() { _showPlayer = false; _isPlayedOnce = true; _showTitle = true; }); 
           _titleHideTimer?.cancel();
         }
       });
       _ytSubscription = ctrl.videoStateStream.listen((state) {
+        if (!mounted) return;
         final d = ctrl.value.metaData.duration.inSeconds; final p = state.position.inSeconds;
         if (p > 0 && !_showPlayer && mounted) { 
           setState(() { _showPlayer = true; _showTitle = true; }); 
@@ -371,233 +373,422 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       });
     });
   }
-  void _disposeController() { _delayTimer?.cancel(); _fadeTimer?.cancel(); _titleHideTimer?.cancel(); _ytSubscription?.cancel(); _ytSubscription = null; _ytController?.close(); _ytController = null; }
+  void _disposeController() { 
+    _delayTimer?.cancel(); 
+    _fadeTimer?.cancel(); 
+    _titleHideTimer?.cancel(); 
+    _ytSubscription?.cancel(); 
+    _playerSubscription?.cancel();
+    _ytSubscription = null; 
+    _playerSubscription = null;
+    if (_ytController != null) {
+      _ytController!.pauseVideo();
+      _ytController!.close();
+      _ytController = null;
+    }
+  }
   @override void dispose() { _disposeController(); super.dispose(); }
 
   @override Widget build(BuildContext context) {
+    try {
+      return _buildHeaderContent(context);
+    } catch (e, stack) {
+      return Container(
+        color: Colors.orange,
+        padding: const EdgeInsets.all(20),
+        child: Text('HEADER ERROR: $e\n\nSTACK: $stack', style: const TextStyle(color: Colors.white, fontSize: 10)),
+      );
+    }
+  }
+
+  Widget _buildHeaderContent(BuildContext context) {
     final d = widget.category == 'movie_anime'
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
         : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
-    // Sabemos si hay logo recién cuando el detalle terminó de cargar; mientras
-    // tanto mantenemos el hero vacío para no anticipar el texto del título.
     final logoReady = widget.animeDetailAsync.hasValue || widget.movieDetailAsync.hasValue;
-    // Banner del hero: usa el banner congelado de la apertura (ruta/fuentes/
-    // backdrop del detalle, capturado UNA vez en `_stableBanner` de la pantalla).
-    // Priorizamos ese banner sobre el backdrop del detalle para que el hero NO
-    // cambie al switchear temporada (evita re-solicitar banner y los timeouts
-    // de la cascada de búsquedas de fuentes al cambiar de temporada).
-    final b = (widget.banner?.isNotEmpty == true)
-        ? widget.banner!
-        : (d?.backdrop?.isNotEmpty == true ? d!.backdrop! : widget.poster);
-    // Título del hero sin sufijo de temporada ("2nd Season") al cambiar de season.
+    // Priority: TMDB backdrop > banner param > poster
+    final b = (d?.backdrop?.isNotEmpty == true)
+        ? d!.backdrop!
+        : (widget.banner?.isNotEmpty == true ? widget.banner! : widget.poster);
     final heroTitle = _stripSeasonSuffix(widget.title);
-    final width = MediaQuery.sizeOf(context).width;
+    final width = MediaQuery.of(context).size.width;
     final isMobile = ResponsiveUtils.isMobile(context);
+
     if (isMobile) {
       return MouseRegion(
-        onHover: (_) { if (!_showTitle) _handleInteraction(); },
+        onHover: (_) { if (mounted && !_showTitle) _handleInteraction(); },
         child: Listener(
-          onPointerDown: (_) => _handleInteraction(),
-          onPointerMove: (_) => _handleInteraction(),
-          onPointerHover: (_) => _handleInteraction(),
-          child: Column(children: [
-            Stack(clipBehavior: Clip.hardEdge, children: [
-              AspectRatio(aspectRatio: 16 / 12, child: LayoutBuilder(builder: (context, constraints) {
-                final h = constraints.maxHeight; final ph = h * 1.35; final pw = ph * (16 / 9);
-                return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
-                  Container(color: const Color(0xFF0B0B0D)),
-                  if (b != null) Positioned.fill(child: ShaderMask(
-                    shaderCallback: (rect) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.black, Colors.transparent],
-                      stops: [0.4, 1.0],
-                    ).createShader(rect),
-                    blendMode: BlendMode.dstIn,
-                    child: TweenAnimationBuilder<double>(
-                      duration: const Duration(milliseconds: 800), 
-                      tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
-                      builder: (context, blur, child) => ImageFiltered(
-                        imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 800), 
-                          foregroundDecoration: BoxDecoration(color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0)), 
-                          child: CachedNetworkImage(imageUrl: b, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
-                        )
-                      )
+          onPointerDown: (_) { if (mounted) _handleInteraction(); },
+          onPointerMove: (_) { if (mounted) _handleInteraction(); },
+          onPointerHover: (_) { if (mounted) _handleInteraction(); },
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.hardEdge, 
+                children: [
+                  Container(
+                    constraints: BoxConstraints(minHeight: width * 0.55),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Senior Fix: Altura de referencia estable para evitar zoom al expandir
+                        final hBase = width * 0.55;
+                        final ph = hBase * 1.35;
+                        final pw = ph * (16 / 9);
+                        return Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Container(color: const Color(0xFF0B0B0D)),
+                                  if (b != null || _ytController != null) Positioned(
+                                    top: 0, left: 0, right: 0,
+                                    height: ph, 
+                                    child: ShaderMask(
+                                      shaderCallback: (rect) {
+                                        final headerH = constraints.maxHeight;
+                                        // Aseguramos que la transparencia total llegue al final del header actual
+                                        final stopEnd = (headerH / ph).clamp(0.0, 1.0);
+                                        final stopStart = (stopEnd * 0.7);
+                                        return LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
+                                          stops: [0.0, stopStart, (stopStart + stopEnd) / 2, stopEnd],
+                                        ).createShader(rect);
+                                      },
+                                      blendMode: BlendMode.dstIn,
+                                      child: Stack(
+                                        children: [
+                                          if (b != null) Positioned.fill(
+                                            child: ClipRect(
+                                              child: OverflowBox(
+                                                alignment: Alignment.topCenter,
+                                                minWidth: pw, maxWidth: pw,
+                                                minHeight: ph, maxHeight: ph,
+                                                child: TweenAnimationBuilder<double>(
+                                                  duration: const Duration(milliseconds: 800), 
+                                                  tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
+                                                  builder: (context, blur, child) => ImageFiltered(
+                                                    imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
+                                                    child: AnimatedContainer(
+                                                      duration: const Duration(milliseconds: 800), 
+                                                      foregroundDecoration: BoxDecoration(color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0)), 
+                                                      child: CachedNetworkImage(imageUrl: b!, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
+                                                    )
+                                                  )
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          if (_ytController != null) Positioned.fill(
+                                            child: AnimatedOpacity(
+                                              duration: const Duration(milliseconds: 500), 
+                                              opacity: _showPlayer ? 1.0 : 0.0, 
+                                              child: PointerInterceptor(
+                                                child: IgnorePointer(
+                                                  ignoring: true, 
+                                                  child: ClipRect(
+                                                    child: OverflowBox(
+                                                      alignment: Alignment.centerRight, 
+                                                      minWidth: pw, maxWidth: pw, 
+                                                      minHeight: ph, maxHeight: ph, 
+                                                      child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9)
+                                                    )
+                                                  )
+                                                )
+                                              )
+                                            )
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  // Gradiente de Fusión Mobile (Dinamizado al alto visible)
+                                  Positioned.fill(
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.transparent,
+                                            const Color(0xFF0B0B0D).withValues(alpha: 0.8),
+                                            const Color(0xFF0B0B0D),
+                                          ],
+                                          stops: const [0.6, 0.9, 1.0],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 100, 20, 16),
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 1200), 
+                                curve: Curves.easeInOut, 
+                                opacity: 1.0, 
+                                child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)]))
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
-                  )),
-                  if (_ytController != null) Positioned.fill(child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9))))))),
-                  Positioned(left: 20, bottom: 16, right: 20, child: AnimatedOpacity(duration: const Duration(milliseconds: 1200), curve: Curves.easeInOut, opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)])))),
-                ]);
-              })),
-              Positioned.fill(child: _buildUpperButtons(context)),
-            ]),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const SizedBox(height: 8), _buildMetaRow(d, isMobile: true), 
-              const SizedBox(height: 24), _buildMainActionButton(context, isMobile: true), 
-              const SizedBox(height: 16), _buildCircularActions(context, isMobile: true),
-              const SizedBox(height: 4),
-              if (widget.totalSeasons > 1 || widget.currentSource != null) ...[
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      if (widget.totalSeasons > 1) ...[
-                        _SeasonSelector(
-                          title: widget.title, 
-                          currentSeason: widget.currentSeason, 
-                          totalSeasons: widget.totalSeasons, 
-                          onSeasonSelected: widget.onSeasonSelected, 
-                          compact: true
-                        ), 
-                        const SizedBox(width: 12)
-                      ],
-                      if (widget.currentSource != null) 
-                        _ServerSelector(
-                          currentSource: widget.currentSource!, 
-                          sources: widget.sources, 
-                          onSourceSelected: widget.onSourceSelected, 
-                          compact: true,
-                          season: widget.season,
-                        ),
-                    ],
                   ),
+                  Positioned.fill(child: _buildUpperButtons(context)),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20), 
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, 
+                  children: [
+                    const SizedBox(height: 8), 
+                    _buildMetaRow(d, isMobile: true), 
+                    const SizedBox(height: 24), 
+                    _buildMainActionButton(context, isMobile: true), 
+                    const SizedBox(height: 16), 
+                    _buildCircularActions(context, isMobile: true),
+                    const SizedBox(height: 4),
+                    if (widget.totalSeasons > 1 || widget.currentSource != null) ...[
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            if (widget.totalSeasons > 1) ...[
+                              _SeasonSelector(
+                                title: widget.title, 
+                                currentSeason: widget.currentSeason, 
+                                totalSeasons: widget.totalSeasons, 
+                                onSeasonSelected: widget.onSeasonSelected, 
+                                compact: true
+                              ), 
+                              const SizedBox(width: 12)
+                            ],
+                            if (widget.currentSource != null) 
+                              _ServerSelector(
+                                currentSource: widget.currentSource!, 
+                                sources: widget.sources, 
+                                onSourceSelected: widget.onSourceSelected, 
+                                compact: true,
+                                season: widget.season,
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 16),
-              ],
-            ])),
-          ]),
+              ),
+            ],
+          ),
         ),
       );
     }
+
+    final isUltraCompact = width < 1050;
+    final titleTop = isUltraCompact ? 40.0 : 45.0;
+    final desktopBackTop = titleTop - 12;
+
     return MouseRegion(
-      onHover: (_) { if (!_showTitle) _handleInteraction(); },
+      onHover: (_) { if (mounted && !_showTitle) _handleInteraction(); },
       child: Listener(
-        onPointerDown: (_) => _handleInteraction(),
-        onPointerMove: (_) => _handleInteraction(),
-        onPointerHover: (_) => _handleInteraction(),
-        child: Stack(clipBehavior: Clip.hardEdge, children: [
-          AspectRatio(aspectRatio: 2.8 / 1, child: LayoutBuilder(builder: (context, constraints) {
-            final h = constraints.maxHeight; final ph = h * 1.35; final pw = ph * (16 / 9);
-            return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
-              Container(color: const Color(0xFF0B0B0D)),
-              if (b != null) Positioned(top: 0, left: 0, right: 0, bottom: -1, child: ShaderMask(
-                shaderCallback: (rect) => const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
-                  stops: [0.0, 0.3, 0.6, 1.0],
-                ).createShader(rect),
-                blendMode: BlendMode.dstIn,
-                child: TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 800), 
-                  tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
-                  builder: (context, blur, child) => ImageFiltered(
-                    imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 800), 
-                      foregroundDecoration: BoxDecoration(color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0)), 
-                      child: CachedNetworkImage(imageUrl: b, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
-                    )
-                  )
-                ),
-              )),
-              if (_ytController != null) Positioned(top: 0, left: 0, right: 0, bottom: 0, child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9))))))),
-              PointerInterceptor(child: Stack(fit: StackFit.expand, children: [
-                // Side Scrim Principal (Unificado con HeroBanner)
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        const Color(0xFF0B0B0D).withValues(alpha: 0.85),
-                        const Color(0xFF0B0B0D).withValues(alpha: 0.4),
-                        const Color(0xFF0B0B0D).withValues(alpha: 0.1),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.3, 0.5, 0.8],
-                    ),
-                  ),
-                ),
-                // Top vignette para legibilidad de la navegación
-                DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.center, colors: [const Color(0xFF0B0B0D).withValues(alpha: 0.5), Colors.transparent], stops: const [0.0, 0.4]))),
-              ])),
-            ]);
-          })),
-          _buildDesktopOverlay(context, d, width, heroTitle, logoReady),
-          Positioned.fill(child: _buildUpperButtons(context)),
-        ]),
+        onPointerDown: (_) { if (mounted) _handleInteraction(); },
+        onPointerMove: (_) { if (mounted) _handleInteraction(); },
+        onPointerHover: (_) { if (mounted) _handleInteraction(); },
+        child: Stack(
+          clipBehavior: Clip.hardEdge, 
+          children: [
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final hStable = width / 2.8;
+                  final headerH = constraints.maxHeight;
+                  final ph = max(hStable * 1.5, headerH + 100); // Siempre más alto que el header para evitar zoom
+                  final pw = ph * (16 / 9);
+                  
+                  return Stack(
+                    fit: StackFit.expand, 
+                    clipBehavior: Clip.hardEdge, 
+                    children: [
+                      Container(color: const Color(0xFF0B0B0D)),
+                      
+                      // 1. Capa de Imagen/Tráiler: Se mantiene con altura FIJA (ph)
+                      if (b != null || _ytController != null) Positioned(
+                        top: 0, left: 0, right: 0, 
+                        height: ph, 
+                        child: ShaderMask(
+                          shaderCallback: (rect) {
+                            // Dinamismo: La transparencia total SIEMPRE ocurre al final del header visible
+                            final stopEnd = (headerH / ph).clamp(0.0, 1.0);
+                            final stopStart = (stopEnd * 0.6);
+                            return LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
+                              stops: [0.0, stopStart, (stopStart + stopEnd) / 2, stopEnd],
+                            ).createShader(rect);
+                          },
+                          blendMode: BlendMode.dstIn,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              if (b != null) TweenAnimationBuilder<double>(
+                                duration: const Duration(milliseconds: 800), 
+                                tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
+                                builder: (context, blur, child) => ImageFiltered(
+                                  imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 800), 
+                                    foregroundDecoration: BoxDecoration(color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0)), 
+                                    child: CachedNetworkImage(
+                                      imageUrl: b!, 
+                                      fit: BoxFit.cover, 
+                                      alignment: Alignment.topCenter, 
+                                      fadeInDuration: const Duration(milliseconds: 300), 
+                                      errorWidget: (_, __, ___) => Container(color: Colors.black12)
+                                    )
+                                  )
+                                )
+                              ),
+                              if (_ytController != null) AnimatedOpacity(
+                                duration: const Duration(milliseconds: 500), 
+                                opacity: _showPlayer ? 1.0 : 0.0, 
+                                child: PointerInterceptor(
+                                  child: IgnorePointer(
+                                    ignoring: true, 
+                                    child: ClipRect(
+                                      child: OverflowBox(
+                                        alignment: Alignment.centerRight, 
+                                        minWidth: pw, maxWidth: pw, 
+                                        minHeight: ph, maxHeight: ph, 
+                                        child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9)
+                                      )
+                                    )
+                                  )
+                                )
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      
+                      // 2. Capa de Gradientes: Estos SIEMPRE llenan el 100% (Positioned.fill)
+                      PointerInterceptor(
+                        child: Stack(
+                          fit: StackFit.expand, 
+                          children: [
+                            // Gradiente Lateral (Original Netflix Style)
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                  colors: [
+                                    const Color(0xFF0B0B0D),
+                                    const Color(0xFF0B0B0D).withValues(alpha: 0.95),
+                                    const Color(0xFF0B0B0D).withValues(alpha: 0.8),
+                                    const Color(0xFF0B0B0D).withValues(alpha: 0.4),
+                                    Colors.transparent,
+                                  ],
+                                  stops: const [0.0, 0.25, 0.45, 0.65, 0.9],
+                                ),
+                              ),
+                            ),
+                            // Gradiente Inferior Atmosférico (Dinámico al alto visible)
+                            Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      const Color(0xFF0B0B0D).withValues(alpha: 0.0),
+                                      const Color(0xFF0B0B0D).withValues(alpha: 0.8),
+                                      const Color(0xFF0B0B0D),
+                                    ],
+                                    stops: const [0.0, 0.5, 0.85, 1.0],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Gradiente Superior (Original Suave)
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter, 
+                                  end: Alignment.bottomCenter, 
+                                  colors: [const Color(0xFF0B0B0D).withValues(alpha: 0.6), Colors.transparent], 
+                                  stops: const [0.0, 0.35]
+                                )
+                              )
+                            ),
+                          ]
+                        )
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            _buildDesktopOverlay(context, d, width, heroTitle, logoReady),
+            Positioned.fill(child: _buildUpperButtons(context, desktopTop: desktopBackTop)),
+          ],
+        ),
       ),
     );
-  }
-
-  Widget _buildDesktopOverlay(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
+  }  Widget _buildDesktopOverlay(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
     final isUltraCompact = width < 1050; 
     final isCompact = width >= 1050 && width < 1250;
     final hPadding = ResponsiveUtils.horizontalPadding(context); 
-    final titleSize = isUltraCompact ? 32.0 : (isCompact ? 40.0 : 64.0);
-    final titleTop = isUltraCompact ? 80.0 : 100.0;
+    final titleSize = isUltraCompact ? 32.0 : (isCompact ? 40.0 : 56.0);
+    final titleTop = isUltraCompact ? 40.0 : 45.0;
     
-    return PointerInterceptor(
-      child: SizedBox(
-        height: width / 2.8,
-        child: Stack(
-          children: [
-            // Gradiente Cinematográfico Profundo (Estilo Netflix)
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      const Color(0xFF0B0B0D),
-                      const Color(0xFF0B0B0D).withValues(alpha: 0.95),
-                      const Color(0xFF0B0B0D).withValues(alpha: 0.8),
-                      const Color(0xFF0B0B0D).withValues(alpha: 0.4),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.25, 0.4, 0.55, 0.85],
-                  ),
-                ),
-              ),
-            ),
-            
-            // Contenido Vertical Alineado a la Izquierda
-            Positioned(
-              left: hPadding,
-              top: titleTop,
-              bottom: 20,
-              width: width * 0.42, 
+    final Widget overlay = Container(
+      constraints: BoxConstraints(minHeight: width / 2.8),
+      child: Stack(
+        children: [
+          // Contenido Vertical Alineado a la Izquierda (Define el tamaño)
+          Padding(
+            padding: EdgeInsets.fromLTRB(hPadding, titleTop, hPadding, 40),
+            child: SizedBox(
+              width: width * 0.42,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   // Logo de Marca AurisTV
-                  SvgPicture.asset(
-                    'assets/icons/auris-logo-web-flat.svg',
-                    height: 24,
-                    fit: BoxFit.contain,
-                    colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 56), 
+                    child: SvgPicture.asset(
+                      'assets/icons/auris-logo-web-flat.svg',
+                      height: 24,
+                      fit: BoxFit.contain,
+                      colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   
                   // Logo de la serie/película
-AnimatedOpacity(
+                  AnimatedOpacity(
                     duration: const Duration(milliseconds: 1200),
                     curve: Curves.easeInOut,
-                    opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0,
+                    opacity: 1.0,
                     child: HeroTitle(
                       title: heroTitle,
                       logo: d?.logo,
                       logoReady: logoReady,
-                      maxWidth: width * 0.4,
-                      maxHeight: titleSize * 2.2,
+                      maxWidth: width * 0.45,
+                      maxHeight: titleSize * 3.5,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: titleSize,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w600,
                         height: 1.0,
                         letterSpacing: isUltraCompact ? 1 : 4,
                         shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4)]
@@ -610,34 +801,27 @@ AnimatedOpacity(
                   _buildMetaRow(d, isMobile: false, isCompact: isUltraCompact),
                   const SizedBox(height: 16),
                   
-                  // ÁREA SCROLLABLE: Sinopsis y Acciones (Para evitar overflow en pantallas bajas)
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSynopsis(d, isCompact: isUltraCompact),
-                          const SizedBox(height: 24),
-                          
-                          // Acciones Rápidas (Tráiler, Lista, Likes)
-                          _buildCircularActions(context, isCompact: isUltraCompact),
-                          const SizedBox(height: 20),
-                          
-                          // Botón Principal de Reproducción
-                          _buildMainActionButton(context, isCompact: isUltraCompact, width: 320),
-                        ],
-                      ),
-                    ),
-                  ),
+                  // SINOPSIS FLEXIBLE (Se adapta al texto, con opción de expandir)
+                  _buildSynopsis(d, isCompact: isUltraCompact),
                   
-                  // Selectores de Temporada y Servidor (Fijos al fondo del Hero)
+                  const SizedBox(height: 20),
+
+                  // Acciones Rápidas (Tráiler, Lista, Likes)
+                  _buildCircularActions(context, isCompact: isUltraCompact),
+                  const SizedBox(height: 16),
+                  
+                  // Botón Principal de Reproducción
+                  _buildMainActionButton(context, isCompact: isUltraCompact, width: 292),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Selectores de Temporada y Servidor
                   if (widget.totalSeasons > 1 || widget.currentSource != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 16),
                       child: Row(
                         children: [
-                          if (widget.totalSeasons > 1)
+                          if (widget.totalSeasons > 1) ...[
                             _SeasonSelector(
                               title: widget.title, 
                               currentSeason: widget.currentSeason, 
@@ -646,7 +830,8 @@ AnimatedOpacity(
                               compact: true,
                               width: 140,
                             ),
-                          const SizedBox(width: 12),
+                            const SizedBox(width: 12),
+                          ],
                           if (widget.currentSource != null)
                             _ServerSelector(
                               currentSource: widget.currentSource!, 
@@ -655,7 +840,7 @@ AnimatedOpacity(
                               compact: true,
                               unavailableSources: widget.unavailableSources,
                               season: widget.season,
-                              width: 180,
+                              width: 140,
                             ),
                         ],
                       ),
@@ -663,13 +848,12 @@ AnimatedOpacity(
                 ],
               ),
             ),
-            
-            // Botones Superiores (Volver)
-            Positioned.fill(child: _buildUpperButtons(context)),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+
+    return overlay;
   }
 
   Widget _buildCircularActions(BuildContext context, {bool isMobile = false, bool isCompact = false}) {
@@ -684,10 +868,12 @@ AnimatedOpacity(
       final iconSize = isMobile ? null : (isCompact ? 22.0 : 28.0);
       final spacing = isMobile ? 0.0 : 12.0;
 
-      return Row(
-        mainAxisSize: isMobile ? MainAxisSize.max : MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: isMobile ? 0 : 8, horizontal: isMobile ? 0 : 4),
+        child: Row(
+          mainAxisSize: isMobile ? MainAxisSize.max : MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
           // TRÁILER (Solo Desktop)
           if (!isMobile && _lastTrailerKey != null) ...[
             _DetailIconButton(
@@ -756,55 +942,110 @@ AnimatedOpacity(
               onPressed: () {},
               isMobile: true,
             ),
-          ]
+          ],
         ],
-      );
-    });
-  }
+      ),
+    );
+  });
+}
 
   Widget _buildMainActionButton(BuildContext context, {bool isMobile = false, bool isCompact = false, double? width}) {
-    final history = ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title);
+    final history = widget.latestHistory;
     final hasHistory = history != null;
     final String label = hasHistory ? 'Continuar viendo' : 'Reproducir ahora';
     final IconData icon = hasHistory ? Icons.play_arrow_rounded : Icons.play_arrow_rounded;
+    
+    // [Senior Logic] Para películas, mostramos progreso directamente en el botón
+    final bool isMovie = widget.category == 'movie' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title);
+    final double? progress = (hasHistory && isMovie) ? history.progressPercentage : null;
 
     if (isMobile) {
       return SizedBox(
         width: double.infinity,
         height: 54,
-        child: ElevatedButton.icon(
+        child: ElevatedButton(
           onPressed: widget.onPlay,
-          icon: Icon(icon, color: Colors.black, size: 28),
-          label: Text(label, style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.only(left: 4, right: 10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Icon(icon, color: Colors.black, size: 36),
+              const SizedBox(width: 8),
+              Text(label, style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
+              if (progress != null && progress > 0.02) ...[
+                const Spacer(),
+                _buildButtonProgressBar(progress, isMobile: true),
+              ],
+            ],
           ),
         ),
       );
     }
 
+    final double effectiveWidth = (progress != null && progress > 0.02) 
+        ? (width ?? 320) + 140 
+        : (width ?? 320);
+
     return SizedBox(
-      width: width ?? 320,
+      width: effectiveWidth,
       height: isCompact ? 56 : 64,
-      child: ElevatedButton.icon(
+      child: ElevatedButton(
         onPressed: widget.onPlay,
-        icon: Icon(icon, color: Colors.black, size: 32),
-        label: Text(
-          label.toUpperCase(),
-          style: GoogleFonts.poppins(
-            color: Colors.black,
-            fontSize: isCompact ? 16 : 18,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.2,
-          ),
-        ),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 8,
-          shadowColor: Colors.black.withValues(alpha: 0.2),
+          shadowColor: Colors.black.withOpacity(0.2),
+          padding: const EdgeInsets.only(left: 8, right: 20),
         ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Icon(icon, color: Colors.black, size: 42),
+            const SizedBox(width: 12),
+            Text(
+              label.toUpperCase(),
+              style: GoogleFonts.poppins(
+                color: Colors.black,
+                fontSize: isCompact ? 16 : 18,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+              ),
+            ),
+            if (progress != null && progress > 0.02) ...[
+              const Spacer(),
+              _buildButtonProgressBar(progress),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildButtonProgressBar(double progress, {bool isMobile = false}) {
+    return Container(
+      width: isMobile ? 50 : 80,
+      height: 6,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0E0E0), // Track: Representa el total del video (Gris claro)
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Stack(
+        children: [
+          FractionallySizedBox(
+            widthFactor: progress,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF7A1E), // Auris Brand Orange: Misma intensidad que el rojo pero con la identidad de la app
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -864,8 +1105,10 @@ AnimatedOpacity(
           // Fila 3: Edad y Advertencia (Nueva línea solicitada)
           Row(
             children: [
-              _buildAgeBadge(context, cert),
-              const SizedBox(width: 10),
+              if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
+                _buildAgeBadge(context, cert),
+                const SizedBox(width: 10),
+              ],
               Expanded(
                 child: Text(
                   _getWarningText(cert),
@@ -925,8 +1168,10 @@ AnimatedOpacity(
         // Línea aparte para Edad y Advertencia de contenido (Solicitud usuario)
         Row(
           children: [
-            _buildAgeBadge(context, cert, small: isCompact),
-            const SizedBox(width: 12),
+            if (cert != null && cert.isNotEmpty && cert != 'NR') ...[
+              _buildAgeBadge(context, cert, small: isCompact),
+              const SizedBox(width: 12),
+            ],
             Expanded(
               child: Text(
                 _getWarningText(cert),
@@ -948,18 +1193,94 @@ AnimatedOpacity(
   Widget _buildDotSeparator() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Text('•', style: TextStyle(color: Colors.white.withValues(alpha: 0.3))),
+      child: Text('•', style: TextStyle(color: Colors.white.withOpacity(0.3))),
     );
   }
 
-  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) => Text(detail?.overview ?? '', maxLines: 4, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.9), fontSize: isCompact ? 15 : 17, height: 1.5, fontWeight: FontWeight.w500));
+  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) {
+    final text = detail?.overview ?? '';
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final style = GoogleFonts.poppins(
+          color: Colors.white.withOpacity(0.9), 
+          fontSize: isCompact ? 15 : 17, 
+          height: 1.5, 
+          fontWeight: FontWeight.w500
+        );
+
+        // Calcular si el texto excede las 4 líneas
+        final span = TextSpan(text: text, style: style);
+        final tp = TextPainter(
+          text: span,
+          maxLines: 4,
+          textDirection: TextDirection.ltr,
+        );
+        tp.layout(maxWidth: constraints.maxWidth);
+        final isOverflowing = tp.didExceedMaxLines;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              text,
+              maxLines: _isSynopsisExpanded ? null : 4,
+              overflow: _isSynopsisExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              style: style,
+            ),
+            if (isOverflowing && !_isSynopsisExpanded)
+              GestureDetector(
+                onTap: () => setState(() => _isSynopsisExpanded = true),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Ver más...',
+                    style: GoogleFonts.poppins(
+                      color: const Color(0xFFEF7A1E), 
+                      fontWeight: FontWeight.bold,
+                      fontSize: isCompact ? 14 : 16,
+                    ),
+                  ),
+                ),
+              ),
+            if (_isSynopsisExpanded)
+              GestureDetector(
+                onTap: () => setState(() => _isSynopsisExpanded = false),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Ver menos',
+                    style: GoogleFonts.poppins(
+                      color: const Color(0xFFEF7A1E).withOpacity(0.7),
+                      fontWeight: FontWeight.bold,
+                      fontSize: isCompact ? 14 : 16,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
   
-  Widget _buildUpperButtons(BuildContext context) {
+  Widget _buildUpperButtons(BuildContext context, {double? desktopTop}) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    return Stack(children: [
-      Positioned(top: isMobile ? 45 : 40, left: isMobile ? 15 : 40, child: PointerInterceptor(child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), onPressed: () => Navigator.of(context).pop()))),
-      if (isMobile) Positioned(top: 45, right: 15, child: PointerInterceptor(child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {}))),
+    final buttons = Stack(children: [
+      Positioned(
+        top: isMobile ? 45 : (desktopTop ?? 40), 
+        left: isMobile ? 15 : 40, 
+        child: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), 
+          onPressed: () { if (mounted) Navigator.of(context).pop(); }
+        )
+      ),
+      if (isMobile) Positioned(top: 45, right: 15, child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {})),
     ]);
+
+    return buttons;
   }
 }
 
@@ -1276,7 +1597,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.6),
+                              color: Colors.black.withOpacity(0.6),
                               blurRadius: 30,
                               spreadRadius: 5,
                               offset: const Offset(0, 10),
@@ -1660,16 +1981,47 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
   }
 }
 
-class _EpisodesSkeleton extends StatelessWidget {
-  final bool isMobile;
-  const _EpisodesSkeleton({this.isMobile = false});
-  @override Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+Widget _buildEpisodesSkeleton(BuildContext context, bool isMobile) {
+  try {
+    final width = MediaQuery.of(context).size.width;
     final count = isMobile ? 1 : (width < 1000 ? 2 : (width < 1400 ? 3 : (width < 2100 ? 4 : (width < 2800 ? 5 : 6))));
     final aspectRatio = isMobile ? 1.15 : (width < 1000 ? 1.25 : 1.1);
     
-    if (isMobile) return SliverList(delegate: SliverChildBuilderDelegate((context, index) => Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Row(children: [ Container(width: 140, height: 80, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(6))), const SizedBox(width: 16), Expanded(child: Column(children: [Container(height: 16, color: Colors.white10), const SizedBox(height: 8), Container(height: 12, color: Colors.white10)])) ])), childCount: 5));
-    return SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: count, mainAxisSpacing: 20, crossAxisSpacing: 20, childAspectRatio: aspectRatio), delegate: SliverChildBuilderDelegate((context, index) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ AspectRatio(aspectRatio: 16 / 9, child: Container(decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)))), const SizedBox(height: 12), Container(height: 14, width: 80, color: Colors.white10), const SizedBox(height: 6), Container(height: 10, width: double.infinity, color: Colors.white10) ]), childCount: 8));
+    if (isMobile) {
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                Container(width: 140, height: 80, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(6))),
+                const SizedBox(width: 16),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(height: 16, width: double.infinity, color: Colors.white10), const SizedBox(height: 8), Container(height: 12, width: 100, color: Colors.white10)]))
+              ]
+            )
+          ),
+          childCount: 5
+        )
+      );
+    }
+    return SliverGrid(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: count, mainAxisSpacing: 20, crossAxisSpacing: 20, childAspectRatio: aspectRatio),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(aspectRatio: 16 / 9, child: Container(decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)))),
+            const SizedBox(height: 12),
+            Container(height: 14, width: 80, color: Colors.white10),
+            const SizedBox(height: 6),
+            Container(height: 10, width: double.infinity, color: Colors.white10)
+          ]
+        ),
+        childCount: 8
+      )
+    );
+  } catch (e) {
+    return SliverToBoxAdapter(child: Center(child: Text('Skeleton Error: $e', style: const TextStyle(color: Colors.red))));
   }
 }
 
@@ -1719,7 +2071,7 @@ class _ThemeCardState extends State<_ThemeCard> {
               width: isSelected ? 2.5 : 1
             ),
             boxShadow: isSelected 
-              ? [BoxShadow(color: (widget.isOP ? Colors.blueAccent : Colors.pinkAccent).withValues(alpha: 0.2), blurRadius: 15, spreadRadius: 1)] 
+              ? [BoxShadow(color: (widget.isOP ? Colors.blueAccent : Colors.pinkAccent).withOpacity(0.2), blurRadius: 15, spreadRadius: 1)] 
               : [],
           ),
           child: ClipRRect(
@@ -1743,8 +2095,8 @@ class _ThemeCardState extends State<_ThemeCard> {
                       begin: Alignment.topCenter, 
                       end: Alignment.bottomCenter, 
                       colors: [
-                        Colors.black.withValues(alpha: isSelected ? 0.2 : 0.4), 
-                        Colors.black.withValues(alpha: isSelected ? 0.7 : 0.9)
+                        Colors.black.withOpacity(isSelected ? 0.2 : 0.4), 
+                        Colors.black.withOpacity(isSelected ? 0.7 : 0.9)
                       ]
                     )
                   )
@@ -1758,9 +2110,9 @@ class _ThemeCardState extends State<_ThemeCard> {
                       duration: const Duration(milliseconds: 200),
                       padding: EdgeInsets.all(isMobile ? 8 : 12), 
                       decoration: BoxDecoration(
-                        color: (widget.isOP ? Colors.blueAccent : Colors.pinkAccent).withValues(alpha: isSelected ? 1.0 : 0.8), 
+                        color: (widget.isOP ? Colors.blueAccent : Colors.pinkAccent).withOpacity(isSelected ? 1.0 : 0.8), 
                         shape: BoxShape.circle,
-                        boxShadow: isSelected ? [BoxShadow(color: (widget.isOP ? Colors.blueAccent : Colors.pinkAccent).withValues(alpha: 0.5), blurRadius: 10)] : [],
+                        boxShadow: isSelected ? [BoxShadow(color: (widget.isOP ? Colors.blueAccent : Colors.pinkAccent).withOpacity(0.5), blurRadius: 10)] : [],
                       ), 
                       child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: isMobile ? 24 : 32)
                     ),
@@ -1777,7 +2129,7 @@ class _ThemeCardState extends State<_ThemeCard> {
                     Text(
                       widget.isOP ? 'OPENING' : 'ENDING', 
                       style: TextStyle(
-                        color: (widget.isOP ? Colors.blueAccent.shade100 : Colors.pinkAccent.shade100).withValues(alpha: 0.8), 
+                        color: (widget.isOP ? Colors.blueAccent.shade100 : Colors.pinkAccent.shade100).withOpacity(0.8), 
                         fontSize: 10, 
                         fontWeight: FontWeight.w900
                       )
@@ -1808,7 +2160,7 @@ class _ExpandableTextState extends State<_ExpandableText> {
       final hasOverflow = tp.didExceedMaxLines;
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(widget.text, maxLines: _expanded ? null : widget.maxLines, overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis, style: widget.style),
-        if (hasOverflow) Padding(padding: const EdgeInsets.only(top: 8), child: InkWell(onTap: () => setState(() => _expanded = !_expanded), child: Text(_expanded ? 'Ver menos' : 'Ver m\u00E1s', style: TextStyle(color: widget.style.color?.withValues(alpha: 0.8), fontWeight: FontWeight.bold)))),
+        if (hasOverflow) Padding(padding: const EdgeInsets.only(top: 8), child: InkWell(onTap: () => setState(() => _expanded = !_expanded), child: Text(_expanded ? 'Ver menos' : 'Ver m\u00E1s', style: TextStyle(color: widget.style.color?.withOpacity(0.8), fontWeight: FontWeight.bold)))),
       ]);
     });
   }
@@ -1847,7 +2199,7 @@ class _NetflixPrimaryButtonState extends State<_NetflixPrimaryButton> {
         duration: const Duration(milliseconds: 200),
         height: 52,
         decoration: BoxDecoration(
-          color: _isHovered ? Colors.white.withValues(alpha: 0.9) : Colors.white,
+          color: _isHovered ? Colors.white.withOpacity(0.9) : Colors.white,
           borderRadius: BorderRadius.circular(4),
         ),
         child: Material(
@@ -2161,7 +2513,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: selected ? const Color(0xFFEF7A1E) : Colors.transparent, width: 3)),
               ),
-              child: Text(labels[i], style: TextStyle(fontSize: isMobile ? 18 : 20, fontWeight: FontWeight.w900, color: selected ? Colors.white : const Color(0xFFA5A5AA))),
+              child: Text(labels[i], style: TextStyle(fontSize: isMobile ? 18 : 20, fontWeight: FontWeight.w600, color: selected ? Colors.white : const Color(0xFFA5A5AA))),
             ),
           );
         }),
@@ -2170,10 +2522,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   }
 
   @override Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
+    try {
+      final width = MediaQuery.of(context).size.width;
+      final isMobile = ResponsiveUtils.isMobile(context);
+      final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
+      final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
     final episodesCrossAxisCount = isMobile ? 1 : (width < 1000 ? 2 : (width < 1400 ? 3 : (width < 2100 ? 4 : (width < 2800 ? 5 : 6))));
     final episodesAspectRatio = isMobile ? 1.15 : (width < 1000 ? 1.25 : 1.1);
 
@@ -2461,11 +2814,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       final detailBackdrop = detailData is MovieDetail
           ? (detailData as MovieDetail).backdrop
           : (detailData is AnimeDetail ? (detailData as AnimeDetail).backdrop : null);
-      final candidate = widget.banner?.isNotEmpty == true
-          ? widget.banner
-          : (activeSources.isNotEmpty && activeSources.first.banner?.isNotEmpty == true
-              ? activeSources.first.banner
-              : (detailBackdrop?.isNotEmpty == true ? detailBackdrop : null));
+      // Priority: TMDB backdrop > banner param > source banner
+      final candidate = detailBackdrop?.isNotEmpty == true
+          ? detailBackdrop
+          : (widget.banner?.isNotEmpty == true
+              ? widget.banner
+              : (activeSources.isNotEmpty && activeSources.first.banner?.isNotEmpty == true
+                  ? activeSources.first.banner
+                  : null));
       if (candidate?.isNotEmpty == true) {
         _stableBanner = ApiEndpoints.proxyImage(candidate);
       }
@@ -2621,7 +2977,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               },
               onSeasonSelected: (s) => setState(() => _selectedSeason = s), 
               inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, 
-              latestHistory: ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title), 
+              latestHistory: ref.watch(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull, 
               unavailableSources: isMovieCategory ? _movieAvail.entries.where((e) => e.value == false).map((e) => e.key).toSet() : null, 
               onPlay: () {
                 // Pel\u00EDcula: elegir la primera fuente disponible si la seleccionada
@@ -2644,7 +3000,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                   context.push('/player/${Uri.encodeComponent(widget.title)}?source=${src}&url=${_episodeUrlFor(ep, playEpisodesUrl, src, 1)}&episode=1&serverName=${simplifySourceName(src)}&language=${((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&totalEpisodes=1$posterParam');
                   return;
                 }
-                final latest = ref.read(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title);
+                final latest = ref.read(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull;
                 int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
                 final epData = episodesAsync.valueOrNull?.response;
                 final epSource = episodeSourceFor(epNum) ?? currentSource;
@@ -2665,7 +3021,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               ],
               Container(padding: const EdgeInsets.symmetric(vertical: 16), decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12), bottom: BorderSide(color: Colors.white12))), child: Row(children: [
                 Expanded(child: Column(children: [const Text('Lanzamientos', style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text((detailData is AnimeDetail ? detailData.firstAirDate : (detailData is MovieDetail ? detailData.releaseDate : null))?.split('-').first ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))])),
-                Expanded(child: Column(children: [Text(isMovieCategory ? 'Duraci\u00F3n' : 'Temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text(isMovieCategory ? _formatRuntime(_getRuntime(detailData)) : '$totalSeasons', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))]))
+                Expanded(child: Column(children: [Text(isMovieCategory ? 'Duraci\u00F3n' : 'Temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text(isMovieCategory ? (detailData != null ? _formatRuntime(_getRuntime(detailData) ?? 0) : 'N/A') : '$totalSeasons', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))]))
               ])),
               const SizedBox(height: 24),
             ]))),
@@ -2760,7 +3116,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                     SliverToBoxAdapter(child: SizedBox(height: isMobile ? 32 : 150)),
                   ]));
                 },
-                loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: _EpisodesSkeleton(isMobile: isMobile)),
+                loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: _buildEpisodesSkeleton(context, isMobile)),
                 error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))),
               ),
               // Para Películas (sin Episodios) las pestañas se desplazan: Relacionado = 0, Extras = 1, Detalles = 2.
@@ -2783,6 +3139,28 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ),
       ),
     );
+    } catch (e, stack) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0B0B0D),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                  const SizedBox(height: 16),
+                  Text('Error al cargar detalle: $e', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text('$stack', style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildPageSkeleton(BuildContext context, bool isMobile) {
@@ -2798,7 +3176,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           SliverToBoxAdapter(child: _buildTabsSkeleton(context, isMobile)),
           SliverPadding(
             padding: EdgeInsets.symmetric(horizontal: ResponsiveUtils.horizontalPadding(context)),
-            sliver: _EpisodesSkeleton(isMobile: isMobile),
+            sliver: _buildEpisodesSkeleton(context, isMobile),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
@@ -2892,7 +3270,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   }
 
   Widget _buildTabsSkeleton(BuildContext context, bool isMobile) {
-    final width = MediaQuery.sizeOf(context).width;
+    final width = MediaQuery.of(context).size.width;
     final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : ResponsiveUtils.horizontalPadding(context));
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: hPadding),
@@ -2935,38 +3313,44 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     return [
       // 1. Carrusel: Franquicia y Secuelas (solo servidores)
       if (franchiseSource.isNotEmpty)
-        _RelatedCarouselRow(
-          title: 'Franquicia y Secuelas',
-          hPadding: hPadding,
-          items: _unifyAndDeduplicate(
-            sourceItems: franchiseSource,
-            currentSource: currentSource,
+        SliverToBoxAdapter(
+          child: _RelatedCarouselRow(
+            title: 'Franquicia y Secuelas',
+            hPadding: hPadding,
+            items: _unifyAndDeduplicate(
+              sourceItems: franchiseSource,
+              currentSource: currentSource,
+            ),
           ),
         ),
 
       // 2. Carrusel: Te recomendamos (solo servidores)
       if (recommendedSource.isNotEmpty)
-        _RelatedCarouselRow(
-          title: 'Te recomendamos',
-          hPadding: hPadding,
-          items: _unifyAndDeduplicate(
-            sourceItems: recommendedSource,
-            currentSource: currentSource,
-            isRecommendation: true,
+        SliverToBoxAdapter(
+          child: _RelatedCarouselRow(
+            title: 'Te recomendamos',
+            hPadding: hPadding,
+            items: _unifyAndDeduplicate(
+              sourceItems: recommendedSource,
+              currentSource: currentSource,
+              isRecommendation: true,
+            ),
           ),
         ),
 
       // 3. Carrusel: mismo Género (UNIFICADO)
       if (genreSource.isNotEmpty)
-        _RelatedCarouselRow(
-          title: 'Mismo G\u00E9nero',
-          hPadding: hPadding,
-          items: genreSource.map((r) => _RelatedCardData(
-            title: _cleanRelatedTitle(r.title), 
-            poster: r.cover, 
-            subtitle: r.relation,
-            onTap: () => context.push('/content/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}')
-          )).toList(),
+        SliverToBoxAdapter(
+          child: _RelatedCarouselRow(
+            title: 'Mismo G\u00E9nero',
+            hPadding: hPadding,
+            items: genreSource.map((r) => _RelatedCardData(
+              title: _cleanRelatedTitle(r.title), 
+              poster: r.cover, 
+              subtitle: r.relation,
+              onTap: () => context.push('/content/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}')
+            )).toList(),
+          ),
         ),
     ];
   }
@@ -3017,11 +3401,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   List<Widget> _buildGalleryTab(double hPadding, String kind, String? title, int? year) {
     return [
-      _GalleryTabContent(
-        hPadding: hPadding,
-        kind: kind,
-        title: title,
-        year: year,
+      SliverToBoxAdapter(
+        child: _GalleryTabContent(
+          hPadding: hPadding,
+          kind: kind,
+          title: title,
+          year: year,
+        ),
       ),
       const SliverToBoxAdapter(child: SizedBox(height: 32)),
     ];
@@ -3233,103 +3619,100 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = ResponsiveUtils.isMobile(context);
-    final isCompactDesktop = width >= 800 && width < 1100;
     
     final cardWidth = isMobile ? 140.0 : 200.0;
-    final carouselHeight = isMobile ? 290.0 : 400.0; // Senior Fix: Ajustado para ser más compacto sin overflow
+    final carouselHeight = isMobile ? 290.0 : 400.0; 
 
-    return SliverToBoxAdapter(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox.shrink(),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
-            child: Text(
-              widget.title, 
-              style: GoogleFonts.poppins(
-                fontSize: isMobile ? 20 : 26,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: -0.4,
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox.shrink(),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
+          child: Text(
+            widget.title, 
+            style: GoogleFonts.poppins(
+              fontSize: isMobile ? 20 : 26,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: -0.4,
             ),
           ),
-          SizedBox(height: isMobile ? 12 : 16),
-          MouseRegion(
-            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
-            child: Stack(
-              children: [
-                SizedBox(
-                  height: carouselHeight,
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: (notification) {
-                      _updateScrollIndicators();
-                      return false;
+        ),
+        SizedBox(height: isMobile ? 12 : 16),
+        MouseRegion(
+          onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
+          onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
+          child: Stack(
+            children: [
+              SizedBox(
+                height: carouselHeight,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    _updateScrollIndicators();
+                    return false;
+                  },
+                  child: ListView.separated(
+                    controller: _scrollController,
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none, 
+                    padding: EdgeInsets.only(
+                      left: widget.hPadding, 
+                      right: widget.hPadding,
+                      top: isMobile ? 10 : 20, 
+                      bottom: isMobile ? 10 : 20,
+                    ),
+                    itemCount: widget.items.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 16),
+                    itemBuilder: (context, index) {
+                      final item = widget.items[index];
+                      return SizedBox(
+                        width: cardWidth,
+                        child: FocusablePosterCard(
+                          title: item.title,
+                          posterUrl: item.poster,
+                          subtitle: item.subtitle,
+                          rating: item.rating,
+                          showInfo: true,
+                          onTap: item.onTap,
+                        ),
+                      );
                     },
-                    child: ListView.separated(
-                      controller: _scrollController,
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none, // Senior Fix: Permite escalado sin recorte
-                      padding: EdgeInsets.only(
-                        left: widget.hPadding, 
-                        right: widget.hPadding,
-                        top: isMobile ? 10 : 20, // Espacio superior para el zoom
-                        bottom: isMobile ? 10 : 20,
-                      ),
-                      itemCount: widget.items.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 16),
-                      itemBuilder: (context, index) {
-                        final item = widget.items[index];
-                        return SizedBox(
-                          width: cardWidth,
-                          child: FocusablePosterCard(
-                            title: item.title,
-                            posterUrl: item.poster,
-                            subtitle: item.subtitle,
-                            rating: item.rating,
-                            showInfo: true,
-                            onTap: item.onTap,
-                          ),
-                        );
-                      },
+                  ),
+                ),
+              ),
+              if (!isMobile) ...[
+                Positioned(
+                  left: 0, 
+                  top: 20, 
+                  bottom: 90, 
+                  child: AnimatedOpacity(
+                    opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: IgnorePointer(
+                      ignoring: !(_isHovered && _canScrollLeft),
+                      child: Center(child: NavArrow(icon: Icons.arrow_back_ios_new, useBackground: true, onTap: () => _scroll(-cardWidth * 3))),
                     ),
                   ),
                 ),
-                if (!isMobile) ...[
-                  Positioned(
-                    left: 0, 
-                    top: 20, 
-                    bottom: 90, // Senior Fix: Centrado sobre el póster (Excluyendo texto)
-                    child: AnimatedOpacity(
-                      opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: IgnorePointer(
-                        ignoring: !(_isHovered && _canScrollLeft),
-                        child: Center(child: NavArrow(icon: Icons.arrow_back_ios_new, useBackground: true, onTap: () => _scroll(-cardWidth * 3))),
-                      ),
+                Positioned(
+                  right: 0, 
+                  top: 20, 
+                  bottom: 90, 
+                  child: AnimatedOpacity(
+                    opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: IgnorePointer(
+                      ignoring: !(_isHovered && _canScrollRight),
+                      child: Center(child: NavArrow(icon: Icons.arrow_forward_ios, useBackground: true, onTap: () => _scroll(cardWidth * 3))),
                     ),
                   ),
-                  Positioned(
-                    right: 0, 
-                    top: 20, 
-                    bottom: 90, // Senior Fix: Centrado sobre el póster
-                    child: AnimatedOpacity(
-                      opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: IgnorePointer(
-                        ignoring: !(_isHovered && _canScrollRight),
-                        child: Center(child: NavArrow(icon: Icons.arrow_forward_ios, useBackground: true, onTap: () => _scroll(cardWidth * 3))),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -3455,7 +3838,7 @@ class _PlatformLogo extends StatelessWidget {
             fit: BoxFit.cover,
             errorWidget: (_, __, ___) => Center(
               child: Text(
-                platform.providerName.substring(0, 1).toUpperCase(),
+                platform.providerName.isNotEmpty ? platform.providerName.substring(0, 1).toUpperCase() : '?',
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: size * 0.4),
               ),
             ),
@@ -3703,37 +4086,33 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
     final isMobile = ResponsiveUtils.isMobile(context);
 
     return async.when(
-      loading: () => SliverPadding(
+      loading: () => Padding(
         padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
-        sliver: SliverGrid(
+        child: GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: isMobile ? 3 : 5,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
             childAspectRatio: 0.7,
           ),
-          delegate: SliverChildBuilderDelegate(
-            (_, __) => Container(decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(10))),
-            childCount: 15,
-          ),
+          itemBuilder: (_, __) => Container(decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(10))),
+          itemCount: 15,
         ),
       ),
-      error: (_, __) => SliverToBoxAdapter(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 40),
-            child: Text("Error al cargar la galería", style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)),
-          ),
+      error: (_, __) => Center(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 40),
+          child: Text("Error al cargar la galería", style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)),
         ),
       ),
       data: (g) {
         if (g.gallery.isEmpty) {
-          return const SliverToBoxAdapter(
-            child: Center(
-              child: Padding(
-                padding: EdgeInsets.only(top: 40),
-                child: Text("No hay imágenes disponibles", style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 18)),
-              ),
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.only(top: 40),
+              child: Text("No hay imágenes disponibles", style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 18)),
             ),
           );
         }
@@ -3747,75 +4126,74 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
         final hasLogos = g.gallery.any((img) => img.type == "logo");
         final hasBanners = g.gallery.any((img) => img.type == "banner");
 
-        return SliverMainAxisGroup(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: widget.hPadding, 
-                  right: widget.hPadding, 
-                  top: isMobile ? 0 : 8, 
-                  bottom: 16
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.only(
+                left: widget.hPadding, 
+                right: widget.hPadding, 
+                top: isMobile ? 0 : 8, 
+                bottom: 16
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _GalleryFilterChip(
+                      label: "Todos",
+                      selected: _selectedFilter == "all",
+                      onSelected: () => setState(() => _selectedFilter = "all"),
+                    ),
+                    if (hasPosters) ...[
+                      const SizedBox(width: 8),
                       _GalleryFilterChip(
-                        label: "Todos",
-                        selected: _selectedFilter == "all",
-                        onSelected: () => setState(() => _selectedFilter = "all"),
+                        label: "Pósters",
+                        selected: _selectedFilter == "poster",
+                        onSelected: () => setState(() => _selectedFilter = "poster"),
                       ),
-                      if (hasPosters) ...[
-                        const SizedBox(width: 8),
-                        _GalleryFilterChip(
-                          label: "Pósters",
-                          selected: _selectedFilter == "poster",
-                          onSelected: () => setState(() => _selectedFilter = "poster"),
-                        ),
-                      ],
-                      if (hasBackdrops) ...[
-                        const SizedBox(width: 8),
-                        _GalleryFilterChip(
-                          label: "Fondos",
-                          selected: _selectedFilter == "backdrop",
-                          onSelected: () => setState(() => _selectedFilter = "backdrop"),
-                        ),
-                      ],
-                      if (hasLogos) ...[
-                        const SizedBox(width: 8),
-                        _GalleryFilterChip(
-                          label: "Logos",
-                          selected: _selectedFilter == "logo",
-                          onSelected: () => setState(() => _selectedFilter = "logo"),
-                        ),
-                      ],
-                      if (hasBanners) ...[
-                        const SizedBox(width: 8),
-                        _GalleryFilterChip(
-                          label: "Banners",
-                          selected: _selectedFilter == "banner",
-                          onSelected: () => setState(() => _selectedFilter = "banner"),
-                        ),
-                      ],
                     ],
-                  ),
+                    if (hasBackdrops) ...[
+                      const SizedBox(width: 8),
+                      _GalleryFilterChip(
+                        label: "Fondos",
+                        selected: _selectedFilter == "backdrop",
+                        onSelected: () => setState(() => _selectedFilter = "backdrop"),
+                      ),
+                    ],
+                    if (hasLogos) ...[
+                      const SizedBox(width: 8),
+                      _GalleryFilterChip(
+                        label: "Logos",
+                        selected: _selectedFilter == "logo",
+                        onSelected: () => setState(() => _selectedFilter = "logo"),
+                      ),
+                    ],
+                    if (hasBanners) ...[
+                      const SizedBox(width: 8),
+                      _GalleryFilterChip(
+                        label: "Banners",
+                        selected: _selectedFilter == "banner",
+                        onSelected: () => setState(() => _selectedFilter = "banner"),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
             if (filtered.isEmpty)
-              const SliverToBoxAdapter(
-                child: Center(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: Text("No hay imágenes de este tipo", style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 16)),
-                  ),
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Text("No hay imágenes de este tipo", style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 16)),
                 ),
               )
             else
-              SliverPadding(
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
-                sliver: SliverGrid(
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: isMobile 
                         ? (_selectedFilter == "backdrop" || _selectedFilter == "banner" ? 2 : 3)
@@ -3826,30 +4204,28 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
                         ? 16 / 9 
                         : (_selectedFilter == "banner" ? 3.0 : (_selectedFilter == "logo" ? 1.0 : 0.67)),
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final img = filtered[index];
-                      return _GalleryItem(
-                        image: img,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            PageRouteBuilder(
-                              opaque: false,
-                              barrierColor: Colors.black.withValues(alpha: 0.5),
-                              pageBuilder: (context, _, __) => FullScreenViewer(
-                                images: filtered,
-                                initialIndex: index,
-                              ),
-                              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                return FadeTransition(opacity: animation, child: child);
-                              },
+                  itemBuilder: (context, index) {
+                    final img = filtered[index];
+                    return _GalleryItem(
+                      image: img,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          PageRouteBuilder(
+                            opaque: false,
+                            barrierColor: Colors.black.withOpacity(0.5),
+                            pageBuilder: (context, _, __) => FullScreenViewer(
+                              images: filtered,
+                              initialIndex: index,
                             ),
-                          );
-                        },
-                      );
-                    },
-                    childCount: filtered.length,
-                  ),
+                            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                              return FadeTransition(opacity: animation, child: child);
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                  itemCount: filtered.length,
                 ),
               ),
           ],
@@ -3944,7 +4320,7 @@ class _GalleryItemState extends State<_GalleryItem> {
                   width: 2,
                 ),
                 boxShadow: (!isMobile && _isHovered) 
-                    ? [BoxShadow(color: const Color(0xFFEF7A1E).withValues(alpha: 0.3), blurRadius: 10, spreadRadius: 2)] 
+                    ? [BoxShadow(color: const Color(0xFFEF7A1E).withOpacity(0.3), blurRadius: 10, spreadRadius: 2)] 
                     : [],
               ),
               child: ClipRRect(

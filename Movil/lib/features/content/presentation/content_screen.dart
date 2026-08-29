@@ -475,9 +475,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
         : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
     final logoReady = widget.animeDetailAsync.hasValue || widget.movieDetailAsync.hasValue;
-    final b = (widget.banner?.isNotEmpty == true)
-        ? widget.banner!
-        : (d?.backdrop?.isNotEmpty == true ? d!.backdrop! : widget.poster);
+    // Priority: TMDB backdrop > banner param > poster
+    final b = (d?.backdrop?.isNotEmpty == true)
+        ? d!.backdrop!
+        : (widget.banner?.isNotEmpty == true ? widget.banner! : widget.poster);
     final heroTitle = _stripSeasonSuffix(widget.title);
 
     return MouseRegion(
@@ -1642,11 +1643,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       final detailBackdrop = detailData is MovieDetail
           ? (detailData as MovieDetail).backdrop
           : (detailData is AnimeDetail ? (detailData as AnimeDetail).backdrop : null);
-      final candidate = widget.banner?.isNotEmpty == true
-          ? widget.banner
-          : (activeSources.isNotEmpty && activeSources.first.banner?.isNotEmpty == true
-              ? activeSources.first.banner
-              : (detailBackdrop?.isNotEmpty == true ? detailBackdrop : null));
+      // Priority: TMDB backdrop > banner param > source banner
+      final candidate = detailBackdrop?.isNotEmpty == true
+          ? detailBackdrop
+          : (widget.banner?.isNotEmpty == true
+              ? widget.banner
+              : (activeSources.isNotEmpty && activeSources.first.banner?.isNotEmpty == true
+                  ? activeSources.first.banner
+                  : null));
       if (candidate?.isNotEmpty == true) {
         _stableBanner = ApiEndpoints.proxyImage(candidate);
       }
