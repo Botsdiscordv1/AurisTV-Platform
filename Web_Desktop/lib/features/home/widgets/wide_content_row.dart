@@ -62,10 +62,16 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
     if (!mounted || !_scrollController.hasClients) return;
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
-    setState(() {
-      _canScrollLeft = currentScroll > 5;
-      _canScrollRight = maxScroll > currentScroll + 5;
-    });
+    
+    final bool canLeft = currentScroll > 5;
+    final bool canRight = maxScroll > currentScroll + 5;
+    
+    if (canLeft != _canScrollLeft || canRight != _canScrollRight) {
+      setState(() {
+        _canScrollLeft = canLeft;
+        _canScrollRight = canRight;
+      });
+    }
   }
 
   void _scroll(double offset) {
@@ -103,8 +109,8 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
           ),
           const SizedBox(height: 12),
           MouseRegion(
-            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
+            onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
+            onExit: (_) { if (mounted) setState(() => _isHovered = false); },
             child: Stack(
               children: [
                 LayoutBuilder(
@@ -113,8 +119,42 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                     final double fadeOffset = horizontalPadding / width;
                     final double fadeSize = 40 / width;
 
+                    final content = ListView.separated(
+                      controller: _scrollController,
+                      physics: const ClampingScrollPhysics(),
+                      cacheExtent: 600,
+                      clipBehavior: Clip.none, 
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
+                      itemCount: widget.items.length,
+                      separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
+                      itemBuilder: (context, index) {
+                        final item = widget.items[index];
+                        return FocusableWideCard(
+                          key: ValueKey('wide_${item.id}_${item.title}'),
+                          title: item.title,
+                          imageUrl: item.imageUrl,
+                          progress: item.progress,
+                          subtitle: item.subtitle,
+                          rating: item.rating,
+                          badgeOverlay: item.badgeOverlay,
+                          width: cardWidth,
+                          height: cardHeight,
+                          onTap: () => widget.onItemTap(item),
+                          onDelete: item.onDelete,
+                        );
+                      },
+                    );
+
+                    if (!_canScrollLeft && !_canScrollRight) {
+                      return SizedBox(
+                        height: isMobile ? ResponsiveUtils.sp(context, 225) : 355,
+                        child: content,
+                      );
+                    }
+
                     return SizedBox(
-                      height: isMobile ? ResponsiveUtils.sp(context, 225) : 355, // Senior Fix: Ajustado a 355 para card de 240px
+                      height: isMobile ? ResponsiveUtils.sp(context, 225) : 355,
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           _updateScrollIndicators();
@@ -144,31 +184,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                             ).createShader(rect);
                           },
                           blendMode: BlendMode.dstIn,
-                          child: ListView.separated(
-                            controller: _scrollController,
-                            physics: const ClampingScrollPhysics(),
-                            clipBehavior: Clip.none, 
-                            scrollDirection: Axis.horizontal,
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5), // Senior: Ajuste de padding vertical
-                            itemCount: widget.items.length,
-                            separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
-                            itemBuilder: (context, index) {
-                              final item = widget.items[index];
-                              
-                              return FocusableWideCard(
-                                title: item.title,
-                                imageUrl: item.imageUrl,
-                                progress: item.progress,
-                                subtitle: item.subtitle,
-                                rating: item.rating,
-                                badgeOverlay: item.badgeOverlay,
-                                width: cardWidth,
-                                height: cardHeight,
-                                onTap: () => widget.onItemTap(item),
-                                onDelete: item.onDelete,
-                              );
-                            },
-                          ),
+                          child: content,
                         ),
                       ),
                     );

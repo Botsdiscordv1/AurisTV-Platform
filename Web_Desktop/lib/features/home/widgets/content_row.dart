@@ -117,18 +117,63 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
           ),
           const SizedBox(height: 8), 
           MouseRegion(
-            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
+            onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
+            onExit: (_) { if (mounted) setState(() => _isHovered = false); },
             child: Stack(
               children: [
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final double width = constraints.maxWidth;
                     final double fadeOffset = horizontalPadding / width;
-                    final double fadeSize = 40 / width; // 40px de suavizado
+                    final double fadeSize = 40 / width;
+
+                    final content = ListView.separated(
+                      controller: _scrollController,
+                      physics: const ClampingScrollPhysics(),
+                      cacheExtent: 600,
+                      clipBehavior: Clip.none,
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
+                      itemCount: widget.items.length,
+                      separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
+                      itemBuilder: (context, index) {
+                        final item = widget.items[index];
+                        return Focus(
+                          onFocusChange: (focused) {
+                            if (focused) {
+                              Scrollable.ensureVisible(
+                                context,
+                                alignment: 0.5,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          },
+                          child: SizedBox(
+                            width: isMobile ? ResponsiveUtils.sp(context, 140) : 200,
+                            child: FocusablePosterCard(
+                              key: ValueKey(item.id),
+                              title: item.title,
+                              posterUrl: item.posterUrl,
+                              rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
+                              subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : item.subtitle,
+                              showInfo: true,
+                              onTap: () => widget.onItemTap(item),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+
+                    if (!_canScrollLeft && !_canScrollRight) {
+                      return SizedBox(
+                        height: isMobile ? ResponsiveUtils.sp(context, 250) : 355,
+                        child: content,
+                      );
+                    }
 
                     return SizedBox(
-                      height: isMobile ? ResponsiveUtils.sp(context, 250) : 355, // Senior: Reducido de 395 a 355 para Web
+                      height: isMobile ? ResponsiveUtils.sp(context, 250) : 355,
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           _updateScrollIndicators();
@@ -158,43 +203,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                             ).createShader(rect);
                           },
                           blendMode: BlendMode.dstIn,
-                          child: ListView.separated(
-                            controller: _scrollController,
-                            physics: const ClampingScrollPhysics(),
-                            cacheExtent: 1000,
-                            clipBehavior: Clip.none,
-                            scrollDirection: Axis.horizontal,
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
-                            itemCount: widget.items.length,
-                            separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
-                            itemBuilder: (context, index) {
-                              final item = widget.items[index];
-                              return Focus(
-                                onFocusChange: (focused) {
-                                  if (focused) {
-                                    Scrollable.ensureVisible(
-                                      context,
-                                      alignment: 0.5,
-                                      duration: const Duration(milliseconds: 300),
-                                      curve: Curves.easeInOut,
-                                    );
-                                  }
-                                },
-                                child: SizedBox(
-                                  width: isMobile ? ResponsiveUtils.sp(context, 140) : 200,
-                                  child: FocusablePosterCard(
-                                    key: ValueKey(item.id),
-                                    title: item.title,
-                                    posterUrl: item.posterUrl,
-                                    rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
-                                    subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : item.subtitle,
-                                    showInfo: true,
-                                    onTap: () => widget.onItemTap(item),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                          child: content,
                         ),
                       ),
                     );

@@ -7,6 +7,7 @@ import '../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../core/theme/editorial_themes.dart';
 import 'marquee_text.dart';
+import 'editorial_animation_controller.dart';
 
 const String _mythicCornerSvg = r'''
 <svg width="74" height="74" viewBox="0 0 74 74" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -31,22 +32,21 @@ class PrimeExpandableCard extends ConsumerStatefulWidget {
   ConsumerState<PrimeExpandableCard> createState() => _PrimeExpandableCardState();
 }
 
-class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with TickerProviderStateMixin {
+class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> {
   bool _isFocused = false;
   bool _isHovered = false;
-  late AnimationController _mythicController;
 
   bool get _isActive => _isFocused || _isHovered;
 
   @override
   void initState() {
     super.initState();
-    _mythicController = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+    EditorialAnimationController.instance.acquire();
   }
 
   @override
   void dispose() {
-    _mythicController.dispose();
+    EditorialAnimationController.instance.release();
     super.dispose();
   }
 
@@ -64,8 +64,8 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
         }
       },
       child: MouseRegion(
-        onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-        onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
+        onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
+        onExit: (_) { if (mounted) setState(() => _isHovered = false); },
         child: GestureDetector(
           onTap: widget.onTap,
           child: SizedBox(
@@ -81,62 +81,68 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
                       borderRadius: BorderRadius.circular(8),
                       boxShadow: _isActive ? [BoxShadow(color: const Color(0xFF6C32FF).withOpacity(0.3), blurRadius: 15, spreadRadius: 1)] : [],
                     ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      clipBehavior: Clip.none,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              AnimatedScale(
-                                scale: _isActive ? 1.12 : 1.0,
-                                duration: const Duration(milliseconds: 400),
-                                curve: Curves.easeOutCubic,
-                                child: CachedNetworkImage(
-                                  imageUrl: widget.media.posterUrl,
-                                  fit: BoxFit.cover,
-                                  memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
-                                  filterQuality: FilterQuality.medium,
-                                ),
-                              ),
-                              Positioned.fill(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                                      colors: [Colors.black.withOpacity(0.6), Colors.transparent],
-                                      stops: const [0.0, 0.4],
+                    child: AnimatedBuilder(
+                      animation: EditorialAnimationController.instance,
+                      builder: (context, _) {
+                        final mythicVal = EditorialAnimationController.instance.mythicValue;
+                        return Stack(
+                          fit: StackFit.expand,
+                          clipBehavior: Clip.none,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  AnimatedScale(
+                                    scale: _isActive ? 1.12 : 1.0,
+                                    duration: const Duration(milliseconds: 400),
+                                    curve: Curves.easeOutCubic,
+                                    child: CachedNetworkImage(
+                                      imageUrl: widget.media.posterUrl,
+                                      fit: BoxFit.cover,
+                                      memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
+                                      filterQuality: FilterQuality.low,
                                     ),
                                   ),
-                                ),
-                              ),
-                              if (widget.media.rating != null)
-                                Positioned(
-                                  top: 8, right: 8,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.star, color: Color(0xFFFFC107), size: 10),
-                                        const SizedBox(width: 4),
-                                        Text(formatRating(widget.media.rating) ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                                      ],
+                                  Positioned.fill(
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.bottomCenter, end: Alignment.topCenter,
+                                          colors: [Colors.black.withOpacity(0.6), Colors.transparent],
+                                          stops: const [0.0, 0.4],
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        Positioned.fill(child: _MythicBorder(animation: _mythicController, primaryColor: theme.primary)),
-                        _MythicCorner(alignment: Alignment.topLeft, animation: _mythicController, primaryColor: theme.primary),
-                        _MythicCorner(alignment: Alignment.topRight, animation: _mythicController, primaryColor: theme.primary),
-                        _MythicCorner(alignment: Alignment.bottomLeft, animation: _mythicController, primaryColor: theme.primary),
-                        _MythicCorner(alignment: Alignment.bottomRight, animation: _mythicController, primaryColor: theme.primary),
-                      ],
+                                  if (widget.media.rating != null)
+                                    Positioned(
+                                      top: 8, right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.star, color: Color(0xFFFFC107), size: 10),
+                                            const SizedBox(width: 4),
+                                            Text(formatRating(widget.media.rating) ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Positioned.fill(child: _MythicBorder(value: mythicVal, primaryColor: theme.primary)),
+                            _MythicCorner(alignment: Alignment.topLeft, value: mythicVal, primaryColor: theme.primary),
+                            _MythicCorner(alignment: Alignment.topRight, value: mythicVal, primaryColor: theme.primary),
+                            _MythicCorner(alignment: Alignment.bottomLeft, value: mythicVal, primaryColor: theme.primary),
+                            _MythicCorner(alignment: Alignment.bottomRight, value: mythicVal, primaryColor: theme.primary),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -192,8 +198,8 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
 }
 
 class _MythicCorner extends StatelessWidget {
-  final Alignment alignment; final Animation<double> animation; final Color primaryColor;
-  const _MythicCorner({required this.alignment, required this.animation, required this.primaryColor});
+  final Alignment alignment; final double value; final Color primaryColor;
+  const _MythicCorner({required this.alignment, required this.value, required this.primaryColor});
   @override Widget build(BuildContext context) {
     int quarterTurns = 0;
     if (alignment == Alignment.topRight) quarterTurns = 1;
@@ -205,20 +211,15 @@ class _MythicCorner extends StatelessWidget {
         quarterTurns: quarterTurns,
         child: SizedBox(
           width: 48, height: 48,
-          child: AnimatedBuilder(
-            animation: animation,
-            builder: (context, _) {
-              return ShaderMask(
-                shaderCallback: (bounds) {
-                  return LinearGradient(
-                    begin: Alignment.topLeft, end: Alignment.bottomRight,
-                    colors: const [Color(0xFF6C32FF), Color(0xFF00FFC3), Color(0xFF6C32FF), Color(0xFF00FFC3), Color(0xFF6C32FF)],
-                    stops: [0.0, (animation.value - 0.2).clamp(0.0, 1.0), animation.value, (animation.value + 0.2).clamp(0.0, 1.0), 1.0],
-                  ).createShader(bounds);
-                },
-                child: SvgPicture.string(_mythicCornerSvg, colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn)),
-              );
+          child: ShaderMask(
+            shaderCallback: (bounds) {
+              return LinearGradient(
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: const [Color(0xFF6C32FF), Color(0xFF00FFC3), Color(0xFF6C32FF), Color(0xFF00FFC3), Color(0xFF6C32FF)],
+                stops: [0.0, (value - 0.2).clamp(0.0, 1.0), value, (value + 0.2).clamp(0.0, 1.0), 1.0],
+              ).createShader(bounds);
             },
+            child: SvgPicture.string(_mythicCornerSvg, colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn)),
           ),
         ),
       ),
@@ -227,23 +228,18 @@ class _MythicCorner extends StatelessWidget {
 }
 
 class _MythicBorder extends StatelessWidget {
-  final Animation<double> animation; final Color primaryColor;
-  const _MythicBorder({required this.animation, required this.primaryColor});
+  final double value; final Color primaryColor;
+  const _MythicBorder({required this.value, required this.primaryColor});
   @override Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, _) {
-        return ShaderMask(
-          shaderCallback: (bounds) {
-            return LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: const [Color(0xFF6C32FF), Color(0xFF00FFC3), Color(0xFF6C32FF), Color(0xFF00FFC3), Color(0xFF6C32FF)],
-              stops: [0.0, (animation.value - 0.2).clamp(0.0, 1.0), animation.value, (animation.value + 0.2).clamp(0.0, 1.0), 1.0],
-            ).createShader(bounds);
-          },
-          child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white, width: 2.5))),
-        );
+    return ShaderMask(
+      shaderCallback: (bounds) {
+        return LinearGradient(
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: const [Color(0xFF6C32FF), Color(0xFF00FFC3), Color(0xFF6C32FF), Color(0xFF00FFC3), Color(0xFF6C32FF)],
+          stops: [0.0, (value - 0.2).clamp(0.0, 1.0), value, (value + 0.2).clamp(0.0, 1.0), 1.0],
+        ).createShader(bounds);
       },
+      child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white, width: 2.5))),
     );
   }
 }

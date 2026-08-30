@@ -47,8 +47,8 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
     return Focus(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       child: MouseRegion(
-        onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-        onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
+        onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
+        onExit: (_) { if (mounted) setState(() => _isHovered = false); },
         child: GestureDetector(
           onTap: widget.onTap,
           child: SizedBox(
@@ -75,7 +75,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                             child: CachedNetworkImage(
                               imageUrl: widget.imageUrl,
                               fit: BoxFit.cover,
-                              filterQuality: FilterQuality.medium,
+                              filterQuality: FilterQuality.low,
                               placeholder: (context, url) => Container(color: Colors.white10),
                               errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
                             ),

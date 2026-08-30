@@ -89,8 +89,8 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
     final double normalWidth = isMobile ? ResponsiveUtils.sp(context, 125) : 200;
 
     return MouseRegion(
-      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }),
-      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }),
+      onEnter: (_) { if (mounted) setState(() => _hovered = true); },
+      onExit: (_) { if (mounted) setState(() => _hovered = false); },
       child: Focus(
         onFocusChange: (focused) => setState(() => _focused = focused),
         onKeyEvent: (node, event) {
@@ -136,7 +136,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                             imageUrl: widget.posterUrl,
                             fit: BoxFit.cover,
                             memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
-                            filterQuality: FilterQuality.medium,
+                            filterQuality: FilterQuality.low,
                             placeholder: (context, url) => _letterPlaceholder(widget.title),
                             errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
                           ),

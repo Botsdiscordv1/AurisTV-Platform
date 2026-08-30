@@ -4,6 +4,7 @@ import 'package:auris_core/auris_core.dart';
 import '../../core/theme/editorial_themes.dart';
 import '../../core/utils/responsive_utils.dart';
 import 'marquee_text.dart';
+import 'editorial_animation_controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 const String _mythicCornerSvg = r'''
@@ -35,36 +36,18 @@ class EditorialCard extends StatefulWidget {
   State<EditorialCard> createState() => _EditorialCardState();
 }
 
-class _EditorialCardState extends State<EditorialCard> with TickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late AnimationController _shimmerController;
-  late AnimationController _mythicController;
+class _EditorialCardState extends State<EditorialCard> {
   bool _isHovered = false;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-
-    _shimmerController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 7),
-    )..repeat();
-
-    _mythicController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
+    EditorialAnimationController.instance.acquire();
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
-    _shimmerController.dispose();
-    _mythicController.dispose();
+    EditorialAnimationController.instance.release();
     super.dispose();
   }
 
@@ -76,8 +59,8 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
     final isMythical = widget.badge == EditorialBadge.mythical;
 
     return MouseRegion(
-      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
+      onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
+      onExit: (_) { if (mounted) setState(() => _isHovered = false); },
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedScale(
@@ -152,8 +135,11 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                               // Efectos de rareza diferenciados (Estilo Netflix/Crunchyroll Premium)
                               Positioned.fill(
                                 child: AnimatedBuilder(
-                                  animation: Listenable.merge([_shimmerController, _pulseController]),
+                                  animation: EditorialAnimationController.instance,
                                   builder: (context, _) {
+                                    final shimmerVal = EditorialAnimationController.instance.shimmerValue;
+                                    final pulseVal = EditorialAnimationController.instance.pulseValue;
+
                                     // 1. Efecto MÍTICO ("Títulos inolvidables"): Barrido de luz dorado lento
                                     if (widget.badge == EditorialBadge.mythical) {
                                       return IgnorePointer(
@@ -164,9 +150,9 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                                               end: Alignment.bottomRight,
                                               colors: theme.shimmerColors,
                                               stops: [
-                                                (_shimmerController.value - 0.1).clamp(0.0, 1.0),
-                                                _shimmerController.value.clamp(0.0, 1.0),
-                                                (_shimmerController.value + 0.1).clamp(0.0, 1.0),
+                                                (shimmerVal - 0.1).clamp(0.0, 1.0),
+                                                shimmerVal.clamp(0.0, 1.0),
+                                                (shimmerVal + 0.1).clamp(0.0, 1.0),
                                               ],
                                             ),
                                           ),
@@ -183,7 +169,7 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                                               center: const Alignment(0.7, -0.8), // Luz desde la esquina superior derecha
                                               radius: 1.2,
                                               colors: [
-                                                theme.primary.withOpacity(0.08 * (1.0 + _pulseController.value * 0.5)),
+                                                theme.primary.withOpacity(0.08 * (1.0 + pulseVal * 0.5)),
                                                 Colors.transparent,
                                               ],
                                             ),
@@ -206,9 +192,9 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                                                 Colors.white.withOpacity(0.0),
                                               ],
                                               stops: [
-                                                (_shimmerController.value - 0.1).clamp(0.0, 1.0),
-                                                _shimmerController.value.clamp(0.0, 1.0),
-                                                (_shimmerController.value + 0.1).clamp(0.0, 1.0),
+                                                (shimmerVal - 0.1).clamp(0.0, 1.0),
+                                                shimmerVal.clamp(0.0, 1.0),
+                                                (shimmerVal + 0.1).clamp(0.0, 1.0),
                                               ],
                                             ),
                                           ),
@@ -230,12 +216,31 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                     if (isMythical) ...[
                       // Borde Animado que conecta las esquinas
                       Positioned.fill(
-                        child: _MythicBorder(animation: _mythicController, primaryColor: theme.primary),
+                        child: _MythicBorder(
+                          value: EditorialAnimationController.instance.mythicValue, 
+                          primaryColor: theme.primary
+                        ),
                       ),
-                      _MythicCorner(alignment: Alignment.topLeft, animation: _mythicController, primaryColor: theme.primary),
-                      _MythicCorner(alignment: Alignment.topRight, animation: _mythicController, primaryColor: theme.primary),
-                      _MythicCorner(alignment: Alignment.bottomLeft, animation: _mythicController, primaryColor: theme.primary),
-                      _MythicCorner(alignment: Alignment.bottomRight, animation: _mythicController, primaryColor: theme.primary),
+                      _MythicCorner(
+                        alignment: Alignment.topLeft, 
+                        value: EditorialAnimationController.instance.mythicValue, 
+                        primaryColor: theme.primary
+                      ),
+                      _MythicCorner(
+                        alignment: Alignment.topRight, 
+                        value: EditorialAnimationController.instance.mythicValue, 
+                        primaryColor: theme.primary
+                      ),
+                      _MythicCorner(
+                        alignment: Alignment.bottomLeft, 
+                        value: EditorialAnimationController.instance.mythicValue, 
+                        primaryColor: theme.primary
+                      ),
+                      _MythicCorner(
+                        alignment: Alignment.bottomRight, 
+                        value: EditorialAnimationController.instance.mythicValue, 
+                        primaryColor: theme.primary
+                      ),
                     ] else
                       Positioned.fill(
                         child: IgnorePointer(
@@ -247,10 +252,26 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
 
                     // 5. BRILLO DE PULSAR (Efecto luz, no punto sólido)
                     if (!isMythical) ...[
-                      _CornerPulsar(alignment: Alignment.topLeft, animation: _pulseController, color: theme.primary),
-                      _CornerPulsar(alignment: Alignment.topRight, animation: _pulseController, color: theme.primary),
-                      _CornerPulsar(alignment: Alignment.bottomLeft, animation: _pulseController, color: theme.primary),
-                      _CornerPulsar(alignment: Alignment.bottomRight, animation: _pulseController, color: theme.primary),
+                      _CornerPulsar(
+                        alignment: Alignment.topLeft, 
+                        value: EditorialAnimationController.instance.pulseValue, 
+                        color: theme.primary
+                      ),
+                      _CornerPulsar(
+                        alignment: Alignment.topRight, 
+                        value: EditorialAnimationController.instance.pulseValue, 
+                        color: theme.primary
+                      ),
+                      _CornerPulsar(
+                        alignment: Alignment.bottomLeft, 
+                        value: EditorialAnimationController.instance.pulseValue, 
+                        color: theme.primary
+                      ),
+                      _CornerPulsar(
+                        alignment: Alignment.bottomRight, 
+                        value: EditorialAnimationController.instance.pulseValue, 
+                        color: theme.primary
+                      ),
                     ],
                   ],
                 ),
@@ -299,12 +320,12 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
 
 class _MythicCorner extends StatelessWidget {
   final Alignment alignment;
-  final Animation<double> animation;
+  final double value;
   final Color primaryColor;
 
   const _MythicCorner({
     required this.alignment,
-    required this.animation,
+    required this.value,
     required this.primaryColor,
   });
 
@@ -322,36 +343,31 @@ class _MythicCorner extends StatelessWidget {
         child: SizedBox(
           width: 54, 
           height: 54,
-          child: AnimatedBuilder(
-            animation: animation,
-            builder: (context, _) {
-              return ShaderMask(
-                shaderCallback: (bounds) {
-                  return LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF6C32FF), // Púrpura
-                      const Color(0xFF00FFC3), // Cian
-                      const Color(0xFF6C32FF), // Púrpura
-                      const Color(0xFF00FFC3), // Cian
-                      const Color(0xFF6C32FF), // Púrpura (loop)
-                    ],
-                    stops: [
-                      0.0,
-                      (animation.value - 0.2).clamp(0.0, 1.0),
-                      animation.value,
-                      (animation.value + 0.2).clamp(0.0, 1.0),
-                      1.0,
-                    ],
-                  ).createShader(bounds);
-                },
-                child: SvgPicture.string(
-                  _mythicCornerSvg,
-                  colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-                ),
-              );
+          child: ShaderMask(
+            shaderCallback: (bounds) {
+              return LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: const [
+                  Color(0xFF6C32FF), // Púrpura
+                  Color(0xFF00FFC3), // Cian
+                  Color(0xFF6C32FF), // Púrpura
+                  Color(0xFF00FFC3), // Cian
+                  Color(0xFF6C32FF), // Púrpura (loop)
+                ],
+                stops: [
+                  0.0,
+                  (value - 0.2).clamp(0.0, 1.0),
+                  value,
+                  (value + 0.2).clamp(0.0, 1.0),
+                  1.0,
+                ],
+              ).createShader(bounds);
             },
+            child: SvgPicture.string(
+              _mythicCornerSvg,
+              colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+            ),
           ),
         ),
       ),
@@ -360,45 +376,40 @@ class _MythicCorner extends StatelessWidget {
 }
 
 class _MythicBorder extends StatelessWidget {
-  final Animation<double> animation;
+  final double value;
   final Color primaryColor;
 
-  const _MythicBorder({required this.animation, required this.primaryColor});
+  const _MythicBorder({required this.value, required this.primaryColor});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, _) {
-        return ShaderMask(
-          shaderCallback: (bounds) {
-            return LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF6C32FF), // Púrpura
-                const Color(0xFF00FFC3), // Cian
-                const Color(0xFF6C32FF), // Púrpura
-                const Color(0xFF00FFC3), // Cian
-                const Color(0xFF6C32FF), // Púrpura
-              ],
-              stops: [
-                0.0,
-                (animation.value - 0.2).clamp(0.0, 1.0),
-                animation.value,
-                (animation.value + 0.2).clamp(0.0, 1.0),
-                1.0,
-              ],
-            ).createShader(bounds);
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.white, width: 1.2),
-            ),
-          ),
-        );
+    return ShaderMask(
+      shaderCallback: (bounds) {
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: const [
+            Color(0xFF6C32FF), // Púrpura
+            Color(0xFF00FFC3), // Cian
+            Color(0xFF6C32FF), // Púrpura
+            Color(0xFF00FFC3), // Cian
+            Color(0xFF6C32FF), // Púrpura
+          ],
+          stops: [
+            0.0,
+            (value - 0.2).clamp(0.0, 1.0),
+            value,
+            (value + 0.2).clamp(0.0, 1.0),
+            1.0,
+          ],
+        ).createShader(bounds);
       },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.white, width: 1.2),
+        ),
+      ),
     );
   }
 }
@@ -436,18 +447,17 @@ class TripleArcCornerPainter extends CustomPainter {
 
 class _CornerPulsar extends StatelessWidget {
   final Alignment alignment;
-  final Animation<double> animation;
+  final double value;
   final Color color;
-  const _CornerPulsar({required this.alignment, required this.animation, required this.color});
+  const _CornerPulsar({required this.alignment, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: alignment,
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, child) {
-          final double size = 12 + (animation.value * 12);
+      child: Builder(
+        builder: (context) {
+          final double size = 12 + (value * 12);
           return Container(
             width: size,
             height: size,
@@ -455,8 +465,8 @@ class _CornerPulsar extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  Colors.white.withOpacity(0.8 * (1 - animation.value)),
-                  color.withOpacity(0.4 * (1 - animation.value)),
+                  Colors.white.withOpacity(0.8 * (1 - value)),
+                  color.withOpacity(0.4 * (1 - value)),
                   Colors.transparent,
                 ],
               ),

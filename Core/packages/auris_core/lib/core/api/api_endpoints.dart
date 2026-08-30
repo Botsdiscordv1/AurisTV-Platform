@@ -60,6 +60,13 @@ class ApiEndpoints {
   static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyeHV6cXVkZGZlZ3B4amNmZnZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MjkwNTcsImV4cCI6MjEwMTEwNTA1N30.YiJVKqtNM1D4aZbgBaVSGkMczNIHGpxj0tzDVj95MY8';
   // ----------------------------------
 
+  // --- TIMEOUTS DE UX (Sincronizados entre plataformas) ---
+  /// Tiempo para esperar metadata enriquecida (logos, sinopsis larga) antes de mostrar fallbacks.
+  static const Duration detailRevealTimeout = Duration(seconds: 30);
+  /// Tiempo máximo para mostrar el esqueleto global de una página.
+  static const Duration pageLoadTimeout = Duration(seconds: 20);
+  // -------------------------------------------------------
+
   static String baseUrlForPort(String port) {
     return _baseUrlForCategory(_categoryForPort(port), port);
   }
@@ -160,14 +167,16 @@ class ApiEndpoints {
 
     // 3. Evaluar necesidad de proxy para URLs externas.
     if (workingUrl.startsWith('http')) {
-      // SENIOR OPTIMIZATION: Dominios que permiten CORS y no bloquean móviles.
-      // Cargar estos directamente ahorra ancho de banda en tu servidor y evita errores 502.
+      // SENIOR OPTIMIZATION: Dominios que permiten carga directa o que bloquean proxies (502).
+      // Incluimos cdns de anime que suelen dar problemas en el proxy.
       const bypassDomains = [
         'tmdb.org', 
         'themoviedb.org', 
         'googleusercontent.com',
         'cloudinary.com',
-        'fbcdn.net'
+        'fbcdn.net',
+        'jkdesa.com',
+        'jkanime.net'
       ];
       
       if (bypassDomains.any((d) => lowerUrl.contains(d))) {

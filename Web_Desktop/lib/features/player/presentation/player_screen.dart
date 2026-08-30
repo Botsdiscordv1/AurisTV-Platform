@@ -4833,6 +4833,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                         final ep = data.episodes[index];
                         final isCurrent = ep.number.toString() == widget.currentEpisode;
                         return _EpisodeCarouselItem(
+                          key: ValueKey('ep_${ep.number}'),
                           number: ep.number,
                           title: ep.title,
                           thumbnail: ep.thumbnail,
@@ -4948,6 +4949,7 @@ class _EpisodeCarouselItem extends StatefulWidget {
   final VoidCallback onTap;
 
   const _EpisodeCarouselItem({
+    super.key,
     required this.number,
     this.title,
     this.thumbnail,
@@ -4975,8 +4977,8 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
     return Focus(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       child: MouseRegion(
-        onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-        onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
+        onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
+        onExit: (_) { if (mounted) setState(() => _isHovered = false); },
         child: GestureDetector(
           onTap: widget.onTap,
           child: AnimatedScale(

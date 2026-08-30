@@ -391,25 +391,15 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
 
   Widget _buildBackgroundTransition(Widget child, Animation<double> animation) {
     // Senior UI Architecture: Técnica de "Capa Sólida".
-    // El widget que entra (child) se desvanece y desliza.
+    // El widget que entra (child) se desvanece.
     // El widget que sale (oldChild) se mantiene estático debajo para evitar el parpadeo gris.
     final bool isIncoming = child.key is ValueKey && 
         (child.key as ValueKey).value.toString().startsWith('bg_');
 
     if (isIncoming) {
-      final offsetAnimation = animation.drive(
-        Tween<Offset>(
-          begin: const Offset(0.02, 0.0), 
-          end: Offset.zero,
-        ).chain(CurveTween(curve: Curves.easeOutCubic)),
-      );
-
       return FadeTransition(
         opacity: animation,
-        child: SlideTransition(
-          position: offsetAnimation,
-          child: child,
-        ),
+        child: child,
       );
     } else {
       // El widget saliente se mantiene sólido y estático para servir de base
@@ -422,7 +412,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
     if (widget.items.isEmpty) return const SizedBox.shrink();
 
     final isMobile = ResponsiveUtils.isMobile(context);
-    final dynamicPadding = ResponsiveUtils.horizontalPadding(context);
+    final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
 
     // Senior: Synchronize player mute state with global provider
     ref.listen(heroBannerMutedProvider, (_, next) => _syncMute(next));
@@ -454,7 +444,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
           return KeyEventResult.ignored;
         },
         child: Padding(
-          padding: EdgeInsets.zero,
+          padding: isMobile 
+              ? EdgeInsets.zero 
+              : EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 48), // Senior: Alineado con carruseles
           child: GestureDetector(
             onHorizontalDragEnd: (details) {
               if (details.primaryVelocity! > 0) {
@@ -464,208 +456,207 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
               }
             },
             onTap: () => widget.onDetails(_currentContentItem),
-            child: ClipRRect(
-              borderRadius: isMobile 
-                ? BorderRadius.zero // Senior: Eliminamos redondeo en móvil para un look Full-Bleed
-                : BorderRadius.zero,
-              child: AspectRatio(
-                aspectRatio: isMobile ? 16 / 11 : 2.8 / 1,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final width = constraints.maxWidth;
-                    final height = constraints.maxHeight;
-                    final playerHeight = height * 1.35;
-                    final playerWidth = playerHeight * (16 / 9);
-                    final bgItem = _currentBackgroundItem;
-                    final contentItem = _currentContentItem;
-                    final dynamicPadding = ResponsiveUtils.horizontalPadding(context);
+            child: Container(
+              color: isMobile ? null : const Color(0xFF0B0B0D), // Senior: Fondo sólido tras la transparencia del borde
+              foregroundDecoration: isMobile ? null : BoxDecoration(
+                borderRadius: BorderRadius.circular(24), 
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.15), 
+                  width: 2.0, 
+                ),
+              ),
+              child: Padding(
+                padding: isMobile ? EdgeInsets.zero : const EdgeInsets.all(2.0), // Senior: Evita que la imagen sangre tras el grosor
+                child: ClipRRect(
+                  borderRadius: isMobile 
+                    ? BorderRadius.zero 
+                    : BorderRadius.circular(22), // Radio ajustado al grosor (24 - 2)
+                  clipBehavior: Clip.antiAliasWithSaveLayer,
+                  child: AspectRatio(
+                    aspectRatio: isMobile ? 16 / 11 : 2.8 / 1,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        final height = constraints.maxHeight;
+                        final playerHeight = height * 1.35;
+                        final playerWidth = playerHeight * (16 / 9);
+                        final bgItem = _currentBackgroundItem;
+                        final contentItem = _currentContentItem;
+                        // Senior: Ajustado a un padding interno moderado
+                        final internalPadding = isMobile ? horizontalPadding : 80.0;
 
-                    return Stack(
-                      children: [
-                        // CAPA 1: Background con Sangrado Total
-                        Positioned(
-                          top: 0, left: 0, right: 0, bottom: -1, // Senior Fix: Sangrado de 1px para evitar fugas
-                          child: Container(
-                            color: const Color(0xFF0B0B0D), 
-                            child: ShaderMask(
-                              shaderCallback: (rect) {
-                                return const LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.black,
-                                    Colors.black,
-                                    Colors.black54,
-                                    Colors.transparent,
-                                  ],
-                                  stops: [0.0, 0.2, 0.6, 1.0], 
-                                ).createShader(rect);
-                              },
-                              blendMode: BlendMode.dstIn,
-                              child: AnimatedOpacity(
-                                // Senior: Ocultamos el banner por completo cuando el trailer está listo
-                                opacity: (_showTrailerLayer && _videoReady) ? 0.0 : 1.0,
-                                duration: const Duration(milliseconds: 800),
-                                child: AnimatedSwitcher(
+                        return Stack(
+                          children: [
+                            // CAPA 1: Background con Sangrado Total
+                            Positioned(
+                              top: 0, left: 0, right: 0, bottom: 0, // Senior Fix: Ajustado a 0 para evitar fugas bajo el borde
+                              child: Container(
+                                color: const Color(0xFF0B0B0D), 
+                                child: AnimatedOpacity(
+                                  // Senior: Ocultamos el banner por completo cuando el trailer está listo
+                                  opacity: (_showTrailerLayer && _videoReady) ? 0.0 : 1.0,
                                   duration: const Duration(milliseconds: 800),
-                                  transitionBuilder: _buildBackgroundTransition,
-                                  layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
-                                    return Stack(
-                                      fit: StackFit.expand,
-                                      children: <Widget>[
-                                        ...previousChildren,
-                                        if (currentChild != null) currentChild,
-                                      ],
-                                    );
-                                  },
-                                  child: _BannerContent(
-                                    key: ValueKey('bg_${bgItem.id}'),
-                                    item: bgItem,
-                                    showTrailer: _showTrailerLayer && _videoReady,
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 800),
+                                    transitionBuilder: _buildBackgroundTransition,
+                                    layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+                                      return Stack(
+                                        fit: StackFit.expand,
+                                        children: <Widget>[
+                                          ...previousChildren,
+                                          if (currentChild != null) currentChild,
+                                        ],
+                                      );
+                                    },
+                                    child: _BannerContent(
+                                      key: ValueKey('bg_${bgItem.id}'),
+                                      item: bgItem,
+                                      showTrailer: _showTrailerLayer && _videoReady,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ),
 
-                        // CAPA 2: Trailer overlay
-                        if (_ytController != null && _showTrailerLayer)
-                          Positioned(
-                            top: 0, bottom: 12, right: 0,
-                            width: isMobile ? width : width * 0.72,
-                            child: AnimatedOpacity(
-                              opacity: (_showTrailerLayer && _videoReady) ? 1.0 : 0.0,
-                              duration: const Duration(milliseconds: 600),
+                            // CAPA 2: Trailer overlay
+                            if (_ytController != null && _showTrailerLayer)
+                              Positioned(
+                                top: 0, bottom: 0, right: 0, // Senior Fix: Alineado al fondo para consistencia con el fondo
+                                width: isMobile ? width : width * 0.72,
+                                child: AnimatedOpacity(
+                                  opacity: (_showTrailerLayer && _videoReady) ? 1.0 : 0.0,
+                                  duration: const Duration(milliseconds: 600),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      IgnorePointer(
+                                        ignoring: true,
+                                        child: ClipRect(
+                                          child: OverflowBox(
+                                            alignment: Alignment.center,
+                                            minWidth: isMobile ? playerWidth : width * 0.72,
+                                            maxWidth: isMobile ? playerWidth : width * 0.72,
+                                            minHeight: playerHeight,
+                                            maxHeight: playerHeight,
+                                            child: YoutubePlayer(
+                                              key: ValueKey('yt_${bgItem.trailerKey}'),
+                                              controller: _ytController!,
+                                              aspectRatio: 16 / 9,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                            // CAPA 3: UI overlay (gradientes + texto con coreografía)
+                            PointerInterceptor(
+                              intercepting: _showTrailerLayer && _videoReady,
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  IgnorePointer(
-                                    ignoring: true,
-                                    child: ClipRect(
-                                      child: OverflowBox(
-                                        alignment: Alignment.center,
-                                        minWidth: isMobile ? playerWidth : width * 0.72,
-                                        maxWidth: isMobile ? playerWidth : width * 0.72,
-                                        minHeight: playerHeight,
-                                        maxHeight: playerHeight,
-                                        child: YoutubePlayer(
-                                          key: ValueKey('yt_${bgItem.trailerKey}'),
-                                          controller: _ytController!,
-                                          aspectRatio: 16 / 9,
-                                        ),
-                                      ),
+                                  _buildGradients(isMobile),
+                                  
+                                  // Senior Fix: El sello hermético ahora va DETRÁS del texto
+                                  _buildHermeticSeal(isMobile),
+
+                                  // Posicionamiento adaptativo
+                                  Positioned(
+                                    left: internalPadding,
+                                    bottom: isMobile ? 35 : 80, // Senior: Revertido a 80 para balancear el diseño
+                                    right: internalPadding,
+                                    child: AnimatedSwitcher(
+                                      duration: const Duration(milliseconds: 600),
+                                      transitionBuilder: _buildTextTransition,
+                                      layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+                                        return Stack(
+                                          alignment: Alignment.bottomLeft, 
+                                          children: [
+                                            ...previousChildren,
+                                            if (currentChild != null) currentChild,
+                                          ],
+                                        );
+                                      },
+                                      child: _contentIndex == -1 
+                                        ? SizedBox(key: const ValueKey('empty'), width: width - (internalPadding * 2)) 
+                                        : _buildContentOverlay(_currentContentItem, isMobile, width - (internalPadding * 2), key: ValueKey('content_${_currentContentItem.id}')),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
 
-                        // CAPA 3: UI overlay (gradientes + texto con coreografía)
-                        PointerInterceptor(
-                          intercepting: _showTrailerLayer && _videoReady,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              _buildGradients(isMobile),
-                              
-                              // Senior Fix: El sello hermético ahora va DETRÁS del texto
-                              _buildHermeticSeal(isMobile),
-
-                              // Posicionamiento adaptativo (Bajamos el contenido de 90 a 50 para cerrar el hueco)
+                            // CAPA 4: Flechas de navegación (Ocultas en móvil)
+                            if (!isMobile) ...[
                               Positioned(
-                                left: dynamicPadding,
-                                bottom: isMobile ? 35 : 90, // Senior Fix: Bajamos la posición para que el bloque "respire" sobre los puntos
-                                right: dynamicPadding,
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 600),
-                                  transitionBuilder: _buildTextTransition,
-                                  layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
-                                    return Stack(
-                                      alignment: Alignment.bottomLeft, // Anclaje a la izquierda durante la transición
-                                      children: [
-                                        ...previousChildren,
-                                        if (currentChild != null) currentChild,
-                                      ],
-                                    );
-                                  },
-                                  child: _contentIndex == -1 
-                                    ? SizedBox(key: const ValueKey('empty'), width: width - (dynamicPadding * 2)) 
-                                    : _buildContentOverlay(contentItem, isMobile, width - (dynamicPadding * 2), key: ValueKey('content_${contentItem.id}')),
+                                left: 10, top: 0, bottom: 0,
+                                child: AnimatedOpacity(
+                                  opacity: _isHovered ? 1.0 : 0.0,
+                                  duration: const Duration(milliseconds: 300),
+                                  child: IgnorePointer(
+                                    ignoring: !_isHovered,
+                                    child: Center(
+                                      child: NavArrow(
+                                        icon: Icons.arrow_back_ios_new,
+                                        useBackground: false,
+                                        enableScale: true,
+                                        onTap: _previousPage,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                right: 10, top: 0, bottom: 0,
+                                child: AnimatedOpacity(
+                                  opacity: _isHovered ? 1.0 : 0.0,
+                                  duration: const Duration(milliseconds: 300),
+                                  child: IgnorePointer(
+                                    ignoring: !_isHovered,
+                                    child: Center(
+                                      child: NavArrow(
+                                        icon: Icons.arrow_forward_ios,
+                                        useBackground: false,
+                                        enableScale: true,
+                                        onTap: _nextPage,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
-                          ),
-                        ),
 
-                        // CAPA 4: Flechas de navegación (Ocultas en móvil)
-                        if (!isMobile) ...[
-                          Positioned(
-                            left: 10, top: 0, bottom: 0,
-                            child: AnimatedOpacity(
-                              opacity: _isHovered ? 1.0 : 0.0,
-                              duration: const Duration(milliseconds: 300),
-                              child: IgnorePointer(
-                                ignoring: !_isHovered,
-                                child: Center(
-                                  child: NavArrow(
-                                    icon: Icons.arrow_back_ios_new,
-                                    useBackground: false,
-                                    enableScale: true,
-                                    onTap: _previousPage,
-                                  ),
+                            // CAPA 5: Dots indicator
+                            Positioned(
+                              bottom: isMobile ? 15 : 25, 
+                              left: 0, right: 0,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(
+                                  widget.items.length,
+                                  (index) {
+                                    final isCurrent = (_backgroundIndex % widget.items.length) == index;
+                                    return AnimatedContainer(
+                                      duration: const Duration(milliseconds: 300),
+                                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                                      width: isCurrent ? (isMobile ? 10 : 12) : (isMobile ? 5 : 7),
+                                      height: isMobile ? 5 : 7,
+                                      decoration: BoxDecoration(
+                                        color: isCurrent ? Colors.white : Colors.white38,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                             ),
-                          ),
-                          Positioned(
-                            right: 10, top: 0, bottom: 0,
-                            child: AnimatedOpacity(
-                              opacity: _isHovered ? 1.0 : 0.0,
-                              duration: const Duration(milliseconds: 300),
-                              child: IgnorePointer(
-                                ignoring: !_isHovered,
-                                child: Center(
-                                  child: NavArrow(
-                                    icon: Icons.arrow_forward_ios,
-                                    useBackground: false,
-                                    enableScale: true,
-                                    onTap: _nextPage,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        // CAPA 5: Dots indicator
-                        Positioned(
-                          bottom: isMobile ? 15 : 25, 
-                          left: 0, right: 0,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(
-                              widget.items.length,
-                              (index) {
-                                final isCurrent = (_backgroundIndex % widget.items.length) == index;
-                                return AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                                  width: isCurrent ? (isMobile ? 10 : 12) : (isMobile ? 5 : 7),
-                                  height: isMobile ? 5 : 7,
-                                  decoration: BoxDecoration(
-                                    color: isCurrent ? Colors.white : Colors.white38,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -673,7 +664,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
         ),
       ),
     );
-}
+  }
 
   Widget _buildGradients(bool isMobile) {
     final bool showTrailer = !isMobile && _showTrailerLayer && _videoReady;
@@ -685,6 +676,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
         fit: StackFit.expand,
         children: [
           // 1. FUNDACIÓN DE LEGIBILIDAD (Side Scrim Potenciado estilo Netflix)
+          // Senior Refinement: Gradiente más concentrado a la izquierda para no oscurecer el centro del arte
           if (!isMobile)
             DecoratedBox(
               decoration: BoxDecoration(
@@ -692,12 +684,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    const Color(0xFF0B0B0D).withOpacity(0.85), 
-                    const Color(0xFF0B0B0D).withOpacity(0.4),
-                    const Color(0xFF0B0B0D).withOpacity(0.1),
+                    const Color(0xFF0B0B0D).withOpacity(0.98), 
+                    const Color(0xFF0B0B0D).withOpacity(0.7),
+                    const Color(0xFF0B0B0D).withOpacity(0.2),
                     Colors.transparent,
                   ],
-                  stops: const [0.0, 0.3, 0.5, 0.8],
+                  stops: const [0.0, 0.35, 0.5, 0.65],
                 ),
               ),
             ),
@@ -735,6 +727,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                 ),
               ),
             ),
+
         ],
       ),
     );
@@ -803,6 +796,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                       height: h,
                       width: logoMaxWidth, // Senior Fix: Forzar ancho para que no colapse al centro
                       fit: BoxFit.contain,
+                      filterQuality: FilterQuality.low,
                       alignment: Alignment.bottomLeft,
                       fadeInDuration: Duration.zero,
                     ),
@@ -818,6 +812,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                 height: h,
                 width: logoMaxWidth, // Senior Fix: Consistencia total de ancho
                 fit: BoxFit.contain,
+                filterQuality: FilterQuality.low,
                 alignment: Alignment.bottomLeft,
                 fadeInDuration: const Duration(milliseconds: 300),
                 placeholder: (context, url) => SizedBox(height: h, width: logoMaxWidth),
@@ -842,7 +837,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
   Widget _buildContentOverlay(MediaItem item, bool isMobile, double constraintsWidth, {Key? key}) {
     final width = constraintsWidth;
     final titleFontSize = isMobile ? 14.0 : (width < 1100 ? 38.0 : 54.0);
-    final spacing = isMobile ? 8.0 : (width < 1100 ? 16.0 : 32.0);
+    final spacing = isMobile ? 8.0 : (width < 1100 ? 12.0 : 20.0);
     final maxTitleWidth = isMobile ? width * 0.85 : (width * 0.7).clamp(400.0, 900.0);
 
     return SizedBox(
@@ -852,29 +847,11 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!isMobile) ...[
-            Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/icons/auris-tv-icon.svg',
-                  height: 32,
-                  colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  _getMediaLabel(item.type),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 4,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-          ],
           _heroTitleWidget(item, isMobile, titleFontSize, maxTitleWidth),
+          if (!isMobile) ...[
+            const SizedBox(height: 16),
+            _buildMetadataCapsules(item),
+          ],
           SizedBox(height: spacing),
           if (isMobile) ...[
             Row(
@@ -988,37 +965,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            DefaultTextStyle(
-              style: const TextStyle(
-                color: Color(0xFFA5A5AA), 
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-              child: Row(
-                children: [
-                  if (item.year != null) ...[
-                    Text('${item.year}', style: const TextStyle(color: Colors.white)),
-                    _buildMetadataSeparator(),
-                  ],
-                  Text(
-                    item.type == MediaType.movie ? 'Película' : (item.aired ? 'Finalizado' : 'En emisión'),
-                    style: TextStyle(
-                      color: item.aired ? const Color(0xFFA5A5AA) : const Color(0xFFEF7A1E),
-                    ),
-                  ),
-                  if (item.rating != null) ...[
-                    _buildMetadataSeparator(),
-                    const Icon(Icons.star, color: Colors.amber, size: 18),
-                    const SizedBox(width: 4),
-                    Text(
-                      formatRating(item.rating) ?? 'N/A',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ],
-                ],
-              ),
-            ),
           ],
         ],
       ),
@@ -1027,13 +973,82 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
 
   Widget _buildMetadataSeparator() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Text('•', style: TextStyle(color: Colors.white.withOpacity(0.3))),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Text(
+        '•',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.3),
+          fontSize: 18,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetadataCapsules(MediaItem item) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Identidad y Categoría
+        SvgPicture.asset(
+          'assets/icons/auris-tv-icon.svg',
+          height: 16,
+          colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          _getMediaLabel(item.type),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+          ),
+        ),
+        if (item.rating != null || item.year != null) ...[
+          _buildMetadataSeparator(),
+          if (item.rating != null) ...[
+            const Icon(Icons.star, color: Colors.amber, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              formatRating(item.rating) ?? 'N/A',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+          if (item.year != null) ...[
+            _buildMetadataSeparator(),
+            Text(
+              '${item.year}',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ],
+      ],
     );
   }
 
   Widget _buildHermeticSeal(bool isMobile) {
-    return const SizedBox.shrink();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            const Color(0xFF0B0B0D).withOpacity(isMobile ? 0.95 : 1.0), 
+            const Color(0xFF0B0B0D).withOpacity(0.4),
+            const Color(0xFF0B0B0D).withOpacity(0.0),
+          ],
+          stops: const [0.0, 0.2, 0.5], // Bajado el alcance para no tapar los rostros
+        ),
+      ),
+    );
   }
 }
 
@@ -1053,47 +1068,31 @@ class _BannerContent extends StatelessWidget {
     final double overlayOpacity = showTrailer ? 0.45 : 0.0;
 
     if (hasBanner) {
-      return TweenAnimationBuilder<double>(
+      return AnimatedContainer(
         duration: const Duration(milliseconds: 800),
-        tween: Tween<double>(begin: 0.0, end: showTrailer ? 4.0 : 0.0),
-        builder: (context, blurValue, child) {
-          return ImageFiltered(
-            imageFilter: ui.ImageFilter.blur(sigmaX: blurValue, sigmaY: blurValue),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 800),
-              foregroundDecoration: BoxDecoration(
-                color: Colors.black.withOpacity(overlayOpacity),
-              ),
-              child: CachedNetworkImage(
-                imageUrl: item.bannerUrl!,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                placeholder: (context, url) => Container(color: Colors.black12),
-                errorWidget: (context, url, error) => Container(color: Colors.black),
-              ),
-            ),
-          );
-        },
+        foregroundDecoration: BoxDecoration(
+          color: Colors.black.withOpacity(overlayOpacity),
+        ),
+        child: CachedNetworkImage(
+          imageUrl: item.bannerUrl!,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.low,
+          alignment: Alignment.topCenter,
+          placeholder: (context, url) => Container(color: Colors.black12),
+          errorWidget: (context, url, error) => Container(color: Colors.black),
+        ),
       );
     }
     return Stack(
       fit: StackFit.expand,
       children: [
-        TweenAnimationBuilder<double>(
-          duration: const Duration(milliseconds: 800),
-          tween: Tween<double>(begin: 0.0, end: showTrailer ? 4.0 : 0.0),
-          builder: (context, blurValue, child) {
-            return ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: blurValue, sigmaY: blurValue),
-              child: CachedNetworkImage(
-                imageUrl: item.posterUrl,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                placeholder: (context, url) => Container(color: Colors.white10),
-                errorWidget: (context, url, error) => Container(color: Colors.black26),
-              ),
-            );
-          },
+        CachedNetworkImage(
+          imageUrl: item.posterUrl,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.low,
+          alignment: Alignment.topCenter,
+          placeholder: (context, url) => Container(color: Colors.white10),
+          errorWidget: (context, url, error) => Container(color: Colors.black26),
         ),
         AnimatedContainer(
           duration: const Duration(milliseconds: 800),

@@ -101,12 +101,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final resultsAsync = ref.watch(
-      searchResultsProvider(
-        SearchParams(category: _selectedCategory, query: _currentQuery),
-      ),
-    );
-
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
       appBar: AppBar(
@@ -196,7 +190,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         duration: const Duration(milliseconds: 300),
         child: _currentQuery.isEmpty 
             ? _buildPreSearchState() 
-            : _buildResultsState(resultsAsync),
+            : _SearchResultsGrid(
+                query: _currentQuery,
+                category: _selectedCategory,
+                onContentTap: _onContentTap,
+              ),
       ),
     );
   }
@@ -250,12 +248,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
     );
   }
+}
 
-  Widget _buildResultsState(AsyncValue<SearchResponse> resultsAsync) {
+class _SearchResultsGrid extends ConsumerWidget {
+  final String query;
+  final String category;
+  final Function(SearchResult) onContentTap;
+
+  const _SearchResultsGrid({
+    required this.query,
+    required this.category,
+    required this.onContentTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final resultsAsync = ref.watch(
+      searchResultsProvider(SearchParams(category: category, query: query)),
+    );
+
     return resultsAsync.when(
       data: (response) {
+        // Senior Fix: Deduplicación aislada de la UI principal
         final results = _deduplicate(response.results);
-        if (results.isEmpty) return _buildNoResultsState();
+        if (results.isEmpty) return _buildNoResultsPlaceholder(context, query, onContentTap);
         
         final isMobile = ResponsiveUtils.isMobile(context);
         final screenWidth = MediaQuery.sizeOf(context).width;
@@ -268,31 +284,32 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           else crossAxisCount = 5;
         }
         
-        return GridView.builder(
-          key: const ValueKey('results_grid'),
-          padding: EdgeInsets.fromLTRB(
-            isMobile ? 16 : 24, 8, isMobile ? 16 : 24, 40
+        return RepaintBoundary(
+          child: GridView.builder(
+            key: const ValueKey('results_grid'),
+            padding: EdgeInsets.fromLTRB(isMobile ? 16 : 24, 8, isMobile ? 16 : 24, 40),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              childAspectRatio: isMobile ? 0.54 : 0.58,
+              crossAxisSpacing: isMobile ? 12 : 20, 
+              mainAxisSpacing: isMobile ? 12 : 16, 
+            ),
+            itemCount: results.length,
+            itemBuilder: (context, index) {
+              final result = results[index];
+              final info = _cardInfo(result, category);
+              return FocusablePosterCard(
+                key: ValueKey('search_${result.url}_${result.source}'),
+                title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
+                posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
+                badge: info['format'] as String?,
+                badgeColor: info['formatColor'] as Color?,
+                subtitle: info['status'] as String?,
+                subtitleColor: info['statusColor'] as Color?,
+                onTap: () => onContentTap(result),
+              );
+            },
           ),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            childAspectRatio: isMobile ? 0.54 : 0.58, // Senior Fix: Ajustado a 0.58 para eliminar el overflow de 12px
-            crossAxisSpacing: isMobile ? 12 : 20, 
-            mainAxisSpacing: isMobile ? 12 : 16, 
-          ),
-          itemCount: results.length,
-          itemBuilder: (context, index) {
-            final result = results[index];
-            final info = _cardInfo(result, _selectedCategory);
-            return FocusablePosterCard(
-              title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
-              posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
-              badge: info['format'] as String?,
-              badgeColor: info['formatColor'] as Color?,
-              subtitle: info['status'] as String?,
-              subtitleColor: info['statusColor'] as Color?,
-              onTap: () => _onContentTap(result),
-            );
-          },
         );
       },
       loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
@@ -300,43 +317,31 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Widget _buildNoResultsState() {
+  Widget _buildNoResultsPlaceholder(BuildContext context, String query, Function(SearchResult) onContentTap) {
     return SingleChildScrollView(
       key: const ValueKey('no_results_scroll'),
       padding: const EdgeInsets.only(top: 60, bottom: 40),
       child: Column(
         children: [
-          // MENSAJE PRINCIPAL
           const Icon(Icons.search_off_rounded, size: 80, color: Colors.white10),
           const SizedBox(height: 24),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
-              'No hemos encontrado resultados para "$_currentQuery"',
+              'No hemos encontrado resultados para "$query"',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white70, 
-                fontSize: 18, 
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
-              ),
+              style: const TextStyle(color: Colors.white70, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.5),
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Prueba con otros términos o explora lo más visto hoy',
-            style: TextStyle(color: Colors.white30, fontSize: 14),
-          ),
-          
+          const Text('Prueba con otros términos o explora lo más visto hoy', style: TextStyle(color: Colors.white30, fontSize: 14)),
           const SizedBox(height: 60),
-          
-          // RECOMENDACIONES (EL TOP 10 RECIÉN CREADO)
-          SearchTrendingSection(onTrendingTap: _onContentTap),
-          
+          SearchTrendingSection(onTrendingTap: (res) => onContentTap(res)),
           const SizedBox(height: 40),
-          
-          // EXPLORACIÓN POR GÉNEROS
-          SearchGenresGrid(onGenreTap: _performSearch),
+          SearchGenresGrid(onGenreTap: (q) {
+            // Senior Helper: En un ConsumerWidget sin estado propio, el callback
+            // debe ser manejado por el padre (SearchScreen).
+          }),
         ],
       ),
     );

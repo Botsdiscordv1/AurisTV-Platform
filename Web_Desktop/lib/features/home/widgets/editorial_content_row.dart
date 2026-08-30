@@ -117,8 +117,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
 
   Widget _buildStandardRow(bool isMobile, double horizontalPadding) {
     return MouseRegion(
-      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
+      onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
+      onExit: (_) { if (mounted) setState(() => _isHovered = false); },
       child: Stack(
         children: [
           SizedBox(
@@ -128,6 +128,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               child: ListView.separated(
                 controller: _scrollController,
                 physics: const ClampingScrollPhysics(),
+                cacheExtent: 600,
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
                 itemCount: widget.items.length,
@@ -179,8 +180,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
           ),
           SizedBox(height: isMobile ? 12 : 24),
           MouseRegion(
-            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
+            onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
+            onExit: (_) { if (mounted) setState(() => _isHovered = false); },
             child: Stack(
               children: [
                 SizedBox(
@@ -190,12 +191,14 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                     child: ListView.builder(
                       controller: _scrollController,
                       scrollDirection: Axis.horizontal,
+                      cacheExtent: 800,
                       clipBehavior: Clip.none, 
                       padding: EdgeInsets.fromLTRB(horizontalPadding, 5, horizontalPadding, 5),
                       itemCount: widget.items.length.clamp(0, 10),
                       itemBuilder: (context, index) {
                         final item = widget.items[index];
                         return _MythicTopItem(
+                          key: ValueKey('mythic_${item.id}'),
                           index: index,
                           item: item,
                           height: posterHeight,
@@ -217,6 +220,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
 
   // WRAPPER DE DIFUMINADO (Efecto Banner Home)
   Widget _buildFadedWrapper({required double horizontalPadding, required Widget child}) {
+    if (!_canScrollLeft && !_canScrollRight) return child;
+    
     return NotificationListener<ScrollNotification>(
       onNotification: (_) {
         _updateScrollIndicators();
@@ -310,6 +315,7 @@ class _MythicTopItem extends StatelessWidget {
   final VoidCallback onTap;
 
   const _MythicTopItem({
+    super.key,
     required this.index,
     required this.item,
     required this.height,

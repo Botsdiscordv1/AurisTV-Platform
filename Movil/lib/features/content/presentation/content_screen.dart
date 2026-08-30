@@ -262,6 +262,8 @@ class _ContentHeader extends ConsumerStatefulWidget {
 class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   YoutubePlayerController? _ytController; StreamSubscription? _ytSubscription; Timer? _fadeTimer; String? _lastTrailerKey; bool _isMuted = true; bool _showPlayer = false; bool _isPlayedOnce = false; Timer? _delayTimer;
   bool _showTitle = true; Timer? _titleHideTimer;
+  bool _revealed = false;
+  Timer? _revealTimeout;
 
   void _startTitleHideTimer() {
     _titleHideTimer?.cancel();
@@ -282,7 +284,21 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     _startTitleHideTimer();
   }
   @override void didChangeDependencies() { super.didChangeDependencies(); _checkAndInitTrailer(); }
-  @override void didUpdateWidget(covariant _ContentHeader oldWidget) { super.didUpdateWidget(oldWidget); _checkAndInitTrailer(); }
+  @override void didUpdateWidget(covariant _ContentHeader oldWidget) { 
+    super.didUpdateWidget(oldWidget); 
+    _checkAndInitTrailer(); 
+    
+    // Senior Fix: Solo revelamos si tenemos DATOS REALES (no null) 
+    // o si ambas peticiones terminaron (aunque sean null) para no esperar al timeout.
+    final animeDone = widget.animeDetailAsync.hasValue;
+    final movieDone = widget.movieDetailAsync.hasValue;
+    final hasRealData = widget.animeDetailAsync.valueOrNull != null || 
+                        widget.movieDetailAsync.valueOrNull != null;
+
+    if (!_revealed && (hasRealData || (animeDone && movieDone))) {
+      setState(() => _revealed = true);
+    }
+  }
   void _checkAndInitTrailer() {
     final d = widget.category == 'movie_anime'
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
@@ -384,11 +400,24 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     });
   }
   void _disposeController() { _delayTimer?.cancel(); _fadeTimer?.cancel(); _titleHideTimer?.cancel(); _ytSubscription?.cancel(); _ytSubscription = null; _ytController?.close(); _ytController = null; }
-  @override void dispose() { _disposeController(); super.dispose(); }
+  @override void initState() {
+    super.initState();
+    // Timeout de seguridad: Si en X segundos no hay enriquecimiento, mostramos fallbacks
+    _revealTimeout = Timer(ApiEndpoints.detailRevealTimeout, () {
+      if (mounted && !_revealed) setState(() => _revealed = true);
+    });
+  }
+
+  @override void dispose() { 
+    _revealTimeout?.cancel();
+    _disposeController(); 
+    super.dispose(); 
+  }
 
   Widget _buildMetaRow(dynamic d, {required bool isMobile}) {
     final year = (d is AnimeDetail) ? d.year?.toString() : (d is MovieDetail ? d.releaseDate?.split('-').first : null);
-    final rating = (d is AnimeDetail) ? d.rating?.toStringAsFixed(1) : (d is MovieDetail ? d.rating?.toStringAsFixed(1) : null);
+    final r = (d?.rating ?? widget.sourceRating) as double?;
+    final rating = formatRating(r);
     
     // Obtenemos géneros
     List<String> genres = [];
@@ -402,7 +431,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Fila 1: Badges (Certificación + Géneros)
-        if ((cert != null && cert.isNotEmpty && cert != 'NR') || genres.isNotEmpty)
+        if ((cert != null && cert.isNotEmpty && cert != 'NR') || (genres.isNotEmpty && _revealed))
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: SingleChildScrollView(
@@ -421,22 +450,70 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 ],
               ),
             ),
+          )
+        else if (!_revealed) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                _SkeletonBox(width: 40, height: 22, borderRadius: 4),
+                const SizedBox(width: 8),
+                _SkeletonBox(width: 80, height: 22, borderRadius: 4),
+              ],
+            ),
           ),
+        ],
         
         // Fila 2: Rating (Estrella Amarilla) y Año
         Row(
           children: [
-            if (rating != null) ...[
-              const Icon(Icons.star, color: Color(0xFFFFC107), size: 18),
-              const SizedBox(width: 6),
-              Text(rating, style: const TextStyle(color: Color(0xFFFFC107), fontSize: 16, fontWeight: FontWeight.bold)),
+            if (!_revealed) ...[
+              const _RatingSkeleton(width: 50, height: 18, mobile: true),
               const SizedBox(width: 16),
+              const _SkeletonBox(width: 40, height: 18),
+            ] else ...[
+              if (r != null && r > 0) ...[
+                const Icon(Icons.star, color: Color(0xFFFFC107), size: 18),
+                const SizedBox(width: 6),
+                Text(rating ?? 'N/A', style: const TextStyle(color: Color(0xFFFFC107), fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 16),
+              ],
+              if (year != null)
+                Text(year, style: const TextStyle(color: Colors.white70, fontSize: 16)),
             ],
-            if (year != null)
-              Text(year, style: const TextStyle(color: Colors.white70, fontSize: 16)),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) {
+    final text = detail?.overview ?? '';
+    
+    if (!_revealed && text.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          _SkeletonBox(width: double.infinity, height: 16),
+          SizedBox(height: 8),
+          _SkeletonBox(width: double.infinity, height: 16),
+          SizedBox(height: 8),
+          _SkeletonBox(width: 200, height: 16),
+        ],
+      );
+    }
+    
+    return Text(
+      text.isNotEmpty ? text : 'Sinopsis no disponible.', 
+      maxLines: 4, 
+      overflow: TextOverflow.ellipsis, 
+      style: TextStyle(
+        color: Colors.white.withOpacity(0.9), 
+        fontSize: 16, 
+        height: 1.3, 
+        fontWeight: FontWeight.w500, 
+        letterSpacing: -0.1
+      )
     );
   }
 
@@ -1252,7 +1329,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   @override void initState() {
     super.initState();
-    _loadTimer = Timer(const Duration(seconds: 130), () {
+    _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () {
       if (mounted) setState(() => _showContent = true);
     });
   }
@@ -1838,7 +1915,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               }
             )),
             if (isMobile) SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _ExpandableText(text: (detailData as dynamic)?.overview ?? 'No hay sinopsis disponible.', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 16), maxLines: 3),
+              _buildSynopsis(detailData),
               const SizedBox(height: 16),
               if (detailData is MovieDetail && detailData.platforms.isNotEmpty) ...[
                 Wrap(spacing: 8, runSpacing: 8, children: detailData.platforms.take(5).map<Widget>((p) => _PlatformLogo(platform: p, size: 24)).toList()),

@@ -147,48 +147,64 @@ class HeroBannerSkeleton extends StatelessWidget {
     final hPadding = ResponsiveUtils.horizontalPadding(context);
     final aspectRatio = isMobile ? 16 / 11 : 2.8 / 1;
 
-    return AspectRatio(
-      aspectRatio: aspectRatio,
-      child: Stack(
-        children: [
-          const SkeletonContainer(
-            width: double.infinity, 
-            height: double.infinity, 
-            borderRadius: 0,
+    return Padding(
+      padding: isMobile 
+          ? EdgeInsets.zero 
+          : EdgeInsets.fromLTRB(hPadding, 24, hPadding, 48),
+      child: Container(
+        foregroundDecoration: isMobile ? null : BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+            width: 2.0,
           ),
-          Positioned(
-            left: hPadding,
-            bottom: isMobile ? 40 : 80,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+        ),
+        child: Padding(
+          padding: isMobile ? EdgeInsets.zero : const EdgeInsets.all(2.0),
+          child: AspectRatio(
+            aspectRatio: aspectRatio,
+            child: Stack(
               children: [
                 SkeletonContainer(
-                  width: isMobile ? 180 : 500, 
-                  height: isMobile ? 24 : 64, // Título más grande en desktop
+                  width: double.infinity, 
+                  height: double.infinity, 
+                  borderRadius: isMobile ? 0 : 22,
                 ),
-                const SizedBox(height: 16),
-                // Línea de metadatos sutil
-                if (!isMobile) ...[
-                  const SkeletonContainer(width: 300, height: 20),
-                  const SizedBox(height: 24),
-                ],
-                Row(
-                  children: [
-                    SkeletonContainer(
-                      width: isMobile ? 100 : 180, 
-                      height: isMobile ? 36 : 56,
-                    ),
-                    const SizedBox(width: 12),
-                    const SkeletonContainer(width: 56, height: 56, borderRadius: 28),
-                    const SizedBox(width: 12),
-                    const SkeletonContainer(width: 56, height: 56, borderRadius: 28),
-                  ],
+                Positioned(
+                  left: isMobile ? hPadding : 80,
+                  bottom: isMobile ? 40 : 80,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SkeletonContainer(
+                        width: isMobile ? 180 : 500, 
+                        height: isMobile ? 24 : 64,
+                      ),
+                      const SizedBox(height: 16),
+                      if (!isMobile) ...[
+                        const SkeletonContainer(width: 300, height: 20),
+                        const SizedBox(height: 24),
+                      ],
+                      Row(
+                        children: [
+                          SkeletonContainer(
+                            width: isMobile ? 100 : 180, 
+                            height: isMobile ? 36 : 56,
+                          ),
+                          const SizedBox(width: 12),
+                          const SkeletonContainer(width: 56, height: 56, borderRadius: 28),
+                          const SizedBox(width: 12),
+                          const SkeletonContainer(width: 56, height: 56, borderRadius: 28),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

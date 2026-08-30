@@ -236,6 +236,10 @@ class AurisRepositoryImpl implements AurisRepository {
       ApiEndpoints.detailAnime,
       queryParameters: params,
       baseUrl: ApiEndpoints.animeBaseUrl,
+      options: Options(
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+      ),
     );
     if (response.statusCode == 404) return null;
     return AnimeDetail.fromJson(response.data as Map<String, dynamic>);
@@ -260,6 +264,10 @@ class AurisRepositoryImpl implements AurisRepository {
       ApiEndpoints.detailMovie,
       queryParameters: params,
       baseUrl: server ?? ApiEndpoints.baseUrlForCategory(category),
+      options: Options(
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+      ),
     );
     if (response.statusCode == 404) return null;
     return MovieDetail.fromJson(response.data as Map<String, dynamic>);

@@ -254,6 +254,8 @@ class _ContentHeader extends ConsumerStatefulWidget {
 class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   YouTubeTrailerPlayerController? _trailerController; Timer? _fadeTimer; String? _lastTrailerKey; bool _isMuted = true; bool _showPlayer = false; bool _isPlayedOnce = false; Timer? _delayTimer;
   bool _showTitle = true; Timer? _titleHideTimer;
+  bool _revealed = false;
+  Timer? _revealTimeout;
 
   void _startTitleHideTimer() {
     _titleHideTimer?.cancel();
@@ -274,7 +276,21 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     _startTitleHideTimer();
   }
   @override void didChangeDependencies() { super.didChangeDependencies(); _checkAndInitTrailer(); }
-  @override void didUpdateWidget(covariant _ContentHeader oldWidget) { super.didUpdateWidget(oldWidget); _checkAndInitTrailer(); }
+  @override void didUpdateWidget(covariant _ContentHeader oldWidget) { 
+    super.didUpdateWidget(oldWidget); 
+    _checkAndInitTrailer(); 
+
+    // Senior Fix: Solo revelamos si tenemos DATOS REALES (no null) 
+    // o si ambas peticiones terminaron (aunque sean null) para no esperar al timeout.
+    final animeDone = widget.animeDetailAsync.hasValue;
+    final movieDone = widget.movieDetailAsync.hasValue;
+    final hasRealData = widget.animeDetailAsync.valueOrNull != null || 
+                        widget.movieDetailAsync.valueOrNull != null;
+
+    if (!_revealed && (hasRealData || (animeDone && movieDone))) {
+      setState(() => _revealed = true);
+    }
+  }
   void _checkAndInitTrailer() {
     final d = widget.category == 'movie_anime'
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
@@ -343,7 +359,19 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     });
   }
   void _disposeController() { _delayTimer?.cancel(); _fadeTimer?.cancel(); _titleHideTimer?.cancel(); _trailerController?.dispose(); _trailerController = null; }
-  @override void dispose() { _disposeController(); super.dispose(); }
+  @override void initState() {
+    super.initState();
+    // Timeout de seguridad: Si en X segundos no hay enriquecimiento, mostramos fallbacks
+    _revealTimeout = Timer(ApiEndpoints.detailRevealTimeout, () {
+      if (mounted && !_revealed) setState(() => _revealed = true);
+    });
+  }
+
+  @override void dispose() { 
+    _revealTimeout?.cancel();
+    _disposeController(); 
+    super.dispose(); 
+  }
 
 @override Widget build(BuildContext context) {
     final d = widget.category == 'movie_anime'
@@ -600,49 +628,58 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 12,
             children: [
-              if (d != null && d.length >= 4) Text(d.substring(0, 4)),
-              if (isMovie) ...[
-                if (runtime != null) Text(_formatRuntime(runtime)),
-              ] else if (widget.totalSeasons > 1) ...[
-                Text('${widget.totalSeasons} Temporadas'),
-              ] else if (detail?.episodes != null) ...[
-                Text('${detail.episodes} Episodios'),
-              ],
-              if (genres.isNotEmpty) ...[
-                ...genres.take(2).map((g) => _buildBadge(context, g.toUpperCase(), small: true)),
-              ],
-              if (r != null && r > 0) ...[
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.star_rounded, color: Colors.amber, size: ResponsiveUtils.sp(context, 20)),
-                    const SizedBox(width: 4),
-                    Text(formatRating(r) ?? 'N/A'),
-                  ],
-                ),
+              if (!_revealed) ...[
+                _SkeletonBox(width: ResponsiveUtils.sp(context, 50), height: ResponsiveUtils.sp(context, 20)),
+                _SkeletonBox(width: ResponsiveUtils.sp(context, 80), height: ResponsiveUtils.sp(context, 20)),
+                const _RatingSkeleton(width: 40, height: 20),
+              ] else ...[
+                if (d != null && d.length >= 4) Text(d.substring(0, 4)),
+                if (isMovie) ...[
+                  if (runtime != null) Text(_formatRuntime(runtime)),
+                ] else if (widget.totalSeasons > 1) ...[
+                  Text('${widget.totalSeasons} Temporadas'),
+                ] else if (detail?.episodes != null) ...[
+                  Text('${detail.episodes} Episodios'),
+                ],
+                if (genres.isNotEmpty) ...[
+                  ...genres.take(2).map((g) => _buildBadge(context, g.toUpperCase(), small: true)),
+                ],
+                if (r != null && r > 0) ...[
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.star_rounded, color: Colors.amber, size: ResponsiveUtils.sp(context, 20)),
+                      const SizedBox(width: 4),
+                      Text(formatRating(r) ?? 'N/A'),
+                    ],
+                  ),
+                ],
               ],
             ],
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            _buildAgeBadge(context, cert, small: true),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                _getWarningText(cert),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                  color: const Color(0xFFA5A5AA),
-                  fontSize: ResponsiveUtils.sp(context, 14),
-                  fontWeight: FontWeight.w500,
+        if (!_revealed)
+          _SkeletonBox(width: ResponsiveUtils.sp(context, 200), height: ResponsiveUtils.sp(context, 16))
+        else
+          Row(
+            children: [
+              _buildAgeBadge(context, cert, small: true),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _getWarningText(cert),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    color: const Color(0xFFA5A5AA),
+                    fontSize: ResponsiveUtils.sp(context, 14),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
       ],
     );
   }
@@ -782,18 +819,35 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     );
   }
 
-  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) => Text(
-    detail?.overview ?? '', 
-    maxLines: 4, 
-    overflow: TextOverflow.ellipsis, 
-    style: TextStyle(
-      color: Colors.white.withOpacity(0.9), 
-      fontSize: ResponsiveUtils.sp(context, 18), // Aumentado para mejor legibilidad en TV
-      height: 1.3, 
-      fontWeight: FontWeight.w500, 
-      letterSpacing: -0.1
-    )
-  );
+  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) {
+    final text = detail?.overview ?? '';
+    
+    if (!_revealed && text.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonBox(width: ResponsiveUtils.sp(context, 400), height: ResponsiveUtils.sp(context, 16)),
+          const SizedBox(height: 8),
+          _SkeletonBox(width: ResponsiveUtils.sp(context, 380), height: ResponsiveUtils.sp(context, 16)),
+          const SizedBox(height: 8),
+          _SkeletonBox(width: ResponsiveUtils.sp(context, 250), height: ResponsiveUtils.sp(context, 16)),
+        ],
+      );
+    }
+
+    return Text(
+      text, 
+      maxLines: 4, 
+      overflow: TextOverflow.ellipsis, 
+      style: TextStyle(
+        color: Colors.white.withOpacity(0.9), 
+        fontSize: ResponsiveUtils.sp(context, 18), 
+        height: 1.3, 
+        fontWeight: FontWeight.w500, 
+        letterSpacing: -0.1
+      )
+    );
+  }
   Widget _buildUpperButtons(BuildContext context) {
     return Stack(children: [
       Positioned(top: ResponsiveUtils.sp(context, 20), left: ResponsiveUtils.sp(context, 30), child: PointerInterceptor(child: IconButton(icon: Icon(Icons.arrow_back, color: Colors.white, size: ResponsiveUtils.sp(context, 24)), onPressed: () => Navigator.of(context).pop()))),
@@ -1469,7 +1523,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   @override void initState() {
     super.initState();
-    _loadTimer = Timer(const Duration(seconds: 130), () {
+    _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () {
       if (mounted) setState(() => _showContent = true);
     });
   }

@@ -6,8 +6,6 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import 'package:auris_core/auris_core.dart';
 
-import 'package:hive_ce_flutter/hive_ce_flutter.dart';
-
 final homeRepositoryProvider = Provider<AurisRepository>((ref) {
   return ref.watch(aurisRepositoryProvider);
 });
@@ -196,7 +194,6 @@ class HomeLayoutSection {
 }
 
 /// Senior: Provider que orquesta el orden de la pantalla de inicio.
-/// En una fase avanzada, esto vendría de un endpoint /api/home/layout.
 final homeLayoutProvider = FutureProvider<List<HomeLayoutSection>>((ref) async {
   final List<HomeLayoutSection> layout = [];
 
@@ -209,19 +206,17 @@ final homeLayoutProvider = FutureProvider<List<HomeLayoutSection>>((ref) async {
   // 3. NUEVO: Novedades Unificadas
   layout.add(const HomeLayoutSection(type: HomeSectionType.recentlyAdded, title: 'Recién añadido a AurisTV'));
 
-  // 4. Cargamos las secciones editoriales unificadas.
-  try {
-    final editorials = await ref.watch(editorialRowsProvider.future);
-    // Agregamos las secciones editoriales al inicio
-    for (final row in editorials) {
+  // 4. Secciones Editoriales (Placeholder dinámico)
+  // Senior Fix: No esperamos a que las editoriales carguen para mostrar el resto del Home.
+  // Esto evita el "blank state" prolongado y los picos de CPU al inicio.
+  final editorialsAsync = ref.watch(editorialRowsProvider);
+  if (editorialsAsync.hasValue) {
+    for (final row in editorialsAsync.value!) {
       layout.add(HomeLayoutSection(type: HomeSectionType.editorial, data: row));
     }
-  } catch (e) {
-    debugPrint('[HomeLayout] Error cargando editoriales: $e');
   }
 
-  // 3. Agregamos las secciones dinámicas (Tendencias y Estrenos)
-  // Senior Logic: Podríamos barajar estas secciones o basarlas en la hora del día.
+  // 5. Agregamos las secciones dinámicas (Tendencias y Estrenos)
   layout.add(const HomeLayoutSection(type: HomeSectionType.recentEpisodes, title: 'Estrenos (Hoy)'));
   layout.add(const HomeLayoutSection(type: HomeSectionType.trendingAnime, title: 'Animes en tendencia'));
   layout.add(const HomeLayoutSection(type: HomeSectionType.trendingMovies, title: 'Películas destacadas'));
@@ -231,12 +226,13 @@ final homeLayoutProvider = FutureProvider<List<HomeLayoutSection>>((ref) async {
 
 final editorialRowsProvider = FutureProvider<List<EditorialRow>>((ref) async {
   final sections = await ref.watch(editorialSectionsProvider.future);
+  
+  // Senior Performance Fix: Limitamos el número de items procesados por fila
+  // en el Home para evitar bloqueos del hilo principal al mapear JSON masivos.
   return sections.map((section) {
     final badge = _badgeFromString(section.badge);
     final isMovie = section.badge.toLowerCase().contains('movie');
     
-    // Senior UI Logic: Decidimos el formato basado en el badge o contenido.
-    // Joyas ocultas y Películas imprescindibles usan formato horizontal (16:9).
     RowFormat format = RowFormat.vertical;
     final titleLower = section.title.toLowerCase();
     if (badge == EditorialBadge.hiddenGem || 
@@ -246,13 +242,17 @@ final editorialRowsProvider = FutureProvider<List<EditorialRow>>((ref) async {
       format = RowFormat.horizontal;
     }
 
+    // Solo mapeamos los primeros 20 items para el carrusel del home.
+    // Esto reduce drásticamente el tiempo de CPU en payloads de 2MB+.
+    final displayItems = section.items.take(20).map(_mapEditorialItemToMediaItem).toList();
+
     return EditorialRow(
       badge: badge ?? EditorialBadge.essential,
       title: section.title,
       subtitle: section.subtitle,
       isMovie: isMovie,
       format: format,
-      items: section.items.map(_mapEditorialItemToMediaItem).toList(),
+      items: displayItems,
     );
   }).toList();
 });
@@ -260,9 +260,8 @@ final editorialRowsProvider = FutureProvider<List<EditorialRow>>((ref) async {
 EditorialBadge? _badgeFromString(String? badge) => editorialBadgeFromString(badge);
 
 MediaItem _mapEditorialItemToMediaItem(EditorialItem result) {
-  MediaType type = MediaType.series; // Senior: Por defecto ahora es Series (Puerto 3001)
+  MediaType type = MediaType.series; 
   
-  // Senior UI Logic: Detección inteligente de tipo basado en fuente y metadatos.
   final s = result.source.toLowerCase();
   final t = result.title.toLowerCase();
   final sub = result.subtitle?.toLowerCase() ?? '';
@@ -284,9 +283,7 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result) {
   } else if (isMovie) {
     type = MediaType.movie;
   }
-  // Si no entra en los anteriores, se queda como MediaType.series (Puerto 3001)
 
-  // Senior UI Logic: Para películas, series y dramas limpiamos etiquetas técnicas redundantes
   String? displaySubtitle = result.subtitle;
   if (type != MediaType.anime) {
     displaySubtitle = (result.year != null && result.year!.isNotEmpty) ? result.year : null;
@@ -322,27 +319,20 @@ final animeMoviesProvider = FutureProvider<List<MediaItem>>((ref) async {
 
 final homeCategoryProvider = StateProvider<String>((ref) => 'inicio');
 
-/// Senior: Global state for the Hero Banner mute status to allow control from the Navbar.
 final heroBannerMutedProvider = StateProvider<bool>((ref) => true);
 
-/// Senior: Exclusividad de expansión para evitar que varias tarjetas se expandan a la vez en un carrusel.
 final hoveredCardIdProvider = StateProvider<String?>((ref) => null);
 
 String _mapUiCategoryToApi(String uiCategory) {
-  switch (uiCategory.toLowerCase()) {
-    case 'animes':
-      return 'anime-seasonal';
-    case 'películas':
-      return 'peliculas';
-    case 'series':
-      return 'peliculas';
-    default:
-      return 'anime';
-  }
+  final cat = uiCategory.toLowerCase();
+  if (cat == 'animes') return 'anime-seasonal';
+  if (cat == 'películas' || cat == 'series' || cat == 'peliculas') return 'peliculas';
+  if (cat == 'kdrama') return 'anime'; 
+  return 'anime';
 }
 
 MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
-  MediaType type = MediaType.series; // Senior: Fallback a Series (Puerto 3001)
+  MediaType type = MediaType.series; 
   final c = category.toLowerCase();
   
   if (c.contains('anime')) type = MediaType.anime;
@@ -350,8 +340,6 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
   else if (c.contains('drama')) type = MediaType.kdrama;
   else if (c.contains('series')) type = MediaType.series;
 
-  // Senior UI Logic: En cine y series mostramos el año como etiqueta; en anime, el año
-  // cuando existe. El rating se pinta como badge (★) en la tarjeta.
   String? displaySubtitle;
   if (type != MediaType.anime) {
     displaySubtitle = result.year?.toString();
@@ -359,7 +347,6 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
     displaySubtitle = result.year.toString();
   }
 
-  // Estado de emisión desde el status del servidor (RELEASING/FINISHED/NOT_YET_RELEASED).
   final isFinished = result.status?.toLowerCase() == 'finished';
 
   return MediaItem(
@@ -382,7 +369,6 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
   );
 }
 
-/// Senior: Provider para las tendencias con caché agresiva para el HeroBanner.
 final trendingListProvider = AsyncNotifierProvider.family<TrendingListNotifier, List<MediaItem>, String>(() {
   return TrendingListNotifier();
 });
@@ -391,8 +377,11 @@ class TrendingListNotifier extends FamilyAsyncNotifier<List<MediaItem>, String> 
   @override
   FutureOr<List<MediaItem>> build(String arg) async {
     ref.keepAlive();
+    
+    final apiCategory = _mapUiCategoryToApi(arg);
+    
     final box = Hive.box('home_cache');
-    final cacheKey = 'trending_$arg';
+    final cacheKey = 'trending_$apiCategory';
     final cachedData = box.get(cacheKey);
 
     if (cachedData != null) {
@@ -424,19 +413,21 @@ class TrendingListNotifier extends FamilyAsyncNotifier<List<MediaItem>, String> 
 
       final items = uniqueItems.values.toList();
       
-      // Guardar en caché
+      // Senior Performance Fix: No guardamos ni procesamos más de 30 items
+      // para el carrusel de tendencias para evitar saturar el hilo de UI.
+      final displayItems = items.take(30).toList();
+      
       final box = Hive.box('home_cache');
-      await box.put('trending_$uiCategory', items.map((e) => _mapMediaItemToJson(e)).toList());
+      await box.put('trending_$uiCategory', displayItems.map((e) => _mapMediaItemToJson(e)).toList());
 
-      state = AsyncData(items);
-      return items;
+      state = AsyncData(displayItems);
+      return displayItems;
     } catch (e) {
       if (state.hasValue) return state.value!;
       rethrow;
     }
   }
 
-  // Helpers para serialización rápida de MediaItem (Senior Tip: Solo campos necesarios para Home)
   Map<String, dynamic> _mapMediaItemToJson(MediaItem item) => {
     'id': item.id,
     'title': item.title,
@@ -468,14 +459,23 @@ class TrendingListNotifier extends FamilyAsyncNotifier<List<MediaItem>, String> 
 
 /// Senior: Provider para precargar las categorías principales en segundo plano.
 final homePrefetchProvider = FutureProvider<void>((ref) async {
-  // Senior Performance Optimization: Lanzamos todo en paralelo y olvidamos.
-  // El ApiClient ahora fallará a los 30s-60s según los nuevos límites de scraping.
+  // Senior Performance Optimization: Carga ESCALONADA (Staggered).
+  // Se eliminan los 'await' de los .ignore() porque devuelven void.
   try {
-    ref.watch(editorialRowsProvider.future).ignore();
-    ref.watch(trendingListProvider('animes').future).ignore();
-    ref.watch(trendingListProvider('películas').future).ignore();
-    ref.watch(trendingListProvider('series').future).ignore();
-    ref.watch(recentEpisodesProvider.future).ignore();
+    // 1. Prioridad: Editoriales (Carga inmediata para llenar el layout)
+    ref.read(editorialRowsProvider.future).ignore();
+    
+    // 2. Respiro para procesar el JSON de editoriales (que suele ser el más grande)
+    await Future.delayed(const Duration(milliseconds: 1500));
+    ref.read(trendingListProvider('animes').future).ignore();
+    
+    // 3. Carga de Películas y Series con delay mayor
+    await Future.delayed(const Duration(milliseconds: 2500));
+    ref.read(trendingListProvider('películas').future).ignore();
+    
+    // 4. Estrenos al final (Suele ser la petición más lenta de scraping)
+    await Future.delayed(const Duration(milliseconds: 3500));
+    ref.read(recentEpisodesProvider.future).ignore();
   } catch (e) {
     debugPrint('[Senior Prefetch] Error en el disparo de precarga: $e');
   }
