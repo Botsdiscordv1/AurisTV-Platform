@@ -172,7 +172,7 @@ class HeroBannerSkeleton extends StatelessWidget {
                 ),
                 Positioned(
                   left: isMobile ? hPadding : 80,
-                  bottom: isMobile ? 40 : 80,
+                  bottom: isMobile ? 30 : 45, // Senior: Sincronizado con HeroBanner real (45px)
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,

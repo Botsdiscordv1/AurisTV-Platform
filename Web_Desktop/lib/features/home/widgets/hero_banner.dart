@@ -565,7 +565,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
                                   // Posicionamiento adaptativo
                                   Positioned(
                                     left: internalPadding,
-                                    bottom: isMobile ? 35 : 80, // Senior: Revertido a 80 para balancear el diseño
+                                    bottom: isMobile ? 25 : 45, // Senior: Bajado de 80 a 45 para mejor peso visual
                                     right: internalPadding,
                                     child: AnimatedSwitcher(
                                       duration: const Duration(milliseconds: 600),
@@ -748,7 +748,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
     }
   }
 
-  Widget _heroTitleWidget(MediaItem item, bool isMobile, double titleFontSize, double maxTitleWidth) {
+  Widget _heroTitleWidget(MediaItem item, bool isMobile, double titleFontSize, double maxTitleWidth, {bool isLarge = false}) {
     final TextStyle textStyle = isMobile
         ? const TextStyle(
             color: Colors.white,
@@ -769,7 +769,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
             shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)],
           );
     if (item.logoUrl != null && item.logoUrl!.isNotEmpty) {
-      final double h = isMobile ? 80 : (titleFontSize * 3.4).clamp(0.0, 140.0);
+      // Senior: Altura dinámica. Si no hay sinopsis larga, el logo crece de 140 a 200px
+      final double h = isMobile 
+          ? 80 
+          : (titleFontSize * (isLarge ? 4.8 : 3.4)).clamp(0.0, isLarge ? 200.0 : 140.0);
       final double logoMaxWidth = isMobile ? maxTitleWidth : (maxTitleWidth * 0.8).clamp(400.0, 800.0);
       
       return Container(
@@ -840,6 +843,25 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
     final spacing = isMobile ? 8.0 : (width < 1100 ? 12.0 : 20.0);
     final maxTitleWidth = isMobile ? width * 0.85 : (width * 0.7).clamp(400.0, 900.0);
 
+    // Senior UI Logic: Detectamos si la sinopsis es corta (1 línea) para priorizar el Logo
+    bool isShortSynopsis = false;
+    if (!isMobile && item.synopsis != null && item.synopsis!.isNotEmpty) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: item.synopsis,
+          style: TextStyle(
+            fontSize: width < 1100 ? 16 : 18,
+            height: 1.4,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 2,
+      )..layout(maxWidth: maxTitleWidth * 0.9);
+      
+      // Si el texto no excede las líneas máximas y solo ocupa una métrica de línea, es "corta"
+      isShortSynopsis = textPainter.computeLineMetrics().length <= 1;
+    }
+
     return SizedBox(
       width: width,
       child: Column(
@@ -847,13 +869,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _heroTitleWidget(item, isMobile, titleFontSize, maxTitleWidth),
+          _heroTitleWidget(item, isMobile, titleFontSize, maxTitleWidth, isLarge: isShortSynopsis),
           if (!isMobile) ...[
             const SizedBox(height: 16),
             _buildMetadataCapsules(item),
           ],
           SizedBox(height: spacing),
           if (isMobile) ...[
+            // ... resto del código sin cambios
             Row(
               children: [
                 Container(
@@ -883,7 +906,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
               ],
             ),
           ] else ...[
-            if (item.synopsis != null && item.synopsis!.isNotEmpty) ...[
+            if (item.synopsis != null && item.synopsis!.isNotEmpty && !isShortSynopsis) ...[
               SizedBox(
                 width: maxTitleWidth * 0.9,
                 child: Text(
@@ -914,7 +937,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Widget
               children: [
                 _BannerButton(
                   onPressed: () => widget.onPlay(item),
-                  icon: Icons.play_arrow_rounded,
+                  icon: Icons.play_arrow, // Senior: Icono más afilado y preciso
                   label: 'Reproducir',
                   isPrimary: true,
                   compact: width < 1100,
@@ -1169,33 +1192,34 @@ class _BannerButtonState extends State<_BannerButton> {
         onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          height: widget.compact ? 44 : 50, 
+          height: widget.compact ? 44 : 56, // Senior: Unificado a 56px para alinear con botones circulares
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(30), 
           ),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: widget.onPressed,
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(30), 
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: widget.compact ? 20 : 24),
+                padding: EdgeInsets.symmetric(horizontal: widget.compact ? 20 : 28), // Senior: Más aire lateral
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       widget.icon, 
                       color: fgColor, 
-                      size: widget.compact ? 22 : 32
+                      size: widget.compact ? 24 : 34 // Senior: Proporción perfecta
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6), // Senior: Espaciado más ajustado al icono
                     Text(
                       widget.label,
                       style: TextStyle(
                         color: fgColor,
-                        fontSize: widget.compact ? 16 : 18,
-                        fontWeight: FontWeight.bold,
+                        fontSize: widget.compact ? 16 : 19, // Senior: Ligeramente más grande
+                        fontWeight: FontWeight.w800, // Senior: Más peso visual
+                        letterSpacing: 0.2,
                       ),
                     ),
                   ],
