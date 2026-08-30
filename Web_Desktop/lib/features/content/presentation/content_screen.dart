@@ -472,12 +472,12 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 clipBehavior: Clip.hardEdge, 
                 children: [
                   Container(
-                    constraints: BoxConstraints(minHeight: width * 0.55),
+                    constraints: BoxConstraints(minHeight: width * 0.85),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         // Senior Fix: Altura de referencia estable para evitar zoom al expandir
-                        final hBase = width * 0.55;
-                        final ph = hBase * 1.35;
+                        final hBase = width * 0.85;
+                        final ph = hBase * 1.2;
                         final pw = ph * (16 / 9);
                         return Stack(
                           children: [
@@ -493,7 +493,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                           shaderCallback: (rect) {
                                             final headerH = constraints.maxHeight;
                                             final stopEnd = (headerH / ph).clamp(0.0, 1.0);
-                                            final stopStart = (stopEnd * 0.75); // Más margen de visibilidad
+                                            final stopStart = (stopEnd * 0.7); // Más margen de visibilidad
                                             return LinearGradient(
                                               begin: Alignment.topCenter,
                                               end: Alignment.bottomCenter,
@@ -565,7 +565,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                             const Color(0xFF0B0B0D).withValues(alpha: 0.8),
                                             const Color(0xFF0B0B0D),
                                           ],
-                                          stops: const [0.6, 0.9, 1.0],
+                                          stops: const [0.5, 0.85, 1.0],
                                         ),
                                       ),
                                     ),
@@ -573,8 +573,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                 ],
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 100, 20, 16),
+                            Positioned(
+                              bottom: 16,
+                              left: 20,
+                              right: 20,
                               child: Stack(
                                 children: [
                                   if (!_revealed) const SkeletonContainer(width: 180, height: 40),
@@ -582,7 +584,24 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                     duration: const Duration(milliseconds: 1200), 
                                     curve: Curves.easeInOut, 
                                     opacity: _revealed ? 1.0 : 0.0, 
-                                    child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)]))
+                                    child: HeroTitle(
+                                      title: heroTitle, 
+                                      logo: d?.logo, 
+                                      logoReady: logoReady, 
+                                      maxWidth: width * 0.75, 
+                                      maxHeight: 80, 
+                                      style: const TextStyle(
+                                        color: Colors.white, 
+                                        fontSize: 14, 
+                                        fontWeight: FontWeight.bold, 
+                                        height: 1.1, 
+                                        letterSpacing: 4, 
+                                        shadows: [
+                                          Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), 
+                                          Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)
+                                        ]
+                                      )
+                                    )
                                   ),
                                 ],
                               ),
@@ -990,101 +1009,108 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
       final size = isMobile ? null : (isCompact ? 44.0 : 56.0);
       final iconSize = isMobile ? null : (isCompact ? 22.0 : 28.0);
-      final spacing = isMobile ? 0.0 : 12.0;
+      final spacing = isMobile ? 8.0 : 12.0;
 
-      return Padding(
-        padding: EdgeInsets.symmetric(vertical: isMobile ? 0 : 8, horizontal: isMobile ? 0 : 4),
-        child: Row(
-          mainAxisSize: isMobile ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-          // TRÁILER (Solo Desktop)
-          if (!isMobile && _lastTrailerKey != null) ...[
-            _DetailIconButton(
-              icon: _showPlayer ? Icons.videocam_off_outlined : Icons.movie_outlined,
-              label: _showPlayer ? 'Quitar tráiler' : 'Ver tráiler',
-              onPressed: () {
-                if (_showPlayer) {
-                  _disposeController();
-                  setState(() { _showPlayer = false; _isPlayedOnce = true; _showTitle = true; });
-                  _titleHideTimer?.cancel();
-                } else {
-                  _initTrailer(_lastTrailerKey!, immediate: true);
-                }
-              },
-              isMobile: false, size: size, iconSize: iconSize,
-            ),
-            if (_showPlayer) ...[
-              SizedBox(width: spacing),
-              _DetailIconButton(
-                icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                label: _isMuted ? 'Activar audio' : 'Silenciar',
-                onPressed: () {
-                  setState(() {
-                    _isMuted = !_isMuted;
-                    _syncMute(_isMuted);
-                  });
-                },
-                isMobile: false,
-                size: size,
-                iconSize: iconSize,
-              ),
-            ],
-            SizedBox(width: spacing),
-          ],
-
-          // MI LISTA (Ambos)
+      final actionRow = Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+        // TRÁILER (Ambos)
+        if (_lastTrailerKey != null) ...[
           _DetailIconButton(
-            icon: isFav ? Icons.check : Icons.add,
-            label: isFav ? 'En mi lista' : 'Mi lista',
+            icon: _showPlayer ? Icons.videocam_off_outlined : Icons.movie_outlined,
+            label: _showPlayer ? 'Quitar tráiler' : 'Ver tráiler',
             onPressed: () {
-              final item = FavoriteItem(
-                id: currentId,
-                title: widget.title,
-                posterUrl: widget.poster ?? '',
-                bannerUrl: widget.banner ?? '',
-                category: widget.category,
-                source: widget.source,
-                url: widget.url,
-                addedAt: DateTime.now(),
-                profileId: profileId,
-              );
-              ref.read(favoritesProvider.notifier).toggleFavorite(item);
+              if (_showPlayer) {
+                _disposeController();
+                setState(() { _showPlayer = false; _isPlayedOnce = true; _showTitle = true; });
+                _titleHideTimer?.cancel();
+              } else {
+                _initTrailer(_lastTrailerKey!, immediate: true);
+              }
             },
             isMobile: isMobile, size: size, iconSize: iconSize,
           ),
-          if (!isMobile) SizedBox(width: spacing),
-
-          // CALIFICAR / ME GUSTA
-          _DetailIconButton(
-            icon: Icons.thumb_up_off_alt,
-            label: isMobile ? 'Calificar' : 'Me gusta',
-            onPressed: () {},
-            isMobile: isMobile, size: size, iconSize: iconSize,
-          ),
-          
-          // NO ES PARA MÍ (Solo Desktop)
-          if (!isMobile) ...[
+          SizedBox(width: spacing),
+          if (_showPlayer) ...[
+            _DetailIconButton(
+              icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              label: _isMuted ? 'Activar audio' : 'Silenciar',
+              onPressed: () {
+                setState(() {
+                  _isMuted = !_isMuted;
+                  _syncMute(_isMuted);
+                });
+              },
+              isMobile: isMobile,
+              size: size,
+              iconSize: iconSize,
+            ),
             SizedBox(width: spacing),
-            _DetailIconButton(
-              icon: Icons.thumb_down_off_alt,
-              label: 'No es para mí',
-              onPressed: () {},
-              isMobile: false, size: size, iconSize: iconSize,
-            ),
-          ],
-
-          // COMPARTIR (Solo Mobile)
-          if (isMobile) ...[
-            _DetailIconButton(
-              icon: Icons.share_outlined,
-              label: 'Compartir',
-              onPressed: () {},
-              isMobile: true,
-            ),
           ],
         ],
-      ),
+
+        // MI LISTA (Ambos)
+        _DetailIconButton(
+          icon: isFav ? Icons.check : Icons.add,
+          label: isMobile ? 'Lista de videos' : (isFav ? 'En mi lista' : 'Mi lista'),
+          onPressed: () {
+            final item = FavoriteItem(
+              id: currentId,
+              title: widget.title,
+              posterUrl: widget.poster ?? '',
+              bannerUrl: widget.banner ?? '',
+              category: widget.category,
+              source: widget.source,
+              url: widget.url,
+              addedAt: DateTime.now(),
+              profileId: profileId,
+            );
+            ref.read(favoritesProvider.notifier).toggleFavorite(item);
+          },
+          isMobile: isMobile, size: size, iconSize: iconSize,
+        ),
+        SizedBox(width: spacing),
+
+        // CALIFICAR / ME GUSTA
+        _DetailIconButton(
+          icon: Icons.thumb_up_off_alt,
+          label: isMobile ? 'Me gusta' : 'Me gusta',
+          onPressed: () {},
+          isMobile: isMobile, size: size, iconSize: iconSize,
+        ),
+        SizedBox(width: spacing),
+        
+        // DISLIKE / NO ES PARA MÍ
+        _DetailIconButton(
+          icon: Icons.thumb_down_off_alt,
+          label: isMobile ? 'Dislike' : 'No es para mí',
+          onPressed: () {},
+          isMobile: isMobile, size: size, iconSize: iconSize,
+        ),
+
+        // COMPARTIR (Solo Mobile)
+        if (isMobile) ...[
+          SizedBox(width: spacing),
+          _DetailIconButton(
+            icon: Icons.share_outlined,
+            label: 'Compartir',
+            onPressed: () {},
+            isMobile: true,
+          ),
+        ],
+      ],
+    );
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8, horizontal: isMobile ? 0 : 4),
+      child: isMobile 
+        ? SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: actionRow,
+          )
+        : actionRow,
     );
   });
 }
@@ -1108,16 +1134,16 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.only(left: 4, right: 10),
+            padding: EdgeInsets.zero,
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: Colors.black, size: 36),
               const SizedBox(width: 8),
               Text(label, style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
               if (progress != null && progress > 0.02) ...[
-                const Spacer(),
+                const SizedBox(width: 12),
                 _buildButtonProgressBar(progress, isMobile: true),
               ],
             ],
@@ -1482,14 +1508,14 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final isMobile = ResponsiveUtils.isMobile(context);
     final buttons = Stack(children: [
       Positioned(
-        top: isMobile ? 45 : (desktopTop ?? 40), 
+        top: isMobile ? 35 : (desktopTop ?? 40), 
         left: isMobile ? 15 : 40, 
         child: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), 
           onPressed: () { if (mounted) Navigator.of(context).pop(); }
         )
       ),
-      if (isMobile) Positioned(top: 45, right: 15, child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {})),
+      if (isMobile) Positioned(top: 35, right: 15, child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {})),
     ]);
 
     return buttons;
@@ -2529,34 +2555,32 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
   bool _isHovered = false;
   @override Widget build(BuildContext context) {
     if (widget.isMobile) {
-      return Expanded(
-        child: InkWell(
-          onTap: widget.onPressed, 
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // Senior: Evitar que el Column ocupe espacio extra
+      return InkWell(
+        onTap: widget.onPressed, 
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            border: Border.all(color: widget.color ?? Colors.white24, width: 0.8), 
+            borderRadius: BorderRadius.circular(8)
+          ), 
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                height: 48, 
-                decoration: BoxDecoration(
-                  border: Border.all(color: widget.color ?? Colors.white24), 
-                  borderRadius: BorderRadius.circular(4)
-                ), 
-                child: Center(child: Icon(widget.icon, color: widget.color ?? Colors.white, size: 24))
-              ), 
-              const SizedBox(height: 8), 
-              SizedBox(
-                height: 28, // Senior Fix: Altura ajustada para 2 líneas sin exceso de espacio
-                child: Text(
-                  widget.label, 
-                  style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 10.5, height: 1.1), 
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+              Icon(widget.icon, color: widget.color ?? Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                widget.label, 
+                style: GoogleFonts.poppins(
+                  color: Colors.white, 
+                  fontSize: 13, 
+                  fontWeight: FontWeight.w500,
                 ),
-              )
-            ]
-          )
-        )
+              ),
+            ],
+          ),
+        ),
       );
     }
     return MouseRegion(
