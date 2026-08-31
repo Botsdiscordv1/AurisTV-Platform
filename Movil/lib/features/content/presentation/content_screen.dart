@@ -264,6 +264,26 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   bool _revealed = false;
   Timer? _revealTimeout;
 
+  // Trailer state
+  YoutubePlayerController? _ytController;
+  StreamSubscription? _ytSubscription;
+  Timer? _fadeTimer;
+  Timer? _delayTimer;
+  Timer? _titleHideTimer;
+  bool _showTitle = true;
+  bool _isMuted = true;
+  bool _showPlayer = false;
+  bool _isPlayedOnce = false;
+
+  void _startTitleHideTimer() {
+    _titleHideTimer?.cancel();
+    _titleHideTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted && _showPlayer && _showTitle) {
+        setState(() => _showTitle = false);
+      }
+    });
+  }
+
   void _handleInteraction() {
     if (!mounted) return;
     if (!_showTitle) {
@@ -271,13 +291,13 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     }
     _startTitleHideTimer();
   }
+
   @override void didChangeDependencies() { super.didChangeDependencies(); _checkAndInitTrailer(); }
-  @override void didUpdateWidget(covariant _ContentHeader oldWidget) { 
+
+  @override void didUpdateWidget(covariant _ContentHeader oldWidget) {
     super.didUpdateWidget(oldWidget); 
     _checkAndInitTrailer(); 
     
-    // Senior Fix: Solo revelamos si tenemos DATOS REALES (no null) 
-    // o si ambas peticiones terminaron (aunque sean null) para no esperar al timeout.
     final animeDone = widget.animeDetailAsync.hasValue;
     final movieDone = widget.movieDetailAsync.hasValue;
     final hasRealData = widget.animeDetailAsync.valueOrNull != null || 
@@ -287,6 +307,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       setState(() => _revealed = true);
     }
   }
+
   void _checkAndInitTrailer() {
     final d = widget.category == 'movie_anime'
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
@@ -295,32 +316,42 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     if (k != null && k.isNotEmpty) { 
       if (k != _lastTrailerKey) { 
         _lastTrailerKey = k; 
-      } 
+        // Trailer auto-play is disabled per requirements
+        // _initTrailer(k);
+      }
     } else if (_lastTrailerKey != null) { 
       _lastTrailerKey = null; 
     }
   }
+
   void _initTrailer(String key, {bool immediate = false}) {
     _delayTimer?.cancel();
     void start() {
       if (!mounted || key != _lastTrailerKey) return;
       if (_ytController != null) {
-        _fadeTimer?.cancel(); _ytController!.pauseVideo(); _ytController!.seekTo(seconds: 0);
+        _fadeTimer?.cancel(); 
+        _ytController!.pauseVideo(); 
+        _ytController!.seekTo(seconds: 0);
         if (!_isMuted) { _ytController!.unMute(); _ytController!.setVolume(100); } else { _ytController!.mute(); }
-        _ytController!.playVideo();
         setState(() { _showPlayer = false; _isPlayedOnce = false; _showTitle = true; });
         _titleHideTimer?.cancel();
-        Future.delayed(const Duration(milliseconds: 600), () { 
-          if (mounted && !_showPlayer) {
-            setState(() { _showPlayer = true; _showTitle = true; }); 
-            _startTitleHideTimer();
-          }
-        });
         return;
       }
-      final ctrl = YoutubePlayerController.fromVideoId(videoId: key, autoPlay: true, params: const YoutubePlayerParams(showControls: false, showFullscreenButton: false, mute: true, loop: false, showVideoAnnotations: false, playsInline: true, strictRelatedVideos: true, enableKeyboard: false));
+      final ctrl = YoutubePlayerController.fromVideoId(
+        videoId: key, 
+        autoPlay: false, 
+        params: const YoutubePlayerParams(
+          showControls: false, 
+          showFullscreenButton: false, 
+          mute: true, 
+          loop: false, 
+          showVideoAnnotations: false, 
+          playsInline: true, 
+          strictRelatedVideos: true, 
+          enableKeyboard: false
+        )
+      );
       ctrl.listen((state) {
-        if (state.playerState == PlayerState.cued && mounted) { ctrl.playVideo(); }
         if (state.playerState == PlayerState.playing && mounted && !_showPlayer) { 
           setState(() { _showPlayer = true; _showTitle = true; }); 
           _startTitleHideTimer();
@@ -336,8 +367,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           setState(() { _showPlayer = true; _showTitle = true; }); 
           _startTitleHideTimer();
         }
-        
-        // Senior Fix: Sincronizar desaparición de Tráiler y audio en los últimos 12 segundos.
         if (p > 5 && d > 30 && (d - p) < 12) { 
           if (_showPlayer && mounted) { 
             setState(() { 
@@ -346,7 +375,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               _showTitle = true;
             }); 
             _titleHideTimer?.cancel();
-            // Iniciar desvanecimiento sincronizado con la animación (500ms).
             _fadeOutAudio(ctrl); 
           } 
         }
@@ -354,77 +382,64 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       if (mounted) {
         setState(() { _ytController = ctrl; _showPlayer = false; _isPlayedOnce = false; _showTitle = true; });
         _titleHideTimer?.cancel();
-        Future.delayed(const Duration(milliseconds: 400), () { 
-          if (mounted) { 
-            ctrl.playVideo(); 
-            Future.delayed(const Duration(milliseconds: 1100), () { 
-              if (mounted && !_showPlayer) {
-                setState(() { _showPlayer = true; _showTitle = true; }); 
-                _startTitleHideTimer();
-              }
-            }); 
-          } 
-        });
       }
     }
-    if (immediate) start(); else _delayTimer = Timer(const Duration(seconds: 3), start);
+    if (immediate) start(); else _delayTimer = Timer(const Duration(seconds: 1), start);
   }
+
   void _fadeOutAudio(YoutubePlayerController ctrl) {
     _fadeTimer?.cancel(); 
     if (_isMuted) { 
       ctrl.pauseVideo(); 
       return; 
     }
-    
-    // Senior: Desvanecimiento en 3 pasos para no saturar el iframe y asegurar la pausa final.
-    // Paso 1: 50% volumen
     ctrl.setVolume(50);
-    
     _fadeTimer = Timer(const Duration(milliseconds: 250), () {
       if (!mounted) return;
-      // Paso 2: 0% volumen
       ctrl.setVolume(0);
-      
       _fadeTimer = Timer(const Duration(milliseconds: 250), () {
         if (!mounted) return;
-        // Paso 3: Silencio total y Pausa definitiva
         ctrl.mute();
         ctrl.pauseVideo();
       });
     });
   }
-  void _disposeController() { _lastTrailerKey = null; }
+
+  void _disposeController() { 
+    _ytController?.close();
+    _ytController = null;
+    _lastTrailerKey = null; 
+  }
+
   @override void initState() {
     super.initState();
-    // Timeout de seguridad: Si en X segundos no hay enriquecimiento, mostramos fallbacks
     _revealTimeout = Timer(ApiEndpoints.detailRevealTimeout, () {
       if (mounted && !_revealed) setState(() => _revealed = true);
     });
   }
 
-  @override void dispose() { 
+  @override void dispose() {
     _revealTimeout?.cancel();
-    _disposeController(); 
-    super.dispose(); 
+    _ytSubscription?.cancel();
+    _delayTimer?.cancel();
+    _fadeTimer?.cancel();
+    _titleHideTimer?.cancel();
+    _disposeController();
+    super.dispose();
   }
 
   Widget _buildMetaRow(dynamic d, {required bool isMobile}) {
     final year = (d is AnimeDetail) ? d.year?.toString() : (d is MovieDetail ? d.releaseDate?.split('-').first : null);
     final r = (d?.rating ?? widget.sourceRating) as double?;
     final rating = formatRating(r);
-    
-    // Obtenemos géneros
     List<String> genres = [];
     if (d is AnimeDetail) genres = d.genres;
     else if (d is MovieDetail) genres = d.genres;
-
-    // Obtenemos certificación (priorizando detalle)
     final cert = (d != null && d.certification != null && d.certification!.isNotEmpty) ? d.certification : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Fila 1: Badges (Certificación + Géneros)
         if ((cert != null && cert.isNotEmpty && cert != 'NR') || (genres.isNotEmpty && _revealed))
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -457,8 +472,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             ),
           ),
         ],
-        
-        // Fila 2: Rating (Estrella Amarilla) y Año
         Row(
           children: [
             if (!_revealed) ...[
@@ -481,67 +494,76 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     );
   }
 
-  Widget _buildSynopsis(dynamic detail, {bool isCompact = false}) {
-    final text = detail?.overview ?? '';
-    
-    if (!_revealed && text.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _SkeletonBox(width: double.infinity, height: 16),
-          SizedBox(height: 8),
-          _SkeletonBox(width: double.infinity, height: 16),
-          SizedBox(height: 8),
-          _SkeletonBox(width: 200, height: 16),
-        ],
-      );
-    }
-    
-    return Text(
-      text.isNotEmpty ? text : 'Sinopsis no disponible.', 
-      maxLines: 4, 
-      overflow: TextOverflow.ellipsis, 
-      style: TextStyle(
-        color: Colors.white.withOpacity(0.9), 
-        fontSize: 16, 
-        height: 1.3, 
-        fontWeight: FontWeight.w500, 
-        letterSpacing: -0.1
-      )
-    );
-  }
-
   Widget _buildMainActionButton(BuildContext context, {required bool isMobile}) {
+    final history = widget.latestHistory;
+    final hasHistory = history != null;
+    final String label = hasHistory ? 'Continuar viendo' : 'Reproducir ahora';
+    final IconData icon = Icons.play_arrow_rounded;
+    final double? progress = hasHistory ? (history.progress ?? 0) / 100 : null;
+    final bool hasProgress = progress != null && progress > 0.02;
+
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton.icon(
+      height: 54,
+      child: ElevatedButton(
         onPressed: widget.onPlay,
-        icon: const Icon(Icons.play_arrow, size: 24, color: Colors.black),
-        label: const Text("Reproducir", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
-          padding: const EdgeInsets.symmetric(vertical: 10),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: EdgeInsets.symmetric(horizontal: hasProgress ? 16 : 0),
           elevation: 0,
         ),
+        child: Row(
+          mainAxisAlignment: hasProgress ? MainAxisAlignment.start : MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.black, size: 36),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)
+            ),
+            if (hasProgress) ...[
+              const Spacer(),
+              _buildButtonProgressBar(progress, isMobile: true),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildButtonProgressBar(double progress, {bool isMobile = false}) {
+    return Container(
+      width: isMobile ? 50 : 80,
+      height: 6,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0E0E0),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Stack(
+        children: [
+          FractionallySizedBox(
+            widthFactor: progress.clamp(0.0, 1.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF7A1E),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildCircularActions(BuildContext context, {required bool isMobile}) {
     return Consumer(builder: (context, ref, _) {
-      final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
-      // [AurisCore] El provider de favoritos debe estar en la capa compartida
-      // final favorites = ref.watch(favoritesProvider);
-      // final bool isFav = favorites.any((f) => f.id == currentId);
-      const bool isFav = false; // Placeholder para la migración
-      
+      const bool isFav = false; 
       final actionRow = Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-        // TRÁILER
         if (_lastTrailerKey != null) ...[
           _DetailIconButton(
             icon: Icons.movie_outlined,
@@ -555,19 +577,13 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           ),
           const SizedBox(width: 8),
         ],
-
-        // MI LISTA
         _DetailIconButton(
           icon: isFav ? Icons.check : Icons.add,
           label: isFav ? 'En mi lista' : 'Mi lista',
-          onPressed: () {
-            // Lógica de favoritos pendiente de unificar con Core
-          },
+          onPressed: () {},
           isMobile: isMobile,
         ),
         const SizedBox(width: 8),
-
-        // CALIFICAR / ME GUSTA
         _DetailIconButton(
           icon: Icons.thumb_up_off_alt,
           label: 'Me gusta',
@@ -575,16 +591,12 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           isMobile: isMobile,
         ),
         const SizedBox(width: 8),
-        
-        // DISLIKE / NO ES PARA MÍ
         _DetailIconButton(
           icon: Icons.thumb_down_off_alt,
           label: 'Dislike',
           onPressed: () {},
           isMobile: isMobile,
         ),
-
-        // COMPARTIR
         const SizedBox(width: 8),
         _DetailIconButton(
           icon: Icons.share_outlined,
@@ -594,7 +606,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         ),
       ],
     );
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: SingleChildScrollView(
@@ -606,7 +617,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   });
 }
 
-@override Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     final d = widget.category == 'movie_anime'
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
         : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
@@ -627,7 +638,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         child: Column(children: [
           Stack(clipBehavior: Clip.hardEdge, children: [
             AspectRatio(aspectRatio: 16 / 12, child: LayoutBuilder(builder: (context, constraints) {
-              final h = constraints.maxHeight; final ph = h * 1.35; final pw = ph * (16 / 9);
               return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
                 Container(color: const Color(0xFF0B0B0D)),
                 if (b != null) Positioned.fill(child: ShaderMask(
@@ -645,6 +655,21 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                     child: CachedNetworkImage(imageUrl: b, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
                   ),
                 )),
+                if (_ytController != null)
+                  Positioned.fill(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 800),
+                      opacity: _showPlayer ? 1.0 : 0.0,
+                      child: IgnorePointer(
+                        ignoring: !_showPlayer,
+                        child: PointerInterceptor(
+                          child: YoutubePlayer(
+                            controller: _ytController!,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 Positioned(left: 20, bottom: 16, right: 20, child: AnimatedOpacity(duration: const Duration(milliseconds: 1200), curve: Curves.easeInOut, opacity: _revealed ? 1.0 : 0.0, child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)])))),
               ]);
             })),
@@ -1366,7 +1391,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   bool _movieValidationScheduled = false;
   final ScrollController _scrollController = ScrollController();
   bool _showContent = false;
+  bool _revealed = false;
   Timer? _loadTimer;
+  Timer? _revealTimeout;
   // Banner del hero congelado: se captura UNA sola vez con la primera imagen
   // disponible al abrir (ruta > fuente > backdrop del detalle) and ya no cambia
   // al switchear temporada, para no re-solicitar banner ni provocar timeouts.
@@ -1382,10 +1409,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () {
       if (mounted) setState(() => _showContent = true);
     });
+    _revealTimeout = Timer(ApiEndpoints.detailRevealTimeout, () {
+      if (mounted && !_revealed) setState(() => _revealed = true);
+    });
   }
 
   @override void dispose() {
     _loadTimer?.cancel();
+    _revealTimeout?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -1538,6 +1569,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final detailData = isMovieCatFetch
         ? (movieDetailAsync.valueOrNull ?? animeDetailAsync.valueOrNull)
         : (animeDetailAsync.valueOrNull ?? movieDetailAsync.valueOrNull);
+
+    // [Senior Reveal Logic] Sincroniza el estado _revealed cuando los datos llegan
+    final animeDone = animeDetailAsync.hasValue;
+    final movieDone = movieDetailAsync.hasValue;
+    final hasRealData = animeDetailAsync.valueOrNull != null || movieDetailAsync.valueOrNull != null;
+    if (!_revealed && (hasRealData || (animeDone && movieDone))) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_revealed) setState(() => _revealed = true);
+      });
+    }
 
     // Tipo resuelto a partir del payload (kind) y no solo de la categoría, para
     // no confundir backend/categoría al abrir contenido de 3000/3001/3002.
@@ -2111,6 +2152,36 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
+    );
+  }
+
+  Widget _buildSynopsis(dynamic detail, {bool isCompact = false, bool revealed = true}) {
+    final text = detail?.overview ?? '';
+    
+    if (!revealed && text.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          _SkeletonBox(width: double.infinity, height: 16),
+          SizedBox(height: 8),
+          _SkeletonBox(width: double.infinity, height: 16),
+          SizedBox(height: 8),
+          _SkeletonBox(width: 200, height: 16),
+        ],
+      );
+    }
+    
+    return Text(
+      text.isNotEmpty ? text : 'Sinopsis no disponible.', 
+      maxLines: 4, 
+      overflow: TextOverflow.ellipsis, 
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.9), 
+        fontSize: 16, 
+        height: 1.3, 
+        fontWeight: FontWeight.w500, 
+        letterSpacing: -0.1
+      )
     );
   }
 

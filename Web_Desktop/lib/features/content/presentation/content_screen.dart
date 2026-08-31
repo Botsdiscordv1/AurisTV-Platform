@@ -1093,11 +1093,11 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final String label = hasHistory ? 'Continuar viendo' : 'Reproducir ahora';
     final IconData icon = hasHistory ? Icons.play_arrow_rounded : Icons.play_arrow_rounded;
     
-    // [Senior Logic] Para películas, mostramos progreso directamente en el botón
-    final bool isMovie = widget.category == 'movie' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title);
-    final double? progress = (hasHistory && isMovie) ? history.progressPercentage : null;
+    // [Senior Logic] Mostramos progreso directamente en el botón si existe historial
+    final double? progress = hasHistory ? history.progress : null;
 
     if (isMobile) {
+      final bool hasProgress = progress != null && progress > 0.02;
       return SizedBox(
         width: double.infinity,
         height: 54,
@@ -1106,16 +1106,16 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: EdgeInsets.zero,
+            padding: EdgeInsets.symmetric(horizontal: hasProgress ? 16 : 0),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: hasProgress ? MainAxisAlignment.start : MainAxisAlignment.center,
             children: [
               Icon(icon, color: Colors.black, size: 36),
               const SizedBox(width: 8),
               Text(label, style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
-              if (progress != null && progress > 0.02) ...[
-                const SizedBox(width: 12),
+              if (hasProgress) ...[
+                const Spacer(),
                 _buildButtonProgressBar(progress, isMobile: true),
               ],
             ],
