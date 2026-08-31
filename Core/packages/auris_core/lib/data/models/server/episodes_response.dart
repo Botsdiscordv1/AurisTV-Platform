@@ -1,3 +1,4 @@
+import '../../../core/api/api_endpoints.dart';
 import 'package:flutter/foundation.dart';
 
 class EpisodesResponse {
@@ -86,7 +87,14 @@ class RelatedInfo {
       title: json['title'] as String? ?? '',
       url: json['url'] as String? ?? '',
       slug: json['slug'] as String? ?? '',
-      cover: json['cover'] as String? ?? '',
+      cover: ApiEndpoints.proxyImage(
+        json['cover'] as String? ?? 
+        json['coverImage'] as String? ?? 
+        json['poster'] as String? ?? 
+        json['posterUrl'] as String? ?? 
+        json['thumbnail'] as String? ?? 
+        json['image'] as String?
+      ),
       relation: json['relation'] as String? ?? 'Relacionado',
     );
   }
@@ -130,7 +138,11 @@ class EpisodeInfo {
       id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       url: json['url'] as String? ?? '',
       title: json['title'] as String?,
-      thumbnail: json['thumbnail'] as String?,
+      thumbnail: ApiEndpoints.proxyImage(
+        json['thumbnail'] as String? ?? 
+        json['image'] as String? ?? 
+        json['still_path'] as String?
+      ),
       description: json['description'] as String?,
       airDate: json['airDate'] as String?,
       duration: json['duration'] as String?,

@@ -102,17 +102,35 @@ class ApiEndpoints {
   static String fixUrl(String? url) {
     if (url == null || url.isEmpty) return '';
     if (url.startsWith('/')) return '$baseUrl$url';
+    
     final lower = url.toLowerCase();
+    
     if (kIsWeb) {
+      String fixed = url;
+      // En Web, si la URL tiene la IP de nuestro servidor, la cambiamos por el dominio
+      // para evitar errores de certificado SSL (Mixed Content / Cert Mismatch).
+      if (lower.contains('129.151.126.4')) {
+        fixed = fixed.replaceAll('129.151.126.4', _defaultDomain);
+        fixed = fixed.replaceAll(':3000', '');
+        fixed = fixed.replaceAll(':3001', '');
+        fixed = fixed.replaceAll(':3002', '');
+      }
+      
       if ((lower.contains('localhost') || lower.contains('127.0.0.1')) &&
           _defaultDomain != 'localhost' && _defaultDomain != '127.0.0.1') {
-        return url.replaceAll('localhost', _defaultDomain).replaceAll('127.0.0.1', _defaultDomain);
+        fixed = fixed.replaceAll('localhost', _defaultDomain).replaceAll('127.0.0.1', _defaultDomain);
+        fixed = fixed.replaceAll(':3000', '');
+        fixed = fixed.replaceAll(':3001', '');
+        fixed = fixed.replaceAll(':3002', '');
       }
-      return url;
+      return fixed;
     }
+
+    // Guard para evitar crash en Web al acceder a Platform
     if (Platform.isAndroid && (lower.contains('127.0.0.1') || lower.contains('localhost'))) {
       return url.replaceAll('127.0.0.1', _defaultDomain).replaceAll('localhost', _defaultDomain);
     }
+    
     return url;
   }
 
@@ -157,15 +175,23 @@ class ApiEndpoints {
       return fixUrl(workingUrl);
     }
 
-    // 4. Aplicar proxy solo para el resto (Principalmente en Web por CORS).
+    // 4. APLICAR PROXY:
     if (workingUrl.startsWith('http')) {
+      // --- FALLBACK PARA DOMINIOS CIEGOS (Weserv) ---
+      // Si el VPS no puede ver el dominio (como jkdesa), usamos un proxy público global.
+      if (lowerUrl.contains('jkdesa.com') || lowerUrl.contains('jkanime.net')) {
+        return 'https://images.weserv.nl/?url=${Uri.encodeComponent(workingUrl)}';
+      }
+
+      // --- PROXY PRIVADO (Nuestro VPS) ---
+      // Para el resto de dominios que el VPS SÍ ve (como animeav1).
       if (kIsWeb) {
         return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
       }
       
       const forceProxyDomains = [
         'zilla-networks.com', 'idmwp.com', 'animeflv', 
-        'animeav1.com', 'jkanime', 'jkdesa'
+        'animeav1.com'
       ];
       if (forceProxyDomains.any((d) => lowerUrl.contains(d))) {
         return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';

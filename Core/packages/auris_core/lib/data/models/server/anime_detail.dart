@@ -242,23 +242,25 @@ class RelationInfo {
   const RelationInfo({this.id, required this.title, required this.relation, this.poster});
 
   factory RelationInfo.fromJson(Map<String, dynamic> json) {
-    final visuals = json['visuals'] as Map<String, dynamic>?;
+    final v = (json['visuals'] as Map<String, dynamic>?) ?? json;
     return RelationInfo(
       id: json['id']?.toString(),
       title: json['title'] as String? ?? '',
       relation: json['relation'] as String? ?? 'UNKNOWN',
       poster: ApiEndpoints.proxyImage(
-        visuals?['poster'] as String? ??
-        visuals?['thumbnail'] as String? ??
+        v['poster'] as String? ??
+        v['posterUrl'] as String? ??
+        v['poster_path'] as String? ??
+        v['thumbnail'] as String? ??
+        v['image'] as String? ??
+        v['imageUrl'] as String? ??
+        v['cover'] as String? ??
+        v['coverImage'] as String? ??
+        v['cover_image'] as String? ??
+        v['img'] as String? ??
         json['poster'] as String? ??
         json['posterUrl'] as String? ??
-        json['poster_path'] as String? ??
-        json['thumbnail'] as String? ??
-        json['cover'] as String? ??
-        json['coverImage'] as String? ??
-        json['cover_image'] as String? ??
-        json['image'] as String? ??
-        json['img'] as String?
+        json['image'] as String?
       ),
     );
   }
@@ -273,22 +275,24 @@ class RecommendationInfo {
   const RecommendationInfo({this.id, required this.title, this.poster, this.score});
 
   factory RecommendationInfo.fromJson(Map<String, dynamic> json) {
-    final visuals = json['visuals'] as Map<String, dynamic>?;
+    final v = (json['visuals'] as Map<String, dynamic>?) ?? json;
     return RecommendationInfo(
       id: json['id']?.toString(),
       title: json['title'] as String? ?? '',
       poster: ApiEndpoints.proxyImage(
-        visuals?['poster'] as String? ??
-        visuals?['thumbnail'] as String? ??
+        v['poster'] as String? ??
+        v['posterUrl'] as String? ??
+        v['poster_path'] as String? ??
+        v['thumbnail'] as String? ??
+        v['image'] as String? ??
+        v['imageUrl'] as String? ??
+        v['cover'] as String? ??
+        v['coverImage'] as String? ??
+        v['cover_image'] as String? ??
+        v['img'] as String? ??
         json['poster'] as String? ??
         json['posterUrl'] as String? ??
-        json['poster_path'] as String? ??
-        json['thumbnail'] as String? ??
-        json['cover'] as String? ??
-        json['coverImage'] as String? ??
-        json['cover_image'] as String? ??
-        json['image'] as String? ??
-        json['img'] as String?
+        json['image'] as String?
       ),
       score: (json['score'] as num?)?.toDouble(),
     );
