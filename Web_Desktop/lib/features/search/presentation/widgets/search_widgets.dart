@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../providers/search_provider.dart';
+import '../../../../shared/widgets/skeletons.dart';
 
 class SearchHistorySection extends ConsumerWidget {
   final Function(String) onQueryTap;
@@ -209,7 +210,7 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(horizontal: 32),
                       scrollDirection: Axis.horizontal,
-                      cacheExtent: 600, // Senior: Buffer de carga para evitar saltos
+                      cacheExtent: 600,
                       itemCount: items.length,
                       itemBuilder: (context, index) {
                         final item = items[index];
@@ -238,7 +239,24 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
                 ),
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+            loading: () => SizedBox(
+              height: posterHeight + 20,
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 5,
+                itemBuilder: (context, index) => Container(
+                  width: itemWidth,
+                  margin: const EdgeInsets.only(right: 20),
+                  child: SkeletonContainer(
+                    width: itemWidth,
+                    height: posterHeight,
+                    borderRadius: 8,
+                  ),
+                ),
+              ),
+            ),
             error: (_, __) => const SizedBox.shrink(),
           ),
         ),

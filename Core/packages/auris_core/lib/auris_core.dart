@@ -29,6 +29,7 @@ export 'core/utils/source_utils.dart';
 export 'core/utils/category_utils.dart';
 export 'core/utils/content_logic.dart';
 export 'core/utils/synopsis_cleaner.dart';
+export 'core/utils/string_utils.dart';
 export 'core/playback/media_category.dart';
 export 'core/playback/playback_policy.dart';
 export 'core/playback/playback_policy_resolver.dart';

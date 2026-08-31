@@ -148,7 +148,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 TVKeyboard(
                   currentQuery: _currentQuery,
                   onKeyTap: (key) {
-                    final newQuery = _searchController.text + key;
+                    final rawQuery = _searchController.text + key;
+                    final newQuery = AurisStringUtils.capitalizeSearchQuery(rawQuery);
                     _searchController.text = newQuery;
                     _onSearchChanged(newQuery);
                   },
@@ -232,6 +233,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 textAlign: TextAlign.left,
                 textAlignVertical: TextAlignVertical.center,
                 style: const TextStyle(fontSize: 15, color: Colors.white),
+                textCapitalization: TextCapitalization.words,
+                inputFormatters: [CapitalizeWordsFormatter()],
                 decoration: InputDecoration(
                   hintText: _dynamicPlaceholder,
                   hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),

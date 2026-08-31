@@ -112,44 +112,48 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           children: [
             // BARRA DE BÚSQUEDA
             Expanded(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 46,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.05),
-                    width: 1.5,
+              child: RepaintBoundary(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.05),
+                      width: 1.5,
+                    ),
                   ),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _focusNode,
-                  textAlign: TextAlign.left, // Texto alineado a la izquierda
-                  textAlignVertical: TextAlignVertical.center, // Centrado vertical respecto al icono
-                  style: const TextStyle(fontSize: 15, color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: _dynamicPlaceholder,
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
-                    prefixIcon: Icon(Icons.search_rounded, 
-                        color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
-                        size: 20),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    isDense: true, // Ayuda al centrado vertical real
-                    contentPadding: EdgeInsets.zero, // Eliminamos paddings extra que rompen el centro vertical
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
-                            onPressed: _clearSearch,
-                          )
-                        : null,
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _focusNode,
+                    textAlign: TextAlign.left,
+                    textAlignVertical: TextAlignVertical.center,
+                    style: const TextStyle(fontSize: 15, color: Colors.white),
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: [CapitalizeWordsFormatter()],
+                    decoration: InputDecoration(
+                      hintText: _dynamicPlaceholder,
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
+                      prefixIcon: Icon(Icons.search_rounded, 
+                          color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
+                          size: 20),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+                              onPressed: _clearSearch,
+                            )
+                          : null,
+                    ),
+                    onChanged: _onSearchChanged,
+                    onSubmitted: _onSearchSubmitted,
                   ),
-                  onChanged: _onSearchChanged,
-                  onSubmitted: _onSearchSubmitted,
                 ),
               ),
             ),

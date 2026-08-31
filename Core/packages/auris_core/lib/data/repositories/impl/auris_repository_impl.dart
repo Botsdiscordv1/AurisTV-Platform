@@ -370,8 +370,8 @@ class AurisRepositoryImpl implements AurisRepository {
       return MediaItem(
         id: m['url'] ?? m['id'] ?? '',
         title: m['title'] ?? '',
-        posterUrl: m['posterUrl'] ?? '',
-        bannerUrl: m['bannerUrl'],
+        posterUrl: ApiEndpoints.proxyImage(m['posterUrl'] as String? ?? ''),
+        bannerUrl: ApiEndpoints.proxyImage(m['bannerUrl'] as String?),
         type: MediaType.anime,
         source: m['source'] ?? '',
         year: m['year'],

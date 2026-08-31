@@ -499,7 +499,9 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final hasHistory = history != null;
     final String label = hasHistory ? 'Continuar viendo' : 'Reproducir ahora';
     final IconData icon = Icons.play_arrow_rounded;
-    final double? progress = hasHistory ? (history.progress ?? 0) / 100 : null;
+
+    // [Senior Logic] El progreso ya viene de 0.0 a 1.0 desde auris_core
+    final double? progress = hasHistory ? history.progress : null;
     final bool hasProgress = progress != null && progress > 0.02;
 
     return SizedBox(
@@ -511,21 +513,24 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          padding: EdgeInsets.symmetric(horizontal: hasProgress ? 16 : 0),
           elevation: 0,
         ),
         child: Row(
-          mainAxisAlignment: hasProgress ? MainAxisAlignment.start : MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.black, size: 36),
+            Icon(icon, color: Colors.black, size: 32),
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)
+              style: const TextStyle(
+                color: Colors.black, 
+                fontWeight: FontWeight.bold, 
+                fontSize: 18
+              )
             ),
             if (hasProgress) ...[
-              const Spacer(),
-              _buildButtonProgressBar(progress, isMobile: true),
+              const SizedBox(width: 16),
+              _buildButtonProgressBar(progress, isMobile: isMobile),
             ],
           ],
         ),
@@ -538,7 +543,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       width: isMobile ? 50 : 80,
       height: 6,
       decoration: BoxDecoration(
-        color: const Color(0xFFE0E0E0),
+        color: Colors.black.withOpacity(0.30), // Senior: Ajustado a 30% para mejor visibilidad sobre fondo blanco, igual que en Web
         borderRadius: BorderRadius.circular(10),
       ),
       child: Stack(
@@ -767,7 +772,7 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
         })
         .toList();
     // Orden de display fijo: AnimeAV1 -> AnimeJara -> AnimeD23 -> JKAnime ->
-    // TIOAnime -> FLV -> Aniyae (al final, por catálogos incompletos).
+    // Aniyae (al final, por catálogos incompletos).
     uniqueIndices.sort((a, b) => sourceDisplayRank(widget.sources[a].source)
         .compareTo(sourceDisplayRank(widget.sources[b].source)));
 
@@ -1740,7 +1745,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       ...seasonUnifiedSources,
     ];
     // Orden de display/fuente por defecto: AnimeAV1 -> AnimeJara -> AnimeD23 ->
-    // JKAnime -> TIOAnime -> FLV -> Aniyae (al final, catálogos incompletos).
+    // JKAnime -> Aniyae (al final, catálogos incompletos).
     activeSources.sort((a, b) => sourceDisplayRank(a.source).compareTo(sourceDisplayRank(b.source)));
 
     final searchQueryForLoading = widget.metadataTitle ?? widget.title;
@@ -2469,7 +2474,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ])),
           const SizedBox(height: 24), if (dir.isNotEmpty || cast.isNotEmpty || std.isNotEmpty || status != null || languages.isNotEmpty) _DetailInfoCard(child: Column(children: [ 
             if (status != null) _buildPrimeRow('Estado', status),
-            if (languages.isNotEmpty) _buildPrimeRow('idiomas', languages.join(', ')),
+            if (languages.isNotEmpty) _buildPrimeRow('Idioma', languages.join(', ')),
             if (dir.isNotEmpty) _buildPrimeRow('Direcci\u00F3n', dir.join(', ')), 
             if (cast.isNotEmpty && detail is! MovieDetail) _buildPrimeRow('Elenco', cast.join(', ')), 
             if (std.isNotEmpty) _buildPrimeRow('Estudio', std.join(', ')) 

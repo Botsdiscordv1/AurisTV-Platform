@@ -29,11 +29,6 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
     pathUrl = '$domain/anime/$slug/episodio-$episode';
   } else if (source.toLowerCase().contains('jkanime')) {
     pathUrl = '$path/$episode/';
-  } else if (source.toLowerCase().contains('animeflv') || source.toLowerCase().contains('tioanime')) {
-    final parts = path.split('/');
-    final slug = parts.last;
-    final domain = parts.take(3).join('/');
-    pathUrl = '$domain/ver/$slug-$episode';
   } else if (source.toLowerCase().contains('animed23')) {
     final parts = path.split('/');
     final slug = parts.last;
@@ -52,10 +47,8 @@ String simplifySourceName(String name) {
   if (l.contains('latinoyt')) return 'LYT';
   if (l.contains('av1')) return 'AV1';
   if (l.contains('jkanime')) return 'JKA';
-  if (l.contains('flv')) return 'FLV';
   if (l.contains('aniyae')) return 'ANY';
   if (l.contains('animed23')) return 'A23';
-  if (l.contains('tioanime')) return 'TIO';
   if (l.contains('animejara')) return 'AJR';
   if (l.contains('gnula')) return 'GNU';
   if (l.contains('katanime')) return 'KAT';
@@ -75,15 +68,13 @@ const Map<String, int> _sourceDisplayOrder = {
   'JKA': 5,
   'KAT': 6,
   'GNU': 7,
-  'TIO': 8,
-  'FLV': 9,
-  'ANY': 10,
-  'OPS': 11,
-  'PPA': 12,
-  'CV3': 13,
-  'GHD': 14,
-  'LMV': 15,
-  'P24': 16,
+  'ANY': 8,
+  'OPS': 9,
+  'PPA': 10,
+  'CV3': 11,
+  'GHD': 12,
+  'LMV': 13,
+  'P24': 14,
 };
 
 int sourceDisplayRank(String source) {

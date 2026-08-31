@@ -1124,12 +1124,9 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       );
     }
 
-    final double effectiveWidth = (progress != null && progress > 0.02) 
-        ? (width ?? 320) + 140 
-        : (width ?? 320);
+
 
     return SizedBox(
-      width: effectiveWidth,
       height: isCompact ? 56 : 64,
       child: ElevatedButton(
         onPressed: widget.onPlay,
@@ -1138,9 +1135,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 8,
           shadowColor: Colors.black.withOpacity(0.2),
-          padding: const EdgeInsets.only(left: 8, right: 20),
+          padding: const EdgeInsets.only(left: 8, right: 20), // Senior: Aumentado a 20 para que el "track" gris tenga el mismo aire visual que el icono de play
         ),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
             Icon(icon, color: Colors.black, size: 42),
@@ -1155,7 +1153,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               ),
             ),
             if (progress != null && progress > 0.02) ...[
-              const Spacer(),
+              const SizedBox(width: 12), // Senior: Reducido de 24 a 12 para acercar la barra al texto
               _buildButtonProgressBar(progress),
             ],
           ],
@@ -1169,7 +1167,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       width: isMobile ? 50 : 80,
       height: 6,
       decoration: BoxDecoration(
-        color: const Color(0xFFE0E0E0), // Track: Representa el total del video (Gris claro)
+        color: Colors.black.withOpacity(0.30), // Senior: Ajuste final a 30% para un equilibrio perfecto entre visibilidad y estética
         borderRadius: BorderRadius.circular(10),
       ),
       child: Stack(
@@ -1538,7 +1536,7 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
         })
         .toList();
     // Orden de display fijo: AnimeAV1 -> AnimeJara -> AnimeD23 -> JKAnime ->
-    // TIOAnime -> FLV -> Aniyae (al final, por catálogos incompletos).
+    // Aniyae (al final, por catálogos incompletos).
     uniqueIndices.sort((a, b) => sourceDisplayRank(widget.sources[a].source)
         .compareTo(sourceDisplayRank(widget.sources[b].source)));
 
@@ -2949,7 +2947,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       ...seasonUnifiedSources,
     ];
     // Orden de display/fuente por defecto: AnimeAV1 -> AnimeJara -> AnimeD23 ->
-    // JKAnime -> TIOAnime -> FLV -> Aniyae (al final, catálogos incompletos).
+    // JKAnime -> Aniyae (al final, catálogos incompletos).
     activeSources.sort((a, b) => sourceDisplayRank(a.source).compareTo(sourceDisplayRank(b.source)));
 
     final searchQueryForLoading = widget.metadataTitle ?? widget.title;
@@ -3675,7 +3673,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ])),
           const SizedBox(height: 24), if (dir.isNotEmpty || cast.isNotEmpty || std.isNotEmpty || status != null || languages.isNotEmpty) _DetailInfoCard(child: Column(children: [ 
             if (status != null) _buildPrimeRow('Estado', status),
-            if (languages.isNotEmpty) _buildPrimeRow('idiomas', languages.join(', ')),
+            if (languages.isNotEmpty) _buildPrimeRow('Idioma', languages.join(', ')),
             if (dir.isNotEmpty) _buildPrimeRow('Direcci\u00F3n', dir.join(', ')), 
             if (cast.isNotEmpty && detail is! MovieDetail) _buildPrimeRow('Elenco', cast.join(', ')), 
             if (std.isNotEmpty) _buildPrimeRow('Estudio', std.join(', ')) 

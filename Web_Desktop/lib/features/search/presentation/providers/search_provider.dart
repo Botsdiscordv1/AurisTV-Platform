@@ -10,10 +10,20 @@ final searchRepositoryProvider = Provider<AurisRepository>((ref) {
 });
 
 final searchTrendingProvider = FutureProvider<List<SearchResult>>((ref) async {
-  final repo = ref.watch(searchRepositoryProvider);
-  // Obtenemos tendencias haciendo una búsqueda vacía en la categoría principal
-  final response = await repo.search('anime', '');
-  // Retornamos los primeros 10 resultados para el Top
+  // Senior Performance Fix: Retardo inicial para no competir con el Home o las Fuentes (8.8MB ttf)
+  // Esto evita el freeze al entrar a la pantalla de búsqueda.
+  await Future.delayed(const Duration(milliseconds: 1500));
+  
+  final repo = ref.read(searchRepositoryProvider);
+  
+  // Obtenemos tendencias haciendo una búsqueda vacía
+  // Senior Tip: Usamos un timeout para que la UI no se quede bloqueada si el server tarda 50s
+  final response = await repo.search('anime', '').timeout(
+    const Duration(seconds: 12),
+    onTimeout: () => const SearchResponse(query: '', category: 'anime', count: 0, results: []),
+  );
+
+  // Mapeo limitado: No procesamos los 5.5MB de JSON, solo lo necesario para el TOP 10.
   return response.results.take(10).toList();
 });
 

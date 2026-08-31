@@ -58,7 +58,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       final source = f.source.toLowerCase();
       final cat = f.category.toLowerCase();
       const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
-      const animeHints = ['jkanime', 'animeav1', 'animeflv', 'aniyae', 'animelatino', 'fiuzidragon', 'tioanime', 'animed23', 'animejara', 'katanime', 'animegratis'];
+      const animeHints = ['jkanime', 'animeav1', 'aniyae', 'animelatino', 'fiuzidragon', 'animed23', 'animejara', 'katanime', 'animegratis'];
       const movieHints = ['gnula', 'gnulahd'];
 
       if (_activeFilter == 'kdrama') return kdramaHints.any((h) => source.contains(h));

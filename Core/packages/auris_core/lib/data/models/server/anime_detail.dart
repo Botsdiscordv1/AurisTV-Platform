@@ -242,11 +242,24 @@ class RelationInfo {
   const RelationInfo({this.id, required this.title, required this.relation, this.poster});
 
   factory RelationInfo.fromJson(Map<String, dynamic> json) {
+    final visuals = json['visuals'] as Map<String, dynamic>?;
     return RelationInfo(
       id: json['id']?.toString(),
       title: json['title'] as String? ?? '',
       relation: json['relation'] as String? ?? 'UNKNOWN',
-      poster: ApiEndpoints.proxyImage(json['poster'] as String?),
+      poster: ApiEndpoints.proxyImage(
+        visuals?['poster'] as String? ??
+        visuals?['thumbnail'] as String? ??
+        json['poster'] as String? ??
+        json['posterUrl'] as String? ??
+        json['poster_path'] as String? ??
+        json['thumbnail'] as String? ??
+        json['cover'] as String? ??
+        json['coverImage'] as String? ??
+        json['cover_image'] as String? ??
+        json['image'] as String? ??
+        json['img'] as String?
+      ),
     );
   }
 }
@@ -260,10 +273,23 @@ class RecommendationInfo {
   const RecommendationInfo({this.id, required this.title, this.poster, this.score});
 
   factory RecommendationInfo.fromJson(Map<String, dynamic> json) {
+    final visuals = json['visuals'] as Map<String, dynamic>?;
     return RecommendationInfo(
       id: json['id']?.toString(),
       title: json['title'] as String? ?? '',
-      poster: ApiEndpoints.proxyImage(json['poster'] as String?),
+      poster: ApiEndpoints.proxyImage(
+        visuals?['poster'] as String? ??
+        visuals?['thumbnail'] as String? ??
+        json['poster'] as String? ??
+        json['posterUrl'] as String? ??
+        json['poster_path'] as String? ??
+        json['thumbnail'] as String? ??
+        json['cover'] as String? ??
+        json['coverImage'] as String? ??
+        json['cover_image'] as String? ??
+        json['image'] as String? ??
+        json['img'] as String?
+      ),
       score: (json['score'] as num?)?.toDouble(),
     );
   }
@@ -300,7 +326,12 @@ class AnimeThemeInfo {
       video720: json['video_720'] as String?,
       video1080: json['video_1080'] as String?,
       audioUrl: json['audio'] as String?,
-      imageUrl: ApiEndpoints.proxyImage(json['image'] as String?),
+      imageUrl: ApiEndpoints.proxyImage(
+        json['image'] as String? ?? 
+        json['imageUrl'] as String? ?? 
+        json['thumbnail'] as String? ?? 
+        json['cover'] as String?
+      ),
       type: json['type'] as String? ?? '',
       sequence: json['sequence'] as int? ?? 0,
     );

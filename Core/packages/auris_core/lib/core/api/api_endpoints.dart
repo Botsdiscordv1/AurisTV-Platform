@@ -29,7 +29,8 @@ class ApiEndpoints {
     final lower = url.toLowerCase();
     final all = <String>{..._servers.values, ..._serverOverride.values};
     return all.any((d) => lower.contains(d.toLowerCase())) || 
-           lower.contains('auristv.dpdns.org');
+           lower.contains('auristv.dpdns.org') ||
+           lower.contains('129.151.126.4');
   }
 
   static const String _animePort = '3000';
@@ -48,6 +49,10 @@ class ApiEndpoints {
         domain.startsWith('192.168.') ||
         domain.startsWith('10.');
     if (isLocal) return 'http://$domain:$port';
+    
+    final bool isIP = RegExp(r'^\d+\.\d+\.\d+\.\d+$').hasMatch(domain);
+    if (isIP) return 'https://$domain:$port';
+
     return 'https://$domain';
   }
 
@@ -61,9 +66,7 @@ class ApiEndpoints {
   // ----------------------------------
 
   // --- TIMEOUTS DE UX (Sincronizados entre plataformas) ---
-  /// Tiempo para esperar metadata enriquecida (logos, sinopsis larga) antes de mostrar fallbacks.
   static const Duration detailRevealTimeout = Duration(seconds: 30);
-  /// Tiempo máximo para mostrar el esqueleto global de una página.
   static const Duration pageLoadTimeout = Duration(seconds: 20);
   // -------------------------------------------------------
 
@@ -71,132 +74,100 @@ class ApiEndpoints {
     return _baseUrlForCategory(_categoryForPort(port), port);
   }
 
-  /// URL base por defecto (servidor de Anime, puerto 3000).
   static String get baseUrl => baseUrlForPort(_animePort);
-
   static String get animeBaseUrl => baseUrlForPort(_animePort);
   static String get moviesSeriesBaseUrl => baseUrlForPort(_moviesSeriesPort);
   static String get kdramasBaseUrl => baseUrlForPort(_kdramasPort);
 
-  /// URL base según la categoría de contenido (sin fan-out para 'all').
   static String baseUrlForCategory(String category) {
     final c = category.toLowerCase();
-    if (c == 'kdrama' || c == 'kdramas' || c == 'dorama' || c == 'doramas') {
-      return kdramasBaseUrl;
-    }
+    if (c == 'kdrama' || c == 'kdramas' || c == 'dorama' || c == 'doramas') return kdramasBaseUrl;
     if (c == 'anime' || c == 'animes' || c == 'animé' ||
         c == 'anime-seasonal' || c == 'anime-movies' ||
-        c == 'movie_anime') {
-      return animeBaseUrl;
-    }
+        c == 'movie_anime') return animeBaseUrl;
     return moviesSeriesBaseUrl;
   }
 
-  /// URL base según la fuente de scraping (p. ej. JKAnime, Cuevana3, Tudorama).
-  /// Las fuentes de películas/series (p. ej. GnulaHD) viven en el server de
-  /// Películas/Series (3001) y no se enrutan al server de anime (3000).
   static String baseUrlForSource(String source, [String? category]) {
     final s = source.toLowerCase();
     const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
     const animeHints = ['jkanime', 'animeav1', 'aniyae', 'animelatino', 'fiuzidragon', 'animed23', 'animejara', 'katanime'];
     const movieHints = ['gnula', 'gnulahd'];
-
     if (kdramaHints.any(s.contains)) return kdramasBaseUrl;
-
-    // GnulaHD solo existe en el server de Películas/Series (3001).
     if (movieHints.any(s.contains)) return moviesSeriesBaseUrl;
-
     if (animeHints.any(s.contains)) return animeBaseUrl;
     return moviesSeriesBaseUrl;
   }
 
   static String fixUrl(String? url) {
     if (url == null || url.isEmpty) return '';
-
-    // Senior Web Fix: Si es una ruta relativa, le anteponemos la baseUrl del servidor actual.
-    // Esto es crítico para que las imágenes de búsqueda carguen en dispositivos móviles.
-    if (url.startsWith('/')) {
-      return '$baseUrl$url';
-    }
-    
+    if (url.startsWith('/')) return '$baseUrl$url';
+    final lower = url.toLowerCase();
     if (kIsWeb) {
-      // Si la URL contiene localhost pero hemos configurado una IP manual, la corregimos.
-      if ((url.contains('localhost') || url.contains('127.0.0.1')) &&
+      if ((lower.contains('localhost') || lower.contains('127.0.0.1')) &&
           _defaultDomain != 'localhost' && _defaultDomain != '127.0.0.1') {
         return url.replaceAll('localhost', _defaultDomain).replaceAll('127.0.0.1', _defaultDomain);
       }
       return url;
     }
-    
-    if (Platform.isAndroid && (url.contains('127.0.0.1') || url.contains('localhost'))) {
+    if (Platform.isAndroid && (lower.contains('127.0.0.1') || lower.contains('localhost'))) {
       return url.replaceAll('127.0.0.1', _defaultDomain).replaceAll('localhost', _defaultDomain);
     }
     return url;
   }
 
   /// Pasa una imagen por el proxy del servidor si es necesario.
-  /// Implementación Senior: Auto-limpieza de recursión infinita (Unwrapping).
+  /// Implementación Senior: Idempotente y Anti-Recursiva.
   static String proxyImage(String? url) {
     if (url == null || url.isEmpty) return '';
 
     String workingUrl = url;
 
-    // 1. DESENVOLVER (Unwrap): Eliminar capas de proxy previas si existen.
-    // Esto previene el error 414 Request-URI Too Large.
-    while (workingUrl.contains('/api/proxy/image?url=')) {
-      try {
-        final uri = Uri.parse(workingUrl);
-        final nestedUrl = uri.queryParameters['url'];
-        if (nestedUrl != null && nestedUrl != workingUrl) {
-          workingUrl = nestedUrl;
-        } else {
-          break;
-        }
-      } catch (_) {
-        break;
-      }
+    // 1. DESENVOLVER (Unwrap) TOTAL:
+    // Siempre limpiamos la URL primero para saber qué hay realmente dentro,
+    // incluso si ya viene con nuestro proxy desde el servidor.
+    while (workingUrl.contains('url=http') || workingUrl.contains('/api/proxy/image')) {
+       final int index = workingUrl.lastIndexOf('url=http');
+       if (index != -1) {
+         workingUrl = workingUrl.substring(index + 4);
+         try {
+           workingUrl = Uri.decodeFull(workingUrl);
+         } catch (_) {}
+       } else {
+         break; 
+       }
     }
 
     final String lowerUrl = workingUrl.toLowerCase();
 
-    // 2. Si es una ruta relativa o ya apunta a nuestro servidor, corregir (fixUrl) y retornar.
-    if (workingUrl.startsWith('/') || _isOurServer(workingUrl) || 
+    // 2. BYPASS DE SEGURIDAD (Prioridad Absoluta):
+    // Dominios que NUNCA deben pasar por el proxy porque fallan (502/403).
+    const bypassKeywords = [
+      'tmdb.org', 'themoviedb.org', 
+      'googleusercontent.com', 'fbcdn.net'
+    ];
+    
+    if (bypassKeywords.any((k) => lowerUrl.contains(k))) {
+      return workingUrl; // Devolvemos la URL limpia y directa
+    }
+
+    // 3. Si la URL limpia es de nuestro servidor o local, fixUrl.
+    if (_isOurServer(workingUrl) || workingUrl.startsWith('/') || 
         lowerUrl.contains('localhost') || lowerUrl.contains('127.0.0.1')) {
       return fixUrl(workingUrl);
     }
 
-    // 3. Evaluar necesidad de proxy para URLs externas.
+    // 4. Aplicar proxy solo para el resto (Principalmente en Web por CORS).
     if (workingUrl.startsWith('http')) {
-      // SENIOR OPTIMIZATION: Dominios que permiten carga directa o que bloquean proxies (502).
-      // Incluimos cdns de anime que suelen dar problemas en el proxy.
-      const bypassDomains = [
-        'tmdb.org', 
-        'themoviedb.org', 
-        'googleusercontent.com',
-        'cloudinary.com',
-        'fbcdn.net',
-        'jkdesa.com',
-        'jkanime.net'
+      if (kIsWeb) {
+        return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+      }
+      
+      const forceProxyDomains = [
+        'zilla-networks.com', 'idmwp.com', 'animeflv', 
+        'animeav1.com', 'jkanime', 'jkdesa'
       ];
-      
-      if (bypassDomains.any((d) => lowerUrl.contains(d))) {
-        return workingUrl;
-      }
-
-      // En Web intentamos proxy para el resto (por CORS).
-      bool shouldProxy = kIsWeb;
-      
-      // En Mobile/Nativo/TV solo para dominios conflictivos conocidos.
-      if (!shouldProxy) {
-        const proxyDomains = [
-          'animeav1.com', 'zilla-networks.com', 'jkanime', 
-          'gnula', 'animeflv', 'jk-anime', 'idmwp.com',
-          'discordapp.com'
-        ];
-        shouldProxy = proxyDomains.any((d) => lowerUrl.contains(d));
-      }
-
-      if (shouldProxy) {
+      if (forceProxyDomains.any((d) => lowerUrl.contains(d))) {
         return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
       }
     }
@@ -204,49 +175,27 @@ class ApiEndpoints {
     return workingUrl;
   }
 
-  // Search
   static const String search = '/api/search';
   static String searchByCategory(String category) => '/api/search/$category';
   static const String searchAnimeVariants = '/api/search/anime/variants';
-
-  // Detail
   static const String detailAnime = '/api/detail/anime';
   static const String detailMovie = '/api/detail/movie';
-
-  // Home Editorial
   static const String homeEditorial = '/api/home/editorial';
-
-  // Home Recent / Top (scraped from real sources)
   static String homeRecent(int limit) => '/api/home/recent?limit=$limit';
   static String homeTop(int limit) => '/api/home/top?limit=$limit';
-
-  // Schedule
   static const String schedule = '/api/schedule';
-
-  // Sources
   static const String sources = '/api/sources';
-
-  // Subscriptions
   static String subscriptions(String userId) => '/api/subscriptions/$userId';
-
-  // Titles
   static const String titlesAnime = '/api/titles/anime';
   static const String titlesMovie = '/api/titles/movie';
-
-  // Extract / Episodes
   static const String extract = '/api/extract';
   static const String episodes = '/api/episodes';
   static const String resolveEpisode = '/api/resolve-episode';
-
-  // OMDB Enriched Data
   static const String omdbSeason = '/api/omdb/season';
   static const String omdbEpisode = '/api/omdb/episode';
-
-  // Health
   static const String health = '/api/health';
-
-  // Gallery (TMDB + fanart.tv images)
   static const String gallery = '/api/gallery';
+
   static String galleryUrl({int? tmdbId, String kind = 'tv', String? title, int? year}) {
     final q = <String, String>{};
     if (tmdbId != null) q['tmdbId'] = tmdbId.toString();

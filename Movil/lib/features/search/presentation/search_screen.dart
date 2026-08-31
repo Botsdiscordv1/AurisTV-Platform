@@ -135,6 +135,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   textAlign: TextAlign.left, // Texto alineado a la izquierda
                   textAlignVertical: TextAlignVertical.center, // Centrado vertical respecto al icono
                   style: const TextStyle(fontSize: 15, color: Colors.white),
+                  textCapitalization: TextCapitalization.words,
+                  inputFormatters: [CapitalizeWordsFormatter()],
                   decoration: InputDecoration(
                     hintText: _dynamicPlaceholder,
                     hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),

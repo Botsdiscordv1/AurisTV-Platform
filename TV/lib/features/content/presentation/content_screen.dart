@@ -2176,7 +2176,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ])),
           const SizedBox(height: 24), if (dir.isNotEmpty || cast.isNotEmpty || std.isNotEmpty || status != null || languages.isNotEmpty) _DetailInfoCard(child: Column(children: [ 
             if (status != null) _buildPrimeRowLocal('Estado', status),
-            if (languages.isNotEmpty) _buildPrimeRowLocal('idiomas', languages.join(', ')),
+            if (languages.isNotEmpty) _buildPrimeRowLocal('Idioma', languages.join(', ')),
             if (dir.isNotEmpty) _buildPrimeRowLocal('Direcci\u00F3n', dir.join(', ')), 
             if (cast.isNotEmpty && detail is! MovieDetail) _buildPrimeRowLocal('Elenco', cast.join(', ')), 
             if (std.isNotEmpty) _buildPrimeRowLocal('Estudio', std.join(', ')) 

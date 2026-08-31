@@ -117,8 +117,15 @@ class SearchResult {
       title: json['title'] as String? ?? '',
       url: json['url'] as String? ?? '',
       quality: json['quality'] as String? ?? '',
-      thumbnail: ApiEndpoints.proxyImage(json['thumbnail'] as String?),
-      banner: ApiEndpoints.proxyImage(json['banner'] as String?),
+      thumbnail: ApiEndpoints.proxyImage(
+        json['thumbnail'] as String? ?? 
+        json['poster'] as String? ?? 
+        json['posterUrl'] as String? ?? 
+        json['cover'] as String? ?? 
+        json['coverImage'] as String? ?? 
+        json['image'] as String?
+      ),
+      banner: ApiEndpoints.proxyImage(json['banner'] as String? ?? json['backdrop'] as String?),
       logo: ApiEndpoints.proxyImage(json['logo'] as String?),
       source: json['source'] as String? ?? '',
       romaji: json['romaji'] as String?,
