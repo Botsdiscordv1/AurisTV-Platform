@@ -990,7 +990,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 // Senior Logic: En móvil, abrir tráiler en el reproductor a pantalla completa
                 final trailerUrl = 'https://www.youtube.com/watch?v=$_lastTrailerKey';
                 final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(widget.poster ?? '')}&bannerUrl=${Uri.encodeComponent(widget.banner ?? '')}';
-                context.push('/player/${Uri.encodeComponent(widget.title)}?source=YouTube&url=${Uri.encodeComponent(trailerUrl)}&episode=Trailer&serverName=YouTube&language=Trailer&totalEpisodes=1$posterParam');
+                context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=YouTube&url=${Uri.encodeComponent(trailerUrl)}&episode=Trailer&serverName=YouTube&language=Trailer&totalEpisodes=1$posterParam');
               } else {
                 if (_showPlayer) {
                   _disposeController();
@@ -2246,7 +2246,7 @@ class _ThemeCardState extends State<_ThemeCard> {
           String url = widget.theme.videoUrl; final typeLabel = widget.isOP ? 'OP' : 'ED';
           if (!url.startsWith('http')) { 
             url = 'https://www.youtube.com/watch?v=$url'; 
-            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube&language=SUB'); 
+            context.push('/media/${Uri.encodeComponent(widget.theme.title)}/reproducir?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube&language=SUB'); 
           }
           else { 
             String url720 = widget.theme.video720 ?? '';
@@ -2258,7 +2258,7 @@ class _ThemeCardState extends State<_ThemeCard> {
             }
             final v720Param = url720.isNotEmpty ? '&video720=${Uri.encodeComponent(url720)}' : '';
             final v1080Param = url1080.isNotEmpty ? '&video1080=${Uri.encodeComponent(url1080)}' : '';
-            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes&language=SUB$v720Param$v1080Param'); 
+            context.push('/media/${Uri.encodeComponent(widget.theme.title)}/reproducir?source=&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes&language=SUB$v720Param$v1080Param'); 
           }
         }, 
         child: AnimatedContainer(
@@ -3195,7 +3195,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 if (isMovieCategory) {
                   final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Pel\u00EDcula', thumbnail: initialThumbnail);
                   final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                  context.push('/player/${Uri.encodeComponent(widget.title)}?source=${src}&url=${_episodeUrlFor(ep, playEpisodesUrl, src, 1)}&episode=1&serverName=${simplifySourceName(src)}&language=${((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&totalEpisodes=1$posterParam');
+                  context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${src}&url=${_episodeUrlFor(ep, playEpisodesUrl, src, 1)}&episode=1&serverName=${simplifySourceName(src)}&language=${((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&totalEpisodes=1$posterParam');
                   return;
                 }
                 final latest = ref.read(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull;
@@ -3207,7 +3207,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 // Prioridad de miniatura: Episode Thumbnail (TMDB/OMDB) > Series Poster
                 final episodeThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
                 final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(episodeThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? src}&url=${_episodeUrlFor(ep, epSource?.url ?? url, epSource?.source ?? src, epNum)}&episode=$epNum&season=${latest?.season ?? currentSeason}&serverName=${simplifySourceName(epSource?.source ?? src)}&language=${(epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB'}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}$posterParam');
+                context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${epSource?.source ?? src}&url=${_episodeUrlFor(ep, epSource?.url ?? url, epSource?.source ?? src, epNum)}&episode=$epNum&season=${latest?.season ?? currentSeason}&serverName=${simplifySourceName(epSource?.source ?? src)}&language=${(epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB'}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}$posterParam');
               }
             )),
             if (isMobile) SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3258,7 +3258,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final tapSource = epBundle?.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? omdb?.thumbnail ?? tapSource?.thumbnail ?? '';
                         final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&language=${(epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                        context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&language=${(epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
                       });
                     }, childCount: epData.total))
                     else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
@@ -3272,7 +3272,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final tapSource = epBundle?.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? omdb?.thumbnail ?? tapSource?.thumbnail ?? '';
                         final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&language=${(epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                        context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&language=${(epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
                       });
                     }, childCount: epData.total)),
                       if (epData.specials.isNotEmpty) ...[
@@ -3297,7 +3297,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, isMobile: true, scrollController: _scrollController, onTap: () {
                           final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
                           final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=$spNum&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&language=${(spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
+                          context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=$spNum&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&language=${(spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
                         });
                       }, childCount: epData.specials.length))
                       else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
@@ -3307,7 +3307,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, onTap: () {
                           final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
                           final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=${sp.number}&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&language=${(spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
+                          context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=${sp.number}&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&language=${(spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
                         });
                       }, childCount: epData.specials.length)),
                     ],
@@ -3546,7 +3546,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               title: _cleanRelatedTitle(r.title), 
               poster: r.cover, 
               subtitle: r.relation,
-              onTap: () => context.push('/content/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}')
+              onTap: () => context.push('/media/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}')
             )).toList(),
           ),
         ),

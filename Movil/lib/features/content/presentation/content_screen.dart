@@ -540,7 +540,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   Widget _buildButtonProgressBar(double progress, {bool isMobile = false}) {
     return Container(
-      width: isMobile ? 50 : 80,
+      width: isMobile ? 120 : 180,
       height: 6,
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.30), // Senior: Ajustado a 30% para mejor visibilidad sobre fondo blanco, igual que en Web

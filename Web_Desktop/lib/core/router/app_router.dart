@@ -44,12 +44,19 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
-        // Rama 1: Búsqueda
+        // Rama 1: Catálogo (Búsqueda)
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/search',
-              builder: (context, state) => const SearchScreen(),
+              path: '/catalogo',
+              builder: (context, state) {
+                final query = state.uri.queryParameters['q'] ?? '';
+                final category = state.uri.queryParameters['cat'] ?? 'all';
+                return SearchScreen(
+                  initialQuery: query,
+                  initialCategory: category,
+                );
+              },
             ),
           ],
         ),
@@ -102,11 +109,11 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const ConnectionsScreen(),
     ),
     GoRoute(
-      path: '/schedule',
+      path: '/horario',
       builder: (context, state) => const ScheduleScreen(),
     ),
     GoRoute(
-      path: '/content/:title',
+      path: '/media/:title',
       builder: (context, state) {
         final title = state.pathParameters['title']!;
         final source = state.uri.queryParameters['source'] ?? '';
@@ -121,7 +128,7 @@ final GoRouter appRouter = GoRouter(
       },
     ),
     GoRoute(
-      path: '/player/:contentId',
+      path: '/media/:contentId/reproducir',
       builder: (context, state) {
         final contentId = state.pathParameters['contentId']!;
         final sourceUrl = state.uri.queryParameters['url'] ?? '';

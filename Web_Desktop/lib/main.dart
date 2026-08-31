@@ -100,7 +100,7 @@ class RemoteCommandListener extends ConsumerWidget {
             query.remove('contentId');
             
             final uri = Uri(
-              path: '/player/${Uri.encodeComponent(contentId)}',
+              path: '/media/${Uri.encodeComponent(contentId)}/reproducir',
               queryParameters: query,
             );
             

@@ -43,7 +43,7 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     
     // Rutas que consideramos "Raíz" de cada pestaña
     final bool isRootPath = location == '/' || 
-                            location == '/search' || 
+                            location == '/catalogo' || 
                             location == '/explore' || 
                             location == '/settings';
 
@@ -210,7 +210,7 @@ class _RemoteMiniPlayer extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         final uri = Uri(
-          path: '/player/${Uri.encodeComponent(target.mediaTitle ?? "Remote")}',
+          path: '/media/${Uri.encodeComponent(target.mediaTitle ?? "Remote")}/reproducir',
           queryParameters: {
             'url': target.mediaUrl ?? '',
             'source': target.mediaSource ?? '',

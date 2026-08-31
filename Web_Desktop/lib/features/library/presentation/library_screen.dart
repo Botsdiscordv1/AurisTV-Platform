@@ -327,7 +327,7 @@ class _HistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        final uri = '/player/${Uri.encodeComponent(item.contentId)}'
+        final uri = '/media/${Uri.encodeComponent(item.contentId)}/reproducir'
             '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
             '&source=${Uri.encodeComponent(item.source ?? "")}'
             '&episode=${item.episode ?? ""}'
@@ -416,7 +416,7 @@ class _LibraryMediaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        final uri = '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(item.source)}&category=${Uri.encodeComponent(item.category)}&url=${Uri.encodeComponent(item.url)}&metadataTitle=${Uri.encodeComponent(item.title)}&banner=${Uri.encodeComponent(item.bannerUrl)}';
+        final uri = '/media/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(item.source)}&category=${Uri.encodeComponent(item.category)}&url=${Uri.encodeComponent(item.url)}&metadataTitle=${Uri.encodeComponent(item.title)}&banner=${Uri.encodeComponent(item.bannerUrl)}';
         context.push(uri);
       },
       child: Column(

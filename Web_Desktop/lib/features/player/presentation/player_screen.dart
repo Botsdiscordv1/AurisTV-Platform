@@ -1314,7 +1314,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Senior Navigation Fix: Actualizar la URL de la ruta sin añadir una nueva entrada al historial
     // para que el botón "Atrás" (Mouse 4) no nos regrese al episodio anterior.
-    final String newPath = '/player/${widget.contentId}';
+    final String newPath = '/media/${widget.contentId}/reproducir';
     final queryParams = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
     queryParams['episode'] = nextNum.toString();
     queryParams['url'] = nextSourceUrl;
@@ -3875,7 +3875,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                        if (epNum.toString() == _activeEpisode) return;
                        
                        // Senior Navigation Fix: Reemplazar la URL actual para limpiar historial de "Mouse 4"
-                       final String newPath = '/player/${widget.contentId}';
+                       final String newPath = '/media/${widget.contentId}/reproducir';
                        final queryParameters = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
                        queryParameters['episode'] = epNum.toString();
                        queryParameters['url'] = epUrl;

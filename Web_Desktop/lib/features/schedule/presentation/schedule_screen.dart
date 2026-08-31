@@ -320,7 +320,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                             subtitle: _buildSubtitle(item),
                             rating: formatRating(item.averageScore),
                             onTap: () => context.push(
-                              '/content/${Uri.encodeComponent(item.title)}?source=&category=anime&url=&metadataTitle=${Uri.encodeComponent(metaTitle)}&year=${itemYear ?? ''}',
+                              '/media/${Uri.encodeComponent(item.title)}?source=&category=anime&url=&metadataTitle=${Uri.encodeComponent(metaTitle)}&year=${itemYear ?? ''}',
                             ),
                           ),
                         );

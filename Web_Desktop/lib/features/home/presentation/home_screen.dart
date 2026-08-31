@@ -36,7 +36,7 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
   
   final metaTitle = item.romaji ?? item.english ?? item.title;
 
-  final uri = '/content/${Uri.encodeComponent(item.title)}'
+  final uri = '/media/${Uri.encodeComponent(item.title)}'
       '?source=${Uri.encodeComponent(source)}'
       '&category=${Uri.encodeComponent(category)}'
       '&url=${Uri.encodeComponent(item.id)}'
@@ -52,7 +52,7 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
 void openHomeScheduleItem(BuildContext context, MediaItem item) {
   final metaTitle = item.romaji ?? item.english ?? item.title;
   final itemYear = item.year ?? (item.airingAt != null ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year : null);
-  final uri = '/content/${Uri.encodeComponent(item.title)}'
+  final uri = '/media/${Uri.encodeComponent(item.title)}'
       '?source=&category=anime&url='
       '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
       '&banner=&year=${itemYear ?? ''}';
@@ -466,7 +466,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 _FocusIconButton(
                   icon: Icons.search,
                   size: isUltraCompact ? 20 : (isCompactDesktop ? 22 : 26),
-                  onPressed: () => context.push('/search'),
+                  onPressed: () => context.push('/catalogo'),
                 ),
                 // Senior: Ocultamos el selector de idioma en resoluciones intermedias para evitar overflow
                 if (width >= 1080) ...[
@@ -479,7 +479,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _FocusIconButton(
                     icon: Icons.grid_view_rounded,
                     size: isCompactDesktop ? 22 : 26,
-                    onPressed: () => context.push('/schedule'),
+                    onPressed: () => context.push('/horario'),
                   ),
                   const SizedBox(width: 12),
                 ],
@@ -972,7 +972,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
   }
 
   void _onTap(BuildContext context, PlaybackHistory item) {
-    final uri = '/player/${Uri.encodeComponent(item.contentId)}'
+    final uri = '/media/${Uri.encodeComponent(item.contentId)}/reproducir'
         '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
         '&source=${Uri.encodeComponent(item.source ?? "")}'
         '&episode=${item.episode ?? ""}'

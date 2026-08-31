@@ -11,23 +11,34 @@ import 'providers/search_provider.dart';
 import 'widgets/search_widgets.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  final String initialQuery;
+  final String initialCategory;
+
+  const SearchScreen({
+    super.key,
+    this.initialQuery = '',
+    this.initialCategory = 'all',
+  });
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
-  final _searchController = TextEditingController();
+  late final TextEditingController _searchController;
   final _focusNode = FocusNode();
-  String _selectedCategory = 'all';
+  late String _selectedCategory;
   Timer? _debounce;
-  String _currentQuery = '';
+  late String _currentQuery;
   bool _isFocused = false;
 
   @override
   void initState() {
     super.initState();
+    _currentQuery = widget.initialQuery;
+    _selectedCategory = widget.initialCategory;
+    _searchController = TextEditingController(text: _currentQuery);
+    
     _focusNode.addListener(() {
       setState(() => _isFocused = _focusNode.hasFocus);
     });
@@ -37,6 +48,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         FocusScope.of(context).requestFocus(_focusNode);
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Senior Fix: Si la URL cambia externamente (ej: botón atrás), sincronizamos el estado local
+    if (widget.initialQuery != oldWidget.initialQuery && widget.initialQuery != _currentQuery) {
+      _currentQuery = widget.initialQuery;
+      _searchController.text = _currentQuery;
+    }
+    if (widget.initialCategory != oldWidget.initialCategory && widget.initialCategory != _selectedCategory) {
+      _selectedCategory = widget.initialCategory;
+    }
   }
 
   @override
@@ -56,14 +80,36 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
   }
 
+  void _updateUrl() {
+    // Senior Web Fix: Sincronizar estado interno con la URL para permitir
+    // búsquedas compartibles y navegación por historial.
+    final uri = Uri(
+      path: '/catalogo',
+      queryParameters: {
+        if (_currentQuery.isNotEmpty) 'q': _currentQuery,
+        if (_selectedCategory != 'all') 'cat': _selectedCategory,
+      },
+    );
+    
+    // Solo actualizamos si la URI es diferente para evitar loops de navegación
+    final currentUri = GoRouterState.of(context).uri;
+    if (currentUri.toString() != uri.toString()) {
+      context.go(uri.toString());
+    }
+  }
+
   void _onSearchChanged(String value) {
     _debounce?.cancel();
     if (value.trim().isEmpty) {
       setState(() => _currentQuery = '');
+      _updateUrl();
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _currentQuery = value.trim());
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() => _currentQuery = value.trim());
+        _updateUrl();
+      }
     });
   }
 
@@ -73,12 +119,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (query.isNotEmpty) {
       setState(() => _currentQuery = query);
       ref.read(searchHistoryProvider.notifier).addQuery(query);
+      _updateUrl();
     }
   }
 
   void _clearSearch() {
     _searchController.clear();
     setState(() => _currentQuery = '');
+    _updateUrl();
   }
 
   void _performSearch(String query) {
@@ -92,7 +140,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
     final openCategory = inferOpenCategory(result, _selectedCategory);
     context.push(
-      '/content/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(openCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
+      '/media/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(openCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
       extra: result,
     );
   }
@@ -182,7 +230,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     DropdownMenuItem(value: 'anime', child: Text('Anime')),
                   ],
                   onChanged: (v) {
-                    if (v != null) setState(() => _selectedCategory = v);
+                    if (v != null) {
+                      setState(() => _selectedCategory = v);
+                      _updateUrl();
+                    }
                   },
                 ),
               ),
