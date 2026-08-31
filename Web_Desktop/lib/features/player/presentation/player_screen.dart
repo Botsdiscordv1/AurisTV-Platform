@@ -2161,18 +2161,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: false));
 
-    // Senior Web Fix: Auto-Fullscreen en Web Móvil al abrir el reproductor
-    if (kIsWeb) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && ResponsiveUtils.isTactic(context)) {
-          if (!_isFullscreen) {
-            // Forzamos que la UI detecte modo táctil/móvil antes de entrar
-            setState(() => _isMobileDevice = true);
-            _toggleFullscreen();
-          }
-        }
-      });
-    }
+    _checkAutoFullscreen();
 
     // --- FLUJO SEQUENCIAL DE ALTA ESTABILIDAD (SOLO NATIVO) ---
     if (!kIsWeb) {
@@ -2402,6 +2391,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _isLoading = false;
         _hasInitialized = true;
         _playbackError = null;
+      });
+      _checkAutoFullscreen();
+    }
+  }
+
+  void _checkAutoFullscreen() {
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && ResponsiveUtils.isTactic(context)) {
+          if (!_isFullscreen) {
+            // Forzamos que la UI detecte modo táctil/móvil antes de entrar
+            setState(() => _isMobileDevice = true);
+            _toggleFullscreen();
+          }
+        }
       });
     }
   }

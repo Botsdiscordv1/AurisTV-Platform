@@ -81,7 +81,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
 enum PlayerOverlay { none, language, server, quality }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBindingObserver {
-  bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime';
+  bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime' || widget.episode == 'Trailer';
   Player? _player;
   VideoController? _controller;
   int _selectedTrackIndex = 0;
@@ -114,6 +114,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isExiting = false;
   bool _showEpisodesOverlay = false;
   bool _webNeedsInteraction = false; // Senior Web Fix: Autoplay blocker
+  YoutubePlayerController? _ytController;
   PlayerOverlay _activeOverlay = PlayerOverlay.none;
   bool _isVolumePillHovered = false;
   Timer? _volumeExitTimer;
@@ -185,12 +186,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   bool get _isSpecial => widget.season == 0;
   String get _displayTitle {
+    if (_isTrailer) return 'Tráiler: ${widget.title ?? widget.contentId}';
     if (_isSpecial && widget.episodeTitle?.isNotEmpty == true) return widget.episodeTitle!;
     return widget.title ?? widget.contentId;
   }
 
   /// Si el contenido actual es un Opening (OP) o Ending (ED).
   bool get _isOpEd => widget.episode == 'OP' || widget.episode == 'ED';
+  bool get _isTrailer => widget.episode == 'Trailer';
 
   /// Al navegar al siguiente/anterior episodio, el nuevo stream debe arrancar
   /// desde cero y NO reaplicar el startPosition/resume del episodio anterior.
@@ -382,7 +385,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _updateHistory({required int positionMs, required int durationMs, bool force = false}) {
-    if (widget.contentId.isEmpty || _historyNotifier == null || _isOpEd) return;
+    if (widget.contentId.isEmpty || _historyNotifier == null || _isOpEd || _isTrailer) return;
     
     // Senior Performance Fix: Throttling de guardado en base de datos.
     // Solo guardamos si es 'force' o si han pasado 1s desde el último movimiento.
@@ -519,8 +522,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Senior Restoration: Si el provider de fuentes está vacío (viniendo de "Continuar Viendo"),
     // intentamos restaurarlo desde el historial persistido para permitir cambio de servidor.
+    // [Trailer Fix] Los tráilers no necesitan buscar alternativas ni restaurar fuentes.
     final currentSources = ref.read(activeContentSourcesProvider);
-    if (currentSources.isEmpty) {
+    if (currentSources.isEmpty && !_isTrailer) {
       final history = _historyNotifier?.getProgress(widget.contentId, widget.season, _activeEpisode);
       if (history?.alternativeSources != null && history!.alternativeSources!.isNotEmpty) {
         // Senior Fix: Diferimos la actualización al siguiente microtask para evitar el error
@@ -538,9 +542,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (widget.sourceUrl.isNotEmpty && widget.source.isEmpty) {
       _hasInitialized = true;
       _initPlayer(widget.sourceUrl);
-      _findAlternatives();
+      if (!_isTrailer) _findAlternatives();
     } else {
-      _findAlternatives();
+      if (!_isTrailer) _findAlternatives();
     }
     
     _startHideTimer();
@@ -1501,6 +1505,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _startAutoplayCountdown({bool isResume = false}) {
+    if (_isTrailer) return; // [Trailer Fix] No hay reproducción automática para tráilers
     if (!isResume && !_policy.autoPlayNext) return;
     
     // Evitar reiniciar si ya está corriendo el mismo tipo de cuenta atrás
@@ -1832,6 +1837,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Future<void> _initPlayer(String videoUrl, [Map<String, String> headers = const {}]) async {
+    // Senior Youtube Fix: Detectar URLs de YouTube para usar el player especializado
+    // y evitar errores del motor nativo (MPV) sin yt-dlp.
+    if (videoUrl.contains('youtube.com') || videoUrl.contains('youtu.be')) {
+      final id = _extractYoutubeId(videoUrl);
+      if (id != null) {
+        _initYoutubePlayer(id);
+        return;
+      }
+    }
+
     // En Android el backend devuelve URLs con localhost:3000 (el servidor corre
     // en el PC); hay que apuntar a la IP real de la LAN para que el dispositivo
     // pueda llegar al servidor.
@@ -1843,8 +1858,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _currentStreamHeaders = headers;
     
     // Senior: Obtener historial al inicio para setear la propiedad 'start' de MPV
-    // [PlaybackHistory] Ignoramos historial para OP/ED
-    final history = _isOpEd ? null : _historyNotifier?.getProgress(widget.contentId, widget.season, _activeEpisode);
+    // [PlaybackHistory] Ignoramos historial para OP/ED y Tráilers
+    final history = (_isOpEd || _isTrailer) ? null : _historyNotifier?.getProgress(widget.contentId, widget.season, _activeEpisode);
     final int historyPos = (history != null && history.positionInMilliseconds > 3000) ? history.positionInMilliseconds : 0;
 
     final bool isSwitching = _resumePosition > 0;
@@ -2123,7 +2138,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             durationMs: duration,
             force: false,
           );
-          if (!_isOpEd && _currentEpisode != null && widget.totalEpisodes != null) {
+          if (!_isOpEd && !_isTrailer && _currentEpisode != null && widget.totalEpisodes != null) {
             final currentEpNum = int.tryParse(_currentEpisode!) ?? 0;
             if (currentEpNum > 0 && currentEpNum < widget.totalEpisodes!) {
               final nextEpNum = currentEpNum + 1;
@@ -2142,7 +2157,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               );
             }
           }
-          if (!_isOpEd && _autoplayCountdown == -1) _startAutoplayCountdown(isResume: false);
+          if (!_isOpEd && !_isTrailer && _autoplayCountdown == -1) _startAutoplayCountdown(isResume: false);
         }
       }
     });
@@ -2181,18 +2196,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: false));
 
-    // Senior Web Fix: Auto-Fullscreen en Web Móvil al abrir el reproductor
-    if (kIsWeb) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && ResponsiveUtils.isTactic(context)) {
-          if (!_isFullscreen) {
-            // Forzamos que la UI detecte modo táctil/móvil antes de entrar
-            setState(() => _isMobileDevice = true);
-            _toggleFullscreen();
-          }
-        }
-      });
-    }
+    _checkAutoFullscreen();
 
     // --- FLUJO SEQUENCIAL DE ALTA ESTABILIDAD (SOLO NATIVO) ---
     if (!kIsWeb) {
@@ -2403,6 +2407,57 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
+  void _initYoutubePlayer(String videoId) {
+    if (_player != null) {
+      _player!.pause();
+    }
+    _ytController = YoutubePlayerController.fromVideoId(
+      videoId: videoId,
+      autoPlay: true,
+      params: const YoutubePlayerParams(
+        showControls: true,
+        showFullscreenButton: true,
+        mute: false,
+        playsInline: true,
+      ),
+    );
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _hasInitialized = true;
+        _playbackError = null;
+      });
+      _checkAutoFullscreen();
+    }
+  }
+
+  void _checkAutoFullscreen() {
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && ResponsiveUtils.isTactic(context)) {
+          if (!_isFullscreen) {
+            // Forzamos que la UI detecte modo táctil/móvil antes de entrar
+            setState(() => _isMobileDevice = true);
+            _toggleFullscreen();
+          }
+        }
+      });
+    }
+  }
+
+  String? _extractYoutubeId(String url) {
+    try {
+      if (url.contains('v=')) return url.split('v=').last.split('&').first;
+      if (url.contains('youtu.be/')) return url.split('/').last.split('?').first;
+      if (url.contains('embed/')) return url.split('embed/').last.split('?').first;
+      final uri = Uri.parse(url);
+      if (uri.pathSegments.isNotEmpty && (uri.host.contains('youtube.com') || uri.host.contains('youtu.be'))) {
+        return uri.pathSegments.last;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   void _initEmbedPlayer(String url, [Map<String, String> headers = const {}]) {
     // En Android el backend devuelve URLs con localhost:3000 (el servidor corre
     // en el PC); hay que apuntar a la IP real de la LAN.
@@ -2476,6 +2531,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _errorSubscription?.cancel();
     _logSubscription?.cancel();
     _playingSubscription?.cancel();
+    _ytController?.close();
 
     final ms = _player?.state.position.inMilliseconds ?? 0;
     final duration = _player?.state.duration.inMilliseconds ?? 0;
@@ -2645,7 +2701,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (target != null) return _buildRemoteModeView(target);
     }
 
-    if (widget.source.isEmpty && widget.sourceUrl.isNotEmpty) {
+    if (_isTrailer || (widget.source.isEmpty && widget.sourceUrl.isNotEmpty)) {
+      if (!_hasInitialized) {
+        _hasInitialized = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _initPlayer(widget.sourceUrl);
+        });
+      }
       return Material(color: Colors.black, child: _playerView());
     }
 
@@ -2905,12 +2967,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            IconButton(
-              iconSize: 32,
-              icon: const Icon(Symbols.skip_previous, color: Colors.white70),
-              onPressed: () => _handleRemoteNavigation(false, target),
-            ),
-            const SizedBox(width: 16),
+            if (!_isTrailer) ...[
+              IconButton(
+                iconSize: 32,
+                icon: const Icon(Symbols.skip_previous, color: Colors.white70),
+                onPressed: () => _handleRemoteNavigation(false, target),
+              ),
+              const SizedBox(width: 16),
+            ],
             IconButton(
               iconSize: 40,
               icon: const Icon(Symbols.replay_10, color: Colors.white),
@@ -2940,12 +3004,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               icon: const Icon(Symbols.forward_10, color: Colors.white),
               onPressed: () => _sendRemoteSeek(target, 10000),
             ),
-            const SizedBox(width: 16),
-            IconButton(
-              iconSize: 32,
-              icon: const Icon(Symbols.skip_next, color: Colors.white70),
-              onPressed: () => _handleRemoteNavigation(true, target),
-            ),
+            if (!_isTrailer) ...[
+              const SizedBox(width: 16),
+              IconButton(
+                iconSize: 32,
+                icon: const Icon(Symbols.skip_next, color: Colors.white70),
+                onPressed: () => _handleRemoteNavigation(true, target),
+              ),
+            ],
           ],
         ),
         if (!_isMobileDevice) ...[
@@ -3243,6 +3309,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _playerView({List<VideoTrackOption> tracks = const []}) {
+    if (_ytController != null) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(color: Colors.black),
+          Center(
+            child: YoutubePlayer(
+              controller: _ytController!,
+              aspectRatio: 16 / 9,
+            ),
+          ),
+          Positioned(
+            top: 16,
+            left: 16,
+            child: SafeArea(
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 30),
+                onPressed: _exitPlayer,
+                style: IconButton.styleFrom(backgroundColor: Colors.black45),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     final playableTracks = tracks.where((t) => !t.isDownload).toList();
     if (!_isCurrentTrackEmbed(playableTracks)) return _buildMobilePlayer(playableTracks);
 
@@ -4225,7 +4317,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildNavigationCapsule(bool hasPrevious, bool hasNext) {
-    if (!hasPrevious && !hasNext) return const SizedBox.shrink();
+    if (_isTrailer || (!hasPrevious && !hasNext)) return const SizedBox.shrink();
     return Container(
       height: 44, // Unificado a 44px
       decoration: _controlCapsuleDecoration,
@@ -4413,7 +4505,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         ],
                       ],
                     ),
-                    if (!_isOpEd && _isMobileDevice)
+                    if (!_isOpEd && _isMobileDevice && !_isTrailer)
                     Row(
                       children: [
                         if (hasPrevious)
@@ -4465,11 +4557,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           ),
                           SizedBox(width: spacing),
                         ],
-                        if (!_isOpEd) ...[
+                        if (!_isOpEd && !_isTrailer) ...[
                           IconButton(iconSize: iconSize, icon: const Icon(Symbols.subtitles, color: Colors.white), onPressed: _showLanguageSelector),
                           SizedBox(width: spacing),
                         ],
-                        if (!_isOpEd && !_isMovie)
+                        if (!_isOpEd && !_isMovie && !_isTrailer)
                         IconButton(
                           iconSize: iconSize, 
                           icon: const Icon(Symbols.video_library, color: Colors.white), 
@@ -4477,7 +4569,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         ),
                         SizedBox(width: spacing),
                         _buildCastIcon(iconSize),
-                        if (!_isOpEd && !_isMovie) ...[
+                        if (!_isOpEd && !_isMovie && !_isTrailer) ...[
                           SizedBox(width: spacing),
                           _PlayerTextButton(onPressed: _skipOpEd, icon: Symbols.fast_forward, label: 'OP / ED', useBackground: true),
                         ],

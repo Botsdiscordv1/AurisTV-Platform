@@ -260,21 +260,9 @@ class _ContentHeader extends ConsumerStatefulWidget {
 }
 
 class _ContentHeaderState extends ConsumerState<_ContentHeader> {
-  YoutubePlayerController? _ytController; StreamSubscription? _ytSubscription; Timer? _fadeTimer; String? _lastTrailerKey; bool _isMuted = true; bool _showPlayer = false; bool _isPlayedOnce = false; Timer? _delayTimer;
-  bool _showTitle = true; Timer? _titleHideTimer;
+  String? _lastTrailerKey;
   bool _revealed = false;
   Timer? _revealTimeout;
-
-  void _startTitleHideTimer() {
-    _titleHideTimer?.cancel();
-    if (_showPlayer) {
-      _titleHideTimer = Timer(const Duration(seconds: 5), () {
-        if (mounted && _showPlayer && _showTitle) {
-          setState(() => _showTitle = false);
-        }
-      });
-    }
-  }
 
   void _handleInteraction() {
     if (!mounted) return;
@@ -304,7 +292,13 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
         : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
     final k = (d is AnimeDetail) ? d.trailerKey : (d is MovieDetail ? d.trailerKey : null);
-    if (k != null && k.isNotEmpty) { if (k != _lastTrailerKey) { _lastTrailerKey = k; } } else if (_lastTrailerKey != null) { _lastTrailerKey = null; _disposeController(); }
+    if (k != null && k.isNotEmpty) { 
+      if (k != _lastTrailerKey) { 
+        _lastTrailerKey = k; 
+      } 
+    } else if (_lastTrailerKey != null) { 
+      _lastTrailerKey = null; 
+    }
   }
   void _initTrailer(String key, {bool immediate = false}) {
     _delayTimer?.cancel();
@@ -399,7 +393,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       });
     });
   }
-  void _disposeController() { _delayTimer?.cancel(); _fadeTimer?.cancel(); _titleHideTimer?.cancel(); _ytSubscription?.cancel(); _ytSubscription = null; _ytController?.close(); _ytController = null; }
+  void _disposeController() { _lastTrailerKey = null; }
   @override void initState() {
     super.initState();
     // Timeout de seguridad: Si en X segundos no hay enriquecimiento, mostramos fallbacks
@@ -536,16 +530,81 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 
   Widget _buildCircularActions(BuildContext context, {required bool isMobile}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _ActionSquareButton(icon: Icons.movie_outlined, label: "Tráiler", onTap: () {}),
-        _ActionSquareButton(icon: Icons.add, label: "Mi lista", onTap: () {}),
-        _ActionSquareButton(icon: Icons.thumb_up_outlined, label: "Me gusta", onTap: () {}),
-        _ActionSquareButton(icon: Icons.thumb_down_outlined, label: "No es para mí", onTap: () {}),
+    return Consumer(builder: (context, ref, _) {
+      final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
+      // [AurisCore] El provider de favoritos debe estar en la capa compartida
+      // final favorites = ref.watch(favoritesProvider);
+      // final bool isFav = favorites.any((f) => f.id == currentId);
+      const bool isFav = false; // Placeholder para la migración
+      
+      final actionRow = Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+        // TRÁILER
+        if (_lastTrailerKey != null) ...[
+          _DetailIconButton(
+            icon: Icons.movie_outlined,
+            label: 'Ver tráiler',
+            onPressed: () {
+              final trailerUrl = 'https://www.youtube.com/watch?v=$_lastTrailerKey';
+              final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(widget.poster ?? '')}&bannerUrl=${Uri.encodeComponent(widget.banner ?? '')}';
+              context.push('/player/${Uri.encodeComponent(widget.title)}?source=YouTube&url=${Uri.encodeComponent(trailerUrl)}&episode=Trailer&serverName=YouTube&language=Trailer&totalEpisodes=1$posterParam');
+            },
+            isMobile: isMobile,
+          ),
+          const SizedBox(width: 8),
+        ],
+
+        // MI LISTA
+        _DetailIconButton(
+          icon: isFav ? Icons.check : Icons.add,
+          label: isFav ? 'En mi lista' : 'Mi lista',
+          onPressed: () {
+            // Lógica de favoritos pendiente de unificar con Core
+          },
+          isMobile: isMobile,
+        ),
+        const SizedBox(width: 8),
+
+        // CALIFICAR / ME GUSTA
+        _DetailIconButton(
+          icon: Icons.thumb_up_off_alt,
+          label: 'Me gusta',
+          onPressed: () {},
+          isMobile: isMobile,
+        ),
+        const SizedBox(width: 8),
+        
+        // DISLIKE / NO ES PARA MÍ
+        _DetailIconButton(
+          icon: Icons.thumb_down_off_alt,
+          label: 'Dislike',
+          onPressed: () {},
+          isMobile: isMobile,
+        ),
+
+        // COMPARTIR
+        const SizedBox(width: 8),
+        _DetailIconButton(
+          icon: Icons.share_outlined,
+          label: 'Compartir',
+          onPressed: () {},
+          isMobile: true,
+        ),
       ],
     );
-  }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: actionRow,
+      ),
+    );
+  });
+}
 
 @override Widget build(BuildContext context) {
     final d = widget.category == 'movie_anime'
@@ -579,21 +638,14 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                     stops: [0.4, 1.0],
                   ).createShader(rect),
                   blendMode: BlendMode.dstIn,
-                  child: TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 800), 
-                    tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
-                    builder: (context, blur, child) => ImageFiltered(
-                      imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 800), 
-                        foregroundDecoration: BoxDecoration(color: Colors.black.withOpacity(_showPlayer ? 0.45 : 0.0)), 
-                        child: CachedNetworkImage(imageUrl: b, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
-                      )
-                    )
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 1200),
+                    curve: Curves.easeInOut,
+                    opacity: _revealed ? 1.0 : 0.0,
+                    child: CachedNetworkImage(imageUrl: b, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
                   ),
                 )),
-                if (_ytController != null) Positioned.fill(child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9))))))),
-                Positioned(left: 20, bottom: 16, right: 20, child: AnimatedOpacity(duration: const Duration(milliseconds: 1200), curve: Curves.easeInOut, opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)])))),
+                Positioned(left: 20, bottom: 16, right: 20, child: AnimatedOpacity(duration: const Duration(milliseconds: 1200), curve: Curves.easeInOut, opacity: _revealed ? 1.0 : 0.0, child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)])))),
               ]);
             })),
             Positioned.fill(child: _buildUpperButtons(context)),
@@ -1226,34 +1278,32 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
   bool _isHovered = false;
   @override Widget build(BuildContext context) {
     if (widget.isMobile) {
-      return Expanded(
-        child: InkWell(
-          onTap: widget.onPressed, 
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // Senior: Evitar que el Column ocupe espacio extra
+      return InkWell(
+        onTap: widget.onPressed, 
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            border: Border.all(color: widget.color ?? Colors.white24, width: 0.8), 
+            borderRadius: BorderRadius.circular(8)
+          ), 
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                height: 48, 
-                decoration: BoxDecoration(
-                  border: Border.all(color: widget.color ?? Colors.white24), 
-                  borderRadius: BorderRadius.circular(4)
-                ), 
-                child: Center(child: Icon(widget.icon, color: widget.color ?? Colors.white, size: 24))
-              ), 
-              const SizedBox(height: 8), 
-              SizedBox(
-                height: 28, // Senior Fix: Altura ajustada para 2 líneas sin exceso de espacio
-                child: Text(
-                  widget.label, 
-                  style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 10.5, height: 1.1), 
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+              Icon(widget.icon, color: widget.color ?? Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                widget.label, 
+                style: GoogleFonts.poppins(
+                  color: Colors.white, 
+                  fontSize: 13, 
+                  fontWeight: FontWeight.w500,
                 ),
-              )
-            ]
-          )
-        )
+              ),
+            ],
+          ),
+        ),
       );
     }
     return MouseRegion(
