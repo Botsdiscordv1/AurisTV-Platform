@@ -125,7 +125,7 @@ class SearchResult {
         json['coverImage'] as String? ?? 
         json['image'] as String?
       ),
-      banner: ApiEndpoints.proxyImage(json['banner'] as String? ?? json['backdrop'] as String?),
+      banner: ApiEndpoints.proxyImage(json['banner'] as String? ?? json['backdrop'] as String?, highQuality: true),
       logo: ApiEndpoints.proxyImage(json['logo'] as String?),
       source: json['source'] as String? ?? '',
       romaji: json['romaji'] as String?,

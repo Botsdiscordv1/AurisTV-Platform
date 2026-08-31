@@ -111,8 +111,8 @@ class AnimeDetail {
           root['thumbnail'] as String?),
       backdrop: ApiEndpoints.proxyImage(visuals?['backdrop'] as String? ??
           root['backdrop'] as String? ??
-          root['banner'] as String?),
-      banner: ApiEndpoints.proxyImage(visuals?['banner'] as String? ?? root['banner'] as String?),
+          root['banner'] as String?, highQuality: true),
+      banner: ApiEndpoints.proxyImage(visuals?['banner'] as String? ?? root['banner'] as String?, highQuality: true),
       logo: ApiEndpoints.proxyImage(visuals?['logo'] as String? ?? root['logo'] as String?),
       rating: (anime['score'] as num?)?.toDouble(),
       episodes: anime['episodes'] as int?,

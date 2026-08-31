@@ -105,6 +105,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   double _playbackSpeed = 1.0;
   StreamSubscription? _posSubscription;
   StreamSubscription? _completedSubscription;
+  StreamSubscription? _fullscreenSubscription;
   bool _isStabilizing = false;
   Timer? _stabilizationTimer;
   bool _isMobileDevice = false;
@@ -454,7 +455,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
 
     if (kIsWeb) {
-       // Web logic can be added here if needed
+      _fullscreenSubscription = onFullscreenChanged()?.listen((_) {
+        // Senior Web Fix: Si el navegador sale de fullscreen (ej: gesto back del sistema)
+        // pero nuestra UI cree que sigue en fullscreen, cerramos el player.
+        if (mounted && _isFullscreen && !isAppFullscreen()) {
+          _exitPlayer();
+        }
+      });
     }
     
     _currentSourceUrl = widget.sourceUrl;
@@ -1893,6 +1900,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _posSubscription?.cancel();
     _bufferingSubscription?.cancel();
     _completedSubscription?.cancel();
+    _fullscreenSubscription?.cancel();
     _errorSubscription?.cancel();
     _logSubscription?.cancel();
     _playingSubscription?.cancel();
@@ -2493,6 +2501,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _posSubscription?.cancel();
     _bufferingSubscription?.cancel();
     _completedSubscription?.cancel();
+    _fullscreenSubscription?.cancel();
     _errorSubscription?.cancel();
     _logSubscription?.cancel();
     _playingSubscription?.cancel();
@@ -3284,13 +3293,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
           ),
           Positioned(
-            top: 16,
+            top: 60,
             left: 16,
             child: SafeArea(
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 30),
-                onPressed: _exitPlayer,
-                style: IconButton.styleFrom(backgroundColor: Colors.black45),
+              child: PointerInterceptor(
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 30),
+                  onPressed: _exitPlayer,
+                  style: IconButton.styleFrom(backgroundColor: Colors.black45),
+                ),
               ),
             ),
           ),

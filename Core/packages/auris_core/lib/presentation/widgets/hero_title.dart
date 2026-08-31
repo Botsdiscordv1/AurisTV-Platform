@@ -45,7 +45,7 @@ class _HeroTitleState extends State<HeroTitle> {
           maxHeight: widget.maxHeight,
         ),
         child: CachedNetworkImage(
-          imageUrl: ApiEndpoints.proxyImage(widget.logo),
+          imageUrl: ApiEndpoints.proxyImage(widget.logo, highQuality: true),
           fit: BoxFit.contain,
           alignment: Alignment.bottomLeft,
           fadeInDuration: const Duration(milliseconds: 300),

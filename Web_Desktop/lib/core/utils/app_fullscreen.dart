@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'app_fullscreen_io.dart'
     if (dart.library.js_interop) 'app_fullscreen_web.dart' as impl;
 
@@ -14,3 +15,6 @@ Future<void> lockAppOrientation() => impl.lockAppOrientationImpl();
 
 /// Libera la orientación (permite vertical/horizontal).
 Future<void> unlockAppOrientation() => impl.unlockAppOrientationImpl();
+
+/// Stream que notifica cambios en el estado de pantalla completa.
+Stream<void>? onFullscreenChanged() => impl.onFullscreenChangedImpl();

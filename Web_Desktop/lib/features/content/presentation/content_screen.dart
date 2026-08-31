@@ -3010,6 +3010,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         bannerParam: widget.banner,
         sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
       ),
+      highQuality: true,
     );
     // Congelar el banner del hero con la primera imagen disponible. Una vez
     // capturado no vuelve a cambiar aunque se switchee de temporada.
@@ -3020,7 +3021,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
       );
       if (candidate.isNotEmpty) {
-        _stableBanner = ApiEndpoints.proxyImage(candidate);
+        _stableBanner = ApiEndpoints.proxyImage(candidate, highQuality: true);
       }
     }
     final stableBanner = _stableBanner ?? initialBanner;
@@ -3057,7 +3058,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ? seasonDetail.backdrop!
         : (seasonDetail != null && seasonDetail.poster?.isNotEmpty == true ? seasonDetail.poster! : null);
     final heroBanner = (seasonSwitched && seasonBannerRaw != null)
-        ? ApiEndpoints.proxyImage(seasonBannerRaw)
+        ? ApiEndpoints.proxyImage(seasonBannerRaw, highQuality: true)
         : stableBanner;
     final episodeLookupTitle = seasonSwitched
         ? (seasonDetail?.titleEnglish?.isNotEmpty == true

@@ -112,7 +112,7 @@ class ScheduleItem {
           [],
       description: json['description'] as String?,
       coverImage: ApiEndpoints.proxyImage(json['coverImage'] as String?),
-      banner: ApiEndpoints.proxyImage(json['banner'] as String?),
+      banner: ApiEndpoints.proxyImage(json['banner'] as String?, highQuality: true),
       genres: (json['genres'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

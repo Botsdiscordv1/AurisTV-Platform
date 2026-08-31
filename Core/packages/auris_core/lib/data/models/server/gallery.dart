@@ -14,7 +14,7 @@ class GalleryImage {
   });
 
   factory GalleryImage.fromJson(Map<String, dynamic> j) => GalleryImage(
-        url: ApiEndpoints.proxyImage(j['url']?.toString()),
+        url: ApiEndpoints.proxyImage(j['url']?.toString(), highQuality: true),
         type: j['type']?.toString() ?? '',
         source: j['source']?.toString() ?? '',
         lang: j['lang']?.toString(),

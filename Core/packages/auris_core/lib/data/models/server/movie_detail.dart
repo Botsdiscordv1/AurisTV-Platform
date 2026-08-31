@@ -72,7 +72,7 @@ class MovieDetail {
       originalTitle: json['originalTitle'] as String?,
       overview: SynopsisCleaner.clean(json['overview'] as String?),
       poster: ApiEndpoints.proxyImage(json['poster'] as String?),
-      backdrop: ApiEndpoints.proxyImage(json['backdrop'] as String?),
+      backdrop: ApiEndpoints.proxyImage(json['backdrop'] as String?, highQuality: true),
       logo: ApiEndpoints.proxyImage(json['logo'] as String?),
       rating: (json['rating'] as num?)?.toDouble(),
       voteCount: json['voteCount'] as int?,

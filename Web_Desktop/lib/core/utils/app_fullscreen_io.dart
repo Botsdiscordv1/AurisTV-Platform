@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:fullscreen_window/fullscreen_window.dart';
 import 'package:flutter/services.dart';
 
@@ -26,3 +27,5 @@ Future<void> unlockAppOrientationImpl() async {
     DeviceOrientation.landscapeRight,
   ]);
 }
+
+Stream<void>? onFullscreenChangedImpl() => null;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:js_interop';
 import 'package:web/web.dart' as web;
 
@@ -44,4 +45,26 @@ Future<void> unlockAppOrientationImpl() async {
   try {
     web.window.screen.orientation.unlock();
   } catch (_) {}
+}
+
+Stream<void> onFullscreenChangedImpl() {
+  final controller = StreamController<void>.broadcast();
+  
+  // Guardamos la referencia para poder removerla luego
+  JSFunction? jsHandler;
+  
+  controller.onListen = () {
+    jsHandler = ((web.Event _) {
+      if (!controller.isClosed) controller.add(null);
+    }).toJS;
+    web.document.addEventListener('fullscreenchange', jsHandler!);
+  };
+  
+  controller.onCancel = () {
+    if (jsHandler != null) {
+      web.document.removeEventListener('fullscreenchange', jsHandler!);
+    }
+  };
+  
+  return controller.stream;
 }

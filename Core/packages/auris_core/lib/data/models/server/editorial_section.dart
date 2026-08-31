@@ -76,7 +76,7 @@ class EditorialItem {
       romaji: json['romaji'] as String?,
       english: json['english'] as String?,
       posterUrl: ApiEndpoints.proxyImage(json['posterUrl'] as String?),
-      bannerUrl: ApiEndpoints.proxyImage(json['bannerUrl'] as String?),
+      bannerUrl: ApiEndpoints.proxyImage(json['bannerUrl'] as String?, highQuality: true),
       trailerKey: json['trailerKey'] as String?,
       synopsis: json['synopsis'] as String?,
       rating: switch (json['rating']) {

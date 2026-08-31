@@ -135,66 +135,69 @@ class ApiEndpoints {
   }
 
   /// Pasa una imagen por el proxy del servidor si es necesario.
-  /// Implementación Senior: Idempotente y Anti-Recursiva.
-  static String proxyImage(String? url) {
+  /// Implementación Senior: Idempotente, Anti-Recursiva y con soporte de Weserv CDN.
+  /// [highQuality] - Si es true, usa parámetros de máxima fidelidad (ideal para 4K/Backdrops).
+  static String proxyImage(String? url, {bool highQuality = false}) {
     if (url == null || url.isEmpty) return '';
 
     String workingUrl = url;
 
     // 1. DESENVOLVER (Unwrap) TOTAL:
-    // Siempre limpiamos la URL primero para saber qué hay realmente dentro,
-    // incluso si ya viene con nuestro proxy desde el servidor.
-    while (workingUrl.contains('url=http') || workingUrl.contains('/api/proxy/image')) {
-       final int index = workingUrl.lastIndexOf('url=http');
-       if (index != -1) {
+    // Limpiamos la URL de cualquier proxy previo (nuestro o externo) para evitar recursividad.
+    while (workingUrl.contains('url=http') || workingUrl.contains('/api/proxy/image') || workingUrl.contains('weserv.nl')) {
+       if (workingUrl.contains('url=http')) {
+         final int index = workingUrl.lastIndexOf('url=http');
          workingUrl = workingUrl.substring(index + 4);
+       } else if (workingUrl.contains('weserv.nl')) {
          try {
-           workingUrl = Uri.decodeFull(workingUrl);
-         } catch (_) {}
+           final uri = Uri.parse(workingUrl);
+           final nested = uri.queryParameters['url'];
+           if (nested != null) {
+             workingUrl = nested;
+           } else {
+             break;
+           }
+         } catch (_) { break; }
        } else {
          break; 
        }
+       
+       try {
+         workingUrl = Uri.decodeFull(workingUrl);
+         // Limpiar parámetros de Weserv que se queden pegados a la URL original
+         if (workingUrl.contains('&output=')) workingUrl = workingUrl.split('&output=')[0];
+         if (workingUrl.contains('?output=')) workingUrl = workingUrl.split('?output=')[0];
+       } catch (_) {}
     }
 
     final String lowerUrl = workingUrl.toLowerCase();
 
-    // 2. BYPASS DE SEGURIDAD (Prioridad Absoluta):
-    // Dominios que NUNCA deben pasar por el proxy porque fallan (502/403).
-    const bypassKeywords = [
-      'tmdb.org', 'themoviedb.org', 
-      'googleusercontent.com', 'fbcdn.net'
-    ];
-    
-    if (bypassKeywords.any((k) => lowerUrl.contains(k))) {
-      return workingUrl; // Devolvemos la URL limpia y directa
-    }
-
-    // 3. Si la URL limpia es de nuestro servidor o local, fixUrl.
+    // 2. EXCEPCIONES DE NUESTRO SERVIDOR (Bypass de Weserv):
+    // Si la URL ya es de nuestro servidor o es local, usamos fixUrl directamente.
     if (_isOurServer(workingUrl) || workingUrl.startsWith('/') || 
         lowerUrl.contains('localhost') || lowerUrl.contains('127.0.0.1')) {
       return fixUrl(workingUrl);
     }
 
-    // 4. APLICAR PROXY:
-    if (workingUrl.startsWith('http')) {
-      // --- FALLBACK PARA DOMINIOS CIEGOS (Weserv) ---
-      // Si el VPS no puede ver el dominio (como jkdesa), usamos un proxy público global.
-      if (lowerUrl.contains('jkdesa.com') || lowerUrl.contains('jkanime.net')) {
-        return 'https://images.weserv.nl/?url=${Uri.encodeComponent(workingUrl)}';
-      }
-
-      // --- PROXY PRIVADO (Nuestro VPS) ---
-      // Para el resto de dominios que el VPS SÍ ve (como animeav1).
+    // 3. MANEJO DE CDNs "SENSIBLES" (Anilist, WordPress):
+    // Estos CDNs bloquean agresivamente a Weserv y DEBEN usar nuestro VPS en Web.
+    const sensitiveCDNs = [
+      'anilist.co', 'wp.com', 'animed23.com'
+    ];
+    if (sensitiveCDNs.any((k) => lowerUrl.contains(k))) {
       if (kIsWeb) {
         return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
       }
-      
-      const forceProxyDomains = [
-        'zilla-networks.com', 'idmwp.com', 'animeflv', 
-        'animeav1.com'
-      ];
-      if (forceProxyDomains.any((d) => lowerUrl.contains(d))) {
-        return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+      return workingUrl; // Directo en Móvil/TV
+    }
+
+    // 4. TODO LO DEMÁS EXTERNO -> WESERV (Incluyendo TMDB, JKAnime, etc.)
+    // TMDB es amigable con Weserv y nos permite ahorrar ancho de banda masivo.
+    if (workingUrl.startsWith('http')) {
+      if (highQuality) {
+        return 'https://images.weserv.nl/?url=${Uri.encodeComponent(workingUrl)}&output=webp&q=95&il';
+      } else {
+        return 'https://images.weserv.nl/?url=${Uri.encodeComponent(workingUrl)}&output=webp&q=82';
       }
     }
 
