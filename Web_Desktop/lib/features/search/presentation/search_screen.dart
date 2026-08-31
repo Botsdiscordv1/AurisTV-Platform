@@ -213,9 +213,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SearchGenresGrid(onGenreTap: _performSearch),
+                  RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
                   const SizedBox(height: 32),
-                  SearchTrendingSection(onTrendingTap: _onContentTap),
+                  RepaintBoundary(child: SearchTrendingSection(onTrendingTap: _onContentTap)),
                 ],
               ),
             ),
@@ -240,10 +240,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       padding: const EdgeInsets.only(bottom: 40),
       child: Column(
         children: [
-          SearchHistorySection(onQueryTap: _performSearch),
-          SearchGenresGrid(onGenreTap: _performSearch),
+          RepaintBoundary(child: SearchHistorySection(onQueryTap: _performSearch)),
+          RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
           const SizedBox(height: 16),
-          SearchTrendingSection(onTrendingTap: _onContentTap),
+          RepaintBoundary(child: SearchTrendingSection(onTrendingTap: _onContentTap)),
         ],
       ),
     );

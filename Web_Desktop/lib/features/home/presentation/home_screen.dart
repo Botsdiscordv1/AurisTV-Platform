@@ -306,9 +306,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildTopNavContent(BuildContext context, WidgetRef ref, String currentCategory, bool isMobile) {
     final width = MediaQuery.of(context).size.width;
-    final isCompactDesktop = width >= 800 && width < 1100;
+    // Senior: Refinamos umbrales para tablets verticales. 
+    // Si el ancho es < 920px entramos en modo Ultra-Compacto para evitar desbordamientos.
+    final isCompactDesktop = width < 1150;
+    final isUltraCompact = width < 920;
+    
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final logoHeight = isCompactDesktop ? 28.0 : 32.0;
+    final logoHeight = isUltraCompact ? 24.0 : (isCompactDesktop ? 28.0 : 32.0);
     final navHeight = isCompactDesktop ? 70.0 : 80.0;
     
     if (isMobile) {
@@ -450,30 +454,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   height: logoHeight,
                   colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
                 ),
-                SizedBox(width: isCompactDesktop ? 20 : 40),
+                SizedBox(width: isUltraCompact ? 8 : (isCompactDesktop ? 20 : 40)),
                 _PillNavBar(
                   currentCategory: currentCategory,
+                  isCompact: isCompactDesktop,
+                  isUltraCompact: isUltraCompact,
                   onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
                 ),
                 const Spacer(),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 _FocusIconButton(
                   icon: Icons.search,
-                  size: isCompactDesktop ? 22 : 26,
+                  size: isUltraCompact ? 20 : (isCompactDesktop ? 22 : 26),
                   onPressed: () => context.push('/search'),
                 ),
+                // Senior: Ocultamos el selector de idioma en resoluciones intermedias para evitar overflow
+                if (width >= 1080) ...[
+                  const SizedBox(width: 12),
+                  const _LanguageSelector(),
+                ],
                 const SizedBox(width: 12),
-                const _LanguageSelector(),
-                const SizedBox(width: 12),
-                _FocusIconButton(
-                  icon: Icons.grid_view_rounded,
-                  size: isCompactDesktop ? 22 : 26,
-                  onPressed: () => context.push('/schedule'),
-                ),
-                const SizedBox(width: 12),
-                _buildUserAvatar(context, isCompactDesktop),
-                const SizedBox(width: 20),
-                _AuthButton(isCompactDesktop: isCompactDesktop),
+                // Senior: Ocultamos el grid en ultra-compacto (iPad Vertical) para priorizar la navegación
+                if (!isUltraCompact) ...[
+                  _FocusIconButton(
+                    icon: Icons.grid_view_rounded,
+                    size: isCompactDesktop ? 22 : 26,
+                    onPressed: () => context.push('/schedule'),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                _buildUserAvatar(context, isUltraCompact ? true : isCompactDesktop),
+                // Senior: El botón de login se oculta si el espacio es crítico (< 950px) para priorizar navegación
+                if (width >= 950) ...[
+                  const SizedBox(width: 20),
+                  _AuthButton(isCompactDesktop: isCompactDesktop),
+                ],
               ],
             ),
           ),
@@ -483,21 +498,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildUserAvatar(BuildContext context, bool isCompact) {
+    final width = MediaQuery.of(context).size.width;
+    final bool isUltra = width < 920;
     return Consumer(
       builder: (context, ref, _) {
         final user = ref.watch(authProvider);
         if (user == null) {
           return _FocusIconButton(
             icon: Icons.person_outline_rounded,
-            size: isCompact ? 20 : 22,
+            size: isUltra ? 20 : (isCompact ? 20 : 22),
             onPressed: () => context.push('/settings'),
           );
         }
         return _FocusIconButton(
           onPressed: () => context.push('/settings'),
           child: Container(
-            width: isCompact ? 28 : 32,
-            height: isCompact ? 28 : 32,
+            width: isUltra ? 24 : (isCompact ? 28 : 32),
+            height: isUltra ? 24 : (isCompact ? 28 : 32),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white24, width: 1.5),
@@ -508,7 +525,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     )
                   : null,
             ),
-            child: user.photoUrl == null ? Icon(Icons.person, size: isCompact ? 16 : 18, color: Colors.white70) : null,
+            child: user.photoUrl == null ? Icon(Icons.person, size: isUltra ? 14 : (isCompact ? 16 : 18), color: Colors.white70) : null,
           ),
         );
       },
@@ -569,12 +586,22 @@ class _PillNavBar extends StatelessWidget {
   final String currentCategory;
   final ValueChanged<String> onCategoryChanged;
   final bool hideHome;
+  final bool isCompact;
+  final bool isUltraCompact;
 
-  const _PillNavBar({required this.currentCategory, required this.onCategoryChanged, this.hideHome = false});
+  const _PillNavBar({
+    required this.currentCategory, 
+    required this.onCategoryChanged, 
+    this.hideHome = false,
+    this.isCompact = false,
+    this.isUltraCompact = false,
+  });
 
   double _calculateTextWidth(String text) {
+    // Senior: Ajuste de fuente para el modo ultra-compacto (Vertical tablets)
+    final double fontSize = isUltraCompact ? 13.5 : (isCompact ? 14 : 15);
     final TextPainter textPainter = TextPainter(
-      text: TextSpan(text: text, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700)),
+      text: TextSpan(text: text, style: GoogleFonts.poppins(fontSize: fontSize, fontWeight: FontWeight.w700)),
       maxLines: 1,
       textDirection: TextDirection.ltr,
     )..layout();
@@ -592,8 +619,12 @@ class _PillNavBar extends StatelessWidget {
       {'id': 'kdrama', 'label': 'KDramas'},
     ];
     final categories = hideHome ? allCategories.where((c) => c['id'] != 'inicio').toList() : allCategories;
-    final double hPadding = isMobile ? 24.0 : 36.0; 
-    const double spacing = 8.0;
+    
+    // Senior: Reducción agresiva de paddings en modo compacto y ultra-compacto
+    final double hPadding = isMobile ? 24.0 : (isUltraCompact ? 14.0 : (isCompact ? 22.0 : 36.0)); 
+    final double spacing = isUltraCompact ? 2.0 : (isCompact ? 6.0 : 8.0);
+    final double fontSize = isUltraCompact ? 13.0 : (isCompact ? 14 : 15);
+    
     final List<double> itemWidths = categories.map((c) => _calculateTextWidth(c['label']!) + hPadding).toList();
     final activeIndex = categories.indexWhere((c) => c['id'] == currentCategory);
     final bool showPill = activeIndex != -1;
@@ -635,6 +666,7 @@ class _PillNavBar extends StatelessWidget {
                   label: cat['label']!,
                   isActive: index == activeIndex,
                   width: itemWidths[index],
+                  fontSize: fontSize,
                   onTap: () => onCategoryChanged(cat['id']!),
                 ),
               );
@@ -650,8 +682,9 @@ class _PillNavItem extends StatefulWidget {
   final String label;
   final bool isActive;
   final double width;
+  final double fontSize;
   final VoidCallback onTap;
-  const _PillNavItem({required this.label, required this.isActive, required this.width, required this.onTap});
+  const _PillNavItem({required this.label, required this.isActive, required this.width, required this.onTap, this.fontSize = 15});
 
   @override
   State<_PillNavItem> createState() => _PillNavItemState();
@@ -676,7 +709,7 @@ class _PillNavItemState extends State<_PillNavItem> {
           ),
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
-            style: GoogleFonts.poppins(color: widget.isActive ? Colors.black : Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
+            style: GoogleFonts.poppins(color: widget.isActive ? Colors.black : Colors.white, fontSize: widget.fontSize, fontWeight: FontWeight.w700),
             child: Text(widget.label),
           ),
         ),

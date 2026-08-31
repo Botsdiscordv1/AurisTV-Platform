@@ -163,6 +163,8 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
     if (!mounted || !_scrollController.hasClients) return;
     final bool left = _scrollController.offset > 20;
     final bool right = _scrollController.offset < _scrollController.position.maxScrollExtent - 20;
+    
+    // Senior Optimization: Solo setState si el estado visual CAMBIA
     if (left != _showLeftArrow || right != _showRightArrow) {
       setState(() {
         _showLeftArrow = left;
@@ -200,35 +202,40 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
           child: trendingAsync.when(
             data: (items) {
               if (items.isEmpty) return const SizedBox.shrink();
-              return Stack(
-                children: [
-                  ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      return _TrendingPosterCard(
-                        index: index,
-                        item: items[index],
-                        height: posterHeight,
-                        width: itemWidth,
-                        onTap: () => widget.onTrendingTap(items[index]),
-                      );
-                    },
-                  ),
-                  
-                  if (!isMobile) ...[
-                    Positioned(
-                      left: 0, top: 0, bottom: 0,
-                      child: _buildArrow(false),
+              return RepaintBoundary(
+                child: Stack(
+                  children: [
+                    ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      scrollDirection: Axis.horizontal,
+                      cacheExtent: 600, // Senior: Buffer de carga para evitar saltos
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return _TrendingPosterCard(
+                          key: ValueKey('trending_search_${item.url}'),
+                          index: index,
+                          item: item,
+                          height: posterHeight,
+                          width: itemWidth,
+                          onTap: () => widget.onTrendingTap(item),
+                        );
+                      },
                     ),
-                    Positioned(
-                      right: 0, top: 0, bottom: 0,
-                      child: _buildArrow(true),
-                    ),
+                    
+                    if (!isMobile) ...[
+                      Positioned(
+                        left: 0, top: 0, bottom: 0,
+                        child: _buildArrow(false),
+                      ),
+                      Positioned(
+                        right: 0, top: 0, bottom: 0,
+                        child: _buildArrow(true),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               );
             },
             loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
@@ -277,6 +284,7 @@ class _TrendingPosterCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _TrendingPosterCard({
+    super.key,
     required this.index,
     required this.item,
     required this.height,
@@ -389,6 +397,7 @@ class _TrendingPosterCard extends StatelessWidget {
                   child: CachedNetworkImage(
                     imageUrl: ApiEndpoints.proxyImage(item.thumbnail),
                     fit: BoxFit.cover,
+                    filterQuality: FilterQuality.low, // Senior: Rendimiento Web
                     placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
                     errorWidget: (context, url, error) => Container(
                       color: Colors.white10,

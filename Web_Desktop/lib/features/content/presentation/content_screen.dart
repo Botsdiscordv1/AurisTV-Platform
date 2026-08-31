@@ -289,14 +289,24 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     }
   }
   void _checkAndInitTrailer() {
+    final isMobile = ResponsiveUtils.isMobile(context);
     final d = widget.category == 'movie_anime'
         ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
         : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
     final k = (d is AnimeDetail) ? d.trailerKey : (d is MovieDetail ? d.trailerKey : null);
     if (k != null && k.isNotEmpty) { 
       if (k != _lastTrailerKey) { 
+        // Senior Fix: Si el ID cambia, limpiamos el controlador anterior para evitar
+        // que se reproduzca el video previo al reactivar el tráiler.
+        if (_lastTrailerKey != null) _disposeController();
+
         _lastTrailerKey = k; 
-        _initTrailer(k);
+
+        // Senior Fix: En Web Móvil NO se autoreproduce el tráiler para ahorrar datos 
+        // y evitar interrupciones en la navegación táctil.
+        if (!isMobile) {
+          _initTrailer(k);
+        }
       } 
     } else if (_lastTrailerKey != null) { 
       _lastTrailerKey = null; _disposeController(); 
@@ -472,143 +482,98 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 clipBehavior: Clip.hardEdge, 
                 children: [
                   Container(
-                    constraints: BoxConstraints(minHeight: width * 0.85),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        // Senior Fix: Altura de referencia estable para evitar zoom al expandir
-                        final hBase = width * 0.85;
-                        final ph = hBase * 1.2;
-                        final pw = ph * (16 / 9);
-                        return Stack(
-                          children: [
-                            Positioned.fill(
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  Container(color: const Color(0xFF0B0B0D)),
-                                  if (b != null || _ytController != null) Positioned(
-                                    top: 0, left: 0, right: 0,
-                                    height: ph, 
-                                        child: ShaderMask(
-                                          shaderCallback: (rect) {
-                                            final headerH = constraints.maxHeight;
-                                            final stopEnd = (headerH / ph).clamp(0.0, 1.0);
-                                            final stopStart = (stopEnd * 0.7); // Más margen de visibilidad
-                                            return LinearGradient(
-                                              begin: Alignment.topCenter,
-                                              end: Alignment.bottomCenter,
-                                              colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
-                                              stops: [0.0, stopStart, (stopStart + stopEnd) / 2, stopEnd],
-                                            ).createShader(rect);
-                                          },
-                                      blendMode: BlendMode.dstIn,
-                                      child: Stack(
-                                        children: [
-                                          if (b != null) Positioned.fill(
-                                            child: ClipRect(
-                                              child: OverflowBox(
-                                                alignment: Alignment.topCenter,
-                                                minWidth: pw, maxWidth: pw,
-                                                minHeight: ph, maxHeight: ph,
-                                                child: TweenAnimationBuilder<double>(
-                                                  duration: const Duration(milliseconds: 800), 
-                                                  tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
-                                                  builder: (context, blur, child) => AnimatedOpacity(
-                                                    duration: const Duration(milliseconds: 1200),
-                                                    curve: Curves.easeInOut,
-                                                    opacity: _revealed ? 1.0 : 0.0,
-                                                    child: ImageFiltered(
-                                                      imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
-                                                      child: AnimatedContainer(
-                                                        duration: const Duration(milliseconds: 800), 
-                                                        foregroundDecoration: BoxDecoration(color: Colors.black.withValues(alpha: _showPlayer ? 0.45 : 0.0)), 
-                                                        child: CachedNetworkImage(imageUrl: b!, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
-                                                      )
-                                                    ),
-                                                  )
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          if (_ytController != null) Positioned.fill(
-                                            child: AnimatedOpacity(
-                                              duration: const Duration(milliseconds: 500), 
-                                              opacity: _showPlayer ? 1.0 : 0.0, 
-                                              child: PointerInterceptor(
-                                                child: IgnorePointer(
-                                                  ignoring: true, 
-                                                  child: ClipRect(
-                                                    child: OverflowBox(
-                                                      alignment: Alignment.centerRight, 
-                                                      minWidth: pw, maxWidth: pw, 
-                                                      minHeight: ph, maxHeight: ph, 
-                                                      child: YoutubePlayer(key: ValueKey(_lastTrailerKey), controller: _ytController!, aspectRatio: 16 / 9)
-                                                    )
-                                                  )
-                                                )
-                                              )
-                                            )
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  // Gradiente de Fusión Mobile (Dinamizado al alto visible)
-                                  Positioned.fill(
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            Colors.transparent,
-                                            const Color(0xFF0B0B0D).withValues(alpha: 0.8),
-                                            const Color(0xFF0B0B0D),
-                                          ],
-                                          stops: const [0.5, 0.85, 1.0],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 16,
-                              left: 20,
-                              right: 20,
-                              child: Stack(
-                                children: [
-                                  if (!_revealed) const SkeletonContainer(width: 180, height: 40),
-                                  AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 1200), 
-                                    curve: Curves.easeInOut, 
-                                    opacity: _revealed ? 1.0 : 0.0, 
-                                    child: HeroTitle(
-                                      title: heroTitle, 
-                                      logo: d?.logo, 
-                                      logoReady: logoReady, 
-                                      maxWidth: width * 0.75, 
-                                      maxHeight: 80, 
-                                      style: const TextStyle(
-                                        color: Colors.white, 
-                                        fontSize: 14, 
-                                        fontWeight: FontWeight.bold, 
-                                        height: 1.1, 
-                                        letterSpacing: 4, 
-                                        shadows: [
-                                          Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), 
-                                          Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)
-                                        ]
-                                      )
+                    width: width,
+                    height: width * 0.85,
+                    child: Stack(
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        // Capa de Imagen/Tráiler
+                        Positioned.fill(
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Container(color: const Color(0xFF0B0B0D)),
+                              if (b != null) 
+                                ShaderMask(
+                                  shaderCallback: (rect) {
+                                    return const LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
+                                      stops: [0.0, 0.6, 0.85, 1.0],
+                                    ).createShader(rect);
+                                  },
+                                  blendMode: BlendMode.dstIn,
+                                  child: AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 1200),
+                                    curve: Curves.easeInOut,
+                                    opacity: _revealed ? 1.0 : 0.0,
+                                    child: CachedNetworkImage(
+                                      imageUrl: b!, 
+                                      fit: BoxFit.cover, 
+                                      alignment: Alignment.topCenter, 
+                                      fadeInDuration: const Duration(milliseconds: 300), 
+                                      errorWidget: (_, __, ___) => Container(color: Colors.black12)
                                     )
                                   ),
-                                ],
+                                ),
+                              
+                              // Gradiente de Fusión Mobile
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        const Color(0xFF0B0B0D).withValues(alpha: 0.8),
+                                        const Color(0xFF0B0B0D),
+                                      ],
+                                      stops: const [0.5, 0.85, 1.0],
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
-                        );
-                      },
+                            ],
+                          ),
+                        ),
+                        
+                        // Logo/Título
+                        Positioned(
+                          bottom: 16,
+                          left: 20,
+                          right: 20,
+                          child: Stack(
+                            children: [
+                              if (!_revealed) const SkeletonContainer(width: 180, height: 40),
+                              AnimatedOpacity(
+                                duration: const Duration(milliseconds: 1200), 
+                                curve: Curves.easeInOut, 
+                                opacity: _revealed ? 1.0 : 0.0, 
+                                child: HeroTitle(
+                                  title: heroTitle, 
+                                  logo: d?.logo, 
+                                  logoReady: logoReady, 
+                                  maxWidth: width * 0.75, 
+                                  maxHeight: 80, 
+                                  style: const TextStyle(
+                                    color: Colors.white, 
+                                    fontSize: 14, 
+                                    fontWeight: FontWeight.bold, 
+                                    height: 1.1, 
+                                    letterSpacing: 4, 
+                                    shadows: [
+                                      Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), 
+                                      Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)
+                                    ]
+                                  )
+                                )
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   Positioned.fill(child: _buildUpperButtons(context)),
@@ -1018,21 +983,28 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         // TRÁILER (Ambos)
         if (_lastTrailerKey != null) ...[
           _DetailIconButton(
-            icon: _showPlayer ? Icons.videocam_off_outlined : Icons.movie_outlined,
-            label: _showPlayer ? 'Quitar tráiler' : 'Ver tráiler',
+            icon: (isMobile || !_showPlayer) ? Icons.movie_outlined : Icons.videocam_off_outlined,
+            label: (isMobile || !_showPlayer) ? 'Ver tráiler' : 'Quitar tráiler',
             onPressed: () {
-              if (_showPlayer) {
-                _disposeController();
-                setState(() { _showPlayer = false; _isPlayedOnce = true; _showTitle = true; });
-                _titleHideTimer?.cancel();
+              if (isMobile) {
+                // Senior Logic: En móvil, abrir tráiler en el reproductor a pantalla completa
+                final trailerUrl = 'https://www.youtube.com/watch?v=$_lastTrailerKey';
+                final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(widget.poster ?? '')}&bannerUrl=${Uri.encodeComponent(widget.banner ?? '')}';
+                context.push('/player/${Uri.encodeComponent(widget.title)}?source=YouTube&url=${Uri.encodeComponent(trailerUrl)}&episode=Trailer&serverName=YouTube&language=Trailer&totalEpisodes=1$posterParam');
               } else {
-                _initTrailer(_lastTrailerKey!, immediate: true);
+                if (_showPlayer) {
+                  _disposeController();
+                  setState(() { _showPlayer = false; _isPlayedOnce = true; _showTitle = true; });
+                  _titleHideTimer?.cancel();
+                } else {
+                  _initTrailer(_lastTrailerKey!, immediate: true);
+                }
               }
             },
             isMobile: isMobile, size: size, iconSize: iconSize,
           ),
           SizedBox(width: spacing),
-          if (_showPlayer) ...[
+          if (!isMobile && _showPlayer) ...[
             _DetailIconButton(
               icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
               label: _isMuted ? 'Activar audio' : 'Silenciar',
