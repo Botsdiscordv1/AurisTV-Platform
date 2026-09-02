@@ -1493,32 +1493,32 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   
   Widget _buildUpperButtons(BuildContext context, {double? desktopTop}) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    final buttons = Stack(children: [
-  Widget _buildUpperButtons(BuildContext context, {double? desktopTop}) {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final buttons = Stack(children: [
-      Positioned(
-        top: isMobile ? 35 : (desktopTop ?? 40), 
-        left: isMobile ? 15 : 40, 
-        child: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), 
-          onPressed: () { 
-            // Senior Web Fix: Al usar navegación atómica (go), el botón atrás
-            // simplemente nos devuelve al catálogo. El sistema recuperará el
-            // estado de búsqueda automáticamente desde la URL.
-            context.go('/catalogo');
-          }
-        )
-      ),
-      if (isMobile) Positioned(top: 35, right: 15, child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {})),
-    ]);
-
-    return buttons;
-  }
-      if (isMobile) Positioned(top: 35, right: 15, child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {})),
-    ]);
-
-    return buttons;
+    return Stack(
+      children: [
+        Positioned(
+          top: isMobile ? 35 : (desktopTop ?? 40), 
+          left: isMobile ? 15 : 40, 
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), 
+            onPressed: () { 
+              // Senior Web Fix: Al usar navegación atómica (go), el botón atrás
+              // simplemente nos devuelve al catálogo. El sistema recuperará el
+              // estado de búsqueda automáticamente desde la URL.
+              context.go('/catalogo');
+            }
+          ),
+        ),
+        if (isMobile) 
+          Positioned(
+            top: 35, 
+            right: 15, 
+            child: IconButton(
+              icon: const Icon(Icons.cast, color: Colors.white, size: 24), 
+              onPressed: () {}
+            )
+          ),
+      ],
+    );
   }
 }
 
