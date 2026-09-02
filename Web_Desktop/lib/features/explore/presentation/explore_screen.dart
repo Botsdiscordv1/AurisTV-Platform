@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
+import '../../../core/utils/url_utils.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../home/presentation/providers/home_provider.dart';
@@ -261,11 +262,14 @@ class ExploreScreen extends ConsumerWidget {
                           rating: formatRating(item.rating),
                           showInfo: true,
                           onTap: () {
-                            final metaTitle = item.romaji ?? item.english ?? item.title;
-                            context.push(
-                              '/media/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(item.source)}&category=${item.type.name}&url=${Uri.encodeComponent(item.id)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}&year=${item.year ?? ''}',
-                              extra: item.toContentSeed(),
+                            final uri = UrlUtils.buildShareableUri(
+                              title: item.title,
+                              source: item.source,
+                              url: item.id,
+                              category: item.type.name,
+                              year: item.year,
                             );
+                            context.push(uri, extra: item.toContentSeed());
                           },
                         );
                       },

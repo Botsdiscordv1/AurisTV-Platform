@@ -540,7 +540,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   Widget _buildButtonProgressBar(double progress, {bool isMobile = false}) {
     return Container(
-      width: isMobile ? 120 : 180,
+      width: isMobile ? 85 : 140,
       height: 6,
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.30), // Senior: Ajustado a 30% para mejor visibilidad sobre fondo blanco, igual que en Web
@@ -631,8 +631,9 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       detail: d,
       bannerParam: widget.banner,
       poster: widget.poster,
+      season: widget.currentSeason,
     );
-    final heroTitle = _stripSeasonSuffix(widget.title);
+    final heroTitle = widget.title;
 
     return MouseRegion(
       onHover: (_) => _handleInteraction(),
@@ -1399,10 +1400,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   bool _revealed = false;
   Timer? _loadTimer;
   Timer? _revealTimeout;
-  // Banner del hero congelado: se captura UNA sola vez con la primera imagen
-  // disponible al abrir (ruta > fuente > backdrop del detalle) and ya no cambia
-  // al switchear temporada, para no re-solicitar banner ni provocar timeouts.
-  String? _stableBanner;
   // Fuente por defecto congelada al abrir (mejor por rank presente en ese
   // momento) y clave de la fuente elegida manualmente por el usuario. Evitan el
   // parpadeo A23 -> AV1 cuando AV1/AnimeJara llegan tarde vía búsqueda suplementaria.
@@ -1544,9 +1541,24 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ? ApiEndpoints.baseUrlForCategory(widget.category)
             : null);
 
+    // Temporada de la pantalla abierta, inferida del título. Se usa para fijar
+    // la fuente y la temporada OMDB a la temporada correcta (evita que una S2
+    // abierta caiga a la S1 por defecto).
+    final openedSeasonN = widget.result?.season
+        ?? _extractSeason(widget.result?.title)
+        ?? _extractSeason(widget.title)
+        ?? _extractSeason(widget.metadataTitle)
+        ?? 1;
+
     final animeDetailAsync = !fetchAnimeDetail
         ? const AsyncValue<AnimeDetail?>.data(null)
-        : ref.watch(animeDetailProvider(AnimeDetailParams(title: widget.title, metadataTitle: widget.metadataTitle, year: widget.year, kind: widget.result?.kind)));
+        : ref.watch(animeDetailProvider(AnimeDetailParams(
+            title: _stripSeasonSuffix(widget.title), 
+            metadataTitle: widget.metadataTitle != null ? _stripSeasonSuffix(widget.metadataTitle!) : null, 
+            year: widget.year, 
+            season: openedSeasonN,
+            kind: widget.result?.kind,
+          )));
 
     // Para category='all' no sabemos de antemano si es anime o movie. Pedimos
     // el detalle de anime primero y solo consultamos /api/detail/movie como
@@ -1561,8 +1573,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ? const AsyncValue<MovieDetail?>.data(null)
         : (isMovieCatFetch || needMovieFallback)
             ? ref.watch(movieDetailProvider(MovieDetailParams(
-                title: widget.title,
-                metadataTitle: widget.metadataTitle,
+                title: _stripSeasonSuffix(widget.title),
+                metadataTitle: widget.metadataTitle != null ? _stripSeasonSuffix(widget.metadataTitle!) : null,
                 category: widget.category,
                 server: originServer,
               )))
@@ -1604,23 +1616,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final detailLoading = (isMovieCategory ? movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null : animeDetailAsync.isLoading) || (isAnimeCategory ? false : movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null);
 
-    // Temporada de la pantalla abierta, inferida del título. Se usa para fijar
-    // la fuente y la temporada OMDB a la temporada correcta (evita que una S2
-    // abierta caiga a la S1 por defecto).
-    // La temporada abierta debe derivarse de la CARD ORIGINAL (widget.result), no
-    // de widget.title: este último es `displayTitle` (result.scrapedTitle ??
-    // metadataTitle ?? title) y el server suele enriquecerlo con el título base de
-    // AniList ("Youjo Senki"), perdiendo el sufijo "2nd Season". Si usáramos
-    // widget.title, openedSeasonN quedaría en 1 y seasonSwitched nunca se activaría
-    // al pasar de S2 -> S1 (se evaluaría 1 != 1 = false): la lista y el detalle se
-    // quedaban en S2. widget.result.title conserva "youjo senki 2nd season".
-    final openedSeasonN = widget.result?.season
-        ?? _extractSeason(widget.result?.title)
-        ?? _extractSeason(widget.title)
-        ?? _extractSeason(widget.metadataTitle)
-        ?? 1;
-    // Solo fijamos el "season" del proveedor cuando el título declara una
-    // temporada > 1, para no romper la lógica original de títulos base (S1).
     // [Senior] Semilla instantánea: la card abierta ya es un SearchResult con sus
     // servidores en `.sources`, así que la lista de servidores se muestra de inmediato
     // y la búsqueda suplementaria (discoveredSourcesProvider) solo la enriquece/fusiona
@@ -1691,7 +1686,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     // temporada de forma determinística (sin él, un título base ambiguo como
     // "Youjo Senki" devuelve S1 o S2 según el ranking de AniList).
     final seasonAnimeDetailAsync = seasonTitle != null
-        ? ref.watch(animeDetailProvider(AnimeDetailParams(title: seasonTitle, metadataTitle: seasonTitle, year: null, season: _selectedSeason, kind: null)))
+        ? ref.watch(animeDetailProvider(AnimeDetailParams(
+            title: _stripSeasonSuffix(widget.title), 
+            metadataTitle: _stripSeasonSuffix(widget.title), 
+            year: null, 
+            season: _selectedSeason, 
+            kind: null,
+          )))
         : animeDetailAsync;
     final displayAnimeDetailAsync = seasonSwitched
         ? (seasonAnimeDetailAsync.valueOrNull != null ? seasonAnimeDetailAsync : animeDetailAsync)
@@ -1807,21 +1808,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         detail: detailData,
         bannerParam: widget.banner,
         sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
+        season: currentSeason,
       ),
     );
-    // Congelar el banner del hero con la primera imagen disponible. Una vez
-    // capturado no vuelve a cambiar aunque se switchee de temporada.
-    if (_stableBanner == null) {
-      final candidate = DetailBackdropResolver.resolve(
-        detail: detailData,
-        bannerParam: widget.banner,
-        sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
-      );
-      if (candidate.isNotEmpty) {
-        _stableBanner = ApiEndpoints.proxyImage(candidate);
-      }
-    }
-    final stableBanner = _stableBanner ?? initialBanner;
+
+    // Senior Dynamic Backdrop: Ya no congelamos el banner para permitir que cambie
+    // al navegar entre temporadas.
+    final heroBanner = initialBanner;
     final familySourcesRaw = currentSource != null ? _familySourcesFor(currentSource, activeSources) : <SearchResult>[];
     final familySources = familySourcesRaw.map((s) => _withSeasonUnified(s, effectiveSeasonForUrl)!).toList();
 
@@ -2349,7 +2342,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             title: _cleanRelatedTitle(r.title), 
             poster: r.cover, 
             subtitle: r.relation,
-            onTap: () => context.push('/content/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}')
+            onTap: () {
+              final sName = r.source ?? currentSource?.source ?? widget.source;
+              final result = SearchResult(
+                title: r.title,
+                url: r.url,
+                source: sName,
+                quality: 'HD',
+                thumbnail: r.cover,
+                slug: r.slug,
+                metadataTitle: r.title,
+                sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
+              );
+              context.push(
+                '/content/${Uri.encodeComponent(r.title)}?source=${Uri.encodeComponent(result.source)}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}',
+                extra: result,
+              );
+            },
           )).toList(),
         ),
     ];
@@ -2377,7 +2386,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         title: displayTitle,
         poster: r.cover,
         subtitle: r.relation,
-        onTap: () => context.push('/content/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}'),
+        onTap: () {
+          final sName = r.source ?? currentSource?.source ?? widget.source;
+          final result = SearchResult(
+            title: r.title,
+            url: r.url,
+            source: sName,
+            quality: 'HD',
+            thumbnail: r.cover,
+            slug: r.slug,
+            metadataTitle: r.title,
+            sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
+          );
+          context.push(
+            '/content/${Uri.encodeComponent(r.title)}?source=${Uri.encodeComponent(result.source)}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}',
+            extra: result,
+          );
+        },
       );
     }
 

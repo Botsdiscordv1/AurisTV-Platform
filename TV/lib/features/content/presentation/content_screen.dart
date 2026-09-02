@@ -382,8 +382,9 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       detail: d,
       bannerParam: widget.banner,
       poster: widget.poster,
+      season: widget.currentSeason,
     );
-    final heroTitle = stripSeasonSuffix(widget.title ?? '');
+    final heroTitle = widget.title ?? '';
     final width = MediaQuery.sizeOf(context).width;
 
     return MouseRegion(
@@ -1514,7 +1515,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showContent = false;
   Timer? _loadTimer;
-  String? _stableBanner;
   // Fuente por defecto congelada al abrir (mejor por rank presente en ese
   // momento) y clave de la fuente elegida manualmente por el usuario. Evitan el
   // parpadeo A23 -> AV1 cuando AV1/AnimeJara llegan tarde vía búsqueda suplementaria.
@@ -1624,9 +1624,24 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ? ApiEndpoints.baseUrlForCategory(widget.category)
             : null);
 
+    // Temporada de la pantalla abierta, inferida del título. Se usa para fijar
+    // la fuente y la temporada OMDB a la temporada correcta (evita que una S2
+    // abierta caiga a la S1 por defecto).
+    final openedSeasonN = widget.result?.season
+        ?? extractSeason(widget.result?.title)
+        ?? extractSeason(widget.title)
+        ?? extractSeason(widget.metadataTitle)
+        ?? 1;
+
     final animeDetailAsync = !fetchAnimeDetail
         ? const AsyncValue<AnimeDetail?>.data(null)
-        : ref.watch(animeDetailProvider(AnimeDetailParams(title: widget.title, metadataTitle: widget.metadataTitle, year: widget.year, kind: widget.result?.kind)));
+        : ref.watch(animeDetailProvider(AnimeDetailParams(
+            title: stripSeasonSuffix(widget.title ?? ''), 
+            metadataTitle: widget.metadataTitle != null ? stripSeasonSuffix(widget.metadataTitle!) : null, 
+            year: widget.year, 
+            season: openedSeasonN,
+            kind: widget.result?.kind,
+          )));
 
     final needMovieFallback = !isAnimeCatFetch &&
         !isMovieCatFetch &&
@@ -1637,8 +1652,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ? const AsyncValue<MovieDetail?>.data(null)
         : (isMovieCatFetch || needMovieFallback)
             ? ref.watch(movieDetailProvider(MovieDetailParams(
-                title: widget.title,
-                metadataTitle: widget.metadataTitle,
+                title: stripSeasonSuffix(widget.title ?? ''),
+                metadataTitle: widget.metadataTitle != null ? stripSeasonSuffix(widget.metadataTitle!) : null,
                 category: widget.category,
                 server: originServer,
               )))
@@ -1661,11 +1676,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final detailLoading = (isMovieCategory ? movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null : animeDetailAsync.isLoading) || (isAnimeCategory ? false : movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null);
 
-    final openedSeasonN = widget.result?.season
-        ?? extractSeason(widget.result?.title)
-        ?? extractSeason(widget.title)
-        ?? extractSeason(widget.metadataTitle)
-        ?? 1;
     final List<SearchResult> initialSources = widget.result != null
         ? [widget.result!]
         : [SearchResult(title: widget.title, url: widget.url, quality: 'TV', thumbnail: widget.banner ?? '', source: widget.source, romaji: widget.metadataTitle, year: widget.year, slug: null)];
@@ -1683,7 +1693,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final seasonSources = ref.watch(discoveredSourcesProvider(seasonSourcesParams));
     
     final seasonAnimeDetailAsync = seasonTitle != null
-        ? ref.watch(animeDetailProvider(AnimeDetailParams(title: seasonTitle, metadataTitle: seasonTitle, year: null, season: _selectedSeason, kind: null)))
+        ? ref.watch(animeDetailProvider(AnimeDetailParams(
+            title: stripSeasonSuffix(widget.title ?? ''), 
+            metadataTitle: stripSeasonSuffix(widget.title ?? ''), 
+            year: null, 
+            season: _selectedSeason, 
+            kind: null,
+          )))
         : animeDetailAsync;
     final displayAnimeDetailAsync = seasonSwitched
         ? (seasonAnimeDetailAsync.valueOrNull != null ? seasonAnimeDetailAsync : animeDetailAsync)
@@ -1791,20 +1807,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         detail: detailData,
         bannerParam: widget.banner,
         sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
+        season: currentSeason,
       ),
     );
-    
-    if (_stableBanner == null) {
-      final candidate = DetailBackdropResolver.resolve(
-        detail: detailData,
-        bannerParam: widget.banner,
-        sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
-      );
-      if (candidate.isNotEmpty) {
-        _stableBanner = ApiEndpoints.proxyImage(candidate);
-      }
-    }
-    final stableBanner = _stableBanner ?? initialBanner;
+
+    // Senior Dynamic Backdrop: Ya no congelamos el banner para permitir que cambie
+    // al navegar entre temporadas.
+    final heroBanner = initialBanner;
     final familySourcesRaw = currentSource != null ? familySourcesFor(currentSource, activeSources) : <SearchResult>[];
     final familySources = familySourcesRaw.map((s) => withSeasonUnified(s, effectiveSeasonForUrl)!).toList();
 
@@ -2096,7 +2105,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             title: _cleanRelatedTitleLocal(r.title), 
             poster: r.cover, 
             subtitle: r.relation,
-            onTap: () => context.push('/content/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}')
+            onTap: () {
+              final sName = r.source ?? currentSource?.source ?? widget.source;
+              final result = SearchResult(
+                title: r.title,
+                url: r.url,
+                source: sName,
+                quality: 'HD',
+                thumbnail: r.cover,
+                slug: r.slug,
+                metadataTitle: r.title,
+                sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
+              );
+              context.push(
+                '/content/${Uri.encodeComponent(r.title)}?source=${Uri.encodeComponent(result.source)}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}',
+                extra: result,
+              );
+            },
           )).toList(),
         ),
     ];
@@ -2119,7 +2144,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         title: displayTitle,
         poster: r.cover,
         subtitle: r.relation,
-        onTap: () => context.push('/content/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}'),
+        onTap: () {
+          final sName = r.source ?? currentSource?.source ?? widget.source;
+          final result = SearchResult(
+            title: r.title,
+            url: r.url,
+            source: sName,
+            quality: 'HD',
+            thumbnail: r.cover,
+            slug: r.slug,
+            metadataTitle: r.title,
+            sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
+          );
+          context.push(
+            '/content/${Uri.encodeComponent(r.title)}?source=${Uri.encodeComponent(result.source)}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}',
+            extra: result,
+          );
+        },
       );
     }
     return unifiedMap.values.toList();

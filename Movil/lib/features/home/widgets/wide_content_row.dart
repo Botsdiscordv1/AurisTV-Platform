@@ -58,14 +58,36 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
   }
 
+  @override
+  void didUpdateWidget(covariant WideContentRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Senior Fix: Si el número de items cambia, debemos recalcular si se puede scrollear.
+    // Esto previene que se queden sombras "fantasma" cuando se eliminan items manualmente.
+    if (widget.items.length != oldWidget.items.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   void _updateScrollIndicators() {
     if (!mounted || !_scrollController.hasClients) return;
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
-    setState(() {
-      _canScrollLeft = currentScroll > 5;
-      _canScrollRight = maxScroll > currentScroll + 5;
-    });
+    
+    final newCanScrollLeft = currentScroll > 5;
+    final newCanScrollRight = maxScroll > currentScroll + 5;
+
+    if (newCanScrollLeft != _canScrollLeft || newCanScrollRight != _canScrollRight) {
+      setState(() {
+        _canScrollLeft = newCanScrollLeft;
+        _canScrollRight = newCanScrollRight;
+      });
+    }
   }
 
   void _scroll(double offset) {

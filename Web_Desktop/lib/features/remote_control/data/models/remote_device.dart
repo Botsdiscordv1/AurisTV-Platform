@@ -12,6 +12,7 @@ class RemoteDevice {
   final String? mediaTitle;
   final String? mediaSource;
   final String? mediaUrl;
+  final String? mediaEpisode;
   final String? metadataTitle;
   final String? posterUrl;
   final String? bannerUrl;
@@ -39,6 +40,7 @@ class RemoteDevice {
     this.mediaTitle,
     this.mediaSource,
     this.mediaUrl,
+    this.mediaEpisode,
     this.metadataTitle,
     this.posterUrl,
     this.bannerUrl,
@@ -64,6 +66,7 @@ class RemoteDevice {
       mediaTitle: json['media_title'],
       mediaSource: json['media_source'],
       mediaUrl: json['media_url'],
+      mediaEpisode: json['media_episode'],
       metadataTitle: json['metadata_title'],
       posterUrl: json['poster_url'],
       bannerUrl: json['banner_url'],
@@ -90,6 +93,7 @@ class RemoteDevice {
       'media_title': mediaTitle,
       'media_source': mediaSource,
       'media_url': mediaUrl,
+      'media_episode': mediaEpisode,
       'metadata_title': metadataTitle,
       'poster_url': posterUrl,
       'banner_url': bannerUrl,
@@ -118,6 +122,7 @@ class RemoteDevice {
     String? mediaTitle,
     String? mediaSource,
     String? mediaUrl,
+    String? mediaEpisode,
     String? metadataTitle,
     String? posterUrl,
     String? bannerUrl,
@@ -141,6 +146,7 @@ class RemoteDevice {
       mediaTitle: mediaTitle ?? this.mediaTitle,
       mediaSource: mediaSource ?? this.mediaSource,
       mediaUrl: mediaUrl ?? this.mediaUrl,
+      mediaEpisode: mediaEpisode ?? this.mediaEpisode,
       metadataTitle: metadataTitle ?? this.metadataTitle,
       posterUrl: posterUrl ?? this.posterUrl,
       bannerUrl: bannerUrl ?? this.bannerUrl,

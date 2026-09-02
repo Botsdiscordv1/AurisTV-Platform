@@ -31,6 +31,7 @@ class AnimeDetail {
   final String? certification;
   final List<CharacterInfo> characters;
   final String? kind;
+  final Map<int, String> backdropsBySeason;
 
   const AnimeDetail({
     required this.id,
@@ -62,6 +63,7 @@ class AnimeDetail {
     this.certification,
     this.characters = const [],
     this.kind,
+    this.backdropsBySeason = const {},
   });
 
   String? get trailerKey => trailer?.videoId;
@@ -90,6 +92,17 @@ class AnimeDetail {
       } else if (theme.type == 'ENDING') {
         endings.add(theme);
       }
+    }
+
+    final backdropsBySeason = <int, String>{};
+    final backdropsData = visuals?['backdrops_by_season'] ?? anime['backdrops_by_season'] ?? root['backdrops_by_season'];
+    if (backdropsData is Map) {
+      backdropsData.forEach((key, value) {
+        final seasonNum = int.tryParse(key.toString());
+        if (seasonNum != null && value != null) {
+          backdropsBySeason[seasonNum] = ApiEndpoints.proxyImage(value.toString(), highQuality: true);
+        }
+      });
     }
 
     return AnimeDetail(
@@ -154,6 +167,7 @@ class AnimeDetail {
               ?.map((e) => CharacterInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      backdropsBySeason: backdropsBySeason,
     );
   }
 }

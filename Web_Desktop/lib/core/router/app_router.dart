@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
+import '../utils/url_utils.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/content/presentation/content_screen.dart';
 import '../../features/explore/presentation/explore_screen.dart';
@@ -20,7 +21,11 @@ import '../../shared/widgets/main_navigation_wrapper.dart';
 /// Observador global para detectar cambios de ruta y gestionar estados de widgets (ej: trailers)
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
+/// Claves globales para controlar el Navigator de forma precisa
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
 final GoRouter appRouter = GoRouter(
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/splash',
   observers: [routeObserver],
   routes: [
@@ -93,85 +98,49 @@ final GoRouter appRouter = GoRouter(
 
     // Rutas fuera del Shell (Full screen)
     GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
       path: '/select-profile',
       builder: (context, state) => const ProfileSelectionScreen(),
     ),
     GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
       path: '/profile-setup',
       builder: (context, state) => const ProfileSetupScreen(),
     ),
     GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
       path: '/login',
       builder: (context, state) => const LoginScreen(),
     ),
     GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
       path: '/connections',
       builder: (context, state) => const ConnectionsScreen(),
     ),
     GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
       path: '/horario',
       builder: (context, state) => const ScheduleScreen(),
     ),
     GoRoute(
-      path: '/media/:title',
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/media/:slug/:token',
       builder: (context, state) {
-        final title = state.pathParameters['title']!;
-        final source = state.uri.queryParameters['source'] ?? '';
-        final url = state.uri.queryParameters['url'] ?? '';
-        final metadataTitle = state.uri.queryParameters['metadataTitle'];
-        final banner = state.uri.queryParameters['banner'];
-        final category = state.uri.queryParameters['category'] ?? 'all';
-        final year = int.tryParse(state.uri.queryParameters['year'] ?? '');
-        final totalSeasons = int.tryParse(state.uri.queryParameters['totalSeasons'] ?? '');
+        final slug = state.pathParameters['slug']!;
+        final token = state.pathParameters['token']!;
+        final data = UrlUtils.decodeShareableToken(token, slug);
+        
+        if (data == null) return const HomeScreen(); 
+
         final extraResult = state.extra is SearchResult ? state.extra as SearchResult : null;
-        return ContentScreen(title: title, source: source, url: url, metadataTitle: metadataTitle, banner: banner, category: category, year: year, totalSeasons: totalSeasons, result: extraResult);
-      },
-    ),
-    GoRoute(
-      path: '/media/:contentId/reproducir',
-      builder: (context, state) {
-        final contentId = state.pathParameters['contentId']!;
-        final sourceUrl = state.uri.queryParameters['url'] ?? '';
-        final source = state.uri.queryParameters['source'] ?? '';
-        final episode = state.uri.queryParameters['episode'];
-        final seasonStr = state.uri.queryParameters['season'];
-        final season = (seasonStr != null && seasonStr.isNotEmpty) ? int.tryParse(seasonStr) : null;
-        final serverName = state.uri.queryParameters['serverName'];
-        final language = state.uri.queryParameters['language'];
-        final startPosition = int.tryParse(state.uri.queryParameters['startPosition'] ?? '');
-        final category = state.uri.queryParameters['category'];
-        final totalEpisodes = int.tryParse(state.uri.queryParameters['totalEpisodes'] ?? '');
-        
-        // Metadata para "Continuar Viendo"
-        final title = state.uri.queryParameters['title'];
-        final metadataTitle = state.uri.queryParameters['metadataTitle'];
-        final episodeTitle = state.uri.queryParameters['episodeTitle'];
-        final posterUrl = state.uri.queryParameters['posterUrl'];
-        final bannerUrl = state.uri.queryParameters['bannerUrl'];
-        
-        final video720 = state.uri.queryParameters['video720'];
-        final video1080 = state.uri.queryParameters['video1080'];
-        final skipResume = state.uri.queryParameters['skipResume'] == '1';
-        
-        return PlayerScreen(
-          contentId: contentId,
-          sourceUrl: sourceUrl,
-          source: source,
-          episode: episode,
-          season: season,
-          serverName: serverName,
-          language: language,
-          startPosition: startPosition,
-          category: category,
-          totalEpisodes: totalEpisodes,
-          title: title,
-          metadataTitle: metadataTitle,
-          episodeTitle: episodeTitle,
-          posterUrl: posterUrl,
-          bannerUrl: bannerUrl,
-          video720: video720,
-          video1080: video1080,
-          skipResume: skipResume,
+
+        return ContentScreen(
+          title: data['title'],
+          source: data['source'],
+          url: data['url'],
+          category: data['category'] ?? 'all',
+          year: data['year'],
+          result: extraResult,
         );
       },
     ),

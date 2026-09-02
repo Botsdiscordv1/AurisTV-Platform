@@ -6,6 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:collection/collection.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../core/utils/url_utils.dart';
+import '../../features/player/presentation/player_screen.dart';
 import '../../features/remote_control/presentation/providers/remote_control_provider.dart';
 import '../../features/remote_control/data/models/remote_device.dart';
 
@@ -70,6 +72,10 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     final targetId = remoteState.activeTargetDeviceId;
     final target = remoteState.availableDevices.firstWhereOrNull((d) => d.id == targetId);
 
+    // Senior Web Fix: Detección segura de pantalla completa para evitar crashes de ciclo de vida.
+    final String location = GoRouterState.of(context).uri.path;
+    final bool isFullScreen = location.startsWith('/media/') || location.startsWith('/ver/');
+
     if (!isTactic) {
       return Scaffold(
         backgroundColor: const Color(0xFF0B0B0D),
@@ -103,7 +109,7 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
               ),
           ],
         ),
-        bottomNavigationBar: Container(
+        bottomNavigationBar: isFullScreen ? null : Container(
           height: 60 + MediaQuery.of(context).padding.bottom,
           decoration: const BoxDecoration(
             color: Color(0xFF0B0B0D),
@@ -209,19 +215,19 @@ class _RemoteMiniPlayer extends ConsumerWidget {
 
     return GestureDetector(
       onTap: () {
-        final uri = Uri(
-          path: '/media/${Uri.encodeComponent(target.mediaTitle ?? "Remote")}/reproducir',
-          queryParameters: {
-            'url': target.mediaUrl ?? '',
-            'source': target.mediaSource ?? '',
-            'metadataTitle': target.metadataTitle ?? '',
-            'banner': target.bannerUrl ?? '',
-            'category': target.category ?? 'anime',
-            'title': target.mediaTitle ?? '',
-            'posterUrl': target.posterUrl ?? '',
-          },
+        final player = PlayerScreen(
+          contentId: target.id,
+          sourceUrl: target.mediaUrl ?? '',
+          source: target.mediaSource ?? '',
+          episode: target.mediaEpisode ?? '1',
+          category: target.category,
+          title: target.mediaTitle,
+          posterUrl: target.posterUrl,
+          bannerUrl: target.bannerUrl,
+          startPosition: target.positionMs,
         );
-        context.push(uri.toString());
+        
+        UrlUtils.openPlayer(context, player);
       },
       child: Container(
         height: 64,

@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
+import '../../../core/utils/url_utils.dart';
 
 import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:auristv_web/features/player/presentation/player_screen.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -327,18 +329,21 @@ class _HistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        final uri = '/media/${Uri.encodeComponent(item.contentId)}/reproducir'
-            '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
-            '&source=${Uri.encodeComponent(item.source ?? "")}'
-            '&episode=${item.episode ?? ""}'
-            '&season=${item.season ?? ""}'
-            '&startPosition=${item.positionInMilliseconds}'
-            '&category=${Uri.encodeComponent(item.category ?? "anime")}'
-            '&title=${Uri.encodeComponent(item.title ?? "")}'
-            '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-            '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
-            '&language=${Uri.encodeComponent(item.language ?? "")}';
-        context.push(uri);
+        final player = PlayerScreen(
+          contentId: item.contentId,
+          sourceUrl: item.url ?? item.contentId,
+          source: item.source ?? "",
+          episode: item.episode ?? "1",
+          season: item.season,
+          startPosition: item.positionInMilliseconds,
+          category: item.category,
+          title: item.title,
+          posterUrl: item.posterUrl,
+          bannerUrl: item.bannerUrl,
+          language: item.language,
+        );
+        
+        UrlUtils.openPlayer(context, player);
       },
       child: SizedBox(
         width: 260,
@@ -416,7 +421,12 @@ class _LibraryMediaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        final uri = '/media/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(item.source)}&category=${Uri.encodeComponent(item.category)}&url=${Uri.encodeComponent(item.url)}&metadataTitle=${Uri.encodeComponent(item.title)}&banner=${Uri.encodeComponent(item.bannerUrl)}';
+        final uri = UrlUtils.buildShareableUri(
+          title: item.title,
+          source: item.source,
+          url: item.url,
+          category: item.category,
+        );
         context.push(uri);
       },
       child: Column(

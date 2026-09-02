@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/utils/url_utils.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
@@ -14,18 +15,27 @@ final _scheduleProvider = FutureProvider<ScheduleResponse>((ref) async {
   return repo.getSchedule();
 });
 
-class ScheduleScreen extends ConsumerWidget {
+class ScheduleScreen extends ConsumerStatefulWidget {
   const ScheduleScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ScheduleScreen> createState() => _ScheduleScreenState();
+}
+
+class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
+  @override
+  Widget build(BuildContext context) {
     final scheduleAsync = ref.watch(_scheduleProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Calendario')),
+      appBar: AppBar(
+        title: const Text('Calendario'),
+        backgroundColor: const Color(0xFF0B0B0D),
+        surfaceTintColor: Colors.transparent,
+      ),
       body: scheduleAsync.when(
         data: (schedule) => _ScheduleBody(schedule: schedule),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
         error: (err, _) => Center(
           child: Text('Error: $err',
               style: const TextStyle(color: Colors.white54)),
@@ -319,9 +329,16 @@ class _ScheduleRowState extends State<ScheduleRow> {
                                 : null,
                             subtitle: _buildSubtitle(item),
                             rating: formatRating(item.averageScore),
-                            onTap: () => context.push(
-                              '/media/${Uri.encodeComponent(item.title)}?source=&category=anime&url=&metadataTitle=${Uri.encodeComponent(metaTitle)}&year=${itemYear ?? ''}',
-                            ),
+                            onTap: () {
+                              final uri = UrlUtils.buildShareableUri(
+                                title: item.title,
+                                source: '',
+                                url: '',
+                                category: 'anime',
+                                year: itemYear,
+                              );
+                              context.push(uri);
+                            },
                           ),
                         );
                       },

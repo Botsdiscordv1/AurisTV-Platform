@@ -14,6 +14,7 @@ class DetailBackdropResolver {
   /// [bannerParam] - Optional banner URL from navigation params.
   /// [sourceBanner] - Optional banner from search source.
   /// [poster] - Fallback poster URL.
+  /// [season] - Current season number for dynamic backdrop.
   ///
   /// Returns the highest priority backdrop URL available.
   static String resolve({
@@ -21,18 +22,27 @@ class DetailBackdropResolver {
     String? bannerParam,
     String? sourceBanner,
     String? poster,
+    int? season,
   }) {
-    // 1. TMDB backdrop (highest priority)
+    // 1. Specific season backdrop (if available)
+    if (season != null && detail is AnimeDetail) {
+      final seasonBackdrop = detail.backdropsBySeason[season];
+      if (seasonBackdrop != null && seasonBackdrop.isNotEmpty) {
+        return seasonBackdrop;
+      }
+    }
+
+    // 2. TMDB backdrop (general or fallback for S1)
     final backdrop = _extractBackdrop(detail);
     if (backdrop != null && backdrop.isNotEmpty) return backdrop;
 
-    // 2. Banner from navigation param
+    // 3. Banner from navigation param
     if (bannerParam != null && bannerParam.isNotEmpty) return bannerParam;
 
-    // 3. Banner from search source
+    // 4. Banner from search source
     if (sourceBanner != null && sourceBanner.isNotEmpty) return sourceBanner;
 
-    // 4. Poster (fallback)
+    // 5. Poster (fallback)
     return poster ?? '';
   }
 

@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
-import '../../../shared/widgets/focusable_poster_card.dart';
-import 'providers/search_provider.dart';
-import 'widgets/search_widgets.dart';
+import 'package:auristv_web/core/router/app_router.dart';
+import 'package:auristv_web/core/utils/responsive_utils.dart';
+import 'package:auristv_web/core/utils/url_utils.dart';
+import 'package:auristv_web/shared/widgets/focusable_poster_card.dart';
+import 'package:auristv_web/features/search/presentation/providers/search_provider.dart';
+import 'package:auristv_web/features/search/presentation/widgets/search_widgets.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   final String initialQuery;
@@ -31,6 +33,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Timer? _debounce;
   late String _currentQuery;
   bool _isFocused = false;
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -39,21 +42,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _selectedCategory = widget.initialCategory;
     _searchController = TextEditingController(text: _currentQuery);
     
-    _focusNode.addListener(() {
-      setState(() => _isFocused = _focusNode.hasFocus);
-    });
-    // En móvil, el teclado se abre automático según la spec
-    Future.delayed(Duration.zero, () {
-      if (mounted && ResponsiveUtils.isMobile(context)) {
-        FocusScope.of(context).requestFocus(_focusNode);
-      }
-    });
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    // Senior Fix: Evitar tocar el estado si el widget ya no existe
+    if (!mounted || _isNavigating) return;
+    setState(() => _isFocused = _focusNode.hasFocus);
   }
 
   @override
   void didUpdateWidget(covariant SearchScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Senior Fix: Si la URL cambia externamente (ej: botón atrás), sincronizamos el estado local
     if (widget.initialQuery != oldWidget.initialQuery && widget.initialQuery != _currentQuery) {
       _currentQuery = widget.initialQuery;
       _searchController.text = _currentQuery;
@@ -65,7 +65,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   void dispose() {
+    _isNavigating = true;
     _debounce?.cancel();
+    _focusNode.removeListener(_onFocusChange);
     _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -81,8 +83,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _updateUrl() {
-    // Senior Web Fix: Sincronizar estado interno con la URL para permitir
-    // búsquedas compartibles y navegación por historial.
+    // Senior Fix: Si estamos destruyendo la pantalla, nos callamos
+    if (!mounted || _isNavigating) return;
+
+    final router = GoRouter.of(context);
+    final String currentGlobalPath = router.routeInformationProvider.value.uri.path;
+    if (currentGlobalPath != '/catalogo') return;
+
     final uri = Uri(
       path: '/catalogo',
       queryParameters: {
@@ -91,22 +98,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       },
     );
     
-    // Solo actualizamos si la URI es diferente para evitar loops de navegación
-    final currentUri = GoRouterState.of(context).uri;
-    if (currentUri.toString() != uri.toString()) {
-      context.go(uri.toString());
+    final String currentFullUrl = router.routeInformationProvider.value.uri.toString();
+    if (currentFullUrl != uri.toString()) {
+      router.replace(uri.toString());
     }
   }
 
   void _onSearchChanged(String value) {
     _debounce?.cancel();
     if (value.trim().isEmpty) {
-      setState(() => _currentQuery = '');
+      if (mounted) setState(() => _currentQuery = '');
       _updateUrl();
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) {
+      if (mounted && !_isNavigating) {
         setState(() => _currentQuery = value.trim());
         _updateUrl();
       }
@@ -117,7 +123,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _debounce?.cancel();
     final query = value.trim();
     if (query.isNotEmpty) {
-      setState(() => _currentQuery = query);
+      if (mounted) setState(() => _currentQuery = query);
       ref.read(searchHistoryProvider.notifier).addQuery(query);
       _updateUrl();
     }
@@ -125,7 +131,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _clearSearch() {
     _searchController.clear();
-    setState(() => _currentQuery = '');
+    if (mounted) setState(() => _currentQuery = '');
     _updateUrl();
   }
 
@@ -135,17 +141,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _onContentTap(SearchResult result) {
+    // Senior Fix: Bloqueo total y transición atómica
+    _isNavigating = true;
+    _debounce?.cancel();
+    _focusNode.unfocus();
+
     final displayTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
-    final metaTitle = result.metadataTitle ?? result.scrapedTitle ?? result.title;
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
     final openCategory = inferOpenCategory(result, _selectedCategory);
-    context.push(
-      '/media/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(openCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
-      extra: result,
+    
+    final shareableUri = UrlUtils.buildShareableUri(
+      title: displayTitle,
+      source: result.source,
+      url: result.url,
+      category: openCategory,
+      year: result.year,
     );
+
+    // Senior Web Fix: Usamos .go para forzar la URL /media/ y limpiar el Shell.
+    context.go(shareableUri, extra: result);
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -158,7 +173,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         toolbarHeight: 80,
         title: Row(
           children: [
-            // BARRA DE BÚSQUEDA
             Expanded(
               child: RepaintBoundary(
                 child: AnimatedContainer(
@@ -206,8 +220,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            
-            // DROPDOWN DE FILTRO
             Container(
               height: 46,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -231,7 +243,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   ],
                   onChanged: (v) {
                     if (v != null) {
-                      setState(() => _selectedCategory = v);
+                      if (mounted) setState(() => _selectedCategory = v);
                       _updateUrl();
                     }
                   },
@@ -261,7 +273,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // COLUMNA IZQUIERDA (GÉNEROS + TRENDING)
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 40, right: 24),
@@ -275,11 +286,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             ),
           ),
-          
-          // DIVISOR SUTIL
           Container(width: 1, color: Colors.white.withOpacity(0.05), margin: const EdgeInsets.symmetric(vertical: 24)),
-          
-          // COLUMNA DERECHA (SIDEBAR HISTORIAL)
           SizedBox(
             width: 340,
             child: SingleChildScrollView(
@@ -324,7 +331,6 @@ class _SearchResultsGrid extends ConsumerWidget {
 
     return resultsAsync.when(
       data: (response) {
-        // Senior Fix: Deduplicación aislada de la UI principal
         final results = _deduplicate(response.results);
         if (results.isEmpty) return _buildNoResultsPlaceholder(context, query, onContentTap);
         
@@ -394,8 +400,6 @@ class _SearchResultsGrid extends ConsumerWidget {
           SearchTrendingSection(onTrendingTap: (res) => onContentTap(res)),
           const SizedBox(height: 40),
           SearchGenresGrid(onGenreTap: (q) {
-            // Senior Helper: En un ConsumerWidget sin estado propio, el callback
-            // debe ser manejado por el padre (SearchScreen).
           }),
         ],
       ),
@@ -403,20 +407,10 @@ class _SearchResultsGrid extends ConsumerWidget {
   }
 }
 
-// Clave de fusión: agrupa por franquicia base + tipo de media (película vs serie),
-// para unir "Youjo Senki Movie" (AV1) y "Youjo Senki Pelicula" (AnimeJara) en una
-// sola tarjeta sin confundir la película con la serie "Youjo Senki".
 String _fuseKey(SearchResult r) {
   final t = r.title.toLowerCase();
-  final typeRe = RegExp(r'\b(movie|pel[íi]cula|film|ova|special|oav)\b');
-  final isMovieish = typeRe.hasMatch(t);
-  final franchise = t.replaceAll(typeRe, '').replaceAll(RegExp(r'[^a-z0-9]'), '');
-  // La categoría (anime/series/movie) distingue resultados que comparten
-  // título pero son contenido distinto (p.ej. "One Piece" anime vs "One Piece"
-  // serie). Antes solo se separaba movie/no-movie, así que anime y serie
-  // colapsaban en la misma tarjeta.
-  final cat = inferOpenCategory(r, isMovieish ? 'movie' : 'tv');
-  return '$franchise#$cat';
+  final franchise = t.replaceAll(RegExp(r'\b(movie|película|ova|special)\b'), '').replaceAll(RegExp(r'[^a-z0-9]'), '');
+  return '$franchise#${r.type}';
 }
 
 List<SearchResult> _deduplicate(List<SearchResult> results) {
@@ -435,8 +429,6 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
       }
       SearchResult better = existing;
       if (r.thumbnail.isNotEmpty && existing.thumbnail.isEmpty) {
-        better = r;
-      } else if ((existing.banner == null || existing.banner!.isEmpty) && (r.banner != null && r.banner!.isNotEmpty)) {
         better = r;
       }
       grouped[key] = SearchResult(
@@ -465,35 +457,13 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
 }
 
 Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
-  // Prioridad: type específico (Especial/OVA/ONA/Película desde AV1) > kind > quality > filtro.
-  // El type del server es más granular que kind (que solo distingue anime/movie),
-  // así que lo usamos cuando es un tipo concreto y no el genérico "ANIME"/"TV".
-  String? typeLabel;
-  final typeUp = (result.type ?? '').toUpperCase();
-  final hasSpecificType = result.type != null &&
-      result.type!.isNotEmpty &&
-      !typeUp.contains('ANIME') &&
-      !typeUp.contains('TV');
-  if (hasSpecificType) {
-    typeLabel = _labelFromType(result.type!, selectedCategory);
-  } else if (result.kind != null && result.kind!.isNotEmpty) {
-    typeLabel = _labelFromKind(result.kind!);
-  } else if (result.quality != null && result.quality!.isNotEmpty) {
-    typeLabel = _categoryFromQuality(result.quality!);
-  } else if (result.type != null && result.type!.isNotEmpty) {
-    typeLabel = _labelFromType(result.type!, selectedCategory);
-  } else {
-    typeLabel = _labelFromSearchCategory(selectedCategory);
-  }
-  final format = typeLabel;
-
-  // El estado va abajo a la izquierda.
+  String? format = result.type?.toUpperCase() ?? selectedCategory.toUpperCase();
   String? statusLabel;
   Color? statusColor;
   final s = (result.status ?? '').toLowerCase();
   if (s.contains('emisi')) {
     statusLabel = 'EN EMISIÓN';
-    statusColor = const Color(0xFFEF7A1E); // AurisTV Brand Orange
+    statusColor = const Color(0xFFEF7A1E); 
   } else if (s.contains('finaliz') || s.contains('complet')) {
     statusLabel = 'FINALIZADO';
     statusColor = Colors.black.withOpacity(0.9);
@@ -501,59 +471,8 @@ Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
 
   return {
     'format': format,
-    'formatColor': const Color(0xFF1976D2), // Azul
+    'formatColor': const Color(0xFF1976D2), 
     'status': statusLabel,
     'statusColor': statusColor,
   };
 }
-
-String? _categoryFromQuality(String quality) {
-  final q = quality.toLowerCase();
-  if (q.contains('pelicula') || q.contains('película') || q.contains('movie') || q.contains('film')) {
-    return 'PELICULA';
-  }
-  if (q.contains('dorama') || q.contains('drama')) {
-    return 'DORAMA';
-  }
-  if (q.contains('serie') || q.contains('series') || q.contains('tv')) {
-    return 'SERIE';
-  }
-  if (q.contains('anime')) {
-    return 'ANIME';
-  }
-  return null;
-}
-
-String _labelFromType(String type, String selectedCategory) {
-  final up = type.toUpperCase();
-  if (up.contains('MOVIE') || up.contains('FILM') || up.contains('PELICULA') || up.contains('PELÍCULA')) return 'PELÍCULA';
-  if (up.contains('DORAMA') || up.contains('DRAMA')) return 'DORAMA';
-  if (up.contains('SERIE') || up == 'TV' || up.contains('TV')) {
-    return selectedCategory.toLowerCase() == 'anime' ? 'TV ANIME' : 'SERIE';
-  }
-  if (up.contains('ANIME')) return 'TV ANIME';
-  return up;
-}
-
-String _labelFromKind(String kind) {
-  final k = kind.toLowerCase();
-  if (k.contains('movie') || k.contains('film')) return 'PELÍCULA';
-  if (k.contains('drama') || k.contains('dorama')) return 'DORAMA';
-  if (k.contains('anime')) return 'TV ANIME';
-  if (k.contains('series') || k.contains('tv')) return 'SERIE';
-  return 'SERIE';
-}
-
-String? _labelFromSearchCategory(String category) {
-  switch (category.toLowerCase()) {
-    case 'peliculas':
-      return 'PELÍCULA';
-    case 'series':
-      return 'SERIE';
-    case 'anime':
-      return 'TV ANIME';
-    default:
-      return null;
-  }
-}
-

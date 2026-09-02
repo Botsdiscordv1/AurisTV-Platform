@@ -23,6 +23,7 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
 import '../../../core/utils/responsive_utils.dart';
+import '../../../core/utils/url_utils.dart';
 import '../../../core/utils/screen_brightness.dart';
 import '../../../core/utils/web_utils.dart';
 
@@ -1304,91 +1305,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final sources = ref.read(activeContentSourcesProvider);
     final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
 
-    // Senior Navigation Fix: Calcular la URL del episodio destino ANTES de reemplazar
-    // la ruta. context.replace recrea la pantalla (GoRouter usa la URI como page key),
-    // por lo que el query param 'url' debe ser la del NUEVO episodio, no la actual,
-    // o el extract provider re-extraería la página del episodio anterior (bug E2->E3).
     final String nextSourceUrl = baseSource != null
         ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
         : _currentSourceUrl;
 
-    // Senior Navigation Fix: Actualizar la URL de la ruta sin añadir una nueva entrada al historial
-    // para que el botón "Atrás" (Mouse 4) no nos regrese al episodio anterior.
-    final String newPath = '/media/${widget.contentId}/reproducir';
-    final queryParams = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
-    queryParams['episode'] = nextNum.toString();
-    queryParams['url'] = nextSourceUrl;
-    if (next) {
-      queryParams['skipResume'] = '1';
-    } else {
-      queryParams.remove('skipResume');
-    }
-    // Senior Language Fix: Persistir el idioma que el usuario eligió realmente
-    // (por si cambió la pista manualmente), para que el siguiente episodio
-    // mantenga LAT/SUB aunque la pantalla se reconstruya.
-    if (_currentLanguage != null) {
-      queryParams['language'] = _currentLanguage!;
-    }
-    
-    // Usamos context.replace para sustituir la entrada actual en el historial
-    // Esto asegura que al retroceder (Mouse 4) no volvamos al episodio anterior.
-    context.replace(Uri(path: newPath, queryParameters: queryParams).toString());
+    _onEpisodeChanged(nextNum);
+  }
 
-    if (_preloadedNext != null && next) {
-      final result = _preloadedNext!;
-      final tracks = result.tracks.where((t) => !t.isDownload).toList();
-      
-      _autoplayTimer?.cancel();
-      setState(() {
-        _preloadedNext = null;
-        _currentEpisode = nextNum.toString();
-        _currentSourceUrl = nextSourceUrl;
-        _isStabilizing = true;
-        _isLoading = true;
-        _hasInitialized = true;
-        _skipResumeOnNextInit = true;
-        _resumePosition = 0;
-        _isAutoplayResume = false;
-        _hasResetPosition = false;
-        _showNextNotifier.value = false;
-        _autoplayCountdown = -1;
-      });
+  void _onEpisodeChanged(int epNum) {
+    // Senior Web Fix: Al cambiar de episodio vía Autoplay o Menú, 
+    // simplemente actualizamos el estado interno. Como el reproductor
+    // es un diálogo/overlay, no necesitamos tocar la URL del navegador.
+    final currentNum = int.tryParse(_currentEpisode ?? '1') ?? 1;
+    if (epNum == currentNum) return;
 
-      if (tracks.isNotEmpty) {
-        // Senior Language Fix: Respetar el idioma elegido (LAT/SUB) al reproducir
-        // el episodio pre-cargado, con fallback a SUB si el doblaje aún no existe.
-        final trackIdx = _indexForLanguage(tracks, _currentLanguage);
-        final initialTrack = tracks[trackIdx];
-        _selectedTrackIndex = trackIdx;
-        // Senior Quality Fix: Cargar las calidades de la pista pre-cargada.
-        _applyTrackQualityOptions(initialTrack);
-        if (initialTrack.isEmbed) {
-          _initEmbedPlayer(initialTrack.url, initialTrack.headers);
-        } else {
-          _initPlayer(initialTrack.url, initialTrack.headers);
-        }
-      }
-      return;
-    }
-    
-    if (baseSource != null) {
-      _autoplayTimer?.cancel();
-      setState(() {
-        _hasInitialized = false; 
-        _currentEpisode = nextNum.toString();
-        _currentSourceUrl = nextSourceUrl;
-        _isStabilizing = true;
-        _skipResumeOnNextInit = true;
-        _resumePosition = 0;
-        _isAutoplayResume = false;
-        _hasResetPosition = false;
-        _showNextNotifier.value = false;
-        _autoplayCountdown = -1;
-      });
+    final sources = ref.read(activeContentSourcesProvider);
+    final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
+    final String nextSourceUrl = baseSource != null
+        ? buildEpisodeUrl(baseSource.url, baseSource.source, epNum)
+        : _currentSourceUrl;
 
-      if (baseSource.source == 'Aniyae') {
-        _resolveEpisodeUrl(baseSource, nextNum);
-      }
+    setState(() {
+      _showEpisodesOverlay = false;
+      _currentEpisode = epNum.toString();
+      _currentSourceUrl = nextSourceUrl;
+      _hasInitialized = false; 
+      _isStabilizing = true;
+      _skipResumeOnNextInit = true;
+      _resumePosition = 0;
+      _isAutoplayResume = false;
+      _hasResetPosition = false;
+      _showNextNotifier.value = false;
+      _autoplayCountdown = -1;
+    });
+
+    if (baseSource != null && baseSource.source == 'Aniyae') {
+      _resolveEpisodeUrl(baseSource, epNum);
     }
   }
 
@@ -2618,11 +2570,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // 3. Salida limpia usando GoRouter para asegurar consistencia
     if (mounted) {
-      if (context.canPop()) {
-        context.pop();
-      } else {
-        context.go('/'); 
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go('/'); 
+          }
+        }
+      });
     }
   }
 
@@ -3875,11 +3831,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                        if (epNum.toString() == _activeEpisode) return;
                        
                        // Senior Navigation Fix: Reemplazar la URL actual para limpiar historial de "Mouse 4"
-                       final String newPath = '/media/${widget.contentId}/reproducir';
-                       final queryParameters = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
-                       queryParameters['episode'] = epNum.toString();
-                       queryParameters['url'] = epUrl;
-                       context.replace(Uri(path: newPath, queryParameters: queryParameters).toString());
+                       final String cleanUri = UrlUtils.buildPlayerUri(
+                         title: widget.title ?? '',
+                         contentId: widget.contentId,
+                         episode: epNum.toString(),
+                         source: _currentSource ?? '',
+                         url: epUrl,
+                         season: widget.season,
+                         serverName: _currentServerName,
+                         language: _currentLanguage,
+                         category: widget.category,
+                         totalEpisodes: widget.totalEpisodes,
+                         posterUrl: widget.posterUrl,
+                         bannerUrl: widget.bannerUrl,
+                       );
+                       context.replace(cleanUri);
 
                        setState(() {
                          _showEpisodesOverlay = false;

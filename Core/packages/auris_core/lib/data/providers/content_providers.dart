@@ -218,44 +218,91 @@ final episodesProvider = FutureProvider.family<EpisodesResponse?, EpisodesParams
   );
 });
 
-final unifiedRelationsProvider = FutureProvider.family<Map<String, List<RelatedInfo>>, List<SearchResult>>((ref, sources) async {
-  if (sources.isEmpty) return {};
-  final repo = ref.read(aurisRepositoryProvider);
-  final results = await Future.wait(sources.map((src) => repo.getEpisodes(src.url, src.source, category: 'anime').then<EpisodesResponse?>((v) => v).catchError((_) => null)));
-  final List<RelatedInfo> allRelations = [];
-  for (var res in results) {
-    if (res != null && res.relations.isNotEmpty) {
-      allRelations.addAll(res.relations);
-    }
-  }
-  final Map<String, RelatedInfo> franchiseMap = {};
-  final Map<String, RelatedInfo> genreMap = {};
-  final Map<String, RelatedInfo> recommendedMap = {};
-  for (var rel in allRelations) {
-    final cleanTitle = rel.title.replaceAll(RegExp(r'\s*\([Ss]erie\)'), '').trim();
-    final key = cleanTitle.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final type = rel.relation.toLowerCase();
-    if (type.contains('precuela') || type.contains('secuela') || type.contains('historia') || type.contains('ova') || type.contains('película')) {
-      if (!franchiseMap.containsKey(key)) franchiseMap[key] = rel;
-    } else if (type.contains('género') || type.contains('similar') || type.contains('relacionado') || rel.url.contains('aniyae')) {
-      if (!genreMap.containsKey(key)) genreMap[key] = rel;
-    } else {
-      if (!recommendedMap.containsKey(key)) recommendedMap[key] = rel;
-    }
-  }
-  for (final key in franchiseMap.keys) {
-    recommendedMap.remove(key);
-    genreMap.remove(key);
-  }
-  for (final key in recommendedMap.keys) {
-    genreMap.remove(key);
-  }
-  return {
-    'franchise': franchiseMap.values.toList(),
-    'genre': genreMap.values.toList(),
-    'recommended': recommendedMap.values.toList(),
-  };
+final unifiedRelationsProvider =
+    StateNotifierProvider.autoDispose.family<_UnifiedRelationsNotifier, AsyncValue<Map<String, List<RelatedInfo>>>, List<SearchResult>>((ref, sources) {
+  return _UnifiedRelationsNotifier(ref, sources);
 });
+
+class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<Map<String, List<RelatedInfo>>>> {
+  final Ref ref;
+  final List<SearchResult> sources;
+  final Map<String, RelatedInfo> _allRelationsMap = {};
+
+  _UnifiedRelationsNotifier(this.ref, this.sources) : super(const AsyncValue.loading()) {
+    _load();
+  }
+
+  void _load() async {
+    if (sources.isEmpty) {
+      state = const AsyncValue.data({});
+      return;
+    }
+
+    final repo = ref.read(aurisRepositoryProvider);
+    int finished = 0;
+
+    for (final src in sources) {
+      repo.getEpisodes(src.url, src.source, category: 'anime').then((res) {
+        finished++;
+        if (!mounted) return;
+        if (res.relations.isNotEmpty) {
+          final relationsWithSource = res.relations.map((r) => r.copyWith(source: src.source)).toList();
+          _updateWithRelations(relationsWithSource);
+        } else if (finished == sources.length && state is AsyncLoading) {
+          state = const AsyncValue.data({});
+        }
+      }).catchError((_) {
+        finished++;
+        if (mounted && finished == sources.length && state is AsyncLoading) {
+          state = const AsyncValue.data({});
+        }
+        return null;
+      });
+    }
+  }
+
+  void _updateWithRelations(List<RelatedInfo> newRelations) {
+    final Map<String, RelatedInfo> franchiseMap = {};
+    final Map<String, RelatedInfo> genreMap = {};
+    final Map<String, RelatedInfo> recommendedMap = {};
+
+    for (var rel in newRelations) {
+      final cleanTitle = rel.title.replaceAll(RegExp(r'\s*\([Ss]erie\)'), '').trim();
+      final key = cleanTitle.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if (!_allRelationsMap.containsKey(key)) {
+        _allRelationsMap[key] = rel;
+      }
+    }
+
+    for (var rel in _allRelationsMap.values) {
+      final cleanTitle = rel.title.replaceAll(RegExp(r'\s*\([Ss]erie\)'), '').trim();
+      final key = cleanTitle.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      final type = rel.relation.toLowerCase();
+
+      if (type.contains('precuela') || type.contains('secuela') || type.contains('historia') || type.contains('ova') || type.contains('película')) {
+        if (!franchiseMap.containsKey(key)) franchiseMap[key] = rel;
+      } else if (type.contains('género') || type.contains('similar') || type.contains('relacionado') || rel.url.contains('aniyae')) {
+        if (!genreMap.containsKey(key)) genreMap[key] = rel;
+      } else {
+        if (!recommendedMap.containsKey(key)) recommendedMap[key] = rel;
+      }
+    }
+
+    for (final key in franchiseMap.keys) {
+      recommendedMap.remove(key);
+      genreMap.remove(key);
+    }
+    for (final key in recommendedMap.keys) {
+      genreMap.remove(key);
+    }
+
+    state = AsyncValue.data({
+      'franchise': franchiseMap.values.toList(),
+      'genre': genreMap.values.toList(),
+      'recommended': recommendedMap.values.toList(),
+    });
+  }
+}
 
 final groupedEpisodesProvider = FutureProvider.family<GroupedEpisodesResult?, GroupedEpisodesParams>((ref, params) async {
   if (params.sources.isEmpty) return null;

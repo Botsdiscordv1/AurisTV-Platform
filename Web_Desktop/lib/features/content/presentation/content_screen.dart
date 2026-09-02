@@ -15,11 +15,14 @@ import 'package:collection/collection.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
-import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
-import '../../../shared/widgets/full_screen_viewer.dart';
-import '../../../shared/widgets/skeletons.dart';
+import 'package:auristv_web/core/utils/responsive_utils.dart';
+import 'package:auristv_web/core/utils/url_utils.dart';
+import 'package:auristv_web/shared/widgets/focusable_poster_card.dart';
+import 'package:auristv_web/shared/widgets/nav_arrow.dart';
+import 'package:auristv_web/shared/widgets/full_screen_viewer.dart';
+import 'package:auristv_web/shared/widgets/skeletons.dart';
+import 'package:auristv_web/features/player/presentation/player_screen.dart';
+import 'package:auristv_web/core/router/app_router.dart';
 
 // --- Galería Local Helpers ---
 
@@ -322,7 +325,9 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         _ytController!.playVideo();
         setState(() { _showPlayer = false; _isPlayedOnce = false; _showTitle = true; });
         _titleHideTimer?.cancel();
-        Future.delayed(const Duration(milliseconds: 600), () { 
+        
+        // Senior Safety: Usamos microtask y mounted para el cambio diferido
+        Future.microtask(() { 
           if (mounted && !_showPlayer) {
             setState(() { _showPlayer = true; _showTitle = true; }); 
             _startTitleHideTimer();
@@ -368,16 +373,16 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       if (mounted) {
         setState(() { _ytController = ctrl; _showPlayer = false; _isPlayedOnce = false; _showTitle = true; });
         _titleHideTimer?.cancel();
-        Future.delayed(const Duration(milliseconds: 400), () { 
-          if (mounted) { 
-            ctrl.playVideo(); 
-            Future.delayed(const Duration(milliseconds: 1100), () { 
-              if (mounted && !_showPlayer) {
-                setState(() { _showPlayer = true; _showTitle = true; }); 
-                _startTitleHideTimer();
-              }
-            }); 
-          } 
+        
+        // Senior Safety: Evitar Future.delayed no gestionado
+        _delayTimer = Timer(const Duration(milliseconds: 1500), () {
+          if (mounted) {
+            ctrl.playVideo();
+            if (!_showPlayer) {
+              setState(() { _showPlayer = true; _showTitle = true; }); 
+              _startTitleHideTimer();
+            }
+          }
         });
       }
     }
@@ -464,8 +469,9 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       detail: d,
       bannerParam: widget.banner,
       poster: widget.poster,
+      season: widget.currentSeason,
     );
-    final heroTitle = _stripSeasonSuffix(widget.title);
+    final heroTitle = widget.title;
     final width = MediaQuery.of(context).size.width;
     final isMobile = ResponsiveUtils.isMobile(context);
 
@@ -990,7 +996,18 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 // Senior Logic: En móvil, abrir tráiler en el reproductor a pantalla completa
                 final trailerUrl = 'https://www.youtube.com/watch?v=$_lastTrailerKey';
                 final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(widget.poster ?? '')}&bannerUrl=${Uri.encodeComponent(widget.banner ?? '')}';
-                context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=YouTube&url=${Uri.encodeComponent(trailerUrl)}&episode=Trailer&serverName=YouTube&language=Trailer&totalEpisodes=1$posterParam');
+                final player = PlayerScreen(
+                  contentId: widget.title,
+                  sourceUrl: trailerUrl,
+                  source: 'YouTube',
+                  episode: 'Trailer',
+                  serverName: 'YouTube',
+                  language: 'Trailer',
+                  totalEpisodes: 1,
+                  posterUrl: widget.poster,
+                  bannerUrl: widget.banner,
+                );
+                UrlUtils.openPlayer(context, player);
               } else {
                 if (_showPlayer) {
                   _disposeController();
@@ -1477,14 +1494,27 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   Widget _buildUpperButtons(BuildContext context, {double? desktopTop}) {
     final isMobile = ResponsiveUtils.isMobile(context);
     final buttons = Stack(children: [
+  Widget _buildUpperButtons(BuildContext context, {double? desktopTop}) {
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final buttons = Stack(children: [
       Positioned(
         top: isMobile ? 35 : (desktopTop ?? 40), 
         left: isMobile ? 15 : 40, 
         child: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), 
-          onPressed: () { if (mounted) Navigator.of(context).pop(); }
+          onPressed: () { 
+            // Senior Web Fix: Al usar navegación atómica (go), el botón atrás
+            // simplemente nos devuelve al catálogo. El sistema recuperará el
+            // estado de búsqueda automáticamente desde la URL.
+            context.go('/catalogo');
+          }
         )
       ),
+      if (isMobile) Positioned(top: 35, right: 15, child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {})),
+    ]);
+
+    return buttons;
+  }
       if (isMobile) Positioned(top: 35, right: 15, child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {})),
     ]);
 
@@ -2246,7 +2276,16 @@ class _ThemeCardState extends State<_ThemeCard> {
           String url = widget.theme.videoUrl; final typeLabel = widget.isOP ? 'OP' : 'ED';
           if (!url.startsWith('http')) { 
             url = 'https://www.youtube.com/watch?v=$url'; 
-            context.push('/media/${Uri.encodeComponent(widget.theme.title)}/reproducir?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube&language=SUB'); 
+            final player = PlayerScreen(
+              contentId: widget.theme.title,
+              sourceUrl: url,
+              source: 'YouTube',
+              episode: typeLabel,
+              serverName: 'YouTube',
+              language: 'SUB',
+              totalEpisodes: 1,
+            );
+            UrlUtils.openPlayer(context, player);
           }
           else { 
             String url720 = widget.theme.video720 ?? '';
@@ -2258,7 +2297,18 @@ class _ThemeCardState extends State<_ThemeCard> {
             }
             final v720Param = url720.isNotEmpty ? '&video720=${Uri.encodeComponent(url720)}' : '';
             final v1080Param = url1080.isNotEmpty ? '&video1080=${Uri.encodeComponent(url1080)}' : '';
-            context.push('/media/${Uri.encodeComponent(widget.theme.title)}/reproducir?source=&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes&language=SUB$v720Param$v1080Param'); 
+            final player = PlayerScreen(
+              contentId: widget.theme.title,
+              sourceUrl: url,
+              source: 'Themes',
+              episode: typeLabel,
+              serverName: 'Themes',
+              language: 'SUB',
+              totalEpisodes: 1,
+              video720: url720.isNotEmpty ? url720 : null,
+              video1080: url1080.isNotEmpty ? url1080 : null,
+            );
+            UrlUtils.openPlayer(context, player);
           }
         }, 
         child: AnimatedContainer(
@@ -2614,18 +2664,37 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showContent = false;
   Timer? _loadTimer;
-  // Banner del hero congelado: se captura UNA sola vez con la primera imagen
-  // disponible al abrir (ruta > fuente > backdrop del detalle) and ya no cambia
-  // al switchear temporada, para no re-solicitar banner ni provocar timeouts.
-  String? _stableBanner;
   // Fuente por defecto congelada al abrir (mejor por rank presente en ese
   // momento) y clave de la fuente elegida manualmente por el usuario. Evitan el
   // parpadeo A23 -> AV1 cuando AV1/AnimeJara llegan tarde vía búsqueda suplementaria.
   String? _frozenDefaultKey;
   String? _userSelectedSourceKey;
 
+  void _openPlayer(PlayerScreen player) {
+    UrlUtils.openPlayer(context, player);
+  }
+
   @override void initState() {
     super.initState();
+
+    // Senior Web Fix: Enforcer de URL de Detalles.
+    // Al entrar por push, obligamos al navegador a mostrar la URL de identidad.
+    // Esto gana la batalla contra el Shell (Search) que intenta mantener su URL.
+    if (kIsWeb) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          final shareableUri = UrlUtils.buildShareableUri(
+            title: widget.title,
+            source: widget.source,
+            url: widget.url,
+            category: widget.category,
+            year: widget.year,
+          );
+          appRouter.replace(shareableUri);
+        }
+      });
+    }
+    
     _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () {
       if (mounted) setState(() => _showContent = true);
     });
@@ -2756,9 +2825,24 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ? ApiEndpoints.baseUrlForCategory(widget.category)
             : null);
 
+    // Temporada de la pantalla abierta, inferida del título. Se usa para fijar
+    // la fuente y la temporada OMDB a la temporada correcta (evita que una S2
+    // abierta caiga a la S1 por defecto).
+    final openedSeasonN = widget.result?.season
+        ?? _extractSeason(widget.result?.title)
+        ?? _extractSeason(widget.title)
+        ?? _extractSeason(widget.metadataTitle)
+        ?? 1;
+
     final animeDetailAsync = !fetchAnimeDetail
         ? const AsyncValue<AnimeDetail?>.data(null)
-        : ref.watch(animeDetailProvider(AnimeDetailParams(title: widget.title, metadataTitle: widget.metadataTitle, year: widget.year, kind: widget.result?.kind)));
+        : ref.watch(animeDetailProvider(AnimeDetailParams(
+            title: _stripSeasonSuffix(widget.title),
+            metadataTitle: widget.metadataTitle != null ? _stripSeasonSuffix(widget.metadataTitle!) : null,
+            year: widget.year,
+            season: openedSeasonN,
+            kind: widget.result?.kind,
+          )));
 
     // Para category='all' no sabemos de antemano si es anime o movie. Pedimos
     // el detalle de anime primero y solo consultamos /api/detail/movie como
@@ -2773,8 +2857,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ? const AsyncValue<MovieDetail?>.data(null)
         : (isMovieCatFetch || needMovieFallback)
             ? ref.watch(movieDetailProvider(MovieDetailParams(
-                title: widget.title,
-                metadataTitle: widget.metadataTitle,
+                title: _stripSeasonSuffix(widget.title),
+                metadataTitle: widget.metadataTitle != null ? _stripSeasonSuffix(widget.metadataTitle!) : null,
                 category: widget.category,
                 server: originServer,
               )))
@@ -2806,23 +2890,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final detailLoading = (isMovieCategory ? movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null : animeDetailAsync.isLoading) || (isAnimeCategory ? false : movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null);
 
-    // Temporada de la pantalla abierta, inferida del título. Se usa para fijar
-    // la fuente y la temporada OMDB a la temporada correcta (evita que una S2
-    // abierta caiga a la S1 por defecto).
-    // La temporada abierta debe derivarse de la CARD ORIGINAL (widget.result), no
-    // de widget.title: este último es `displayTitle` (result.scrapedTitle ??
-    // metadataTitle ?? title) y el server suele enriquecerlo con el título base de
-    // AniList ("Youjo Senki"), perdiendo el sufijo "2nd Season". Si usáramos
-    // widget.title, openedSeasonN quedaría en 1 y seasonSwitched nunca se activaría
-    // al pasar de S2 -> S1 (se evaluaría 1 != 1 = false): la lista y el detalle se
-    // quedaban en S2. widget.result.title conserva "youjo senki 2nd season".
-    final openedSeasonN = widget.result?.season
-        ?? _extractSeason(widget.result?.title)
-        ?? _extractSeason(widget.title)
-        ?? _extractSeason(widget.metadataTitle)
-        ?? 1;
-    // Solo fijamos el "season" del proveedor cuando el título declara una
-    // temporada > 1, para no romper la lógica original de títulos base (S1).
     // [Senior] Semilla instantánea: la card abierta ya es un SearchResult con sus
     // servidores en `.sources`, así que la lista de servidores se muestra de inmediato
     // y la búsqueda suplementaria (discoveredSourcesProvider) solo la enriquece/fusiona
@@ -2893,7 +2960,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     // temporada de forma determinística (sin él, un título base ambiguo como
     // "Youjo Senki" devuelve S1 o S2 según el ranking de AniList).
     final seasonAnimeDetailAsync = seasonTitle != null
-        ? ref.watch(animeDetailProvider(AnimeDetailParams(title: seasonTitle, metadataTitle: seasonTitle, year: null, season: _selectedSeason, kind: null)))
+        ? ref.watch(animeDetailProvider(AnimeDetailParams(
+            title: _stripSeasonSuffix(widget.title),
+            metadataTitle: _stripSeasonSuffix(widget.title),
+            year: null,
+            season: _selectedSeason,
+            kind: null,
+          )))
         : animeDetailAsync;
     final displayAnimeDetailAsync = seasonSwitched
         ? (seasonAnimeDetailAsync.valueOrNull != null ? seasonAnimeDetailAsync : animeDetailAsync)
@@ -3004,27 +3077,37 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final episodesUrl = currentSource?.url ?? widget.url;
     final episodesSource = currentSource?.source ?? widget.source;
     final initialThumbnail = ApiEndpoints.proxyImage(currentSource?.thumbnail);
+    
+    // Para anime, el "N" de temporada lo manda el server en animeDetail.season
+    // (curado por IdentityResolver a partir del título, p.ej. "2nd Season" -> 2).
+    final animeSeasonN = (detailData is AnimeDetail && detailData.season != null)
+        ? (int.tryParse(detailData.season!) ?? openedSeasonN)
+        : openedSeasonN;
+    final currentSeason = _selectedSeason ??
+        (detailData is MovieDetail
+            ? (detailData.seasons.isNotEmpty ? detailData.seasons.first.seasonNumber : 1)
+            : animeSeasonN);
+
+    // Al cambiar de temporada, la metadata (títulos, miniaturas, año) de los
+    // episodios debe corresponder a la temporada seleccionada, no a la temporada
+    // con la que se abrió la pantalla.
+    final seasonDetail = seasonAnimeDetailAsync.valueOrNull is AnimeDetail
+        ? seasonAnimeDetailAsync.valueOrNull as AnimeDetail
+        : null;
+
     final initialBanner = ApiEndpoints.proxyImage(
       DetailBackdropResolver.resolve(
-        detail: detailData,
+        detail: seasonDetail ?? detailData, // Preferimos el detalle de la temporada actual
         bannerParam: widget.banner,
         sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
+        season: currentSeason,
       ),
       highQuality: true,
     );
-    // Congelar el banner del hero con la primera imagen disponible. Una vez
-    // capturado no vuelve a cambiar aunque se switchee de temporada.
-    if (_stableBanner == null) {
-      final candidate = DetailBackdropResolver.resolve(
-        detail: detailData,
-        bannerParam: widget.banner,
-        sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
-      );
-      if (candidate.isNotEmpty) {
-        _stableBanner = ApiEndpoints.proxyImage(candidate, highQuality: true);
-      }
-    }
-    final stableBanner = _stableBanner ?? initialBanner;
+    
+    // Senior Web Fix: Backdrop dinámico por temporada. 
+    // Ya no congelamos el banner para permitir que cambie al navegar entre temporadas.
+    final heroBanner = initialBanner;
     final familySourcesRaw = currentSource != null ? _familySourcesFor(currentSource, activeSources) : <SearchResult>[];
     final familySources = familySourcesRaw.map((s) => _withSeasonUnified(s, effectiveSeasonForUrl)!).toList();
 
@@ -3035,31 +3118,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final unifiedRelationsAsync = ref.watch(unifiedRelationsProvider(searchSources));
     
     final certification = detailData != null ? ((detailData is MovieDetail ? (detailData as MovieDetail).certification : (detailData is AnimeDetail ? (detailData as AnimeDetail).certification : null)) ?? 'NR') : 'NR';
-    // Para anime, el "N" de temporada lo manda el server en animeDetail.season
-    // (curado por IdentityResolver a partir del título, p.ej. "2nd Season" -> 2).
-    final animeSeasonN = (detailData is AnimeDetail && detailData.season != null)
-        ? (int.tryParse(detailData.season!) ?? openedSeasonN)
-        : openedSeasonN;
-    final currentSeason = _selectedSeason ??
-        (detailData is MovieDetail
-            ? (detailData.seasons.isNotEmpty ? detailData.seasons.first.seasonNumber : 1)
-            : animeSeasonN);
-    // Al cambiar de temporada, la metadata (títulos, miniaturas, año) de los
-    // episodios debe corresponder a la temporada seleccionada, no a la temporada
-    // con la que se abrió la pantalla. Preferimos el título ingl\u00E9s del detalle de
-    // la temporada destino (si ya cargó) y caemos a seasonTitle como fallback.
-    final seasonDetail = seasonAnimeDetailAsync.valueOrNull is AnimeDetail
-        ? seasonAnimeDetailAsync.valueOrNull as AnimeDetail
-        : null;
-    // Hero banner season-aware: al cambiar de temporada, si el detalle de la
-    // temporada destino ya cargó, usamos su backdrop; si aún no, mantenemos el
-    // banner congelado de la temporada abierta para no romper el hero.
-    final seasonBannerRaw = (seasonDetail != null && seasonDetail.backdrop?.isNotEmpty == true)
-        ? seasonDetail.backdrop!
-        : (seasonDetail != null && seasonDetail.poster?.isNotEmpty == true ? seasonDetail.poster! : null);
-    final heroBanner = (seasonSwitched && seasonBannerRaw != null)
-        ? ApiEndpoints.proxyImage(seasonBannerRaw, highQuality: true)
-        : stableBanner;
+
     final episodeLookupTitle = seasonSwitched
         ? (seasonDetail?.titleEnglish?.isNotEmpty == true
             ? seasonDetail!.titleEnglish!
@@ -3187,27 +3246,49 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 final src = playSource?.source ?? widget.source;
                 final url = playSource?.url ?? widget.url;
                 final playEpisodesUrl = playSource?.url ?? widget.url;
-                // Pel\u00EDcula: reproducir directo con la URL de movie de la fuente
-                // seleccionada, sin depender de la lista de episodios (unhas fuentes la
-                // presentan como ep1 en su detail, otras con URL directa como AnimeJara
-                // "animejara.com/movie/...", otras como GNU no la listan). No usamos el
-                // episode/season del historial para no arrastrar la temporada de la serie.
+                
+                String targetUri = '';
+
                 if (isMovieCategory) {
                   final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Pel\u00EDcula', thumbnail: initialThumbnail);
-                  final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                  context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${src}&url=${_episodeUrlFor(ep, playEpisodesUrl, src, 1)}&episode=1&serverName=${simplifySourceName(src)}&language=${((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&totalEpisodes=1$posterParam');
-                  return;
+                  final player = PlayerScreen(
+                    contentId: widget.title,
+                    sourceUrl: _episodeUrlFor(ep, playEpisodesUrl, src, 1),
+                    source: src,
+                    episode: '1',
+                    serverName: simplifySourceName(src),
+                    language: ((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                    category: widget.category,
+                    totalEpisodes: 1,
+                    posterUrl: playSource?.thumbnail,
+                    bannerUrl: heroBanner,
+                  );
+                  UrlUtils.openPlayer(context, player);
+                } else {
+                  final latest = ref.read(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull;
+                  int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
+                  final epData = episodesAsync.valueOrNull?.response;
+                  final epSource = episodeSourceFor(epNum) ?? currentSource;
+                  final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
+                  
+                  final episodeThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
+                  final player = PlayerScreen(
+                    contentId: widget.title,
+                    sourceUrl: _episodeUrlFor(ep, epSource?.url ?? url, epSource?.source ?? src, epNum),
+                    source: epSource?.source ?? src,
+                    episode: epNum.toString(),
+                    season: latest?.season ?? currentSeason,
+                    serverName: simplifySourceName(epSource?.source ?? src),
+                    language: (epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB',
+                    startPosition: latest?.positionInMilliseconds,
+                    category: widget.category,
+                    totalEpisodes: epData?.total ?? 0,
+                    title: seasonTitle ?? widget.title,
+                    posterUrl: episodeThumb,
+                    bannerUrl: heroBanner,
+                  );
+                  UrlUtils.openPlayer(context, player);
                 }
-                final latest = ref.read(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull;
-                int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
-                final epData = episodesAsync.valueOrNull?.response;
-                final epSource = episodeSourceFor(epNum) ?? currentSource;
-                final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
-                
-                // Prioridad de miniatura: Episode Thumbnail (TMDB/OMDB) > Series Poster
-                final episodeThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
-                final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(episodeThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${epSource?.source ?? src}&url=${_episodeUrlFor(ep, epSource?.url ?? url, epSource?.source ?? src, epNum)}&episode=$epNum&season=${latest?.season ?? currentSeason}&serverName=${simplifySourceName(epSource?.source ?? src)}&language=${(epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB'}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}$posterParam');
               }
             )),
             if (isMobile) SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3257,8 +3338,22 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
                         final tapSource = epBundle?.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? omdb?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                        context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&language=${(epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                        final player = PlayerScreen(
+                          contentId: widget.title,
+                          sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1),
+                          source: tapSource?.source ?? currentSource?.source ?? widget.source,
+                          episode: (ep?.number ?? index + 1).toString(),
+                          season: currentSeason,
+                          serverName: simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source),
+                          language: (epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                          startPosition: hist?.positionInMilliseconds,
+                          category: widget.category,
+                          totalEpisodes: epData.total,
+                          title: seasonTitle ?? widget.title,
+                          posterUrl: epThumb,
+                          bannerUrl: heroBanner,
+                        );
+                        UrlUtils.openPlayer(context, player);
                       });
                     }, childCount: epData.total))
                     else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
@@ -3271,8 +3366,22 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
                         final tapSource = epBundle?.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? omdb?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                        context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&language=${(epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                        final player = PlayerScreen(
+                          contentId: widget.title,
+                          sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1),
+                          source: tapSource?.source ?? currentSource?.source ?? widget.source,
+                          episode: (ep?.number ?? index + 1).toString(),
+                          season: currentSeason,
+                          serverName: simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source),
+                          language: (epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                          startPosition: hist?.positionInMilliseconds,
+                          category: widget.category,
+                          totalEpisodes: epData.total,
+                          title: seasonTitle ?? widget.title,
+                          posterUrl: epThumb,
+                          bannerUrl: heroBanner,
+                        );
+                        UrlUtils.openPlayer(context, player);
                       });
                     }, childCount: epData.total)),
                       if (epData.specials.isNotEmpty) ...[
@@ -3296,8 +3405,21 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final spQuality = sp.quality ?? spSource?.quality ?? '';
                         return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, isMobile: true, scrollController: _scrollController, onTap: () {
                           final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                          final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                          context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=$spNum&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&language=${(spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
+                          final player = PlayerScreen(
+                            contentId: widget.title,
+                            sourceUrl: _episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number),
+                            source: spSource?.source ?? currentSource?.source ?? widget.source,
+                            episode: spNum.toString(),
+                            season: 0,
+                            serverName: simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source),
+                            language: (spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                            category: widget.category,
+                            totalEpisodes: epData.total,
+                            title: seasonTitle ?? widget.title,
+                            posterUrl: epThumb,
+                            bannerUrl: heroBanner,
+                          );
+                          UrlUtils.openPlayer(context, player);
                         });
                       }, childCount: epData.specials.length))
                       else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
@@ -3306,8 +3428,21 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final spQuality = sp.quality ?? spSource?.quality ?? '';
                         return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, onTap: () {
                           final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                          final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                          context.push('/media/${Uri.encodeComponent(widget.title)}/reproducir?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=${sp.number}&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&language=${(spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
+                          final player = PlayerScreen(
+                            contentId: widget.title,
+                            sourceUrl: _episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number),
+                            source: spSource?.source ?? currentSource?.source ?? widget.source,
+                            episode: sp.number.toString(),
+                            season: 0,
+                            serverName: simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source),
+                            language: (spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                            category: widget.category,
+                            totalEpisodes: epData.total,
+                            title: seasonTitle ?? widget.title,
+                            posterUrl: epThumb,
+                            bannerUrl: heroBanner,
+                          );
+                          UrlUtils.openPlayer(context, player);
                         });
                       }, childCount: epData.specials.length)),
                     ],
@@ -3546,7 +3681,26 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               title: _cleanRelatedTitle(r.title), 
               poster: r.cover, 
               subtitle: r.relation,
-              onTap: () => context.push('/media/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}')
+              onTap: () {
+              final sName = r.source ?? currentSource?.source ?? widget.source;
+              final result = SearchResult(
+                title: r.title,
+                url: r.url,
+                source: sName,
+                quality: 'HD',
+                thumbnail: r.cover,
+                slug: r.slug,
+                metadataTitle: r.title,
+                sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
+              );
+              final uri = UrlUtils.buildShareableUri(
+                title: r.title,
+                source: result.source,
+                url: result.url,
+                category: 'anime',
+              );
+              context.push(uri, extra: result);
+            },
             )).toList(),
           ),
         ),
@@ -3575,7 +3729,26 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         title: displayTitle,
         poster: r.cover,
         subtitle: r.relation,
-        onTap: () => context.push('/content/${Uri.encodeComponent(r.title)}?source=${currentSource?.source ?? widget.source}&category=anime&url=${Uri.encodeComponent(r.url)}&metadataTitle=${Uri.encodeComponent(r.title)}'),
+        onTap: () {
+          final sName = r.source ?? currentSource?.source ?? widget.source;
+          final result = SearchResult(
+            title: r.title,
+            url: r.url,
+            source: sName,
+            quality: 'HD',
+            thumbnail: r.cover,
+            slug: r.slug,
+            metadataTitle: r.title,
+            sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
+          );
+          final uri = UrlUtils.buildShareableUri(
+            title: r.title,
+            source: result.source,
+            url: result.url,
+            category: 'anime',
+          );
+          context.push(uri, extra: result);
+        },
       );
     }
 

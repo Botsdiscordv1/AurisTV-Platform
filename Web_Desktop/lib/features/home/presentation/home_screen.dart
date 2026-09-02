@@ -9,10 +9,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/web_utils.dart';
+import '../../../core/utils/url_utils.dart';
 import '../widgets/content_row.dart';
 import '../widgets/editorial_content_row.dart';
 import '../widgets/wide_content_row.dart';
 import '../widgets/hero_banner.dart';
+import 'package:auristv_web/features/player/presentation/player_screen.dart';
 import '../../../shared/widgets/skeletons.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import 'providers/home_provider.dart';
@@ -36,13 +38,13 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
   
   final metaTitle = item.romaji ?? item.english ?? item.title;
 
-  final uri = '/media/${Uri.encodeComponent(item.title)}'
-      '?source=${Uri.encodeComponent(source)}'
-      '&category=${Uri.encodeComponent(category)}'
-      '&url=${Uri.encodeComponent(item.id)}'
-      '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
-      '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
-      '&year=${item.year ?? ''}';
+  final uri = UrlUtils.buildShareableUri(
+    title: item.title,
+    source: source,
+    url: item.id,
+    category: category,
+    year: item.year,
+  );
       
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (context.mounted) context.push(uri, extra: item.toContentSeed());
@@ -52,10 +54,13 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
 void openHomeScheduleItem(BuildContext context, MediaItem item) {
   final metaTitle = item.romaji ?? item.english ?? item.title;
   final itemYear = item.year ?? (item.airingAt != null ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year : null);
-  final uri = '/media/${Uri.encodeComponent(item.title)}'
-      '?source=&category=anime&url='
-      '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
-      '&banner=&year=${itemYear ?? ''}';
+  final uri = UrlUtils.buildShareableUri(
+    title: item.title,
+    source: '', 
+    url: '', // Se autodescubrirá o usará el título
+    category: 'anime',
+    year: itemYear,
+  );
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (context.mounted) context.push(uri, extra: item.toContentSeed());
   });
@@ -466,7 +471,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 _FocusIconButton(
                   icon: Icons.search,
                   size: isUltraCompact ? 20 : (isCompactDesktop ? 22 : 26),
-                  onPressed: () => context.push('/catalogo'),
+                  onPressed: () => context.go('/catalogo'),
                 ),
                 // Senior: Ocultamos el selector de idioma en resoluciones intermedias para evitar overflow
                 if (width >= 1080) ...[
@@ -479,7 +484,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _FocusIconButton(
                     icon: Icons.grid_view_rounded,
                     size: isCompactDesktop ? 22 : 26,
-                    onPressed: () => context.push('/horario'),
+                    onPressed: () => context.go('/horario'),
                   ),
                   const SizedBox(width: 12),
                 ],
@@ -972,17 +977,22 @@ class _ContinueWatchingSection extends ConsumerWidget {
   }
 
   void _onTap(BuildContext context, PlaybackHistory item) {
-    final uri = '/media/${Uri.encodeComponent(item.contentId)}/reproducir'
-        '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
-        '&source=${Uri.encodeComponent(item.source ?? "")}'
-        '&episode=${item.episode ?? ""}'
-        '&season=${item.season ?? ""}'
-        '&startPosition=${item.positionInMilliseconds}'
-        '&category=${Uri.encodeComponent(item.category ?? "anime")}'
-        '&title=${Uri.encodeComponent(item.title ?? "")}'
-        '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-        '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}';
-    context.push(uri);
+    final player = PlayerScreen(
+      contentId: item.contentId,
+      sourceUrl: item.url ?? item.contentId,
+      source: item.source ?? "",
+      episode: item.episode ?? "1",
+      season: item.season,
+      startPosition: item.positionInMilliseconds,
+      category: item.category,
+      title: item.title,
+      posterUrl: item.posterUrl,
+      bannerUrl: item.bannerUrl,
+    );
+    
+    // Senior UI Fix: Abrir el reproductor como un diálogo a pantalla completa
+    // para mantener la URL actual intacta.
+    UrlUtils.openPlayer(context, player);
   }
 }
 

@@ -73,6 +73,7 @@ class RelatedInfo {
   final String slug;
   final String cover;
   final String relation;
+  final String? source;
 
   const RelatedInfo({
     required this.title,
@@ -80,7 +81,19 @@ class RelatedInfo {
     required this.slug,
     required this.cover,
     required this.relation,
+    this.source,
   });
+
+  RelatedInfo copyWith({String? source}) {
+    return RelatedInfo(
+      title: title,
+      url: url,
+      slug: slug,
+      cover: cover,
+      relation: relation,
+      source: source ?? this.source,
+    );
+  }
 
   factory RelatedInfo.fromJson(Map<String, dynamic> json) {
     return RelatedInfo(
@@ -96,6 +109,7 @@ class RelatedInfo {
         json['image'] as String?
       ),
       relation: json['relation'] as String? ?? 'Relacionado',
+      source: json['source'] as String?,
     );
   }
 }

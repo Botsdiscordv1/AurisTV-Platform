@@ -11,6 +11,8 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'shared/widgets/min_width_wrapper.dart';
 import 'features/windows/presentation/windows_web_wrapper.dart';
+import 'core/utils/url_utils.dart';
+import 'package:auristv_web/features/player/presentation/player_screen.dart';
 import 'features/remote_control/presentation/providers/remote_control_provider.dart';
 import 'features/remote_control/data/models/remote_device.dart';
 
@@ -36,6 +38,7 @@ Future<void> main() async {
   await Hive.openBox('user_data'); // Senior: Nuevo box para persistir perfiles y conexiones
   await Hive.openBox('favorites'); // Senior: Biblioteca personalizada por perfil
   await Hive.openBox('home_cache'); // Senior: Cache para el inicio instantáneo
+  await Hive.openBox('media_slug_cache'); // Senior: Mapeo de Slugs -> Metadata para URLs limpias
 
   // Inicializa Supabase
   await Supabase.initialize(
@@ -95,16 +98,18 @@ class RemoteCommandListener extends ConsumerWidget {
         if (next['action'] == RemoteAction.openMedia) {
           final p = next['params'] as Map<String, dynamic>?;
           if (p != null) {
-            final contentId = p['contentId'];
-            final query = Map<String, String>.from(p);
-            query.remove('contentId');
-            
-            final uri = Uri(
-              path: '/media/${Uri.encodeComponent(contentId)}/reproducir',
-              queryParameters: query,
+            final player = PlayerScreen(
+              contentId: p['contentId'] ?? '',
+              sourceUrl: p['url'] ?? '',
+              source: p['source'] ?? '',
+              episode: p['episode'] ?? '1',
+              category: p['category'],
+              title: p['title'],
+              posterUrl: p['posterUrl'],
+              bannerUrl: p['bannerUrl'],
             );
             
-            appRouter.push(uri.toString());
+            UrlUtils.openPlayer(context, player);
           }
         }
       }

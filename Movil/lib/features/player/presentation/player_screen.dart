@@ -426,6 +426,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   final ValueNotifier<bool> _showNextNotifier = ValueNotifier<bool>(false);
   bool _isPreloading = false;
   ExtractResult? _preloadedNext;
+  late DateTime _screenInitTime;
   int _autoplayCountdown = -1;
   bool _isAutoplayResume = false;
   Timer? _autoplayTimer;
@@ -454,6 +455,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   @override
   void initState() {
     super.initState();
+    _screenInitTime = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
     
     _isMobileDevice = true;
@@ -488,6 +490,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           DateTime.now().difference(_lastManualVolumeTime!).inMilliseconds < 1500) return;
 
       if (mounted) {
+        // Ignorar eventos iniciales de sincronización del sistema (cooldown de 2s)
+        if (DateTime.now().difference(_screenInitTime).inSeconds < 2) {
+          _volume = v;
+          return;
+        }
+
         if (_volume > 1.0 && v >= 0.99) return;
 
         setState(() {
@@ -592,10 +600,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       // restauramos la UI del sistema para no "secuestrar" los botones de volumen fuera del player.
       VolumeController().showSystemUI = true;
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      ScreenBrightnessController.resetBrightness();
     } else if (state == AppLifecycleState.resumed) {
       // Al volver al player, retomamos el control total de la interfaz de volumen.
       VolumeController().showSystemUI = false;
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true});
+      ScreenBrightnessController.setBrightness(_brightness);
     }
   }
 
@@ -2525,6 +2535,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_isMobileDevice && _isExiting) {
       VolumeController().showSystemUI = true;
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      ScreenBrightnessController.resetBrightness();
     }
     _posSubscription?.cancel();
     _bufferingSubscription?.cancel();
@@ -2641,6 +2652,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       VolumeController().showSystemUI = true;
+      ScreenBrightnessController.resetBrightness();
     }
 
     // 3. Salida limpia usando GoRouter para asegurar consistencia
@@ -3382,58 +3394,54 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ? (value > 0.7 ? Icons.brightness_7_rounded : (value > 0.3 ? Icons.brightness_6_rounded : Icons.brightness_2_rounded))
         : (value > 1.0 ? Icons.bolt_rounded : (value > 0.5 ? Icons.volume_up_rounded : (value > 0 ? Icons.volume_down_rounded : Icons.volume_off_rounded)));
 
-    return Align(
-      alignment: isBrightness ? Alignment.centerLeft : Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                shape: BoxShape.circle,
-                border: Border.all(color: isBoost ? Colors.orangeAccent.withValues(alpha: 0.5) : Colors.white10),
-              ),
-              child: Icon(icon, color: isBoost ? Colors.orangeAccent : Colors.white, size: 28),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black87,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: isBoost ? Colors.orangeAccent.withValues(alpha: 0.5) : Colors.white10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: isBoost ? Colors.orangeAccent : Colors.white, size: 18),
+          const SizedBox(width: 12),
+          Container(
+            width: 100,
+            height: 4,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
             ),
-            const SizedBox(height: 16),
-            Container(
-              height: 160,
-              width: 8,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                children: [
-                  FractionallySizedBox(
-                    heightFactor: isBrightness ? value.clamp(0.0, 1.0) : (value / 2.0).clamp(0.0, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isBoost ? Colors.orangeAccent : Colors.white,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+            child: Stack(
+              children: [
+                FractionallySizedBox(
+                  widthFactor: isBrightness ? value.clamp(0.0, 1.0) : (value / 2.0).clamp(0.0, 1.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isBoost ? Colors.orangeAccent : Colors.white,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              '${(value * 100).toInt()}%',
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 30,
+            child: Text(
+              '${(value * 100).toInt()}',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: isBoost ? Colors.orangeAccent : Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -3791,8 +3799,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                                      gradient: LinearGradient(
                                        begin: Alignment.topCenter, 
                                        end: Alignment.bottomCenter, 
-                                       colors: [Colors.black.withOpacity(0.7), Colors.transparent, Colors.transparent, Colors.black.withOpacity(0.8)], 
-                                       stops: const [0.0, 0.2, 0.7, 1.0],
+                                       colors: [
+                                         Colors.black.withOpacity(0.4), 
+                                         Colors.black.withOpacity(0.2),
+                                         Colors.black.withOpacity(0.05),
+                                         Colors.transparent, 
+                                         Colors.transparent, 
+                                         Colors.black.withOpacity(0.1),
+                                         Colors.black.withOpacity(0.4),
+                                         Colors.black.withOpacity(0.6)
+                                       ], 
+                                       stops: const [0.0, 0.15, 0.35, 0.48, 0.52, 0.65, 0.85, 1.0],
                                      ),
                                    ),
                                  ),
@@ -3830,8 +3847,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                ),
              ),
            
-           if (_showVolumeIndicator) IgnorePointer(child: _buildGestureIndicator(false, _volume)),
-           if (_showBrightnessIndicator) IgnorePointer(child: _buildGestureIndicator(true, _brightness)),
+           if (_showVolumeIndicator || _showBrightnessIndicator) 
+             Positioned(
+               top: 32,
+               left: 0,
+               right: 0,
+               child: Center(
+                 child: IgnorePointer(
+                   child: _buildGestureIndicator(
+                     _showBrightnessIndicator, 
+                     _showBrightnessIndicator ? _brightness : _volume,
+                   ),
+                 ),
+               ),
+             ),
            if (_showSeekIndicator) Positioned.fill(child: IgnorePointer(child: _buildSeekIndicator())),
            
            if (_showLeftSkip) _buildSkipVisual(false),
