@@ -137,7 +137,7 @@ class ApiEndpoints {
   /// Pasa una imagen por el proxy del servidor si es necesario.
   /// Implementación Senior: Idempotente, Anti-Recursiva y con soporte de Weserv CDN.
   /// [highQuality] - Si es true, usa parámetros de máxima fidelidad (ideal para 4K/Backdrops).
-  static String proxyImage(String? url, {bool highQuality = false}) {
+  static String proxyImage(String? url, {bool highQuality = false, String? fallbackUrl}) {
     if (url == null || url.isEmpty) return '';
 
     String workingUrl = url;
