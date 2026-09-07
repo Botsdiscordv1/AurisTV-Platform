@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../auris_core.dart';
 
@@ -17,16 +18,33 @@ class HivePlaybackHistoryRepository implements PlaybackHistoryRepository {
 
   @override
   Future<List<PlaybackHistory>> getHistory(String profileId) async {
-    return _box.values
-        .map((e) => PlaybackHistory.fromJson(e as Map))
-        .where((h) => h.profileId == profileId)
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    final List<PlaybackHistory> history = [];
+    
+    for (var value in _box.values) {
+      try {
+        if (value is Map) {
+          final item = PlaybackHistory.fromJson(value);
+          // Senior Fix: Si el item no tiene profileId (legacy), lo asignamos al invitado
+          // para no perder el historial al actualizar la app.
+          final itemProfileId = item.profileId ?? 'guest_profile';
+          if (itemProfileId == profileId) {
+            history.add(item);
+          }
+        }
+      } catch (e) {
+        debugPrint('[HiveHistory] Error mapeando entrada legacy: $e');
+        // Ignoramos entradas corruptas para no bloquear el resto del historial
+      }
+    }
+    
+    return history..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
   @override
   Future<void> saveHistory(PlaybackHistory history) async {
     await _box.put(history.key, history.toJson());
+    // Senior Fix: Forzar persistencia física en disco inmediatamente
+    await _box.flush();
   }
 
   @override

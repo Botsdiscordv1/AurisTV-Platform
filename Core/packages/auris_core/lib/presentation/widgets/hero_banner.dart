@@ -792,14 +792,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                       ),
                       const SizedBox(width: 6),
                     ],
-                    // Senior Fix: Año en blanco puro (Oculto para animes en emisión en el Hero)
-                    if (item.type != MediaType.anime) ...[
-                      Text(
-                        '${item.year ?? "2024"}', 
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)
-                      ),
-                      const SizedBox(width: 6),
-                    ],
                     if (item.rating != null && item.rating! > 0) ...[
                       const Icon(Icons.star_rounded, color: Color(0xFFEF7A1E), size: 14),
                       const SizedBox(width: 2),
@@ -964,22 +956,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               ),
             ],
             
-            // Separador 1 (Oculto para animes en emisión en el Hero)
-            if (item.year != null && item.type != MediaType.anime) ...[
-              const SizedBox(width: 12),
-              Container(width: 1.2, height: 12, color: Colors.white30),
-              const SizedBox(width: 12),
-              Text(
-                '${item.year}', 
-                style: TextStyle(
-                  color: Colors.white, 
-                  fontSize: context.breakpoint < Breakpoint.xl ? 13 : 14, 
-                  fontWeight: FontWeight.w700
-                )
-              ),
-            ],
-
-            // Separador 2 (Rating)
+            // Separador 1 (Rating)
             if (item.rating != null && item.rating! > 0) ...[
               const SizedBox(width: 12),
               Container(width: 1.2, height: 12, color: Colors.white30),

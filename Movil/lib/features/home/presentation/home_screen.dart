@@ -702,27 +702,7 @@ else if (currentCategory == 'películas') ...[
                 
                 const Spacer(),
                 
-                // Acciones (Derecha)
-                const SizedBox(width: 8),
-                _FocusIconButton(
-                  icon: Icons.search,
-                  size: isCompactDesktop ? 22 : 26,
-                  onPressed: () => context.push('/search'),
-                ),
-                const SizedBox(width: 12),
-                _LanguageSelector(isCompact: isCompactDesktop),
-                const SizedBox(width: 12),
-                _FocusIconButton(
-                  icon: Icons.grid_view_rounded,
-                  size: isCompactDesktop ? 22 : 26,
-                  onPressed: () => context.push('/schedule'),
-                ),
-                const SizedBox(width: 12),
-                _buildUserAvatar(context, isCompactDesktop),
-                const SizedBox(width: 20),
-                
-                // Botón de Autenticación
-                _AuthButton(isCompactDesktop: isCompactDesktop),
+                // Acciones (Removidas por simplificación móvil)
               ],
             ),
           ),

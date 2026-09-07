@@ -4182,8 +4182,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     ? _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0]
                     : null;
 
-                // Senior Fix: Usar estrictamente la etiqueta de idioma (quality) y no la de la fuente (label)
-                final String label = currentTrack?.quality ?? _currentTrackQuality;
+                // Senior Fix: Usar la etiqueta de idioma (quality) con fallback al estado actual
+                // para asegurar visibilidad constante en Web y durante la carga inicial.
+                String label = currentTrack?.quality ?? _currentTrackQuality;
+                if (label.isEmpty) label = _currentLanguage ?? widget.language ?? '';
 
                 Color color = const Color(0xFFEF7A1E);
                 if (currentTrack?.color != null) {
@@ -4202,7 +4204,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               },
             ),
             const SizedBox(width: 16),
-            if (_isMobileDevice)
+            if (!_isMobileDevice) // Senior UI: Quitamos el cast superior en Móvil/Tablet como pidió el usuario
               _buildCastIcon(iconSize),
           ])));
   }

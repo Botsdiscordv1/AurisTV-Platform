@@ -49,20 +49,14 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     final repository = ref.watch(playbackHistoryRepositoryProvider);
     final user = ref.watch(authProvider);
     
-    // Senior Fix: Si hay una sesión activa en Supabase pero el authProvider aún es null,
-    // mantenemos el estado en LOADING.
-    if (user == null && Supabase.instance.client.auth.currentSession != null) {
-      final completer = Completer<List<PlaybackHistory>>();
-      return completer.future;
-    }
-
     final profileId = user?.activeProfileId ?? 'guest_profile';
     
-    // Le damos un pequeño margen a Hive para asegurar que el box esté listo 
-    // y poblado tras el Hot Restart.
+    // Senior Fix: Ya no bloqueamos con Completer si el auth es null. 
+    // Cargamos lo que tengamos en local (Hive) de inmediato para que la app sea funcional.
     final history = await repository.getHistory(profileId);
     _memoryCache = history;
 
+    // Si hay usuario real, disparamos la sincronización en segundo plano
     if (user != null && user.email != null) {
       _triggerSync(repository, profileId, user.id).ignore();
     }

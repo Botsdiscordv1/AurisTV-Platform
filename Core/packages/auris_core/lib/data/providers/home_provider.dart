@@ -326,10 +326,10 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result) {
 
   String? displaySubtitle = result.subtitle;
   if (type != MediaType.anime) {
-    displaySubtitle = (result.year != null && result.year!.isNotEmpty) ? result.year : null;
+    displaySubtitle = null; // Senior Fix: Eliminamos el año como subtítulo por petición UX
   } else if (displaySubtitle != null &&
       (displaySubtitle.toLowerCase().contains('1 ep') || displaySubtitle.toLowerCase().contains('película'))) {
-    displaySubtitle = (result.year != null && result.year!.isNotEmpty) ? result.year : null;
+    displaySubtitle = null; // Senior Fix: Ocultar año incluso en animes/ovas
   }
 
   // Senior Fix: Asegurar que el source sea un nombre de servidor válido para UrlUtils
@@ -384,7 +384,6 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
   else if (c.contains('drama')) type = MediaType.kdrama;
   else if (c.contains('series')) type = MediaType.series;
 
-  String? displaySubtitle = (type != MediaType.anime || result.year != null) ? result.year?.toString() : null;
   final isFinished = result.status?.toLowerCase() == 'finished';
 
   // Senior Fix: Asegurar que el source sea un nombre de servidor válido
@@ -394,6 +393,9 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
     else if (result.url.contains('animejara.com')) effectiveSource = 'AnimeJara';
     else if (result.url.contains('tudorama.net')) effectiveSource = 'TuDorama';
   }
+
+  // Senior Fix: Eliminamos el año como subtítulo por petición UX
+  const String? displaySubtitle = null;
 
   return MediaItem(
     id: result.url,
@@ -536,7 +538,7 @@ final recentEpisodesProvider = FutureProvider<List<MediaItem>>((ref) async {
       id: item.url ?? item.id.toString(), title: item.title, romaji: item.romaji, english: item.english,
       posterUrl: ApiEndpoints.proxyImage(item.coverImage), bannerUrl: ApiEndpoints.proxyImage(rawBanner),
       type: isMovie ? MediaType.movie : MediaType.anime, rating: item.averageScore,
-      subtitle: (isMovie || ep == 0) ? item.year?.toString() : (item.year != null ? '${item.year} • Episodio $ep' : 'Episodio $ep'),
+      subtitle: (isMovie || ep == 0) ? null : 'Episodio $ep',
       year: item.year, source: effectiveSource, episode: ep == 0 ? null : ep, airingAt: item.airingAt,
       aired: isMovie || item.aired || item.status?.toLowerCase() == 'finished', card: card,
     );

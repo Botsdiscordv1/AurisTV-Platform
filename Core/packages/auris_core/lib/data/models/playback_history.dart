@@ -79,12 +79,14 @@ class PlaybackHistory {
     final double calcProgress = dur > 0 ? (pos / dur).clamp(0.0, 1.0) : 0.0;
 
     return PlaybackHistory(
-      contentId: json['contentId'] as String,
+      contentId: json['contentId'] as String? ?? 'unknown',
       season: json['season'] != null ? int.tryParse(json['season'].toString()) : null,
       episode: json['episode']?.toString(),
       positionInMilliseconds: pos,
       durationInMilliseconds: dur,
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      updatedAt: json['updatedAt'] != null 
+          ? DateTime.tryParse(json['updatedAt'].toString()) ?? DateTime.now() 
+          : DateTime.now(),
       title: json['title'] as String?,
       posterUrl: json['posterUrl'] as String?,
       bannerUrl: json['bannerUrl'] as String?,
@@ -99,7 +101,7 @@ class PlaybackHistory {
           : null,
       progress: json['progress'] != null ? double.tryParse(json['progress'].toString()) : calcProgress,
       isCompleted: json['isCompleted'] as bool? ?? (calcProgress > 0.95),
-      profileId: json['profileId'] as String?,
+      profileId: json['profileId'] as String? ?? 'guest_profile',
     );
   }
 

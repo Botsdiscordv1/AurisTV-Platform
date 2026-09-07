@@ -530,11 +530,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   size: isUltraCompact ? 20 : (isCompactDesktop ? 22 : 26),
                   onPressed: () => context.go('/catalogo'),
                 ),
-                // Senior: Ocultamos el selector de idioma en resoluciones intermedias para evitar overflow
-                if (context.atLeast(Breakpoint.lg)) ...[
-                  const SizedBox(width: 12),
-                  const _LanguageSelector(),
-                ],
+                const SizedBox(width: 12),
+                const _LanguageSelector(),
                 const SizedBox(width: 12),
                 // Senior: Ocultamos el grid en ultra-compacto (iPad Vertical) para priorizar la navegación
                 if (!isUltraCompact) ...[
@@ -546,11 +543,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(width: 12),
                 ],
                 _buildUserAvatar(context, isUltraCompact ? true : isCompactDesktop),
-                // Senior: El botón de login se oculta si el espacio es crítico para priorizar navegación
-                if (context.atLeast(Breakpoint.lg)) ...[
-                  const SizedBox(width: 20),
-                  _AuthButton(isCompactDesktop: isCompactDesktop),
-                ],
+                const SizedBox(width: 20),
+                _AuthButton(isCompactDesktop: isCompactDesktop),
               ],
             ),
           ),
@@ -580,12 +574,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
         return _FocusIconButton(
           onPressed: () => context.go('/settings'),
-          child: Container(
+          builder: (context, isSelected) => Container(
             width: isUltra ? 24 : (isCompact ? 28 : 32),
             height: isUltra ? 24 : (isCompact ? 28 : 32),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white24, width: 1.5),
+              border: Border.all(
+                color: isSelected ? Colors.black12 : Colors.white24, 
+                width: 1.5
+              ),
               image: user.photoUrl != null
                   ? DecorationImage(
                       image: user.photoUrl!.startsWith('assets/') ? AssetImage(user.photoUrl!) as ImageProvider : NetworkImage(user.photoUrl!),
@@ -593,7 +590,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     )
                   : null,
             ),
-            child: user.photoUrl == null ? Icon(Icons.person, size: isUltra ? 14 : (isCompact ? 16 : 18), color: Colors.white70) : null,
+            child: user.photoUrl == null 
+                ? Icon(
+                    Icons.person, 
+                    size: isUltra ? 14 : (isCompact ? 16 : 18), 
+                    color: isSelected ? Colors.black87 : Colors.white70
+                  ) 
+                : null,
           ),
         );
       },
@@ -788,10 +791,11 @@ class _PillNavItemState extends State<_PillNavItem> {
 
 class _FocusIconButton extends StatefulWidget {
   final IconData? icon;
+  final Widget Function(BuildContext context, bool isSelected)? builder;
   final Widget? child;
   final VoidCallback onPressed;
   final double size;
-  const _FocusIconButton({this.icon, this.child, required this.onPressed, this.size = 28});
+  const _FocusIconButton({this.icon, this.builder, this.child, required this.onPressed, this.size = 28});
 
   @override
   State<_FocusIconButton> createState() => _FocusIconButtonState();
@@ -816,7 +820,9 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
             duration: const Duration(milliseconds: 200),
             width: 42, height: 42,
             decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? Colors.white : Colors.transparent),
-            child: widget.child ?? Icon(widget.icon, color: isSelected ? Colors.black : Colors.white, size: widget.size),
+            child: widget.builder != null 
+                ? widget.builder!(context, isSelected)
+                : (widget.child ?? Icon(widget.icon, color: isSelected ? Colors.black : Colors.white, size: widget.size)),
           ),
         ),
       ),
@@ -824,158 +830,98 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
   }
 }
 
-class _LanguageSelector extends StatefulWidget {
+class _LanguageSelector extends StatelessWidget {
   const _LanguageSelector();
-  @override
-  State<_LanguageSelector> createState() => _LanguageSelectorState();
-}
-
-class _LanguageSelectorState extends State<_LanguageSelector> {
-  final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
-
-  void _showOverlay() {
-    if (_overlayEntry != null) return;
-    _overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        width: 280,
-        child: CompositedTransformFollower(
-          link: _layerLink,
-          offset: const Offset(-120, 48),
-          child: MouseRegion(
-            onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) => _showOverlay()),
-            onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) => _hideOverlay()),
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 25, spreadRadius: 2, offset: const Offset(0, 8))],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A222B).withOpacity(0.55),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withOpacity(0.12)),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _LanguageItem(label: 'English', onTap: () => _hideOverlay()),
-                          _LanguageItem(label: 'Español', onTap: () => _hideOverlay()),
-                          _LanguageItem(label: 'Español Latinoamerica', onTap: () => _hideOverlay()),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    Overlay.of(context).insert(_overlayEntry!);
-  }
-
-  void _hideOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-    if (mounted) setState(() {});
-  }
 
   @override
   Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: MouseRegion(
-        onEnter: (_) => _showOverlay(),
-        onExit: (_) => _hideOverlay(),
-        child: _FocusTextButton(
-          label: 'ES',
-          icon: _overlayEntry != null ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-          onPressed: () {},
+    return Theme(
+      data: Theme.of(context).copyWith(
+        hoverColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+      ),
+      child: PopupMenuButton<String>(
+        offset: const Offset(0, 48),
+        color: const Color(0xFF1A222B).withOpacity(0.9),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.white.withOpacity(0.12)),
+        ),
+        elevation: 10,
+        tooltip: 'Cambiar idioma',
+        onSelected: (String value) {
+          // Lógica de cambio de idioma aquí
+        },
+        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+          _buildPopupItem('English'),
+          _buildPopupItem('Español'),
+          _buildPopupItem('Español Latinoamerica'),
+        ],
+        child: const _LanguageButton(),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildPopupItem(String label) {
+    return PopupMenuItem<String>(
+      value: label,
+      child: Text(
+        label,
+        style: GoogleFonts.poppins(
+          color: Colors.white.withOpacity(0.9),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
   }
 }
 
-class _FocusTextButton extends StatefulWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-  const _FocusTextButton({required this.label, required this.icon, required this.onPressed});
-
+class _LanguageButton extends StatefulWidget {
+  const _LanguageButton();
   @override
-  State<_FocusTextButton> createState() => _FocusTextButtonState();
+  State<_LanguageButton> createState() => _LanguageButtonState();
 }
 
-class _FocusTextButtonState extends State<_FocusTextButton> {
+class _LanguageButtonState extends State<_LanguageButton> {
   bool _focused = false;
   bool _hovered = false;
+
   @override
   Widget build(BuildContext context) {
     final bool isSelected = _focused || _hovered;
     return Focus(
-      onFocusChange: (focused) => setState(() => _focused = focused),
+      onFocusChange: (f) => setState(() => _focused = f),
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
-        child: InkWell(
-          onTap: widget.onPressed,
-          borderRadius: BorderRadius.circular(12),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            height: 42,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: isSelected ? Colors.white : Colors.transparent),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(widget.label, style: GoogleFonts.poppins(color: isSelected ? Colors.black : Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
-                const SizedBox(width: 4),
-                Icon(widget.icon, color: isSelected ? Colors.black : Colors.white, size: 16),
-              ],
-            ),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: 42,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12), 
+            color: isSelected ? Colors.white : Colors.transparent
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LanguageItem extends StatefulWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _LanguageItem({required this.label, required this.onTap});
-
-  @override
-  State<_LanguageItem> createState() => _LanguageItemState();
-}
-
-class _LanguageItemState extends State<_LanguageItem> {
-  bool _isHovered = false;
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(color: _isHovered ? Colors.white.withOpacity(0.05) : Colors.transparent, borderRadius: BorderRadius.circular(8)),
-          child: Text(
-            widget.label,
-            style: GoogleFonts.poppins(color: _isHovered ? Colors.white : Colors.white.withOpacity(0.7), fontSize: 14, fontWeight: _isHovered ? FontWeight.w700 : FontWeight.w500),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'ES', 
+                style: GoogleFonts.poppins(
+                  color: isSelected ? Colors.black : Colors.white, 
+                  fontSize: 13, 
+                  fontWeight: FontWeight.w700
+                )
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.keyboard_arrow_down, 
+                color: isSelected ? Colors.black : Colors.white, 
+                size: 16
+              ),
+            ],
           ),
         ),
       ),

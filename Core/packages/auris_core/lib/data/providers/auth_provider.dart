@@ -13,7 +13,18 @@ final authProvider = StateNotifierProvider<AuthNotifier, UserAccount?>((ref) {
 class AuthNotifier extends StateNotifier<UserAccount?> {
   final Box _userBox = Hive.box('user_data');
 
-  AuthNotifier() : super(null) {
+  // Senior Fix: Inicializar con una cuenta de invitado por defecto 
+  // para estabilizar el profileId durante el arranque de la app.
+  static final UserAccount _defaultGuest = UserAccount(
+    id: 'guest_user',
+    profiles: [
+      UserProfile(id: 'guest_profile', name: 'Invitado', isMain: true)
+    ],
+    activeProfileId: 'guest_profile',
+    email: null,
+  );
+
+  AuthNotifier() : super(_defaultGuest) {
     _init();
   }
 
@@ -24,9 +35,11 @@ class AuthNotifier extends StateNotifier<UserAccount?> {
         final map = savedUserData is String ? jsonDecode(savedUserData) : Map<String, dynamic>.from(savedUserData);
         state = UserAccount.fromJson(map);
       } catch (e) {
-        // ignore: avoid_print
-        print('Error cargando perfil local: $e');
+        debugPrint('Error cargando perfil local: $e');
       }
+    } else {
+      // Si no hay datos guardados, nos aseguramos de estar en modo invitado limpio
+      state = _defaultGuest;
     }
 
     Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
@@ -198,7 +211,7 @@ class AuthNotifier extends StateNotifier<UserAccount?> {
 
   Future<void> signOut() async {
     await Supabase.instance.client.auth.signOut();
-    await _userBox.clear();
-    state = null;
+    await _userBox.delete('profile');
+    state = _defaultGuest; // Volver a invitado en lugar de null
   }
 }

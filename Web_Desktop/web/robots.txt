@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://auristv.dpdns.org/sitemap.xml
