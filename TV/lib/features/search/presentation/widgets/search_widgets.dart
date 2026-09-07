@@ -388,7 +388,7 @@ class _TrendingPosterCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: CachedNetworkImage(
-                    imageUrl: ApiEndpoints.proxyImage(item.thumbnail),
+                    imageUrl: ApiEndpoints.proxyImage(item.thumbnail, fallbackUrl: item.tmdbThumbnail),
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
                     errorWidget: (context, url, error) => Container(

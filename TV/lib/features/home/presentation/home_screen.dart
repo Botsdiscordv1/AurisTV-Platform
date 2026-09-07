@@ -69,8 +69,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     
     // Prioridad de Identidad: Romaji > Inglés > Título Local
     final metaTitle = item.romaji ?? item.english ?? item.title;
+    final effectiveUrl = item.detailUrl ?? item.id;
+    final String? kind = item.card?.kind;
 
-    final uri = '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(source)}&category=${Uri.encodeComponent(category)}&url=${Uri.encodeComponent(item.id)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}&year=${item.year ?? ''}';
+    final uri = '/content/${Uri.encodeComponent(item.title)}'
+        '?source=${Uri.encodeComponent(source)}'
+        '&category=${Uri.encodeComponent(category)}'
+        '&url=${Uri.encodeComponent(effectiveUrl)}'
+        '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
+        '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
+        '&year=${item.year ?? ''}'
+        '${kind != null ? '&type=${Uri.encodeComponent(kind)}' : ''}';
+        
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.mounted) context.push(uri, extra: item.toContentSeed());
     });
@@ -289,10 +299,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-void _openScheduleItem(BuildContext context, MediaItem item) {
+  void _openScheduleItem(BuildContext context, MediaItem item) {
     final metaTitle = item.romaji ?? item.english ?? item.title;
-    final itemYear = item.year ?? (item.airingAt != null ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year : null);
-    final uri = '/content/${Uri.encodeComponent(item.title)}?source=&category=anime&url=&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=&year=${itemYear ?? ''}';
+    final itemYear = item.year ??
+        (item.airingAt != null
+            ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year
+            : null);
+
+    final seed = item.card;
+    final source = seed?.source ?? item.source;
+    final url = seed?.url ?? item.id;
+    final quality = seed?.quality ?? '';
+    final type = seed?.type ?? '';
+
+    final uri =
+        '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(source)}&category=anime&url=${Uri.encodeComponent(url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=&year=${itemYear ?? ''}&quality=${Uri.encodeComponent(quality)}&type=${Uri.encodeComponent(type)}';
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.mounted) context.push(uri, extra: item.toContentSeed());
     });

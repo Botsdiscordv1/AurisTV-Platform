@@ -4,7 +4,6 @@ import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/prime_expandable_card.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 
 class EditorialContentRow extends StatefulWidget {
   final String title;
@@ -80,10 +79,10 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     super.build(context);
     if (widget.items.isEmpty) return const SizedBox.shrink();
 
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.useMobileLayout;
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final width = MediaQuery.of(context).size.width;
-    final isCompactDesktop = width >= 800 && width < 1100;
+    final isCompactDesktop = context.breakpoint < Breakpoint.xl;
     
     final bool isMythical = widget.badge == EditorialBadge.mythical;
 
@@ -101,7 +100,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
             child: Text(
               widget.title,
               style: GoogleFonts.poppins(
-                fontSize: isMobile ? 20 : (isCompactDesktop ? 26 : 28),
+                fontSize: ResponsiveUtils.rowTitleFontSize(context),
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: -0.4,
@@ -122,7 +121,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       child: Stack(
         children: [
           SizedBox(
-            height: isMobile ? ResponsiveUtils.sp(context, 250) : 355, // Senior: Reducido de 395 a 355 para Web
+            height: ResponsiveUtils.rowHeight(context),
             child: _buildFadedWrapper(
               horizontalPadding: horizontalPadding,
               child: ListView.separated(
@@ -135,7 +134,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
                   return SizedBox(
-                    width: isMobile ? ResponsiveUtils.sp(context, 140) : 200,
+                    width: ResponsiveUtils.posterWidth(context),
                     child: FocusablePosterCard(
                       key: ValueKey(item.id),
                       title: item.title,
@@ -157,7 +156,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
 
   Widget _buildMythicalTopRow(bool isMobile, double horizontalPadding) {
     // Senior Fix: Sincronizamos dimensiones con el resto de la app para evitar desbordes y unificar huecos
-    final double posterHeight = isMobile ? ResponsiveUtils.sp(context, 210) : 310;
+    final double posterHeight = ResponsiveUtils.posterHeight(context);
     final double titleAreaHeight = isMobile ? 40 : 40; // Senior: Reducido a 40 para alinear con posters estándar
     
     return Padding(
@@ -170,7 +169,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
             child: Text(
               widget.title,
               style: GoogleFonts.poppins(
-                fontSize: isMobile ? 22 : 30,
+                fontSize: ResponsiveUtils.rowTitleFontSize(context) + 4.0,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: -0.8,
@@ -184,7 +183,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
             child: Stack(
               children: [
                 SizedBox(
-                  height: isMobile ? ResponsiveUtils.sp(context, 250) : 355, // Senior: Unificado con posters estándar (355px)
+                  height: ResponsiveUtils.rowHeight(context), // Senior: Unificado con posters estándar
                   child: _buildFadedWrapper(
                     horizontalPadding: horizontalPadding,
                     child: ListView.builder(
@@ -215,48 +214,14 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     );
   }
 
-  // WRAPPER DE DIFUMINADO (Efecto Banner Home)
+  // WRAPPER SIN DIFUMINADO (Removido por petición del usuario)
   Widget _buildFadedWrapper({required double horizontalPadding, required Widget child}) {
     return NotificationListener<ScrollNotification>(
       onNotification: (_) {
         _updateScrollIndicators();
         return false;
       },
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final double width = constraints.maxWidth;
-          // El difuminado se aplica sobre el margen lateral
-          final double fadeOffset = horizontalPadding / width;
-          final double fadeSize = 50 / width; // Grosor del difuminado
-
-          return ShaderMask(
-            shaderCallback: (Rect rect) {
-              return LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Colors.transparent,
-                  _canScrollLeft ? Colors.transparent : Colors.black,
-                  Colors.black,
-                  Colors.black,
-                  _canScrollRight ? Colors.transparent : Colors.black,
-                  Colors.transparent,
-                ],
-                stops: [
-                  0.0,
-                  fadeOffset,
-                  (fadeOffset + fadeSize).clamp(0.0, 1.0),
-                  (1.0 - fadeOffset - fadeSize).clamp(0.0, 1.0),
-                  1.0 - fadeOffset,
-                  1.0,
-                ],
-              ).createShader(rect);
-            },
-            blendMode: BlendMode.dstIn,
-            child: child,
-          );
-        },
-      ),
+      child: child,
     );
   }
 

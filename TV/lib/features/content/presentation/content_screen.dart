@@ -204,8 +204,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final String category;
   final String? poster; 
   final String? banner; 
-  final AsyncValue<dynamic> animeDetailAsync; 
-  final AsyncValue<dynamic> movieDetailAsync; 
+  final AsyncValue<ContentDetailResponse?> detailAsync; 
   final SearchResult? currentSource; 
   final List<SearchResult> sources; 
   final Function(int) onSourceSelected; 
@@ -229,8 +228,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
     required this.category,
     this.poster, 
     this.banner, 
-    required this.animeDetailAsync, 
-    required this.movieDetailAsync, 
+    required this.detailAsync, 
     this.currentSource, 
     required this.sources, 
     required this.onSourceSelected, 
@@ -281,20 +279,16 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     _checkAndInitTrailer(); 
 
     // Senior Fix: Solo revelamos si tenemos DATOS REALES (no null) 
-    // o si ambas peticiones terminaron (aunque sean null) para no esperar al timeout.
-    final animeDone = widget.animeDetailAsync.hasValue;
-    final movieDone = widget.movieDetailAsync.hasValue;
-    final hasRealData = widget.animeDetailAsync.valueOrNull != null || 
-                        widget.movieDetailAsync.valueOrNull != null;
+    // o si la petición terminó (aunque sea null) para no esperar al timeout.
+    final hasRealData = widget.detailAsync.valueOrNull != null;
 
-    if (!_revealed && (hasRealData || (animeDone && movieDone))) {
+    if (!_revealed && (hasRealData || widget.detailAsync.hasValue)) {
       setState(() => _revealed = true);
     }
   }
+
   void _checkAndInitTrailer() {
-    final d = widget.category == 'movie_anime'
-        ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
-        : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
+    final d = widget.detailAsync.valueOrNull?.main;
     final k = (d is AnimeDetail) ? d.trailerKey : (d is MovieDetail ? d.trailerKey : null);
     if (k != null && k.isNotEmpty) { if (k != _lastTrailerKey) { _lastTrailerKey = k; } } else if (_lastTrailerKey != null) { _lastTrailerKey = null; _disposeController(); }
   }
@@ -374,10 +368,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 
 @override Widget build(BuildContext context) {
-    final d = widget.category == 'movie_anime'
-        ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
-        : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
-    final logoReady = widget.animeDetailAsync.hasValue || widget.movieDetailAsync.hasValue;
+    final d = widget.detailAsync.valueOrNull?.main;
+    final logoReady = widget.detailAsync.hasValue;
     final b = DetailBackdropResolver.resolve(
       detail: d,
       bannerParam: widget.banner,
@@ -1498,10 +1490,35 @@ class _DetailInfoCard extends StatelessWidget {
 // --- MAIN WIDGETS ---
 
 class ContentScreen extends ConsumerStatefulWidget {
-  final String title; final String source; final String url; final String? metadataTitle; final String? banner; final String category; final int? year; final int? totalSeasons;
+  final String title;
+  final String source;
+  final String url;
+  final String? quality;
+  final String? type;
+  final String? metadataTitle;
+  final String? banner;
+  final String category;
+  final int? year;
+  final int? totalSeasons;
   final SearchResult? result;
-  const ContentScreen({super.key, required this.title, required this.source, required this.url, this.metadataTitle, this.banner, this.category = 'all', this.year, this.totalSeasons, this.result});
-  @override ConsumerState<ContentScreen> createState() => _ContentScreenState();
+
+  const ContentScreen({
+    super.key,
+    required this.title,
+    required this.source,
+    required this.url,
+    this.quality,
+    this.type,
+    this.metadataTitle,
+    this.banner,
+    this.category = 'all',
+    this.year,
+    this.totalSeasons,
+    this.result,
+  });
+
+  @override
+  ConsumerState<ContentScreen> createState() => _ContentScreenState();
 }
 
 class _ContentScreenState extends ConsumerState<ContentScreen> {
@@ -1611,9 +1628,80 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final episodesCrossAxisCount = (width < 1000 ? 5 : (width < 1400 ? 6 : (width < 2100 ? 6 : (width < 2800 ? 7 : 8))));
     final episodesAspectRatio = (width < 1000 ? 0.82 : 0.8); 
 
-    final isAnimeCatFetch = widget.category == 'anime';
-    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'series' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie' || widget.result?.kind?.toLowerCase() == 'series';
-    final fetchAnimeDetail = isAnimeCatFetch || widget.category == 'movie_anime' || widget.category == 'all';
+    // Clasificación pre-carga (solo categoría, porque aún no tenemos el payload).
+    final isMovieishPre = (widget.category == 'movie' ||
+            widget.category == 'series' ||
+            widget.category == 'movie_anime' ||
+            _isMovieLikeTitle(widget.title) ||
+            widget.result?.kind?.toLowerCase() == 'movie' ||
+            widget.result?.kind?.toLowerCase() == 'series') &&
+        widget.result?.kind?.toLowerCase() != 'anime';
+
+    // Temporada de la pantalla abierta, inferida del título.
+    // Senior Fix: Si detectamos que es película o similar, NO forzamos temporada 1.
+    final openedSeasonN = isMovieishPre 
+        ? null 
+        : (widget.result?.season
+            ?? extractSeason(widget.result?.title)
+            ?? extractSeason(widget.title)
+            ?? extractSeason(widget.metadataTitle)
+            ?? extractSeason(widget.url)
+            ?? 1);
+
+    final openedDetailAsync = ref.watch(unifiedContentDetailProvider(UnifiedDetailParams(
+      title: widget.title,
+      metadataTitle: widget.metadataTitle,
+      category: widget.category,
+      kind: widget.result?.kind ?? widget.type,
+      year: widget.year,
+      season: openedSeasonN,
+      source: widget.source,
+      url: widget.url,
+      type: widget.type,
+    )));
+
+    final seasonSwitched = _selectedSeason != null && _selectedSeason != openedSeasonN;
+
+    final seasonDetailAsync = seasonSwitched
+        ? ref.watch(unifiedContentDetailProvider(UnifiedDetailParams(
+            title: widget.title,
+            metadataTitle: widget.metadataTitle,
+            category: widget.category,
+            kind: widget.result?.kind ?? widget.type,
+            year: widget.year,
+            season: _selectedSeason,
+            source: widget.source,
+            url: widget.url,
+            type: widget.type,
+          )))
+        : openedDetailAsync;
+
+    // Al cambiar de temporada, el detalle (año, estado, OP/ED, sinopsis...) debe
+    // corresponder a la temporada seleccionada, no al de la temporada con la que
+    // se abrió la pantalla. Pedimos el detalle de la temporada concreta y, mientras
+    // carga, seguimos mostrando el detalle abierto para no romper el hero.
+    final detailAsync = (seasonSwitched && seasonDetailAsync.valueOrNull != null)
+        ? seasonDetailAsync
+        : openedDetailAsync;
+
+    final detailData = detailAsync.valueOrNull?.main;
+    final isMovieish = detailAsync.valueOrNull?.isMovieish ?? isMovieishPre;
+
+    final resolvedKind = (detailData is AnimeDetail
+            ? detailData.kind
+            : (detailData is MovieDetail ? detailData.kind : null)) ??
+        widget.result?.kind ??
+        widget.category;
+    final isAnimeCategory = resolvedKind == 'anime';
+    final isMovieCategory = isMovieish;
+    
+    final effectiveCategory = detailAsync.valueOrNull?.effectiveCategory ?? widget.category;
+
+    final detailLoading = detailAsync.isLoading && detailAsync.valueOrNull == null;
+
+    final List<SearchResult> initialSources = widget.result != null
+        ? [widget.result!]
+        : [SearchResult(title: widget.title, url: widget.url, quality: 'TV', thumbnail: widget.banner ?? '', source: widget.source, romaji: widget.metadataTitle, year: widget.year, slug: null)];
 
     const metadataSourceHints = {'anilist', 'tmdb', 'trakt', 'mal', 'jikan'};
     final isMetadataOriginSource = widget.source.isNotEmpty &&
@@ -1624,92 +1712,57 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ? ApiEndpoints.baseUrlForCategory(widget.category)
             : null);
 
-    // Temporada de la pantalla abierta, inferida del título. Se usa para fijar
-    // la fuente y la temporada OMDB a la temporada correcta (evita que una S2
-    // abierta caiga a la S1 por defecto).
-    final openedSeasonN = widget.result?.season
-        ?? extractSeason(widget.result?.title)
-        ?? extractSeason(widget.title)
-        ?? extractSeason(widget.metadataTitle)
-        ?? 1;
+    final cleanTitle = cleanTitleForDisplay(stripSeasonSuffix(widget.title ?? ''));
+    final cleanMetadata = widget.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(widget.metadataTitle!)) : null;
 
-    final animeDetailAsync = !fetchAnimeDetail
-        ? const AsyncValue<AnimeDetail?>.data(null)
-        : ref.watch(animeDetailProvider(AnimeDetailParams(
-            title: stripSeasonSuffix(widget.title ?? ''), 
-            metadataTitle: widget.metadataTitle != null ? stripSeasonSuffix(widget.metadataTitle!) : null, 
-            year: widget.year, 
-            season: openedSeasonN,
-            kind: widget.result?.kind,
-          )));
-
-    final needMovieFallback = !isAnimeCatFetch &&
-        !isMovieCatFetch &&
-        !animeDetailAsync.isLoading &&
-        animeDetailAsync.valueOrNull == null;
-
-    final movieDetailAsync = isAnimeCatFetch
-        ? const AsyncValue<MovieDetail?>.data(null)
-        : (isMovieCatFetch || needMovieFallback)
-            ? ref.watch(movieDetailProvider(MovieDetailParams(
-                title: stripSeasonSuffix(widget.title ?? ''),
-                metadataTitle: widget.metadataTitle != null ? stripSeasonSuffix(widget.metadataTitle!) : null,
-                category: widget.category,
-                server: originServer,
-              )))
-            : const AsyncValue<MovieDetail?>.data(null);
-
-    final detailData = isMovieCatFetch
-        ? (movieDetailAsync.valueOrNull ?? animeDetailAsync.valueOrNull)
-        : (animeDetailAsync.valueOrNull ?? movieDetailAsync.valueOrNull);
-
-    final resolvedKind = (detailData is AnimeDetail
-            ? detailData.kind
-            : (detailData is MovieDetail ? detailData.kind : null)) ??
-        widget.result?.kind ??
-        widget.category;
-    final isAnimeCategory = resolvedKind == 'anime';
-    final isMovieCategory = resolvedKind == 'movie' ||
-        widget.result?.kind?.toLowerCase() == 'movie' ||
-        _isMovieLikeTitle(widget.title);
-    final effectiveCategory = isMovieCategory ? 'movie_anime' : widget.category;
-
-    final detailLoading = (isMovieCategory ? movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null : animeDetailAsync.isLoading) || (isAnimeCategory ? false : movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null);
-
-    final List<SearchResult> initialSources = widget.result != null
-        ? [widget.result!]
-        : [SearchResult(title: widget.title, url: widget.url, quality: 'TV', thumbnail: widget.banner ?? '', source: widget.source, romaji: widget.metadataTitle, year: widget.year, slug: null)];
-
-    final sourcesParams = DiscoveredSourcesParams(title: widget.title, metadataTitle: widget.metadataTitle, category: effectiveCategory, year: widget.year, season: openedSeasonN, server: originServer, initialSources: initialSources);
+    final sourcesParams = DiscoveredSourcesParams(
+      title: cleanTitle,
+      metadataTitle: cleanMetadata,
+      category: effectiveCategory,
+      year: widget.year,
+      season: openedSeasonN,
+      kind: widget.result?.kind ?? widget.type,
+      source: widget.source,
+      url: widget.url,
+      type: widget.type,
+      server: originServer,
+      initialSources: initialSources,
+    );
     final searchSources = ref.watch(discoveredSourcesProvider(sourcesParams));
 
-    final effectiveSeasonForUrl = _selectedSeason ?? (openedSeasonN > 1 ? openedSeasonN : null);
+    final effectiveSeasonForUrl = _selectedSeason ?? ((openedSeasonN ?? 0) > 1 ? openedSeasonN : null);
 
     final seasonSwitched = _selectedSeason != null && _selectedSeason != openedSeasonN;
-    final seasonTitle = seasonSwitched ? seasonTitleFor(stripSeasonSuffix(widget.title ?? ''), _selectedSeason!) : null;
-    final seasonSourcesParams = seasonTitle != null
-        ? DiscoveredSourcesParams(title: seasonTitle, metadataTitle: seasonTitle, category: effectiveCategory, year: widget.year, season: _selectedSeason, server: originServer, initialSources: initialSources)
-        : sourcesParams;
-    final seasonSources = ref.watch(discoveredSourcesProvider(seasonSourcesParams));
     
-    final seasonAnimeDetailAsync = seasonTitle != null
-        ? ref.watch(animeDetailProvider(AnimeDetailParams(
-            title: stripSeasonSuffix(widget.title ?? ''), 
-            metadataTitle: stripSeasonSuffix(widget.title ?? ''), 
-            year: null, 
-            season: _selectedSeason, 
-            kind: null,
-          )))
-        : animeDetailAsync;
-    final displayAnimeDetailAsync = seasonSwitched
-        ? (seasonAnimeDetailAsync.valueOrNull != null ? seasonAnimeDetailAsync : animeDetailAsync)
-        : animeDetailAsync;
-    final displayDetail = isMovieCatFetch
-        ? (movieDetailAsync.valueOrNull ?? displayAnimeDetailAsync.valueOrNull)
-        : displayAnimeDetailAsync.valueOrNull;
+    // [Senior] El switch busca el título DE LA TEMPORADA (p.ej. "youjo senki 2nd Season")
+    final seasonTitle = seasonSwitched ? seasonTitleFor(cleanTitle, _selectedSeason!) : null;
+
+    // [Senior Optimization] Si no hay cambio de temporada, reusamos el provider original
+    // evitando una doble petición idéntica al servidor.
+    final seasonSourcesParams = (seasonSwitched)
+        ? DiscoveredSourcesParams(
+            title: seasonTitle!,
+            metadataTitle: seasonTitle,
+            category: effectiveCategory,
+            year: widget.year,
+            season: _selectedSeason,
+            kind: widget.result?.kind ?? widget.type,
+            source: widget.source,
+            url: widget.url,
+            type: widget.type,
+            server: originServer,
+            initialSources: initialSources,
+          )
+        : sourcesParams;
+
+    final seasonSources = (seasonSwitched) 
+        ? ref.watch(discoveredSourcesProvider(seasonSourcesParams))
+        : searchSources;
+    
+    final displayDetail = detailData;
 
     final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
-    final _detailForExtras = displayAnimeDetailAsync.valueOrNull;
+    final _detailForExtras = detailAsync.valueOrNull?.anime;
     final _desiredExtras = _detailForExtras != null &&
         (_detailForExtras.openings.isNotEmpty || _detailForExtras.endings.isNotEmpty);
     if (_detailForExtras != null && _desiredExtras != _hasExtras && !_tabRebuildPending) {
@@ -1818,8 +1871,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final familySources = familySourcesRaw.map((s) => withSeasonUnified(s, effectiveSeasonForUrl)!).toList();
 
     final historyAsync = ref.watch(playbackHistoryStateProvider);
-    final history = historyAsync.valueOrNull ?? [];
-    
+    // Senior Unified Relations: Obtenemos relacionados de TODAS las fuentes disponibles
+    // Senior Unified Relations: Obtenemos relacionados de TODAS las fuentes disponibles
     final unifiedRelationsAsync = ref.watch(unifiedRelationsProvider(searchSources));
     
     final certification = detailData != null ? ((detailData is MovieDetail ? (detailData as MovieDetail).certification : (detailData is AnimeDetail ? (detailData as AnimeDetail).certification : null)) ?? 'NR') : 'NR';
@@ -1830,9 +1883,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         (detailData is MovieDetail
             ? (detailData.seasons.isNotEmpty ? detailData.seasons.first.seasonNumber : 1)
             : animeSeasonN);
-    final seasonDetail = seasonAnimeDetailAsync.valueOrNull is AnimeDetail
-        ? seasonAnimeDetailAsync.valueOrNull as AnimeDetail
-        : null;
+    final seasonDetail = seasonDetailAsync.valueOrNull?.anime;
     final seasonBannerRaw = (seasonDetail != null && seasonDetail.backdrop?.isNotEmpty == true)
         ? seasonDetail.backdrop!
         : (seasonDetail != null && seasonDetail.poster?.isNotEmpty == true ? seasonDetail.poster! : null);
@@ -1909,16 +1960,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           category: widget.category,
           poster: initialThumbnail, 
           banner: heroBanner, 
-          animeDetailAsync: displayAnimeDetailAsync, 
-          movieDetailAsync: movieDetailAsync, 
+          detailAsync: detailAsync, 
           currentSource: currentSource, 
           sources: activeSources, 
-          season: currentSeason, 
+          season: currentSeason ?? 1, 
           sourceRating: currentSource?.score, 
           showRatingSkeleton: currentSource?.score == null && detailLoading, 
           isLoadingSources: searchLoading && activeSources.isEmpty,
           totalSeasons: totalSeasons, 
-          currentSeason: currentSeason, 
+          currentSeason: currentSeason ?? 1, 
           onSourceSelected: (index) {
             if (activeSources.isEmpty) return;
             setState(() {
@@ -2068,10 +2118,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     }
     
     final List<RelatedInfo> franchiseSource = unifiedRelations['franchise'] ?? [];
-    final List<RelatedInfo> genreSource = unifiedRelations['genre'] ?? [];
+    final List<RelatedInfo> similarSource = unifiedRelations['similar'] ?? [];
     final List<RelatedInfo> recommendedSource = unifiedRelations['recommended'] ?? [];
 
-    if (franchiseSource.isEmpty && genreSource.isEmpty && recommendedSource.isEmpty) {
+    if (franchiseSource.isEmpty && similarSource.isEmpty && recommendedSource.isEmpty) {
       return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay contenido relacionado disponible', style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 18)))))];
     }
 
@@ -2097,11 +2147,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ),
         ),
 
-      if (genreSource.isNotEmpty)
+      if (similarSource.isNotEmpty)
         _RelatedCarouselRow(
-          title: 'Mismo G\u00E9nero',
+          title: 'Similares a ${cleanTitleForDisplay(stripSeasonSuffix(widget.title))}',
           hPadding: hPadding,
-          items: genreSource.map((r) => _RelatedCardData(
+          items: similarSource.map((r) => _RelatedCardData(
             title: _cleanRelatedTitleLocal(r.title), 
             poster: r.cover, 
             subtitle: r.relation,
@@ -2198,7 +2248,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     if (detail is MovieDetail) { dir = detail.directors; cast = detail.cast.take(5).map((e) => e.name).toList(); std = detail.productionCompanies; }
     else if (detail is AnimeDetail) { std = detail.studios; }
     final cert = (detail is MovieDetail ? detail.certification : (detail is AnimeDetail ? detail.certification : null)) ?? 'NR';
-    final platforms = detail is MovieDetail ? detail.platforms : <PlatformInfo>[];
+    final platforms = (detail is MovieDetail) ? detail.platforms : (detail is AnimeDetail ? detail.platforms : <PlatformInfo>[]);
     final status = detail is MovieDetail ? detail.status : (detail is AnimeDetail ? detail.status : null);
     final languages = detail is MovieDetail ? detail.languages : <String>[];
 

@@ -3,12 +3,16 @@ import '../../data/models/server/search_result.dart';
 import 'source_utils.dart';
 
 int? extractSeason(String? s) {
-  if (s == null) return null;
+  if (s == null || s.isEmpty) return null;
   final t = s.toLowerCase();
+
+  // 1. Detección por palabras clave (Muy alta certidumbre)
   final m = RegExp(r'(\d+)(?:st|nd|rd|th)?\s+(?:season|temporada|part|parte|cour)').firstMatch(t);
   if (m != null) return int.tryParse(m.group(1)!);
   final m2 = RegExp(r'(?:season|temporada|part|parte|cour)\s*(\d+)').firstMatch(t);
   if (m2 != null) return int.tryParse(m2.group(1)!);
+
+  // 2. Detección por números romanos (Estándar en Anime)
   final romanMap = {'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6, 'vii': 7, 'viii': 8, 'ix': 9, 'x': 10};
   for (final entry in romanMap.entries) {
     if (entry.key == 'x') {
@@ -17,32 +21,44 @@ int? extractSeason(String? s) {
     }
     if (RegExp(r'[\s\-]' + entry.key + r'(?:$|[\s\-:,.)\]])', caseSensitive: false).hasMatch(s)) return entry.value;
   }
-  final hasNonLatin = RegExp(r'[^\x00-\x7F]').hasMatch(t);
-  if (!hasNonLatin) {
-    if (t.endsWith('1/2') || t.endsWith('1-2') || t.endsWith('\u00BD')) return null;
-    final parts = t.split(RegExp(r'[\s\-/]')).where((e) => e.isNotEmpty).toList();
-    if (parts.isNotEmpty) {
-      final last = parts.last;
-      if (RegExp(r'^\d+$').hasMatch(last)) {
-        final n = int.tryParse(last);
-        if (n != null && n >= 2 && n < 30) return n;
-      }
-      if (romanMap[last] != null) return romanMap[last];
-    }
-  }
+
+  // Senior Identity Fix: Evitamos extraer números árabes solos al final (ej: "Thunder 3")
+  // porque suelen ser parte del nombre oficial y no una temporada.
+  // Solo los aceptamos si vienen con prefijos claros (punto 1).
   return null;
 }
 
 String stripSeasonSuffix(String title) {
-  return title
-      .replaceAll(
-        RegExp(
-          r'\s*(?:\d+(?:st|nd|rd|th)?\s*(?:season|temporada|part|parte|cour)|(?:season|temporada|part|parte|cour)\s*\d+|ii{1,3}|iv|v|vi{1,3}|final\s*season)\s*$',
-          caseSensitive: false,
-        ),
-        '',
-      )
-      .trim();
+  if (title.isEmpty) return title;
+  final tLower = title.toLowerCase();
+
+  // 1. Limpiar si contiene palabras clave explícitas (Seguro)
+  final keywordPatterns = [
+    RegExp(r'\s*\d+(?:st|nd|rd|th)?\s*(?:season|temporada|part|parte|cour).*', caseSensitive: false),
+    RegExp(r'\s*(?:season|temporada|part|parte|cour)\s*\d+.*', caseSensitive: false),
+    RegExp(r'\s+final\s*season.*', caseSensitive: false),
+    RegExp(r'\s+s\d+\b', caseSensitive: false),
+  ];
+
+  for (var p in keywordPatterns) {
+    if (p.hasMatch(tLower)) return title.replaceAll(p, '').trim();
+  }
+
+  // 2. Limpiar números romanos al final (Estándar en Anime)
+  final romanPatterns = [
+    RegExp(r'\s+ii\b', caseSensitive: false),
+    RegExp(r'\s+iii\b', caseSensitive: false),
+    RegExp(r'\s+iv\b', caseSensitive: false),
+    RegExp(r'\s+v\b', caseSensitive: false),
+  ];
+
+  for (var p in romanPatterns) {
+    if (p.hasMatch(tLower)) return title.replaceAll(p, '').trim();
+  }
+
+  // Senior Identity Fix: YA NO eliminamos números árabes sueltos (ej: " 3")
+  // para evitar romper títulos como "Thunder 3".
+  return title.trim();
 }
 
 String seasonTitleFor(String baseTitle, int season) {
@@ -73,6 +89,10 @@ bool isMovieResult(SearchResult r) {
   return r.kind?.toLowerCase() == 'movie' ||
       movieUrlRe.hasMatch(r.url) ||
       (r.slug != null && movieUrlRe.hasMatch(r.slug!));
+}
+
+bool isMovieLikeTitle(String title) {
+  return RegExp(r'\b(movie|film)\b|pel[ií]culas?', caseSensitive: false).hasMatch(title);
 }
 
 SearchResult? withSeasonUnified(SearchResult? source, int? season) {

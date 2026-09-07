@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'marquee_text.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -58,6 +59,7 @@ class FocusablePosterCard extends StatefulWidget {
   final String? rating;
   final Color? badgeColor;
   final bool showInfo;
+  final double? progress; // Senior Fix: Soporte para barra de progreso en póster
 
   const FocusablePosterCard({
     super.key,
@@ -71,6 +73,7 @@ class FocusablePosterCard extends StatefulWidget {
     this.rating,
     this.badgeColor,
     this.showInfo = true,
+    this.progress,
   });
 
   @override
@@ -132,13 +135,25 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                           scale: _isActive ? 1.12 : 1.0,
                           duration: const Duration(milliseconds: 400),
                           curve: Curves.easeOutCubic,
-                          child: CachedNetworkImage(
-                            imageUrl: widget.posterUrl,
-                            fit: BoxFit.cover,
-                            memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
-                            filterQuality: FilterQuality.low,
-                            placeholder: (context, url) => _letterPlaceholder(widget.title),
-                            errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
+                          child: Builder(
+                            builder: (context) {
+                              final dpr = MediaQuery.of(context).devicePixelRatio;
+                              final targetWidth = (normalWidth * dpr).round();
+                              final targetHeight = (targetWidth * 1.5).round();
+
+                              return CachedNetworkImage(
+                                imageUrl: ApiEndpoints.proxyImage(
+                                  widget.posterUrl,
+                                  width: targetWidth,
+                                  height: targetHeight,
+                                ),
+                                fit: BoxFit.cover,
+                                memCacheWidth: targetWidth.clamp(1, 2048),
+                                filterQuality: FilterQuality.low,
+                                placeholder: (context, url) => _letterPlaceholder(widget.title),
+                                errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
+                              );
+                            }
                           ),
                         ),
                         if (widget.badgeOverlay != null)
@@ -187,7 +202,8 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                         // Senior Fix: Integrar Subtítulo como Badge en la parte inferior del póster
                         if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
                           Positioned(
-                            bottom: 0, left: 0,
+                            bottom: (widget.progress != null && widget.progress! > 0) ? 4 : 0, // Senior Fix: Subir badge si hay progreso
+                            left: 0,
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
@@ -204,6 +220,27 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          ),
+                        // Senior Fix: Barra de progreso en la base del póster
+                        if (widget.progress != null && widget.progress! > 0)
+                          Positioned(
+                            bottom: 0, left: 0, right: 0,
+                            child: Container(
+                              height: 4,
+                              color: Colors.black45,
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: widget.progress!.clamp(0.0, 1.0),
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFEF7A1E),
+                                    boxShadow: [
+                                      BoxShadow(color: Color(0xFFEF7A1E), blurRadius: 4)
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -229,7 +266,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                       animate: isMobile ? true : _isActive,
                       style: GoogleFonts.poppins(
                         color: _isActive ? Colors.white : Colors.white.withOpacity(0.95),
-                        fontSize: isMobile ? ResponsiveUtils.sp(context, 13) : 16,
+                        fontSize: ResponsiveUtils.posterTitleFontSize(context),
                         fontWeight: FontWeight.w700,
                         height: 1.2,
                         letterSpacing: 0.2,

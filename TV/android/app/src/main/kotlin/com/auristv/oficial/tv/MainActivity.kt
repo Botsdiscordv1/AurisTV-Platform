@@ -1,4 +1,4 @@
-package com.auristv.google.tv
+package com.auristv.oficial.tv
 
 import io.flutter.embedding.android.FlutterActivity
 

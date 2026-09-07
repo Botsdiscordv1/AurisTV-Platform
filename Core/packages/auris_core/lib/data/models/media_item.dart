@@ -23,6 +23,12 @@ class MediaItem {
   final int? airingAt;
   final bool aired;
   final EditorialBadge? editorialBadge;
+  // Extras del hero del servidor (opcionales, defaults seguros).
+  final List<String> genres;
+  final String? certification;
+  final bool available;
+  final String? detailUrl;
+  final int? tmdbId;
 
   final SearchResult? card;
 
@@ -46,6 +52,11 @@ class MediaItem {
     this.airingAt,
     this.aired = false,
     this.editorialBadge,
+    this.genres = const [],
+    this.certification,
+    this.available = true,
+    this.detailUrl,
+    this.tmdbId,
     this.card,
   });
 }
@@ -54,7 +65,7 @@ extension MediaItemToSeed on MediaItem {
   SearchResult toContentSeed() => card ??
       SearchResult(
         title: title,
-        url: id,
+        url: detailUrl ?? id,
         quality: 'TV',
         thumbnail: posterUrl,
         banner: bannerUrl,

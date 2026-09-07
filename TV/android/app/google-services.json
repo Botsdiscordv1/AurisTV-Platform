@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "551312224458",
+    "project_id": "device-streaming-da6dfeda",
+    "storage_bucket": "device-streaming-da6dfeda.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:551312224458:android:eac96fe4585a625f948433",
+        "android_client_info": {
+          "package_name": "com.auristv.oficial"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDH83e-lJJwumj1yrKZ8BdpIax8niTfEXw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:551312224458:android:a37dd63f1d4a6877948433",
+        "android_client_info": {
+          "package_name": "com.auristv.oficial.tv"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDH83e-lJJwumj1yrKZ8BdpIax8niTfEXw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

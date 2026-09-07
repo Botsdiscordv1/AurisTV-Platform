@@ -1,8 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
 import '../../../core/utils/category_utils.dart';
+import '../../../core/utils/content_logic.dart';
 import '../../models/server/anilist_media.dart';
 import '../../models/server/anime_detail.dart';
 import '../../models/server/episodes_response.dart';
@@ -81,14 +84,109 @@ class AurisRepositoryImpl implements AurisRepository {
   }
 
   @override
-  Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase}) async {
+  Future<SearchResponse> search(
+    String category, 
+    String query, {
+    int? year, 
+    String? server, 
+    String? phase,
+    String? imgSize,
+    CancelToken? cancelToken,
+  }) async {
     final normalized = _normalizeSearchCategory(category);
     if (server != null) {
-      return _searchOn(server, normalized, query, year: year, phase: phase);
+      return _searchOn(server, normalized, query, year: year, phase: phase, imgSize: imgSize, cancelToken: cancelToken);
     }
     final targets = _searchTargetsFor(normalized);
     final filter = normalized.toLowerCase() == 'all' ? null : normalized;
-    return _searchFanout(targets, query, year, phase, filterCategory: filter);
+    return _searchFanout(targets, query, year, phase, filterCategory: filter, imgSize: imgSize, cancelToken: cancelToken);
+  }
+
+  @override
+  Stream<SearchResponse> searchStream(
+    String category, 
+    String query, {
+    int? year, 
+    String? server, 
+    String? phase,
+    String? imgSize,
+    CancelToken? cancelToken,
+  }) async* {
+    final normalized = _normalizeSearchCategory(category);
+    
+    // Si se especifica un servidor concreto, buscamos solo ahí
+    if (server != null) {
+      yield* _searchStreamOn(server, normalized, query, year: year, phase: phase, imgSize: imgSize, cancelToken: cancelToken);
+      return;
+    }
+
+    // Senior Fanout Logic: Lanzamiento escalonado para evitar agotar el pool de conexiones del navegador (Límite 6)
+    final targets = _searchTargetsFor(normalized);
+    final controller = StreamController<SearchResponse>();
+    int completed = 0;
+
+    // 1. Lanzamos el primer target inmediatamente
+    _searchStreamOn(targets.first, normalized, query, year: year, phase: phase, imgSize: imgSize, cancelToken: cancelToken)
+      .listen(
+        (data) { if (!controller.isClosed) controller.add(data); },
+        onError: (e) { if (e is! DioException || e.type != DioExceptionType.cancel) debugPrint('[AurisRepo] Stream error 1: $e'); },
+        onDone: () { completed++; if (completed == targets.length && !controller.isClosed) controller.close(); },
+      );
+
+    // 2. Retrasamos los demás para dar tiempo a la cancelación si el usuario sigue escribiendo
+    if (targets.length > 1) {
+      Future.delayed(const Duration(milliseconds: 450), () {
+        if (cancelToken?.isCancelled == true || controller.isClosed) return;
+        
+        for (int i = 1; i < targets.length; i++) {
+          _searchStreamOn(targets[i], normalized, query, year: year, phase: phase, imgSize: imgSize, cancelToken: cancelToken)
+            .listen(
+              (data) { if (!controller.isClosed) controller.add(data); },
+              onError: (e) { if (e is! DioException || e.type != DioExceptionType.cancel) debugPrint('[AurisRepo] Stream error $i: $e'); },
+              onDone: () { completed++; if (completed == targets.length && !controller.isClosed) controller.close(); },
+            );
+        }
+      });
+    }
+
+    yield* controller.stream;
+  }
+
+  Stream<SearchResponse> _searchStreamOn(
+    String server,
+    String category,
+    String query, {
+    int? year,
+    String? phase,
+    String? imgSize,
+    CancelToken? cancelToken,
+  }) async* {
+    final stream = _client.getStream(
+      ApiEndpoints.searchByCategory(category),
+      queryParameters: {
+        'q': query,
+        if (year != null) 'year': year,
+        if (phase != null) 'phase': phase,
+        if (imgSize != null) 'img': imgSize,
+        'stream': '1',
+      },
+      baseUrl: server,
+      cancelToken: cancelToken,
+    );
+
+    await for (final line in stream) {
+      if (line.trim().isEmpty) continue;
+      try {
+        final decoded = jsonDecode(line);
+        final Map<String, dynamic> data = (decoded is Map && decoded.containsKey('data')) 
+            ? decoded['data'] 
+            : decoded;
+        
+        yield SearchResponse.fromJson(data);
+      } catch (e) {
+        debugPrint('[AurisRepo] NDJSON Parse Error ($server): $e');
+      }
+    }
   }
 
   List<String> _searchTargetsFor(String category) {
@@ -113,9 +211,9 @@ class AurisRepositoryImpl implements AurisRepository {
     final c = category.toLowerCase();
     final target = (c == 'peliculas' || c == 'movie')
         ? 'movie'
-        : (c == 'series')
+        : (c == 'series' || c == 'kdrama')
             ? 'series'
-            : (c == 'anime' || c == 'movie_anime')
+            : (c == 'anime' || c == 'movie_anime' || c.contains('anime'))
                 ? 'anime'
                 : null;
     if (target == null) return true;
@@ -128,15 +226,19 @@ class AurisRepositoryImpl implements AurisRepository {
     String query, {
     int? year,
     String? phase,
+    String? imgSize,
+    CancelToken? cancelToken,
   }) async {
     final params = {'q': query};
     if (year != null) params['year'] = year.toString();
     if (phase != null) params['phase'] = phase;
+    if (imgSize != null) params['img'] = imgSize;
 
     final response = await _client.get(
       ApiEndpoints.searchByCategory(category),
       queryParameters: params,
       baseUrl: baseUrl,
+      cancelToken: cancelToken,
       options: Options(
         connectTimeout: const Duration(seconds: 70),
         receiveTimeout: const Duration(seconds: 120),
@@ -151,6 +253,8 @@ class AurisRepositoryImpl implements AurisRepository {
     int? year,
     String? phase, {
     String? filterCategory,
+    String? imgSize,
+    CancelToken? cancelToken,
   }) async {
     Future<SearchResponse> guarded(
       Future<SearchResponse> Function() search) async {
@@ -162,7 +266,7 @@ class AurisRepositoryImpl implements AurisRepository {
     }
 
     final futures = baseUrls.map(
-      (b) => guarded(() => _searchOn(b, 'all', query, year: year, phase: phase)),
+      (b) => guarded(() => _searchOn(b, 'all', query, year: year, phase: phase, imgSize: imgSize, cancelToken: cancelToken)),
     );
 
     final responses = await Future.wait(futures.map((f) => f.timeout(
@@ -224,6 +328,9 @@ class AurisRepositoryImpl implements AurisRepository {
     int? year,
     int? season,
     String? kind,
+    String? url,
+    String? type,
+    String? imgSize, // Senior Fix: Soporte para el nuevo parámetro &img del servidor
   }) async {
     final params = <String, dynamic>{'title': title};
     if (malId != null) params['malId'] = malId;
@@ -231,14 +338,17 @@ class AurisRepositoryImpl implements AurisRepository {
     if (year != null) params['year'] = year;
     if (season != null) params['season'] = season;
     if (kind != null) params['kind'] = kind;
+    if (url != null) params['url'] = url;
+    if (type != null) params['type'] = type;
+    if (imgSize != null) params['img'] = imgSize;
     params['metadataOnly'] = '1';
     final response = await _client.get(
       ApiEndpoints.detailAnime,
       queryParameters: params,
       baseUrl: ApiEndpoints.animeBaseUrl,
       options: Options(
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 60),
+        connectTimeout: const Duration(seconds: 40),
+        receiveTimeout: const Duration(seconds: 90),
       ),
     );
     if (response.statusCode == 404) return null;
@@ -251,15 +361,20 @@ class AurisRepositoryImpl implements AurisRepository {
     int? year,
     String? metadataTitle,
     String? url,
-    String? quality,
+    String? type,
     String category = 'movie',
     String? server,
+    String? kind,
+    String? imgSize, // Senior Fix: Soporte para &img en películas y series
   }) async {
     final params = <String, dynamic>{'title': title};
     if (year != null) params['year'] = year;
     if (metadataTitle != null) params['metadataTitle'] = metadataTitle;
     if (url != null) params['url'] = url;
-    if (quality != null) params['quality'] = quality;
+    if (type != null) params['type'] = type;
+    if (kind != null) params['kind'] = kind;
+    if (imgSize != null) params['img'] = imgSize;
+    params['category'] = category;
     final response = await _client.get(
       ApiEndpoints.detailMovie,
       queryParameters: params,
@@ -271,6 +386,142 @@ class AurisRepositoryImpl implements AurisRepository {
     );
     if (response.statusCode == 404) return null;
     return MovieDetail.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<MediaItem>> getHomeHero({String category = 'anime', String? imgSize}) async {
+    try {
+      final params = <String, dynamic>{};
+      
+      // Senior Fix: Si se pide 1080 (FHD), solicitamos 'original' al server 
+      // para tener la fuente de alta resolución y luego redimensionamos en el proxy.
+      final bool isFHD = imgSize == '1080';
+      params['img'] = isFHD ? 'original' : (imgSize ?? 'w780');
+      
+      // Normalización de categorías...
+      final String normalizedCat = switch (category.toLowerCase()) {
+        'animes' => 'anime',
+        'películas' => 'peliculas',
+        'series' => 'series',
+        'kdrama' => 'kdrama',
+        _ => category,
+      };
+
+      if (normalizedCat != 'anime' && normalizedCat != 'inicio') {
+        params['category'] = normalizedCat;
+      }
+
+      final response = await _client.get(
+        ApiEndpoints.homeHero,
+        queryParameters: params,
+        baseUrl: ApiEndpoints.baseUrlForCategory(normalizedCat),
+      );
+
+      // Senior Resilience: El servidor puede devolver la lista en 'data.items' o directamente en 'items' o como Array.
+      List<dynamic> list = [];
+      if (response.data is List) {
+        list = response.data;
+      } else if (response.data is Map) {
+        list = response.data['data']?['items'] ?? response.data['items'] ?? [];
+      }
+
+      return list.map((e) {
+        try {
+          final m = e as Map<String, dynamic>;
+          // Senior Fix: Mapeo Ultra-Resiliente para el Hero
+          final List<String> extractedGenres = [];
+          final rawGenres = m['genres'] ?? m['genre'] ?? m['category'];
+          if (rawGenres is List) {
+            extractedGenres.addAll(rawGenres.map((e) => e.toString()));
+          } else if (rawGenres is String && rawGenres.isNotEmpty) {
+            extractedGenres.add(rawGenres);
+          }
+
+          // Senior Fix: Extraer la lista de fuentes (sources) si existe para crear la "semilla" (card)
+          final rawSources = m['sources'] as List?;
+          final List<SourceItem> sources = [];
+          if (rawSources != null) {
+            for (var s in rawSources) {
+              if (s is Map<String, dynamic>) {
+                sources.add(SourceItem.fromJson(s));
+              }
+            }
+          }
+
+          final String? scraperUrl = m['url'] ?? m['sURL'] ?? m['detailUrl'];
+          final String itemId = m['id']?.toString() ?? scraperUrl ?? '';
+
+          // Senior Fix: Clasificación precisa del MediaType para el Hero
+          final String rawKind = m['kind']?.toString().toLowerCase() ?? '';
+          MediaType mediaType;
+          
+          if (normalizedCat == 'anime' || normalizedCat == 'inicio') {
+            // En Inicio/Anime, el kind manda. Si no hay kind, por defecto es anime.
+            mediaType = rawKind == 'movie' ? MediaType.movie : MediaType.anime;
+          } else if (normalizedCat == 'series' || rawKind == 'series') {
+            mediaType = MediaType.series;
+          } else if (normalizedCat == 'kdrama' || rawKind == 'kdrama') {
+            mediaType = MediaType.kdrama;
+          } else {
+            mediaType = MediaType.movie;
+          }
+
+          final String? bannerSource = m['bannerUrl'] ?? m['banner'] ?? m['backdrop'];
+          
+          // Senior Optimization: Aplicar FHD real (1920x1080) vía Proxy si se solicita 1080
+          final String bannerUrl = isFHD 
+              ? ApiEndpoints.proxyImage(bannerSource, width: 1920, height: 1080)
+              : ApiEndpoints.proxyImage(bannerSource, highQuality: imgSize == 'original');
+
+          final card = SearchResult(
+            title: m['title'] ?? '',
+            url: scraperUrl ?? itemId,
+            source: m['source'] ?? (mediaType == MediaType.anime ? 'AniList' : 'TMDB'),
+            quality: 'HD',
+            thumbnail: m['posterUrl'] ?? m['thumbnail'] ?? '',
+            banner: bannerSource ?? '',
+            romaji: m['romaji'],
+            english: m['english'],
+            year: (m['year'] as num?)?.toInt() ?? int.tryParse(m['year']?.toString() ?? ''),
+            slug: m['slug'],
+            sources: sources,
+          );
+
+          return MediaItem(
+            id: itemId,
+            title: m['title'] ?? '',
+            romaji: m['romaji'],
+            english: m['english'],
+            posterUrl: ApiEndpoints.proxyImage(m['posterUrl'] ?? m['thumbnail']),
+            bannerUrl: bannerUrl,
+            logoUrl: m['logoUrl'] ?? m['logo'],
+            trailerKey: m['trailerKey'] ?? m['trailer_key'],
+            type: mediaType,
+            synopsis: m['synopsis'],
+            rating: (m['rating'] as num?)?.toDouble() ?? (m['score'] as num?)?.toDouble(),
+            year: (m['year'] as num?)?.toInt() ?? int.tryParse(m['year']?.toString() ?? ''),
+            episode: (m['episode'] as num?)?.toInt(),
+            airingAt: (m['airingAt'] as num?)?.toInt(),
+            genres: extractedGenres,
+            certification: m['certification'],
+            available: (m['available'] as bool?) ?? true,
+            detailUrl: scraperUrl,
+            tmdbId: (m['tmdbId'] as num?)?.toInt() ?? (m['tmdb_id'] as num?)?.toInt(),
+            source: m['source'] ?? (mediaType == MediaType.anime ? 'AniList' : 'TMDB'),
+            card: card.copyWith(
+              kind: rawKind,
+              type: m['type']?.toString(),
+            ),
+          );
+        } catch (e) {
+          debugPrint('[AurisRepo] Error mapping hero item: $e');
+          return null;
+        }
+      }).whereType<MediaItem>().toList();
+    } catch (e) {
+      debugPrint('[AurisRepo] getHomeHero critical error: $e');
+      return [];
+    }
   }
 
   @override
@@ -314,12 +565,15 @@ class AurisRepositoryImpl implements AurisRepository {
   }
 
   @override
-  Future<EditorialResponse> getEditorial() async {
+  Future<EditorialResponse> getEditorial({String? imgSize}) async {
     Future<EditorialResponse?> fetchEditorial(String baseUrl) async {
       try {
+        final params = <String, dynamic>{'locale': 'es-MX'};
+        if (imgSize != null) params['img'] = imgSize;
+
         final response = await _client.get(
           ApiEndpoints.homeEditorial,
-          queryParameters: {'locale': 'es-MX'},
+          queryParameters: params,
           baseUrl: baseUrl,
         );
         return EditorialResponse.fromJson(response.data as Map<String, dynamic>);
@@ -445,19 +699,24 @@ class AurisRepositoryImpl implements AurisRepository {
     int? year,
   }) async {
     final params = <String, dynamic>{'url': url, 'source': source};
+    
+    // Senior Fix: Si el cliente no pasó season, intentamos inferirlo de la URL 
+    // antes de enviar la petición al servidor para ayudar al IdentityResolver.
+    final int? effectiveSeason = season ?? extractSeason(url);
+    
     if (title != null) params['title'] = title;
     if (fullTitle != null) params['fullTitle'] = fullTitle;
     if (altTitle != null) params['altTitle'] = altTitle;
     if (tmdbId != null) params['tmdbId'] = tmdbId;
-    if (season != null) params['season'] = season;
+    if (effectiveSeason != null) params['season'] = effectiveSeason;
     if (year != null) params['year'] = year;
     final response = await _client.get(
       ApiEndpoints.episodes,
       queryParameters: params,
       baseUrl: ApiEndpoints.baseUrlForSource(source, category),
       options: Options(
-        connectTimeout: const Duration(seconds: 35),
-        receiveTimeout: const Duration(seconds: 60),
+        connectTimeout: const Duration(seconds: 40),
+        receiveTimeout: const Duration(seconds: 90),
       ),
     );
     return EpisodesResponse.fromJson(response.data as Map<String, dynamic>);
@@ -507,5 +766,46 @@ class AurisRepositoryImpl implements AurisRepository {
     );
     if (response.statusCode == 404) return null;
     return OmdbEpisode.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  // --- NOTIFICACIONES ---
+  
+  @override
+  Future<void> registerDeviceToken(String userId, String token, String platform) async {
+    try {
+      await _client.post(
+        ApiEndpoints.subscriptions(userId) + '/token',
+        data: {'token': token, 'platform': platform},
+        baseUrl: ApiEndpoints.animeBaseUrl,
+      );
+    } catch (e) {
+      debugPrint('[AurisRepo] Error registering token: $e');
+    }
+  }
+
+  @override
+  Future<void> subscribeToTopic(String userId, String topic) async {
+    try {
+      await _client.post(
+        ApiEndpoints.subscriptions(userId) + '/subscribe',
+        data: {'topic': topic},
+        baseUrl: ApiEndpoints.animeBaseUrl,
+      );
+    } catch (e) {
+      debugPrint('[AurisRepo] Error subscribing to topic: $e');
+    }
+  }
+
+  @override
+  Future<void> unsubscribeFromTopic(String userId, String topic) async {
+    try {
+      await _client.post(
+        ApiEndpoints.subscriptions(userId) + '/unsubscribe',
+        data: {'topic': topic},
+        baseUrl: ApiEndpoints.animeBaseUrl,
+      );
+    } catch (e) {
+      debugPrint('[AurisRepo] Error unsubscribing from topic: $e');
+    }
   }
 }

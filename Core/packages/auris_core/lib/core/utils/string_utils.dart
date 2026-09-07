@@ -2,31 +2,25 @@ import 'package:flutter/services.dart';
 
 /// Utilidades para manipulación de strings en AurisTV.
 class AurisStringUtils {
-  /// Capitaliza la primera letra de cada palabra en un query de búsqueda.
+  /// Capitaliza solo la primera letra del texto (útil para queries de búsqueda).
   /// 
-  /// Ejemplo: "resident evil" -> "Resident Evil"
-  /// Si la letra ya es mayúscula, no se modifica.
+  /// Ejemplo: "resident evil" -> "Resident evil"
+  /// Si la letra ya es mayúscula o el texto empieza con un símbolo, no se modifica.
   static String capitalizeSearchQuery(String text) {
     if (text.isEmpty) return text;
 
-    final words = text.split(' ');
-    final capitalizedWords = words.map((word) {
-      if (word.isEmpty) return word;
-      
-      // Solo capitalizamos si el primer carácter es una letra minúscula
-      final firstChar = word[0];
-      if (firstChar.toUpperCase() != firstChar) {
-        return firstChar.toUpperCase() + word.substring(1);
-      }
-      return word;
-    });
+    // Solo capitalizamos el primer carácter de todo el texto
+    final firstChar = text[0];
+    if (firstChar.toUpperCase() != firstChar) {
+      return firstChar.toUpperCase() + text.substring(1);
+    }
 
-    return capitalizedWords.join(' ');
+    return text;
   }
 }
 
-/// Formateador para campos de texto que capitaliza cada palabra automáticamente.
-class CapitalizeWordsFormatter extends TextInputFormatter {
+/// Formateador para campos de texto que capitaliza solo la primera letra automáticamente.
+class CapitalizeFirstLetterFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,

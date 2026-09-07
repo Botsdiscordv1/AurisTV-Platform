@@ -1,5 +1,6 @@
 import '../../../core/utils/synopsis_cleaner.dart';
 import '../../../core/api/api_endpoints.dart';
+import 'shared_models.dart';
 
 class MovieDetail {
   final String tmdbId;
@@ -158,20 +159,6 @@ class SeasonInfo {
       episodeCount: json['episodeCount'] as int?,
       airDate: json['airDate'] as String?,
       poster: ApiEndpoints.proxyImage(json['poster'] as String?),
-    );
-  }
-}
-
-class PlatformInfo {
-  final String providerName;
-  final String? logo;
-
-  const PlatformInfo({required this.providerName, this.logo});
-
-  factory PlatformInfo.fromJson(Map<String, dynamic> json) {
-    return PlatformInfo(
-      providerName: json['providerName'] as String? ?? '',
-      logo: ApiEndpoints.proxyImage(json['logo'] as String?),
     );
   }
 }

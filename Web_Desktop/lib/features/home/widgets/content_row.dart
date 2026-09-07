@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 
 class ContentRow extends StatefulWidget {
   final String title;
@@ -95,8 +94,9 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final isCompactDesktop = width >= 800 && width < 1100;
     
-    // Senior Fix: Altura calculada para centrar flechas solo en el póster, ignorando el texto inferior
-    final double posterHeight = isMobile ? ResponsiveUtils.sp(context, 200) : 310;
+    final double posterHeight = ResponsiveUtils.posterHeight(context);
+    final double cardWidth = ResponsiveUtils.posterWidth(context);
+    final double rowHeight = ResponsiveUtils.rowHeight(context);
 
     return Padding(
       padding: EdgeInsets.only(bottom: isMobile ? 32 : 48), // Padding unificado
@@ -108,7 +108,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
             child: Text(
               widget.title,
               style: GoogleFonts.poppins(
-                fontSize: isMobile ? 20 : 26,
+                fontSize: ResponsiveUtils.rowTitleFontSize(context),
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: -0.4,
@@ -150,7 +150,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                             }
                           },
                           child: SizedBox(
-                            width: isMobile ? ResponsiveUtils.sp(context, 140) : 200,
+                            width: cardWidth,
                             child: FocusablePosterCard(
                               key: ValueKey(item.id),
                               title: item.title,
@@ -167,13 +167,13 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
 
                     if (!_canScrollLeft && !_canScrollRight) {
                       return SizedBox(
-                        height: isMobile ? ResponsiveUtils.sp(context, 250) : 355,
+                        height: rowHeight,
                         child: content,
                       );
                     }
 
                     return SizedBox(
-                      height: isMobile ? ResponsiveUtils.sp(context, 250) : 355,
+                      height: rowHeight,
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           _updateScrollIndicators();

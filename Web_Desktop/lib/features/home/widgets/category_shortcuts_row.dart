@@ -14,7 +14,7 @@ class CategoryShortcutsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
 
     final shortcuts = [

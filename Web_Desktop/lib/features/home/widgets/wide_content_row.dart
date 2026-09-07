@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/focusable_wide_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
+import 'package:auris_core/auris_core.dart';
 
 class WideContentItem {
   final String id;
@@ -85,10 +85,11 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
     super.build(context);
     if (widget.items.isEmpty) return const SizedBox.shrink();
 
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final cardWidth = isMobile ? ResponsiveUtils.sp(context, 280.0) : ResponsiveUtils.sp(context, 420.0);
-    final cardHeight = isMobile ? ResponsiveUtils.sp(context, 160.0) : ResponsiveUtils.sp(context, 240.0); // Senior Fix: Ajustado a 240px por petición
+    final cardWidth = ResponsiveUtils.bannerWidth(context);
+    final cardHeight = ResponsiveUtils.bannerHeight(context);
+    final rowHeight = ResponsiveUtils.bannerRowHeight(context);
 
     return Padding(
       padding: EdgeInsets.only(bottom: isMobile ? 32 : 48), // Padding unificado
@@ -100,7 +101,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
             child: Text(
               widget.title,
               style: GoogleFonts.poppins(
-                fontSize: isMobile ? 20 : 26,
+                fontSize: ResponsiveUtils.rowTitleFontSize(context),
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: -0.4,
@@ -148,13 +149,13 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
 
                     if (!_canScrollLeft && !_canScrollRight) {
                       return SizedBox(
-                        height: isMobile ? ResponsiveUtils.sp(context, 225) : 355,
+                        height: rowHeight,
                         child: content,
                       );
                     }
 
                     return SizedBox(
-                      height: isMobile ? ResponsiveUtils.sp(context, 225) : 355,
+                      height: rowHeight,
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           _updateScrollIndicators();

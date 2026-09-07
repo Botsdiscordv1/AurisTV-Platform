@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 
 class ContentRow extends StatefulWidget {
   final String title;
@@ -95,8 +94,9 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final isCompactDesktop = width >= 800 && width < 1100;
     
-    // Senior Fix: Altura calculada para centrar flechas solo en el póster, ignorando el texto inferior
-    final double posterHeight = isMobile ? ResponsiveUtils.sp(context, 200) : 310;
+    final double posterHeight = ResponsiveUtils.posterHeight(context);
+    final double cardWidth = ResponsiveUtils.posterWidth(context);
+    final double rowHeight = ResponsiveUtils.rowHeight(context);
 
     return Padding(
       padding: EdgeInsets.only(bottom: isMobile ? 32 : 48), // Padding unificado
@@ -108,7 +108,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
             child: Text(
               widget.title,
               style: GoogleFonts.poppins(
-                fontSize: isMobile ? 20 : 26,
+                fontSize: ResponsiveUtils.rowTitleFontSize(context),
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: -0.4,
@@ -128,73 +128,48 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                     final double fadeSize = 40 / width; // 40px de suavizado
 
                     return SizedBox(
-                      height: isMobile ? ResponsiveUtils.sp(context, 250) : 355, // Senior: Reducido de 395 a 355 para Web
+                      height: rowHeight,
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           _updateScrollIndicators();
                           return false;
                         },
-                        child: ShaderMask(
-                          shaderCallback: (Rect rect) {
-                            return LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                Colors.transparent,
-                                _canScrollLeft ? Colors.transparent : Colors.black,
-                                Colors.black,
-                                Colors.black,
-                                _canScrollRight ? Colors.transparent : Colors.black,
-                                Colors.transparent,
-                              ],
-                              stops: [
-                                0.0,
-                                fadeOffset,
-                                (fadeOffset + fadeSize).clamp(0.0, 1.0),
-                                (1.0 - fadeOffset - fadeSize).clamp(0.0, 1.0),
-                                1.0 - fadeOffset,
-                                1.0,
-                              ],
-                            ).createShader(rect);
-                          },
-                          blendMode: BlendMode.dstIn,
-                          child: ListView.separated(
-                            controller: _scrollController,
-                            physics: const ClampingScrollPhysics(),
-                            cacheExtent: 1000,
-                            clipBehavior: Clip.none,
-                            scrollDirection: Axis.horizontal,
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
-                            itemCount: widget.items.length,
-                            separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
-                            itemBuilder: (context, index) {
-                              final item = widget.items[index];
-                              return Focus(
-                                onFocusChange: (focused) {
-                                  if (focused) {
-                                    Scrollable.ensureVisible(
-                                      context,
-                                      alignment: 0.5,
-                                      duration: const Duration(milliseconds: 300),
-                                      curve: Curves.easeInOut,
-                                    );
-                                  }
-                                },
-                                child: SizedBox(
-                                  width: isMobile ? ResponsiveUtils.sp(context, 140) : 200,
-                                  child: FocusablePosterCard(
-                                    key: ValueKey(item.id),
-                                    title: item.title,
-                                    posterUrl: item.posterUrl,
-                                    rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
-                                    subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : item.subtitle,
-                                    showInfo: true,
-                                    onTap: () => widget.onItemTap(item),
-                                  ),
+                        child: ListView.separated(
+                          controller: _scrollController,
+                          physics: const ClampingScrollPhysics(),
+                          cacheExtent: 1000,
+                          clipBehavior: Clip.none,
+                          scrollDirection: Axis.horizontal,
+                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
+                          itemCount: widget.items.length,
+                          separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
+                          itemBuilder: (context, index) {
+                            final item = widget.items[index];
+                            return Focus(
+                              onFocusChange: (focused) {
+                                if (focused) {
+                                  Scrollable.ensureVisible(
+                                    context,
+                                    alignment: 0.5,
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                }
+                              },
+                              child: SizedBox(
+                                width: cardWidth,
+                                child: FocusablePosterCard(
+                                  key: ValueKey(item.id),
+                                  title: item.title,
+                                  posterUrl: item.posterUrl,
+                                  rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
+                                  subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : item.subtitle,
+                                  showInfo: true,
+                                  onTap: () => widget.onItemTap(item),
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     );

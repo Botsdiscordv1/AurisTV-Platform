@@ -1,12 +1,13 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:collection/collection.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
+import '../../home/widgets/wide_content_row.dart';
 import 'providers/search_provider.dart';
 import 'widgets/search_widgets.dart';
 
@@ -87,17 +88,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _onContentTap(SearchResult result) {
-    final displayTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
-    final metaTitle = result.metadataTitle ?? result.scrapedTitle ?? result.title;
+    final rawTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
+    final displayTitle = cleanTitleForDisplay(rawTitle);
+    final metaTitle = cleanTitleForDisplay(result.metadataTitle ?? result.scrapedTitle ?? result.title);
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
     final openCategory = inferOpenCategory(result, _selectedCategory);
-    context.push(
-      '/content/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(openCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
-      extra: result,
-    );
+
+    final uri = '/content/${Uri.encodeComponent(displayTitle)}'
+        '?source=${Uri.encodeComponent(result.source)}'
+        '&url=${Uri.encodeComponent(result.url)}'
+        '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
+        '&banner=${Uri.encodeComponent(result.banner ?? '')}'
+        '&category=${Uri.encodeComponent(openCategory)}'
+        '&year=${result.year ?? ''}'
+        '&totalSeasons=${result.totalSeasons ?? ''}'
+        '${result.kind != null ? '&type=${Uri.encodeComponent(result.kind!)}' : ''}';
+
+    context.push(uri, extra: result);
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -132,11 +140,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: TextField(
                   controller: _searchController,
                   focusNode: _focusNode,
-                  textAlign: TextAlign.left, // Texto alineado a la izquierda
-                  textAlignVertical: TextAlignVertical.center, // Centrado vertical respecto al icono
+                  textAlign: TextAlign.left,
+                  textAlignVertical: TextAlignVertical.center,
                   style: const TextStyle(fontSize: 15, color: Colors.white),
-                  textCapitalization: TextCapitalization.words,
-                  inputFormatters: [CapitalizeWordsFormatter()],
+                  textCapitalization: TextCapitalization.sentences,
+                  inputFormatters: [CapitalizeFirstLetterFormatter()],
                   decoration: InputDecoration(
                     hintText: _dynamicPlaceholder,
                     hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
@@ -147,8 +155,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     filled: false,
-                    isDense: true, // Ayuda al centrado vertical real
-                    contentPadding: EdgeInsets.zero, // Eliminamos paddings extra que rompen el centro vertical
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
@@ -204,46 +212,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildPreSearchState() {
-    final isDesktop = MediaQuery.sizeOf(context).width >= 1200;
-
-    if (isDesktop) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // COLUMNA IZQUIERDA (GÉNEROS + TRENDING)
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 40, right: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SearchGenresGrid(onGenreTap: _performSearch),
-                  const SizedBox(height: 32),
-                  SearchTrendingSection(onTrendingTap: _onContentTap),
-                ],
-              ),
-            ),
-          ),
-          
-          // DIVISOR SUTIL
-          Container(width: 1, color: Colors.white.withOpacity(0.05), margin: const EdgeInsets.symmetric(vertical: 24)),
-          
-          // COLUMNA DERECHA (SIDEBAR HISTORIAL)
-          SizedBox(
-            width: 340,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(top: 12),
-              child: SearchHistorySection(onQueryTap: _performSearch),
-            ),
-          ),
-        ],
-      );
-    }
-
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 40),
       child: Column(
         children: [
+          const _ContinueWatchingSection(),
           SearchHistorySection(onQueryTap: _performSearch),
           SearchGenresGrid(onGenreTap: _performSearch),
           const SizedBox(height: 16),
@@ -277,23 +250,43 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: isMobile ? 0.54 : 0.58, // Senior Fix: Ajustado a 0.58 para eliminar el overflow de 12px
+            childAspectRatio: isMobile ? 0.54 : 0.58,
             crossAxisSpacing: isMobile ? 12 : 20, 
             mainAxisSpacing: isMobile ? 12 : 16, 
           ),
           itemCount: results.length,
           itemBuilder: (context, index) {
             final result = results[index];
-            final info = _cardInfo(result, _selectedCategory);
-            return FocusablePosterCard(
+            final meta = result.resolveMetadata(_selectedCategory);
+
+            final historyAsync = ref.watch(playbackHistoryStateProvider);
+            double? progress;
+            historyAsync.whenData((items) {
+              final match = items.firstWhereOrNull((h) => h.contentId == result.url);
+              if (match != null) progress = match.progress;
+            });
+
+            final card = FocusablePosterCard(
               title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
-              posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
-              badge: info['format'] as String?,
-              badgeColor: info['formatColor'] as Color?,
-              subtitle: info['status'] as String?,
-              subtitleColor: info['statusColor'] as Color?,
+              posterUrl: ApiEndpoints.proxyImage(result.thumbnail, fallbackUrl: result.tmdbThumbnail),
+              badge: meta.label,
+              badgeColor: meta.labelColor,
+              subtitle: meta.status,
+              subtitleColor: meta.statusColor,
+              progress: progress,
               onTap: () => _onContentTap(result),
             );
+
+            if (index < 24) {
+              return _StaggeredResultItem(
+                itemId: '${result.url}_${result.source}',
+                sessionKey: '$_currentQuery|$_selectedCategory',
+                delay: Duration(milliseconds: index * 35),
+                child: card,
+              );
+            }
+
+            return card;
           },
         );
       },
@@ -308,7 +301,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       padding: const EdgeInsets.only(top: 60, bottom: 40),
       child: Column(
         children: [
-          // MENSAJE PRINCIPAL
           const Icon(Icons.search_off_rounded, size: 80, color: Colors.white10),
           const SizedBox(height: 24),
           Padding(
@@ -329,15 +321,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             'Prueba con otros términos o explora lo más visto hoy',
             style: TextStyle(color: Colors.white30, fontSize: 14),
           ),
-          
           const SizedBox(height: 60),
-          
-          // RECOMENDACIONES (EL TOP 10 RECIÉN CREADO)
           SearchTrendingSection(onTrendingTap: _onContentTap),
-          
           const SizedBox(height: 40),
-          
-          // EXPLORACIÓN POR GÉNEROS
           SearchGenresGrid(onGenreTap: _performSearch),
         ],
       ),
@@ -345,18 +331,169 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-// Clave de fusión: agrupa por franquicia base + tipo de media (película vs serie),
-// para unir "Youjo Senki Movie" (AV1) y "Youjo Senki Pelicula" (AnimeJara) en una
-// sola tarjeta sin confundir la película con la serie "Youjo Senki".
+class _ContinueWatchingSection extends ConsumerWidget {
+  const _ContinueWatchingSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final continueWatchingAsync = ref.watch(continueWatchingProvider);
+
+    return continueWatchingAsync.when(
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 24, top: 12),
+          child: WideContentRow(
+            title: 'Continuar Viendo',
+            items: items.map((h) => _mapHistoryToWide(ref, h)).toList(),
+            onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
+          ),
+        );
+      },
+      loading: () => Padding(
+        padding: const EdgeInsets.only(bottom: 24, top: 12),
+        child: RowSkeleton(isWide: true),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
+    String displayTitle = h.title ?? 'Contenido';
+    final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
+    if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+      displayTitle = 'Ep ${h.episode} • $displayTitle';
+    }
+
+    String remainingText = '';
+    final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
+    if (remainingMs > 0) {
+      final minutes = (remainingMs / 60000).ceil();
+      remainingText = 'Quedan $minutes min';
+    }
+
+    return WideContentItem(
+      id: h.contentId,
+      title: displayTitle,
+      imageUrl: h.posterUrl ?? h.bannerUrl ?? '',
+      progress: h.progress,
+      subtitle: remainingText,
+      onDelete: () {
+        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+      },
+      originalItem: h,
+    );
+  }
+
+  void _onTap(BuildContext context, PlaybackHistory item) {
+    final uri = '/player/${Uri.encodeComponent(item.contentId)}'
+        '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
+        '&source=${Uri.encodeComponent(item.source ?? "")}'
+        '&episode=${item.episode ?? ""}'
+        '&season=${item.season ?? ""}'
+        '&startPosition=${item.positionInMilliseconds}'
+        '&category=${Uri.encodeComponent(item.category ?? "anime")}'
+        '&title=${Uri.encodeComponent(item.title ?? "")}'
+        '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
+        '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
+        '&language=${Uri.encodeComponent(item.language ?? "")}';
+    context.push(uri);
+  }
+}
+
+class _StaggeredResultItem extends StatefulWidget {
+  final Widget child;
+  final Duration delay;
+  final String itemId;
+  final String sessionKey;
+
+  const _StaggeredResultItem({
+    required this.child,
+    required this.delay,
+    required this.itemId,
+    required this.sessionKey,
+  });
+
+  @override
+  State<_StaggeredResultItem> createState() => _StaggeredResultItemState();
+}
+
+class _StaggeredResultItemState extends State<_StaggeredResultItem> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
+  Timer? _timer;
+
+  // Senior State Tracking: Registro global para persistencia de scroll
+  static final Set<String> _animatedIds = {};
+  static String _activeSession = '';
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Resetear sesión si la búsqueda cambió
+    if (_activeSession != widget.sessionKey) {
+      _animatedIds.clear();
+      _activeSession = widget.sessionKey;
+    }
+
+    final bool alreadyAnimated = _animatedIds.contains(widget.itemId);
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+      value: alreadyAnimated ? 1.0 : 0.0,
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 1.0, curve: Curves.easeOutCubic),
+    ));
+
+    if (!alreadyAnimated) {
+      _animatedIds.add(widget.itemId);
+      _timer = Timer(widget.delay, () {
+        if (mounted) {
+          _controller.forward();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 String _fuseKey(SearchResult r) {
   final t = r.title.toLowerCase();
   final typeRe = RegExp(r'\b(movie|pel[íi]cula|film|ova|special|oav)\b');
   final isMovieish = typeRe.hasMatch(t);
   final franchise = t.replaceAll(typeRe, '').replaceAll(RegExp(r'[^a-z0-9]'), '');
-  // La categoría (anime/series/movie) distingue resultados que comparten
-  // título pero son contenido distinto (p.ej. "One Piece" anime vs "One Piece"
-  // serie). Antes solo se separaba movie/no-movie, así que anime y serie
-  // colapsaban en la misma tarjeta.
   final cat = inferOpenCategory(r, isMovieish ? 'movie' : 'tv');
   return '$franchise#$cat';
 }
@@ -405,97 +542,3 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
   }
   return grouped.values.toList();
 }
-
-Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
-  // Prioridad: type específico (Especial/OVA/ONA/Película desde AV1) > kind > quality > filtro.
-  // El type del server es más granular que kind (que solo distingue anime/movie),
-  // así que lo usamos cuando es un tipo concreto y no el genérico "ANIME"/"TV".
-  String? typeLabel;
-  final typeUp = (result.type ?? '').toUpperCase();
-  final hasSpecificType = result.type != null &&
-      result.type!.isNotEmpty &&
-      !typeUp.contains('ANIME') &&
-      !typeUp.contains('TV');
-  if (hasSpecificType) {
-    typeLabel = _labelFromType(result.type!, selectedCategory);
-  } else if (result.kind != null && result.kind!.isNotEmpty) {
-    typeLabel = _labelFromKind(result.kind!);
-  } else if (result.quality != null && result.quality!.isNotEmpty) {
-    typeLabel = _categoryFromQuality(result.quality!);
-  } else if (result.type != null && result.type!.isNotEmpty) {
-    typeLabel = _labelFromType(result.type!, selectedCategory);
-  } else {
-    typeLabel = _labelFromSearchCategory(selectedCategory);
-  }
-  final format = typeLabel;
-
-  // El estado va abajo a la izquierda.
-  String? statusLabel;
-  Color? statusColor;
-  final s = (result.status ?? '').toLowerCase();
-  if (s.contains('emisi')) {
-    statusLabel = 'EN EMISIÓN';
-    statusColor = const Color(0xFFEF7A1E); // AurisTV Brand Orange
-  } else if (s.contains('finaliz') || s.contains('complet')) {
-    statusLabel = 'FINALIZADO';
-    statusColor = Colors.black.withOpacity(0.9);
-  }
-
-  return {
-    'format': format,
-    'formatColor': const Color(0xFF1976D2), // Azul
-    'status': statusLabel,
-    'statusColor': statusColor,
-  };
-}
-
-String? _categoryFromQuality(String quality) {
-  final q = quality.toLowerCase();
-  if (q.contains('pelicula') || q.contains('película') || q.contains('movie') || q.contains('film')) {
-    return 'PELICULA';
-  }
-  if (q.contains('dorama') || q.contains('drama')) {
-    return 'DORAMA';
-  }
-  if (q.contains('serie') || q.contains('series') || q.contains('tv')) {
-    return 'SERIE';
-  }
-  if (q.contains('anime')) {
-    return 'ANIME';
-  }
-  return null;
-}
-
-String _labelFromType(String type, String selectedCategory) {
-  final up = type.toUpperCase();
-  if (up.contains('MOVIE') || up.contains('FILM') || up.contains('PELICULA') || up.contains('PELÍCULA')) return 'PELÍCULA';
-  if (up.contains('DORAMA') || up.contains('DRAMA')) return 'DORAMA';
-  if (up.contains('SERIE') || up == 'TV' || up.contains('TV')) {
-    return selectedCategory.toLowerCase() == 'anime' ? 'TV ANIME' : 'SERIE';
-  }
-  if (up.contains('ANIME')) return 'TV ANIME';
-  return up;
-}
-
-String _labelFromKind(String kind) {
-  final k = kind.toLowerCase();
-  if (k.contains('movie') || k.contains('film')) return 'PELÍCULA';
-  if (k.contains('drama') || k.contains('dorama')) return 'DORAMA';
-  if (k.contains('anime')) return 'TV ANIME';
-  if (k.contains('series') || k.contains('tv')) return 'SERIE';
-  return 'SERIE';
-}
-
-String? _labelFromSearchCategory(String category) {
-  switch (category.toLowerCase()) {
-    case 'peliculas':
-      return 'PELÍCULA';
-    case 'series':
-      return 'SERIE';
-    case 'anime':
-      return 'TV ANIME';
-    default:
-      return null;
-  }
-}
-

@@ -1,4 +1,4 @@
-package com.auristv.auristv_mobile
+package com.auristv.oficial
 
 import android.os.Build
 import android.os.Bundle
@@ -15,7 +15,7 @@ class MainActivity: FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Senior Immersive Elite: Forzar el dibujo detrás del Notch y barras de sistema
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES

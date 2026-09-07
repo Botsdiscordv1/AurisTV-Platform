@@ -4,7 +4,6 @@ import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/prime_expandable_card.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 
 class EditorialContentRow extends StatefulWidget {
   final String title;
@@ -101,7 +100,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
             child: Text(
               widget.title,
               style: GoogleFonts.poppins(
-                fontSize: isMobile ? 20 : (isCompactDesktop ? 26 : 28),
+                fontSize: ResponsiveUtils.rowTitleFontSize(context),
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: -0.4,
@@ -122,7 +121,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       child: Stack(
         children: [
           SizedBox(
-            height: isMobile ? ResponsiveUtils.sp(context, 250) : 355, // Senior: Reducido de 395 a 355 para Web
+            height: ResponsiveUtils.rowHeight(context),
             child: _buildFadedWrapper(
               horizontalPadding: horizontalPadding,
               child: ListView.separated(
@@ -136,7 +135,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
                   return SizedBox(
-                    width: isMobile ? ResponsiveUtils.sp(context, 140) : 200,
+                    width: ResponsiveUtils.posterWidth(context),
                     child: FocusablePosterCard(
                       key: ValueKey(item.id),
                       title: item.title,
@@ -158,7 +157,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
 
   Widget _buildMythicalTopRow(bool isMobile, double horizontalPadding) {
     // Senior Fix: Sincronizamos dimensiones con el resto de la app para evitar desbordes y unificar huecos
-    final double posterHeight = isMobile ? ResponsiveUtils.sp(context, 210) : 310;
+    final double posterHeight = ResponsiveUtils.posterHeight(context);
     final double titleAreaHeight = isMobile ? 40 : 40; // Senior: Reducido a 40 para alinear con posters estándar
     
     return Padding(
@@ -171,7 +170,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
             child: Text(
               widget.title,
               style: GoogleFonts.poppins(
-                fontSize: isMobile ? 22 : 30,
+                fontSize: ResponsiveUtils.rowTitleFontSize(context) + 4.0,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 letterSpacing: -0.8,
@@ -185,7 +184,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
             child: Stack(
               children: [
                 SizedBox(
-                  height: isMobile ? ResponsiveUtils.sp(context, 250) : 355, // Senior: Unificado con posters estándar (355px)
+                  height: ResponsiveUtils.rowHeight(context), // Senior: Unificado con posters estándar
                   child: _buildFadedWrapper(
                     horizontalPadding: horizontalPadding,
                     child: ListView.builder(

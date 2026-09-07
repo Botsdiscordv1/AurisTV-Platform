@@ -11,6 +11,7 @@ class EpisodesResponse {
   final List<EpisodeInfo> specials;
 
   final int? tmdbId;
+  final String? fullTitle;
   final int? season;
   final List<RelatedInfo> relations;
 
@@ -31,6 +32,7 @@ class EpisodesResponse {
     this.specials = const [],
     this.relations = const [],
     this.tmdbId,
+    this.fullTitle,
     this.season,
     this.seasonAirDate,
     this.seasonNotAvailable,
@@ -46,6 +48,7 @@ class EpisodesResponse {
       url: json['url'] as String? ?? '',
       slug: json['slug'] as String? ?? '',
       total: json['total'] as int? ?? 0,
+      fullTitle: json['fullTitle'] as String?,
       episodes: (json['episodes'] as List<dynamic>?)
               ?.map((e) => EpisodeInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -73,6 +76,7 @@ class RelatedInfo {
   final String slug;
   final String cover;
   final String relation;
+  final String? category; // Senior Fix: Clasificación servida por el VPS (franquicia | relacionado)
   final String? source;
 
   const RelatedInfo({
@@ -81,6 +85,7 @@ class RelatedInfo {
     required this.slug,
     required this.cover,
     required this.relation,
+    this.category,
     this.source,
   });
 
@@ -91,6 +96,7 @@ class RelatedInfo {
       slug: slug,
       cover: cover,
       relation: relation,
+      category: category,
       source: source ?? this.source,
     );
   }
@@ -109,6 +115,7 @@ class RelatedInfo {
         json['image'] as String?
       ),
       relation: json['relation'] as String? ?? 'Relacionado',
+      category: json['category'] as String?,
       source: json['source'] as String?,
     );
   }

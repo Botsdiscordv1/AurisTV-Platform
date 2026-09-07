@@ -9,25 +9,22 @@ import 'package:auris_core/core/utils/source_utils.dart';
 /// en formato TIPO-IDIOMA (p.ej. "DUB-MX", "SUB-EN", "CAST-ES").
 class ActiveSourceBadge extends StatelessWidget {
   final String? serverName;
-  final String quality;
+  final String label;
+  final Color color;
   final double serverFontSize;
   final double langFontSize;
 
   const ActiveSourceBadge({
     super.key,
     this.serverName,
-    required this.quality,
+    required this.label,
+    required this.color,
     this.serverFontSize = 11,
     this.langFontSize = 10,
   });
 
   @override
   Widget build(BuildContext context) {
-    final type = trackQualityType(quality);
-    final label = type == 'SUB' ? 'SUB' : (type == 'CAST' ? 'CAST' : 'LAT');
-    final code = languageCodeText(quality);
-    final color = type == 'SUB' ? Colors.blueAccent : const Color(0xFFEF7A1E);
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -46,14 +43,9 @@ class ActiveSourceBadge extends StatelessWidget {
                   simplifySourceName(serverName!),
                   style: TextStyle(color: Colors.white, fontSize: serverFontSize, fontWeight: FontWeight.w900),
                 ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    code.isEmpty ? label : '$label · $code',
-                    style: TextStyle(color: color, fontSize: langFontSize, fontWeight: FontWeight.w900),
-                  ),
-                ],
+              Text(
+                label.toUpperCase(),
+                style: TextStyle(color: color, fontSize: langFontSize, fontWeight: FontWeight.w900),
               ),
             ],
           ),

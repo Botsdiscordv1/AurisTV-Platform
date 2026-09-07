@@ -367,8 +367,8 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
     title: result.title,
     romaji: result.romaji,
     english: result.english,
-    posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
-    bannerUrl: ApiEndpoints.proxyImage(result.banner),
+    posterUrl: ApiEndpoints.proxyImage(result.thumbnail, fallbackUrl: result.tmdbThumbnail),
+    bannerUrl: ApiEndpoints.proxyImage(result.banner, fallbackUrl: result.tmdbBanner),
     logoUrl: result.logo,
     type: type,
     rating: result.score,
@@ -483,34 +483,70 @@ final homePrefetchProvider = FutureProvider<void>((ref) async {
 
 final recentEpisodesProvider = FutureProvider<List<MediaItem>>((ref) async {
   ref.keepAlive();
-  final repo = ref.watch(homeRepositoryProvider);
   final schedule = await ref.watch(scheduleProvider.future);
-  
-  final todayItems = schedule.days.firstWhere(
-    (d) => d.isToday,
-    orElse: () => schedule.days.first,
-  ).items.where((item) => item.sourceAvailable).toList();
+
+  final todayItems = schedule.days
+      .firstWhere(
+        (d) => d.isToday,
+        orElse: () => schedule.days.first,
+      )
+      .items
+      .where((item) => item.sourceAvailable)
+      .toList();
 
   return todayItems.map((item) {
     final ep = item.episode ?? 0;
     final isMovie = item.format?.toUpperCase() == 'MOVIE';
-    
-    return MediaItem(
-      id: item.id.toString(),
+    final metaTitle = item.romaji ?? item.english ?? item.title;
+    final itemYear = item.year ??
+        (item.airingAt != null
+            ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year
+            : null);
+
+    // Senior Optimization: Construimos la semilla SearchResult directamente
+    // para que la navegación desde Home sea igual de rápida que desde Schedule.
+    final card = SearchResult(
       title: item.title,
+      source: item.source ?? '',
+      url: item.url ?? '',
+      thumbnail: ApiEndpoints.proxyImage(item.coverImage),
+      quality: item.quality ?? 'HD',
+      kind: 'anime',
+      type: item.type,
+      slug: item.slug,
+      year: itemYear,
+      romaji: item.romaji,
+      english: item.english,
+      sources: item.sources
+          .map((s) => SourceItem(
+                source: s.source,
+                url: s.url,
+                quality: s.quality,
+                slug: s.slug,
+                type: s.type,
+              ))
+          .toList(),
+    );
+
+    return MediaItem(
+      id: item.url ?? item.id.toString(),
+      title: item.title,
+      romaji: item.romaji,
       english: item.english,
       posterUrl: ApiEndpoints.proxyImage(item.coverImage),
-      bannerUrl: item.banner != null ? ApiEndpoints.proxyImage(item.banner!) : null,
+      bannerUrl:
+          item.banner != null ? ApiEndpoints.proxyImage(item.banner!) : null,
       type: isMovie ? MediaType.movie : MediaType.anime,
       rating: item.averageScore,
       subtitle: (isMovie || ep == 0)
           ? item.year?.toString()
           : (item.year != null ? '${item.year} • Episodio $ep' : 'Episodio $ep'),
       year: item.year,
-      source: '',
+      source: item.source ?? '',
       episode: ep == 0 ? null : ep,
       airingAt: item.airingAt,
       aired: isMovie || item.aired || item.status?.toLowerCase() == 'finished',
+      card: card,
     );
   }).toList();
 });

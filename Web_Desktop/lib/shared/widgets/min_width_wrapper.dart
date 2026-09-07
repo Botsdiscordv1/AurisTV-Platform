@@ -1,9 +1,11 @@
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../core/utils/responsive_utils.dart';
 
 /// Un wrapper senior que garantiza un ancho mínimo para la versión Web/Desktop.
 /// Si el viewport es menor a [minWidth], activa un scroll horizontal y
 /// sobrescribe el MediaQuery para proteger la integridad del layout.
+/// El valor por defecto es [Breakpoint.lg] (1024dp).
 class MinWidthWrapper extends StatefulWidget {
   final Widget child;
   final double minWidth;
@@ -11,7 +13,7 @@ class MinWidthWrapper extends StatefulWidget {
   const MinWidthWrapper({
     super.key,
     required this.child,
-    this.minWidth = 1024,
+    this.minWidth = 360, // Cambiado de 1024 para permitir breakpoints adaptativos
   });
 
   @override
@@ -39,11 +41,7 @@ class _MinWidthWrapperState extends State<MinWidthWrapper> {
     // Esto permite que "Web (Móvil)" reutilice el diseño nativo de la app.
     if (!kIsWeb) return widget.child;
 
-    final bool isMobilePlatform =
-        defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS;
-
-    if (isMobilePlatform) return widget.child;
+    if (ResponsiveUtils.isMobilePlatform) return widget.child;
 
     return LayoutBuilder(
       builder: (context, constraints) {

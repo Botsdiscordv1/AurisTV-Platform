@@ -319,9 +319,35 @@ class _ScheduleRowState extends State<ScheduleRow> {
                                 : null,
                             subtitle: _buildSubtitle(item),
                             rating: formatRating(item.averageScore),
-                            onTap: () => context.push(
-                              '/content/${Uri.encodeComponent(item.title)}?source=&category=anime&url=&metadataTitle=${Uri.encodeComponent(metaTitle)}&year=${itemYear ?? ''}',
-                            ),
+                            onTap: () {
+                              final metaTitle = item.romaji ?? item.english ?? item.title;
+                              final itemYear = item.year ?? (item.airingAt != null ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year : null);
+                              
+                              // Construimos la semilla completa para el detalle
+                              final seed = SearchResult(
+                                title: item.title,
+                                source: item.source ?? '',
+                                url: item.url ?? '',
+                                thumbnail: ApiEndpoints.proxyImage(item.coverImage),
+                                quality: item.quality ?? 'HD',
+                                kind: 'anime',
+                                type: item.type,
+                                slug: item.slug,
+                                year: itemYear,
+                                sources: item.sources.map((s) => SourceItem(
+                                  source: s.source,
+                                  url: s.url,
+                                  quality: s.quality,
+                                  slug: s.slug,
+                                  type: s.type,
+                                )).toList(),
+                              );
+
+                              context.push(
+                                '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(item.source ?? '')}&category=anime&url=${Uri.encodeComponent(item.url ?? '')}&metadataTitle=${Uri.encodeComponent(metaTitle)}&year=${itemYear ?? ''}&quality=${Uri.encodeComponent(item.quality ?? '')}&type=${Uri.encodeComponent(item.type ?? '')}',
+                                extra: seed,
+                              );
+                            },
                           ),
                         );
                       },

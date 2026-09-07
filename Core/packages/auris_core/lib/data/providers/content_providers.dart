@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import '../../auris_core.dart';
@@ -37,7 +38,11 @@ class DiscoveredSourcesParams {
   final String category;
   final int? year;
   final int? season;
+  final String? kind;
   final String? server;
+  final String source;
+  final String? url;
+  final String? type;
   final List<SearchResult>? initialSources;
 
   const DiscoveredSourcesParams({
@@ -46,7 +51,11 @@ class DiscoveredSourcesParams {
     this.category = 'all',
     this.year,
     this.season,
+    this.kind,
     this.server,
+    this.source = '',
+    this.url,
+    this.type,
     this.initialSources,
   });
 
@@ -59,11 +68,26 @@ class DiscoveredSourcesParams {
           category == other.category &&
           year == other.year &&
           season == other.season &&
+          kind == other.kind &&
           server == other.server &&
+          source == other.source &&
+          url == other.url &&
+          type == other.type &&
           const ListEquality<SearchResult>().equals(initialSources, other.initialSources);
 
   @override
-  int get hashCode => Object.hash(title, metadataTitle, category, year, season, server, const ListEquality<SearchResult>().hash(initialSources));
+  int get hashCode => Object.hash(
+      title,
+      metadataTitle,
+      category,
+      year,
+      season,
+      kind,
+      server,
+      source,
+      url,
+      type,
+      const ListEquality<SearchResult>().hash(initialSources));
 }
 
 class GroupedEpisodesParams {
@@ -157,7 +181,18 @@ final omdbSeasonProvider = FutureProvider.family<List<OmdbEpisode>, OmdbSeasonPa
 
 final contentSearchProvider = FutureProvider.family<SearchResponse, ContentSearchParams>((ref, params) async {
   final repo = ref.watch(aurisRepositoryProvider);
-  return repo.search(params.category, params.query, year: params.year, server: params.server);
+  final cancelToken = CancelToken();
+  ref.onDispose(() => cancelToken.cancel('Provider disposed'));
+
+  // Senior Fix: Asegurar que el query de búsqueda no lleve el año si ya se pasa como parámetro
+  final cleanQuery = cleanTitleForDisplay(params.query);
+  return repo.search(
+    params.category, 
+    cleanQuery, 
+    year: params.year, 
+    server: params.server,
+    cancelToken: cancelToken,
+  );
 });
 
 final galleryProvider = FutureProvider.family<GalleryResponse, GalleryParams>((ref, params) async {
@@ -168,6 +203,7 @@ final galleryProvider = FutureProvider.family<GalleryResponse, GalleryParams>((r
 class EpisodesParams {
   final String url; 
   final String source; 
+  final String? category;
   final String? title; 
   final String? fullTitle; 
   final String? altTitle; 
@@ -178,6 +214,7 @@ class EpisodesParams {
   const EpisodesParams({
     required this.url, 
     required this.source, 
+    this.category,
     this.title, 
     this.fullTitle, 
     this.altTitle, 
@@ -191,16 +228,10 @@ class EpisodesParams {
     identical(this, other) || 
     other is EpisodesParams && 
     url == other.url && 
-    source == other.source && 
-    title == other.title && 
-    fullTitle == other.fullTitle && 
-    altTitle == other.altTitle && 
-    tmdbId == other.tmdbId && 
-    season == other.season && 
-    year == other.year;
+    source == other.source;
 
   @override 
-  int get hashCode => Object.hash(url, source, title, fullTitle, altTitle, tmdbId, season, year);
+  int get hashCode => Object.hash(url, source);
 }
 
 final episodesProvider = FutureProvider.family<EpisodesResponse?, EpisodesParams>((ref, params) async {
@@ -209,6 +240,7 @@ final episodesProvider = FutureProvider.family<EpisodesResponse?, EpisodesParams
   return repo.getEpisodes(
     params.url, 
     params.source, 
+    category: params.category,
     title: params.title, 
     fullTitle: params.fullTitle, 
     altTitle: params.altTitle, 
@@ -238,13 +270,16 @@ class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<Map<String, Lis
       return;
     }
 
-    final repo = ref.read(aurisRepositoryProvider);
     int finished = 0;
 
     for (final src in sources) {
-      repo.getEpisodes(src.url, src.source, category: 'anime').then((res) {
+      ref.read(episodesProvider(EpisodesParams(
+        url: src.url, 
+        source: src.source,
+        category: 'anime',
+      )).future).then((res) {
         finished++;
-        if (!mounted) return;
+        if (!mounted || res == null) return;
         if (res.relations.isNotEmpty) {
           final relationsWithSource = res.relations.map((r) => r.copyWith(source: src.source)).toList();
           _updateWithRelations(relationsWithSource);
@@ -263,7 +298,7 @@ class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<Map<String, Lis
 
   void _updateWithRelations(List<RelatedInfo> newRelations) {
     final Map<String, RelatedInfo> franchiseMap = {};
-    final Map<String, RelatedInfo> genreMap = {};
+    final Map<String, RelatedInfo> similarMap = {};
     final Map<String, RelatedInfo> recommendedMap = {};
 
     for (var rel in newRelations) {
@@ -277,12 +312,36 @@ class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<Map<String, Lis
     for (var rel in _allRelationsMap.values) {
       final cleanTitle = rel.title.replaceAll(RegExp(r'\s*\([Ss]erie\)'), '').trim();
       final key = cleanTitle.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-      final type = rel.relation.toLowerCase();
+      final type = rel.relation.toLowerCase().trim();
 
-      if (type.contains('precuela') || type.contains('secuela') || type.contains('historia') || type.contains('ova') || type.contains('película')) {
+      bool isStrictFranchise = false;
+      bool isSimilar = false;
+
+      if (rel.category != null) {
+        isStrictFranchise = rel.category == 'franquicia';
+        isSimilar = rel.category == 'relacionado';
+      } else {
+        isStrictFranchise = type.contains('precuela') || 
+                            type.contains('secuela') || 
+                            type.contains('historia paralela') || 
+                            type.contains('historia alternativa') || 
+                            type.contains('ova') || 
+                            type.contains('ona') ||
+                            type.contains('spin-off') ||
+                            type.contains('alternativa') ||
+                            type.contains('adicional') ||
+                            type.contains('personaje incluido') ||
+                            type == 'relacionado';
+
+        isSimilar = type.contains('similar') || 
+                    type.contains('relacionado') || 
+                    type.contains('género');
+      }
+
+      if (isStrictFranchise) {
         if (!franchiseMap.containsKey(key)) franchiseMap[key] = rel;
-      } else if (type.contains('género') || type.contains('similar') || type.contains('relacionado') || rel.url.contains('aniyae')) {
-        if (!genreMap.containsKey(key)) genreMap[key] = rel;
+      } else if (isSimilar) {
+        if (!similarMap.containsKey(key)) similarMap[key] = rel;
       } else {
         if (!recommendedMap.containsKey(key)) recommendedMap[key] = rel;
       }
@@ -290,15 +349,15 @@ class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<Map<String, Lis
 
     for (final key in franchiseMap.keys) {
       recommendedMap.remove(key);
-      genreMap.remove(key);
+      similarMap.remove(key);
     }
-    for (final key in recommendedMap.keys) {
-      genreMap.remove(key);
+    for (final key in similarMap.keys) {
+      recommendedMap.remove(key);
     }
 
     state = AsyncValue.data({
       'franchise': franchiseMap.values.toList(),
-      'genre': genreMap.values.toList(),
+      'similar': similarMap.values.toList(),
       'recommended': recommendedMap.values.toList(),
     });
   }
@@ -306,40 +365,84 @@ class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<Map<String, Lis
 
 final groupedEpisodesProvider = FutureProvider.family<GroupedEpisodesResult?, GroupedEpisodesParams>((ref, params) async {
   if (params.sources.isEmpty) return null;
-  final repo = ref.watch(aurisRepositoryProvider);
-  final familySourcesRaw = params.sources.where((s) => simplifySourceName(s.source) == params.familyKey).toList();
-  if (familySourcesRaw.isEmpty) return null;
+  
+  // Evitar mezclar temporadas distintas de la misma familia
   int? _seasonInUrl(String u) {
     final m = RegExp(r'[-/#](\d{1,2})(?:st|nd|rd|th)?-?(?:season|temporada)', caseSensitive: false).firstMatch(u) ??
         RegExp(r'[-/#](?:season|temporada)-(\d{1,2})', caseSensitive: false).firstMatch(u);
     return m != null ? int.tryParse(m.group(1)!) : null;
   }
-  // Evitar mezclar temporadas distintas de la misma familia (p.ej. la URL base
-  // de S1 y la de S2) que viajan juntas en activeSources: solo fusionamos las
-  // fuentes que corresponden a la temporada solicitada.
+
+  final familySourcesRaw = params.sources.where((s) => simplifySourceName(s.source) == params.familyKey).toList();
+  if (familySourcesRaw.isEmpty) return null;
+
   final familySources = (params.season == null || params.season! <= 1)
       ? familySourcesRaw
       : familySourcesRaw.where((s) {
           final su = _seasonInUrl(s.url);
           return su == null || su == params.season;
         }).toList();
+
   final hasDubVariant = familySources.any((s) => isDubQuality(s.quality));
   final hasSubVariant = familySources.any((s) => s.quality.isNotEmpty && !isDubQuality(s.quality));
   final hasVariants = hasDubVariant && hasSubVariant;
-  // Se consultan TODAS las fuentes provistas para que la "Temporada 0"
-  // (especiales/OVAs) se agregue de cualquier servidor, no solo de la familia
-  // del seleccionado. Los episodios se siguen fusionando únicamente dentro de la
-  // familia activa; los especiales se fusionan de todas las fuentes.
-  final results = await Future.wait(params.sources.map((src) {
-    return repo.getEpisodes(src.url, src.source, category: params.category, title: params.title, fullTitle: params.metadataTitle, tmdbId: params.tmdbId, season: params.season, year: params.year).then<EpisodesResponse?>((v) => v).catchError((_) => null);
-  }));
+
+  // Senior Optimization: Await primary active source first for instant episode list display
+  final currentSrc = params.sources.firstWhere(
+    (s) => s.url == params.currentSourceUrl,
+    orElse: () => familySources.first,
+  );
+
+  final primaryFuture = ref.watch(episodesProvider(EpisodesParams(
+    url: currentSrc.url,
+    source: currentSrc.source,
+    category: params.category,
+    title: params.title,
+    fullTitle: params.metadataTitle,
+    tmdbId: params.tmdbId,
+    season: params.season,
+    year: params.year,
+  )).future).catchError((_) => null);
+
+  final secondaryFutures = params.sources
+      .where((s) => s.url != currentSrc.url)
+      .map((src) => ref.watch(episodesProvider(EpisodesParams(
+            url: src.url,
+            source: src.source,
+            category: params.category,
+            title: params.title,
+            fullTitle: params.metadataTitle,
+            tmdbId: params.tmdbId,
+            season: params.season,
+            year: params.year,
+          )).future).catchError((_) => null))
+      .toList();
+
+  final primaryRes = await primaryFuture;
+  final secondaryResults = await Future.wait(secondaryFutures).timeout(
+    const Duration(seconds: 3),
+    onTimeout: () => List<EpisodesResponse?>.filled(secondaryFutures.length, null),
+  );
+
+  final results = <EpisodesResponse?>[];
+  for (final src in params.sources) {
+    if (src.url == currentSrc.url) {
+      results.add(primaryRes);
+    } else {
+      final secIdx = params.sources.where((s) => s.url != currentSrc.url).toList().indexWhere((s) => s.url == src.url);
+      results.add(secIdx >= 0 && secIdx < secondaryResults.length ? secondaryResults[secIdx] : null);
+    }
+  }
+
   final resBySource = <String, EpisodesResponse?>{};
   for (var i = 0; i < params.sources.length; i++) {
     resBySource[params.sources[i].url] = results[i];
   }
+
   EpisodesResponse? primary;
   final mergedByNumber = <int, (EpisodeInfo, SearchResult?)>{};
   final mergedRelations = <RelatedInfo>[];
+  
   for (final src in familySources) {
     final res = resBySource[src.url];
     if (res == null) continue;
@@ -362,13 +465,9 @@ final groupedEpisodesProvider = FutureProvider.family<GroupedEpisodesResult?, Gr
       }
     }
   }
+
   if (primary == null) return null;
-  // Fusion de especiales entre fuentes: se agrupan por identidad real
-  // (tmdbSpecialNumber si existe, si no numero + titulo normalizado) para no
-  // mostrar duplicados cuando varios servidores aportan el mismo especial.
-  // Se conserva la entrada mas completa (url y descripcion) por si la primera
-  // carece de ellos; al abrirse se reproduce la fuente conservada y el usuario
-  // puede cambiar de servidor desde el reproductor.
+
   final mergedSpecials = <EpisodeInfo>[];
   String specialKey(EpisodeInfo e) {
     final t = e.tmdbSpecialNumber;
@@ -392,16 +491,19 @@ final groupedEpisodesProvider = FutureProvider.family<GroupedEpisodesResult?, Gr
       }
     }
   }
+  
   mergedSpecials.sort((a, b) => (a.number).compareTo(b.number));
   final entries = mergedByNumber.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
   final mergedList = [for (final e in entries) e.value.$1];
   final mergedSources = [for (final e in entries) e.value.$2];
+
   return GroupedEpisodesResult(
     response: EpisodesResponse(
       source: primary.source,
       url: primary.url,
       slug: primary.slug,
       total: mergedList.length,
+      fullTitle: primary.fullTitle,
       episodes: mergedList,
       specials: mergedSpecials,
       relations: mergedRelations.isNotEmpty ? mergedRelations : primary.relations,
@@ -414,20 +516,80 @@ final groupedEpisodesProvider = FutureProvider.family<GroupedEpisodesResult?, Gr
 });
 
 final discoveredSourcesProvider = Provider.family<List<SearchResult>, DiscoveredSourcesParams>((ref, params) {
+  // Senior Fix: Si la categoría es 'all', esperamos a que el orquestador resuelva.
+  if (params.category.toLowerCase() == 'all' || params.category.isEmpty) {
+    return const <SearchResult>[];
+  }
+
   final searchQuery = params.metadataTitle ?? params.title;
-  final searchAsync = ref.watch(contentSearchProvider(ContentSearchParams(query: searchQuery, category: params.category, year: params.year, server: params.server)));
+  final cat = params.category.toLowerCase();
+  final kind = params.kind?.toLowerCase();
+  final isFromAnimeServer = params.server == ApiEndpoints.animeBaseUrl;
+  
+  // 1. Identificar naturaleza del contenido.
+  final isAnimeKind = kind == 'anime';
+  final isAnimeCat = cat == 'anime';
+  final isMovie = cat == 'movie' || kind == 'movie';
+  
+  // 2. ¿Es una serie de imagen real pura?
+  final isStrictLiveActionSeries = (kind == 'series' || cat == 'series') && !isAnimeKind;
+  
+  // 3. Selección de Servidor y Categoría de Petición.
+  final String? effectiveServer = params.server ?? 
+      (isStrictLiveActionSeries || (isMovie && !isFromAnimeServer) 
+          ? ApiEndpoints.moviesSeriesBaseUrl 
+          : (isAnimeKind || isFromAnimeServer ? ApiEndpoints.animeBaseUrl : null));
+
+  String requestCategory = cat;
+  if (effectiveServer == ApiEndpoints.moviesSeriesBaseUrl) {
+    // Si buscamos en el servidor movie pero es anime, pedimos movie_anime para redirección
+    requestCategory = isAnimeKind ? 'movie_anime' : (isMovie ? 'movie' : 'series');
+  } else if (effectiveServer == ApiEndpoints.animeBaseUrl) {
+    requestCategory = 'anime';
+  }
+
+  // Senior Optimization: Solo bloqueamos la búsqueda si ya recibimos una lista 
+  // "autoritativa" de fuentes (más de una fuente o una fuente que ya trae sub-fuentes).
+  // Esto permite que el Calendario sea instantáneo pero que la Búsqueda Normal 
+  // Search all alternative servers to discover all sources (including Calendar)
+  final searchAsync = ref.watch(contentSearchProvider(ContentSearchParams(
+    query: searchQuery, 
+    category: requestCategory, 
+    year: params.year, 
+    server: effectiveServer
+  )));
+
   final baseSearchQuery = stripSeasonSuffix(searchQuery);
   final baseSearchAsync = (baseSearchQuery.isNotEmpty && baseSearchQuery != searchQuery)
-      ? ref.watch(contentSearchProvider(ContentSearchParams(query: baseSearchQuery, category: params.category, year: params.year, server: params.server)))
+      ? ref.watch(contentSearchProvider(ContentSearchParams(query: baseSearchQuery, category: requestCategory, year: params.year, server: effectiveServer)))
       : null;
+
   final romanQuery = (params.season != null && params.season! > 1) ? seasonTitleRoman(stripSeasonSuffix(searchQuery), params.season!) : null;
   final romanSearchAsync = (romanQuery != null && romanQuery.toLowerCase() != searchQuery.toLowerCase())
-      ? ref.watch(contentSearchProvider(ContentSearchParams(query: romanQuery, category: params.category, year: params.year, server: params.server)))
+      ? ref.watch(contentSearchProvider(ContentSearchParams(query: romanQuery, category: requestCategory, year: params.year, server: effectiveServer)))
       : null;
-  final isMovieCategory = params.category == 'movie' || params.category == 'movie_anime';
-  final detailAsync = isMovieCategory ? const AsyncValue<AnimeDetail?>.data(null) : ref.watch(animeDetailProvider(AnimeDetailParams(title: params.title, metadataTitle: params.metadataTitle, year: params.year, season: params.season, kind: null)));
+
+  // 4. Detalle de Anime (Enriquecimiento)
+  // Solo enriquecemos si es anime o viene del servidor de anime.
+  final allowAnimeDetail = isAnimeKind || isAnimeCat || isFromAnimeServer;
+  
+  final detailAsync = !allowAnimeDetail 
+      ? const AsyncValue<ContentDetailResponse?>.data(null) 
+      : ref.watch(unifiedContentDetailProvider(UnifiedDetailParams(
+          title: params.title,
+          metadataTitle: params.metadataTitle,
+          category: params.category,
+          kind: params.kind,
+          year: params.year,
+          season: params.season,
+          source: params.source, 
+          url: params.url,
+          type: params.type,
+        )));
+
   final searchData = searchAsync.valueOrNull;
-  final detail = detailAsync.valueOrNull;
+  final detail = detailAsync.valueOrNull?.anime;
+  final isMovieCategory = cat == 'movie' || cat == 'movie_anime' || kind == 'movie';
   final qBase = cleanTitleForMatching(params.title);
   final metaBase = params.metadataTitle != null ? cleanTitleForMatching(params.metadataTitle!) : null;
   final targetSeason = params.season ?? extractSeason(params.title) ?? extractSeason(params.metadataTitle);

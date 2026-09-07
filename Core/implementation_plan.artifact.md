@@ -1,46 +1,36 @@
-# Estandarizar tamaño de tarjetas normales con las editoriales
+# Plan de Limpieza de Fuentes
 
-El objetivo es que las tarjetas normales (`FocusablePosterCard`) tengan el mismo tamaño de imagen que las tarjetas editoriales (`EditorialCard`), manteniendo una relación de aspecto de 2:3 para el área del póster.
+Este plan detalla la limpieza de las fuentes de contenido en el proyecto AurisTV, limitándolas únicamente a las especificadas como activas por el usuario.
 
-## Cambios Propuestos
+## User Review Required
 
-### [Shared Widgets]
+> [!IMPORTANT]
+> No se mencionaron fuentes activas para el servidor de **KDramas (puerto 3002)**. Por ahora, mantendré la infraestructura de KDramas pero eliminaré los "hints" antiguos si no se confirma su actividad. ¿Existen fuentes activas para el puerto 3002?
 
-#### [MODIFY] [focusable_poster_card.dart](file:///E:/AurisTV/lib/shared/widgets/focusable_poster_card.dart)
-- Ajustar bordes y sombras para que sean consistentes con el nuevo tamaño.
+## Proposed Changes
 
-### [Home Feature]
+### [Component: API & Endpoints]
 
-#### [MODIFY] [content_row.dart](file:///E:/AurisTV/lib/features/home/widgets/content_row.dart)
-- Actualizar el ancho de la tarjeta:
-    - Escritorio: 190 -> 200
-    - Móvil: 110 -> 140
-- Actualizar la altura del contenedor del carrusel:
-    - Escritorio: 390 -> 400
-    - Móvil: 220 -> 280
-- Ajustar la altura de las flechas de navegación para que coincidan con el área de la imagen (300px).
+#### [MODIFY] [api_endpoints.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/core/api/api_endpoints.dart)
+- Actualizar `animeHints` para incluir solo: `jkanime`, `animeav1`, `animed23`, `animejara`.
+- Actualizar `movieHints` para incluir solo: `gnulahd`, `onlypelis`, `pelispedia`.
 
-### [Schedule Feature]
+### [Component: Utils]
 
-#### [MODIFY] [schedule_screen.dart](file:///E:/AurisTV/lib/features/schedule/presentation/schedule_screen.dart)
-- Hacer que el tamaño de las tarjetas sea responsivo (actualmente es fijo 190).
-- Usar los nuevos tamaños: 200 (Escritorio) y 140 (Móvil).
-- Ajustar la altura del carrusel y las flechas.
+#### [MODIFY] [source_utils.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/core/utils/source_utils.dart)
+- Limpiar `buildEpisodeUrl` eliminando lógica de fuentes obsoletas (`katanime`, `animegratis`, `aniyae`).
+- Simplificar `simplifySourceName` y `_sourceDisplayOrder` eliminando fuentes inactivas.
 
-### [Search Feature]
+### [Component: Providers]
 
-#### [MODIFY] [search_screen.dart](file:///E:/AurisTV/lib/features/search/presentation/search_screen.dart)
-- Ajustar el `childAspectRatio` del `GridView` para mantener la proporción 2:3 en la imagen considerando el área de texto inferior.
-- Nuevo `childAspectRatio`: 0.52 -> 0.54 (aprox).
+#### [MODIFY] [content_providers.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/providers/content_providers.dart)
+- Eliminar la inferencia de "similares" basada en la URL de `aniyae`.
 
-### [Content Detail Feature]
+#### [MODIFY] [home_provider.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/providers/home_provider.dart)
+- Limpiar la lógica de detección de tipo de contenido en `_mapEditorialItemToMediaItem` y `_mapSearchResultToMediaItem`, eliminando referencias a fuentes inactivas (`flv`, `katanime`, `animegratis`).
 
-#### [MODIFY] [content_screen.dart](file:///E:/AurisTV/lib/features/content/presentation/content_screen.dart)
-- Ajustar el `childAspectRatio` en las secciones de "Relacionados" y "Recomendaciones".
+## Verification Plan
 
-## Plan de Verificación
-
-### Verificación Manual
-- Abrir la aplicación en modo Escritorio y comparar visualmente una fila normal con una editorial.
-- Abrir la aplicación en modo Móvil y verificar que las tarjetas no se corten y mantengan la proporción.
-- Verificar que el foco en TV/Desktop siga funcionando correctamente con el nuevo tamaño.
+### Manual Verification
+- Verificar que el mapeo de categorías en la búsqueda siga funcionando correctamente para las fuentes activas.
+- Comprobar que los nombres simplificados (JKA, AV1, etc.) se muestren correctamente en la UI.

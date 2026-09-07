@@ -21,31 +21,38 @@ import '../../shared/widgets/main_navigation_wrapper.dart';
 /// Observador global para detectar cambios de ruta y gestionar estados de widgets (ej: trailers)
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
-/// Claves globales para controlar el Navigator de forma precisa
+/// Clave global para el Navigator Raíz
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
-  initialLocation: '/splash',
+  initialLocation: '/inicio',
   observers: [routeObserver],
   routes: [
+    // Redirección por defecto
+    GoRoute(
+      path: '/',
+      redirect: (context, state) => '/inicio',
+    ),
+
     // Intro / Splash
     GoRoute(
       path: '/splash',
       builder: (context, state) => const SplashScreen(),
     ),
-    // Rutas con Navegación Inferior Persistente (Shell)
+    
+    // Rutas con Shell persistente (Navegación principal)
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return MainNavigationWrapper(navigationShell: navigationShell);
       },
       branches: [
-        // Rama 0: Inicio
+        // Rama 0: Inicio y sus Secciones (URLs de primer nivel)
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/',
-              builder: (context, state) => const HomeScreen(),
+              path: '/inicio',
+              builder: (context, state) => const HomeScreen(categoryPath: 'inicio'),
             ),
           ],
         ),
@@ -57,10 +64,7 @@ final GoRouter appRouter = GoRouter(
               builder: (context, state) {
                 final query = state.uri.queryParameters['q'] ?? '';
                 final category = state.uri.queryParameters['cat'] ?? 'all';
-                return SearchScreen(
-                  initialQuery: query,
-                  initialCategory: category,
-                );
+                return SearchScreen(initialQuery: query, initialCategory: category);
               },
             ),
           ],
@@ -74,43 +78,86 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
-        // Rama 3: Ajustes (Perfil)
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: '/settings',
-              builder: (context, state) => const SettingsScreen(),
-              routes: [
-                GoRoute(
-                  path: 'library', // Esto será /settings/library
-                  builder: (context, state) => const LibraryScreen(),
-                ),
-                GoRoute(
-                  path: 'avatar', // Esto será /settings/avatar
-                  builder: (context, state) => const AvatarSelectorScreen(),
-                ),
-              ],
-            ),
-          ],
-        ),
       ],
     ),
 
-    // Rutas fuera del Shell (Full screen)
+    // Detalles (Media)
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,
-      path: '/select-profile',
-      builder: (context, state) => const ProfileSelectionScreen(),
+      path: '/detalles',
+      builder: (context, state) {
+        final params = state.uri.queryParameters;
+        
+        final title = params['title'] ?? 'Contenido';
+        final source = params['source'] ?? '';
+        final url = params['url'] ?? '';
+
+        if (url.isEmpty) return const HomeScreen(); 
+
+        final extraResult = state.extra is SearchResult ? state.extra as SearchResult : null;
+
+        return ContentScreen(
+          title: title,
+          source: source,
+          url: url,
+          category: params['category'] ?? 'all',
+          year: int.tryParse(params['year'] ?? ''),
+          quality: params['quality'],
+          type: params['type'],
+          result: extraResult,
+          from: params['from'],
+        );
+      },
+    ),
+
+    // Reproductor
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/reproductor',
+      builder: (context, state) {
+        final params = state.uri.queryParameters;
+        return PlayerScreen(
+          contentId: params['contentId'] ?? '',
+          sourceUrl: params['url'] ?? '',
+          source: params['source'] ?? '',
+          episode: params['episode'] ?? '1',
+          season: int.tryParse(params['season'] ?? ''),
+          serverName: params['serverName'],
+          language: params['language'],
+          category: params['category'],
+          totalEpisodes: int.tryParse(params['totalEpisodes'] ?? ''),
+          title: params['title'],
+          posterUrl: params['posterUrl'],
+          bannerUrl: params['bannerUrl'],
+        );
+      },
+    ),
+
+    // Rutas Globales
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/settings',
+      builder: (context, state) => const SettingsScreen(),
     ),
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,
-      path: '/profile-setup',
-      builder: (context, state) => const ProfileSetupScreen(),
+      path: '/settings/avatar',
+      builder: (context, state) => const AvatarSelectorScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/settings/library',
+      builder: (context, state) => const LibraryScreen(),
     ),
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,
       path: '/login',
       builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/select-profile',
+      builder: (context, state) => const ProfileSelectionScreen(),
     ),
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,
@@ -121,28 +168,6 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: rootNavigatorKey,
       path: '/horario',
       builder: (context, state) => const ScheduleScreen(),
-    ),
-    GoRoute(
-      parentNavigatorKey: rootNavigatorKey,
-      path: '/media/:slug/:token',
-      builder: (context, state) {
-        final slug = state.pathParameters['slug']!;
-        final token = state.pathParameters['token']!;
-        final data = UrlUtils.decodeShareableToken(token, slug);
-        
-        if (data == null) return const HomeScreen(); 
-
-        final extraResult = state.extra is SearchResult ? state.extra as SearchResult : null;
-
-        return ContentScreen(
-          title: data['title'],
-          source: data['source'],
-          url: data['url'],
-          category: data['category'] ?? 'all',
-          year: data['year'],
-          result: extraResult,
-        );
-      },
     ),
   ],
 );

@@ -10,7 +10,6 @@ import '../domain/avatar_selection.dart';
 import 'providers/avatar_providers.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 
 class AvatarSelectorScreen extends ConsumerStatefulWidget {
   const AvatarSelectorScreen({super.key});

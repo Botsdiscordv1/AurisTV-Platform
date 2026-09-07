@@ -1,34 +1,80 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../auris_core.dart';
 import 'auth_provider.dart';
+
+final playbackHistoryRepositoryProvider = Provider<PlaybackHistoryRepository>((ref) {
+  final box = Hive.box('playback_history');
+  final local = HivePlaybackHistoryRepository(box);
+  final remote = SupabasePlaybackHistoryRepository(Supabase.instance.client);
+  
+  return HybridPlaybackHistoryRepository(local: local, remote: remote);
+});
 
 final playbackHistoryStateProvider = AsyncNotifierProvider<PlaybackHistoryNotifier, List<PlaybackHistory>>(() {
   return PlaybackHistoryNotifier();
 });
 
+/// Provider especializado para el carrusel de "Continuar Viendo"
+/// Filtra contenidos completados, agrupa por serie para mostrar solo el último episodio
+/// y mantiene el orden cronológico.
+final continueWatchingProvider = Provider<AsyncValue<List<PlaybackHistory>>>((ref) {
+  final historyAsync = ref.watch(playbackHistoryStateProvider);
+  
+  return historyAsync.whenData((list) {
+    final Set<String> seenContentIds = {};
+    return list.where((h) {
+      if (h.isCompleted) return false;
+      // Senior Logic: Solo mostramos la entrada más reciente para cada serie/contenido
+      if (seenContentIds.contains(h.contentId)) return false;
+      seenContentIds.add(h.contentId);
+      return true;
+    }).toList();
+  });
+});
+
 class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
-  late Box _box;
   Timer? _throttleTimer;
   PlaybackHistory? _pendingSave;
   
   final Map<String, int> _lastSavedPositionsMs = {};
+  
+  // Cache en memoria para actualizaciones rápidas sin recargar todo de Hive
+  List<PlaybackHistory> _memoryCache = [];
 
   @override
   FutureOr<List<PlaybackHistory>> build() async {
-    _box = Hive.box('playback_history');
+    final repository = ref.watch(playbackHistoryRepositoryProvider);
     final user = ref.watch(authProvider);
+    
+    // Senior Fix: Si hay una sesión activa en Supabase pero el authProvider aún es null,
+    // mantenemos el estado en LOADING.
+    if (user == null && Supabase.instance.client.auth.currentSession != null) {
+      final completer = Completer<List<PlaybackHistory>>();
+      return completer.future;
+    }
+
     final profileId = user?.activeProfileId ?? 'guest_profile';
-    return _loadAll(profileId);
+    
+    // Le damos un pequeño margen a Hive para asegurar que el box esté listo 
+    // y poblado tras el Hot Restart.
+    final history = await repository.getHistory(profileId);
+    _memoryCache = history;
+
+    if (user != null && user.email != null) {
+      _triggerSync(repository, profileId, user.id).ignore();
+    }
+
+    return _memoryCache;
   }
 
-  List<PlaybackHistory> _loadAll(String profileId) {
-    return _box.values
-        .map((e) => PlaybackHistory.fromJson(e as Map))
-        .where((h) => h.profileId == profileId)
-        .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  Future<void> _triggerSync(PlaybackHistoryRepository repository, String profileId, String userId) async {
+    await repository.syncWithCloud(profileId, userId);
+    // Recargar memoria después de sync si algo cambió en la nube
+    _memoryCache = await repository.getHistory(profileId);
+    state = AsyncData(List.from(_memoryCache));
   }
 
   void updatePosition({
@@ -58,23 +104,20 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
 
     final key = PlaybackHistory.generateKey(contentId, season, episode, profileId: profileId);
 
-    final existingData = _box.get(key);
-    PlaybackHistory? existingHistory;
-    if (existingData != null) {
-      existingHistory = PlaybackHistory.fromJson(existingData as Map);
-    }
+    // Buscar en caché primero
+    final existingHistory = _memoryCache.cast<PlaybackHistory?>().firstWhere(
+      (h) => h?.key == key, 
+      orElse: () => null
+    );
     
-    final int lastSavedMs = existingHistory?.positionInMilliseconds ?? 0;
-    final int jumpDiff = (finalPositionMs - lastSavedMs).abs();
-    
-    if (jumpDiff > 300000 && !force && !completed) {
-      return;
-    }
-
+    // Eliminamos la restricción de jumpDiff > 300000 para permitir seeks manuales
+    // Pero mantenemos un pequeño throttle para no saturar si no hay cambios significativos
     if (!force) {
       final lastPersistedPos = _lastSavedPositionsMs[key] ?? -10000;
       final diff = (finalPositionMs - lastPersistedPos).abs();
-      if (diff < 10000 && !completed) return;
+      // Si el video es muy corto, bajamos el umbral a 5s, si no 10s
+      final threshold = durationMs < 60000 ? 5000 : 10000;
+      if (diff < threshold && !completed) return;
     }
 
     final history = PlaybackHistory(
@@ -98,6 +141,9 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     );
 
     _pendingSave = history;
+    
+    // Actualización optimista de la memoria
+    _updateMemoryCache(history);
 
     if (force) {
       _savePending(notify: true);
@@ -112,6 +158,21 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     }
   }
 
+  void _updateMemoryCache(PlaybackHistory history) {
+    final index = _memoryCache.indexWhere((h) => h.key == history.key);
+    if (index != -1) {
+      _memoryCache[index] = history;
+    } else {
+      _memoryCache.insert(0, history);
+    }
+    
+    // Re-ordenar por fecha de actualización
+    _memoryCache.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    
+    // Notificar al estado (esto hará que la UI se actualice)
+    state = AsyncData(List.from(_memoryCache));
+  }
+
   Future<void> _savePending({bool notify = true}) async {
     if (_pendingSave == null) return;
     
@@ -120,11 +181,13 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     final key = history.key;
     _lastSavedPositionsMs[key] = history.positionInMilliseconds;
 
-    await _box.put(key, history.toJson());
+    final repository = ref.read(playbackHistoryRepositoryProvider);
+    await repository.saveHistory(history);
     
-    if (notify) {
-      final user = ref.read(authProvider);
-      state = AsyncData(_loadAll(user?.activeProfileId ?? 'guest_profile'));
+    // Aplicar cleanup cada vez que guardamos para mantener la DB limpia
+    final user = ref.read(authProvider);
+    if (user != null) {
+      await repository.cleanup(user.activeProfileId ?? 'guest_profile');
     }
   }
 
@@ -132,15 +195,17 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     final user = ref.read(authProvider);
     final profileId = user?.activeProfileId ?? 'guest_profile';
     final key = PlaybackHistory.generateKey(contentId, season, episode, profileId: profileId);
-    final data = _box.get(key);
-    if (data == null) return null;
-    final history = PlaybackHistory.fromJson(data as Map);
-    return history.isFinished ? null : history;
+    
+    final history = _memoryCache.cast<PlaybackHistory?>().firstWhere(
+      (h) => h?.key == key, 
+      orElse: () => null
+    );
+    
+    return history?.isFinished == true ? null : history;
   }
 
   PlaybackHistory? getLatestWatched(String contentId) {
-    final user = ref.read(authProvider);
-    final entries = _loadAll(user?.activeProfileId ?? 'guest_profile').where((h) => h.contentId == contentId).toList();
+    final entries = _memoryCache.where((h) => h.contentId == contentId).toList();
     if (entries.isEmpty) return null;
     return entries.first;
   }
@@ -148,17 +213,24 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
   Future<void> deleteProgress(String contentId, int? season, String? episode) async {
     final user = ref.read(authProvider);
     final profileId = user?.activeProfileId ?? 'guest_profile';
+    final repository = ref.read(playbackHistoryRepositoryProvider);
+    
+    await repository.deleteHistory(contentId, season, episode, profileId);
+    
     final key = PlaybackHistory.generateKey(contentId, season, episode, profileId: profileId);
-    await _box.delete(key);
-    state = AsyncData(_loadAll(profileId));
+    _memoryCache.removeWhere((h) => h.key == key);
+    state = AsyncData(List.from(_memoryCache));
   }
 
   Future<void> clearContentHistory(String contentId) async {
     final user = ref.read(authProvider);
     final profileId = user?.activeProfileId ?? 'guest_profile';
-    final keysToDelete = _box.keys.where((k) => k.toString().startsWith('$profileId|$contentId|') || k.toString() == '$profileId|$contentId');
-    await _box.deleteAll(keysToDelete);
-    state = AsyncData(_loadAll(profileId));
+    final repository = ref.read(playbackHistoryRepositoryProvider);
+    
+    await repository.clearHistory(contentId, profileId);
+    
+    _memoryCache.removeWhere((h) => h.contentId == contentId && h.profileId == profileId);
+    state = AsyncData(List.from(_memoryCache));
   }
 
   void flush() {

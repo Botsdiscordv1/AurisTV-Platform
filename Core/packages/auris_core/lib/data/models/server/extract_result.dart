@@ -37,6 +37,7 @@ class VideoTrackOption {
   final Map<String, String> headers;
   final List<QualityOption> qualities;
   final String quality;
+  final int? color;
 
   const VideoTrackOption({
     required this.label,
@@ -46,6 +47,7 @@ class VideoTrackOption {
     this.headers = const {},
     this.qualities = const [],
     this.quality = '',
+    this.color,
   });
 
   factory VideoTrackOption.fromJson(Map<String, dynamic> json) {
@@ -62,6 +64,7 @@ class VideoTrackOption {
               .toList() ??
           const [],
       quality: json['quality'] as String? ?? '',
+      color: json['color'] is int ? json['color'] : (json['color'] is String ? int.tryParse(json['color'].toString().replaceAll('#', '0xFF')) : null),
     );
   }
 }

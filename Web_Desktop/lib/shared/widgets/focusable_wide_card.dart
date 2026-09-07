@@ -162,7 +162,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                           animate: isMobile ? true : isSelected,
                           style: GoogleFonts.poppins(
                             color: isSelected ? Colors.white : Colors.white.withOpacity(0.95),
-                            fontSize: isMobile ? ResponsiveUtils.sp(context, 14) : 17,
+                            fontSize: ResponsiveUtils.bannerTitleFontSize(context),
                             fontWeight: FontWeight.w700,
                             height: 1.2,
                             letterSpacing: 0.2,
@@ -179,7 +179,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.6),
-                              fontSize: isMobile ? ResponsiveUtils.sp(context, 13) : 15,
+                              fontSize: ResponsiveUtils.bannerTitleFontSize(context) - 2.0,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.2,
                             ),

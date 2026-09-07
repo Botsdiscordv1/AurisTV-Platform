@@ -153,7 +153,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// lugar de entrar/salir de fullscreen del SO/navegador.
   bool get _useVideoFitCycle {
     if (kIsWeb) {
-      return MediaQuery.sizeOf(context).shortestSide < 600;
+      // Senior Fix: En Web, solo usamos el ciclo de iconos si ya estamos en Fullscreen (Modo Táctico)
+      // o si es un dispositivo móvil detectado.
+      return ResponsiveUtils.isTactic(context) && _isFullscreen;
     }
     return _isMobileDevice || ResponsiveUtils.isTablet(context);
   }
@@ -421,8 +423,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   PlaybackHistoryNotifier? _historyNotifier;
   late PlaybackPolicy _policy;
   final ValueNotifier<bool> _showNextNotifier = ValueNotifier<bool>(false);
-  bool _isPreloading = false;
-  ExtractResult? _preloadedNext;
   int _autoplayCountdown = -1;
   bool _isAutoplayResume = false;
   Timer? _autoplayTimer;
@@ -547,6 +547,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (kIsWeb && state == AppLifecycleState.resumed) {
+      // Senior Web Seamless Fix: Eliminamos el 'seek' para evitar el microcorte de audio.
+      // En su lugar, forzamos un rebuild de la UI de Flutter. Esto obliga al widget 'Video'
+      // a re-vincularse con la textura del Canvas de media_kit sin interrumpir el stream.
+      if (_player != null && _player!.state.playing) {
+        debugPrint('[player web] Tab resumed. Waking up renderer without audio interruption.');
+        setState(() {
+          // El rebuild es suficiente para despertar al motor de dibujo.
+        });
+      }
+    }
+
     if (!_isMobileDevice) return;
 
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
@@ -1290,7 +1302,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _navigateToEpisode(bool next) async {
-    if (_currentEpisode == null) return;
+    if (_isTrailer || _currentEpisode == null) return;
     final currentNum = int.tryParse(_currentEpisode!) ?? 1;
     final nextNum = next ? currentNum + 1 : currentNum - 1;
     if (nextNum < 1) return;
@@ -1302,12 +1314,48 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _webViewController = null;
     }
 
-    final sources = ref.read(activeContentSourcesProvider);
-    final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
+    final preloaded = ref.read(nextEpisodePreloadProvider);
+    if (preloaded != null && next) {
+      final tracks = preloaded.tracks.where((t) => !t.isDownload).toList();
+      final sources = ref.read(activeContentSourcesProvider);
+      final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
+      final String nextSourceUrl = baseSource != null
+          ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
+          : _currentSourceUrl;
 
-    final String nextSourceUrl = baseSource != null
-        ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
-        : _currentSourceUrl;
+      _autoplayTimer?.cancel();
+      ref.read(playerPreloadControllerProvider).clearPreload();
+
+      setState(() {
+        _currentEpisode = nextNum.toString();
+        _currentSourceUrl = nextSourceUrl;
+        _isStabilizing = true;
+        _isLoading = true;
+        _hasInitialized = true;
+        _skipResumeOnNextInit = true;
+        _resumePosition = 0;
+        _isAutoplayResume = false;
+        _hasResetPosition = false;
+        _showNextNotifier.value = false;
+        _autoplayCountdown = -1;
+      });
+
+      if (tracks.isNotEmpty) {
+        // Senior Language Fix: Respetar el idioma elegido (LAT/SUB) al reproducir
+        // el episodio pre-cargado, con fallback a SUB si el doblaje aún no existe.
+        final trackIdx = _indexForLanguage(tracks, _currentLanguage);
+        final initialTrack = tracks[trackIdx];
+        _selectedTrackIndex = trackIdx;
+        // Senior Quality Fix: Cargar las calidades de la pista pre-cargada.
+        _applyTrackQualityOptions(initialTrack);
+        if (initialTrack.isEmbed) {
+          _initEmbedPlayer(initialTrack.url, initialTrack.headers);
+        } else {
+          _initPlayer(initialTrack.url, initialTrack.headers);
+        }
+      }
+      return;
+    }
 
     _onEpisodeChanged(nextNum);
   }
@@ -1349,8 +1397,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// cae automáticamente al SUB; si tampoco hay SUB, usa la primera disponible.
   int _indexForLanguage(List<VideoTrackOption> tracks, String? language) {
     if (tracks.isEmpty) return 0;
-    final isLat = language == 'LAT' || language == 'DUB';
-    final isCast = language == 'CAST';
+
+    // Senior Fix: Usar preferencia del usuario si no hay un idioma forzado por la navegación
+    final settings = ref.read(settingsProvider);
+    final String pref = settings.preferredLanguage;
+    final String effectiveLang = language ?? (pref == 'latino' ? 'LAT' : (pref == 'castellano' ? 'CAST' : 'SUB'));
+
+    final isLat = effectiveLang == 'LAT' || effectiveLang == 'DUB';
+    final isCast = effectiveLang == 'CAST';
     
     final latIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'DUB');
     final castIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'CAST');
@@ -1366,9 +1420,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// la selección a "auto" si la pista nueva no las ofrece (o solo tiene una).
   void _applyTrackQualityOptions(VideoTrackOption track) {
     final newQualities = track.qualities;
+    final settings = ref.read(settingsProvider);
+
     setState(() {
       _qualityOptions = newQualities;
-      if (newQualities.length <= 1) _selectedQuality = 'auto';
+      if (newQualities.length <= 1) {
+        _selectedQuality = 'auto';
+      } else {
+        // Senior Fix: Intentar coincidir con la calidad preferida del usuario
+        final pref = settings.preferredQuality.replaceAll('p', '');
+        if (pref == 'auto') {
+          _selectedQuality = 'auto';
+        } else {
+          final found = newQualities.firstWhereOrNull((q) => q.key.contains(pref));
+          _selectedQuality = found?.key ?? 'auto';
+        }
+      }
     });
   }
 
@@ -1401,36 +1468,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return _qualityOptions.length > 1;
   }
 
-  void _preloadNextEpisode() async {
-    if (_isOpEd || _isPreloading || _currentEpisode == null) return;
-    final nextNum = (int.tryParse(_currentEpisode!) ?? 0) + 1;
-    if (widget.totalEpisodes != null && nextNum > widget.totalEpisodes!) return;
-
-    _isPreloading = true;
-
-    try {
-      final sources = ref.read(activeContentSourcesProvider);
-      final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
-      
-      if (baseSource != null) {
-        final nextUrl = buildEpisodeUrl(baseSource.url, baseSource.source, nextNum);
-        final extract = await ref.read(aurisRepositoryProvider).extractVideo(nextUrl, baseSource.source, category: widget.category, direct: !kIsWeb);
-        
-        if (mounted) {
-          setState(() {
-            _preloadedNext = extract;
-            _isPreloading = false;
-          });
-        }
-      }
-    } catch (e) {
-      _isPreloading = false;
-    }
-  }
-
   void _startAutoplayCountdown({bool isResume = false}) {
     if (_isTrailer) return; // [Trailer Fix] No hay reproducción automática para tráilers
-    if (!isResume && !_policy.autoPlayNext) return;
+
+    // Senior Fix: Respetar la preferencia de Autoplay del usuario
+    final settings = ref.read(settingsProvider);
+    if (!isResume && (!settings.autoPlayNextEpisode || !_policy.autoPlayNext)) return;
     
     // Evitar reiniciar si ya está corriendo el mismo tipo de cuenta atrás
     if (_autoplayTimer != null && _autoplayTimer!.isActive && _isAutoplayResume == isResume) {
@@ -1995,8 +2038,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           final double progress = ms / duration;
           final Duration remaining = Duration(milliseconds: duration - ms);
 
-          if (_policy.preloadNext && progress >= 0.90 && !_isPreloading && _preloadedNext == null) {
-            _preloadNextEpisode();
+          if (_policy.preloadNext && progress >= 0.90) {
+            ref.read(playerPreloadControllerProvider).triggerNextPreload(
+              currentSource: _currentSource,
+              currentEpisode: _activeEpisode,
+              totalEpisodes: widget.totalEpisodes,
+              currentSourceUrl: _currentSourceUrl,
+              category: widget.category,
+            );
           }
 
           bool shouldShowNext = false;
@@ -2476,6 +2525,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     WidgetsBinding.instance.removeObserver(this);
 
+    _indicatorTimer?.cancel();
+    _historySaveTimer?.cancel();
+    _skipVisualTimer?.cancel();
+    _centerIndicatorTimer?.cancel();
+    _stabilizationTimer?.cancel();
+    _volumeExitTimer?.cancel();
+
     if (_player != null) {
       // Senior Fix: Red de seguridad final por si _exitPlayer no fue invocado
       final p = _player;
@@ -2598,6 +2654,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Fix: Sincronización forzada de UI antes de cada build para evitar
     // layouts de escritorio en pantallas móviles durante transiciones.
     _isMobileDevice = ResponsiveUtils.isTactic(context);
+    final settings = ref.watch(settingsProvider);
 
     // Senior Shield: Interceptamos la navegación de retroceso (Mouse 4, Botón Atrás, Gestos)
     return PopScope(
@@ -2618,11 +2675,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
         _handleBackNavigation();
       },
-      child: _buildMainContent(context),
+      child: _buildMainContent(context, settings),
     );
   }
 
-  Widget _buildMainContent(BuildContext context) {
+  Widget _buildMainContent(BuildContext context, UserSettings settings) {
     final remoteState = ref.watch(remoteControlProvider);
     final targetId = remoteState.activeTargetDeviceId;
     
@@ -2631,14 +2688,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (target != null) return _buildRemoteModeView(target);
     }
 
-    if (_isTrailer || (widget.source.isEmpty && widget.sourceUrl.isNotEmpty)) {
+    // Senior Direct Flow: Fuentes que ya entregan el stream directo o proxied
+    final bool isDirectSource = _currentSource == 'Themes' || _currentSource == 'YouTube';
+
+    if (_isTrailer || isDirectSource || (widget.source.isEmpty && widget.sourceUrl.isNotEmpty)) {
       if (!_hasInitialized) {
         _hasInitialized = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _initPlayer(widget.sourceUrl);
         });
       }
-      return Material(color: Colors.black, child: _playerView());
+      return Material(color: Colors.black, child: _playerView(settings: settings));
     }
 
     final extractAsync = ref.watch(extractProvider(ExtractParams(
@@ -2671,7 +2731,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             }
             });
           }
-          return _playerView(tracks: tracks);
+          return _playerView(tracks: tracks, settings: settings);
         },
         loading: () => Stack(children: [
             const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Conectando con la fuente...', style: TextStyle(color: Colors.white54))])),
@@ -3236,7 +3296,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
-  Widget _playerView({List<VideoTrackOption> tracks = const []}) {
+  Widget _playerView({List<VideoTrackOption> tracks = const [], required UserSettings settings}) {
     if (_ytController != null) {
       return Stack(
         fit: StackFit.expand,
@@ -3266,7 +3326,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
 
     final playableTracks = tracks.where((t) => !t.isDownload).toList();
-    if (!_isCurrentTrackEmbed(playableTracks)) return _buildMobilePlayer(playableTracks);
+    if (!_isCurrentTrackEmbed(playableTracks)) return _buildMobilePlayer(playableTracks, settings);
 
     // Senior Elite Fix: WebView (Embed) directo sin Scaffold intermedio para máximo aprovechamiento.
     return _buildEmbedStack(playableTracks);
@@ -3465,7 +3525,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  Widget _buildMobilePlayer(List<VideoTrackOption> playableTracks) {
+  Widget _buildMobilePlayer(List<VideoTrackOption> playableTracks, UserSettings settings) {
     final bool isAnyGestureActive = _isBrightnessGesture != null || _showSeekIndicator;
     final bool showAnyway = (_showControls || _isLocked || (_autoplayCountdown >= 0 && _isAutoplayResume) || _showEpisodesOverlay || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
 
@@ -3490,10 +3550,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   controls: NoVideoControls, 
                   fit: _videoFit,
                   subtitleViewConfiguration: SubtitleViewConfiguration(
-                    style: const TextStyle(
+                    style: TextStyle(
                       height: 1.2,
-                      fontSize: 24,
-                      color: Colors.white,
+                      fontSize: 24 * settings.subtitleSize,
+                      color: Color(settings.subtitleColor),
                       fontWeight: FontWeight.bold,
                       backgroundColor: Colors.black38,
                     ),
@@ -3949,6 +4009,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildNextEpisodeOverlay() {
+    if (_isTrailer) return const SizedBox.shrink();
     final isMobile = ResponsiveUtils.isMobile(context);
     final bool isCountdown = _autoplayCountdown >= 0;
     final String label = _isAutoplayResume ? 'Reanudar' : 'Siguiente episodio';
@@ -4115,7 +4176,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 },
               ),
             ),
-            ActiveSourceBadge(serverName: _currentServerName ?? widget.serverName ?? widget.source, quality: _currentTrackQuality),
+            Builder(
+              builder: (context) {
+                final currentTrack = _allTracks.isNotEmpty
+                    ? _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0]
+                    : null;
+
+                // Senior Fix: Usar estrictamente la etiqueta de idioma (quality) y no la de la fuente (label)
+                final String label = currentTrack?.quality ?? _currentTrackQuality;
+
+                Color color = const Color(0xFFEF7A1E);
+                if (currentTrack?.color != null) {
+                  color = Color(currentTrack!.color!);
+                } else {
+                  // Fallback visual por tipo de contenido
+                  final type = trackQualityType(label);
+                  if (type == 'SUB') color = Colors.blueAccent;
+                }
+
+                return ActiveSourceBadge(
+                  serverName: _currentServerName ?? widget.serverName ?? widget.source,
+                  label: label,
+                  color: color,
+                );
+              },
+            ),
             const SizedBox(width: 16),
             if (_isMobileDevice)
               _buildCastIcon(iconSize),

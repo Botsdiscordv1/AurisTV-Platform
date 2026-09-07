@@ -262,8 +262,16 @@ class ExploreScreen extends ConsumerWidget {
                           showInfo: true,
                           onTap: () {
                             final metaTitle = item.romaji ?? item.english ?? item.title;
+                            final kind = item.card?.kind ?? item.type.name;
                             context.push(
-                              '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(item.source)}&category=${item.type.name}&url=${Uri.encodeComponent(item.id)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}&year=${item.year ?? ''}',
+                              '/content/${Uri.encodeComponent(item.title)}'
+                              '?source=${Uri.encodeComponent(item.source)}'
+                              '&category=${item.type.name}'
+                              '&url=${Uri.encodeComponent(item.id)}'
+                              '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
+                              '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
+                              '&year=${item.year ?? ''}'
+                              '&type=${Uri.encodeComponent(kind)}',
                               extra: item.toContentSeed(),
                             );
                           },

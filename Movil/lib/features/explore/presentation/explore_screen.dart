@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:collection/collection.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../home/presentation/providers/home_provider.dart';
 import '../../schedule/presentation/schedule_screen.dart';
 
 final _exploreFilterProvider = StateProvider<String>((ref) => 'En Emisión');
@@ -24,9 +24,7 @@ final _exploreContentProvider = FutureProvider<List<MediaItem>>((ref) async {
 
   List<MediaItem> results = [];
 
-  // Obtenemos la lista base según el filtro (Sin llamar a búsqueda completa de API)
   if (filter == 'En Emisión') {
-    // Para "En Emisión" buscamos en TODO el calendario semanal disponible
     final schedule = await ref.watch(scheduleProvider.future);
     results = schedule.days.expand((d) => d.items).where((item) => item.sourceAvailable).map((item) {
       final ep = item.episode ?? 0;
@@ -63,7 +61,6 @@ final _exploreContentProvider = FutureProvider<List<MediaItem>>((ref) async {
     results = List.from(list);
   }
 
-  // Filtrado LOCAL: solo sobre lo que el filtro actual ofrece
   if (query.isNotEmpty) {
     results = results.where((item) {
       final t = item.title.toLowerCase();
@@ -73,7 +70,6 @@ final _exploreContentProvider = FutureProvider<List<MediaItem>>((ref) async {
     }).toList();
   }
 
-  // Aplicar ordenamiento
   switch (sort) {
     case ExploreSort.recent:
       results.sort((a, b) => (b.year ?? 0).compareTo(a.year ?? 0));
@@ -105,12 +101,11 @@ class ExploreScreen extends ConsumerWidget {
     final scheduleAsync = ref.watch(scheduleProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D), // Color de fondo de la app
+      backgroundColor: const Color(0xFF0B0B0D),
       body: SafeArea(
         child: CustomScrollView(
           physics: const ClampingScrollPhysics(),
           slivers: [
-            // Barra superior de filtros
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -160,7 +155,6 @@ class ExploreScreen extends ConsumerWidget {
               ),
             ),
 
-            // Buscador y botón de filtro (Solo si no es Calendario)
             if (selectedFilter != 'Calendario')
               SliverToBoxAdapter(
                 child: Padding(
@@ -176,15 +170,15 @@ class ExploreScreen extends ConsumerWidget {
                           ),
                           child: TextField(
                             onChanged: (val) => ref.read(_exploreSearchQueryProvider.notifier).state = val,
-                            textAlignVertical: TextAlignVertical.center, // Senior Fix: Centrado vertical real
+                            textAlignVertical: TextAlignVertical.center,
                             style: const TextStyle(color: Colors.white, fontSize: 16),
                             decoration: const InputDecoration(
-                              isDense: true, // Senior Fix: Mejor centrado
+                              isDense: true,
                               hintText: 'Buscar...',
                               hintStyle: TextStyle(color: Colors.white38),
                               prefixIcon: Icon(Icons.search, color: Colors.white38),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero, // Eliminamos padding manual que causa desfase
+                              contentPadding: EdgeInsets.zero,
                             ),
                           ),
                         ),
@@ -224,7 +218,6 @@ class ExploreScreen extends ConsumerWidget {
                 ),
               ),
 
-            // Grid de contenido o Calendario
             if (selectedFilter == 'Calendario')
               ...[
                 scheduleAsync.when(
@@ -244,13 +237,20 @@ class ExploreScreen extends ConsumerWidget {
                   data: (items) => SliverGrid(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: isMobile ? 3 : 5,
-                      mainAxisSpacing: isMobile ? 12 : 24, // Senior Fix: Compactado igual que el calendario
+                      mainAxisSpacing: isMobile ? 12 : 24,
                       crossAxisSpacing: 12,
-                      childAspectRatio: 0.55, // Senior Fix: Proporción ajustada para evitar aire muerto
+                      childAspectRatio: 0.55,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final item = items[index];
+                        final historyAsync = ref.watch(playbackHistoryStateProvider);
+                        double? progress;
+                        historyAsync.whenData((historyItems) {
+                          final match = historyItems.firstWhereOrNull((h) => h.contentId == item.id);
+                          if (match != null) progress = match.progress;
+                        });
+
                         return FocusablePosterCard(
                           title: item.title,
                           posterUrl: item.posterUrl,
@@ -260,10 +260,19 @@ class ExploreScreen extends ConsumerWidget {
                           subtitle: item.subtitle,
                           rating: formatRating(item.rating),
                           showInfo: true,
+                          progress: progress,
                           onTap: () {
                             final metaTitle = item.romaji ?? item.english ?? item.title;
+                            final kind = item.card?.kind ?? item.type.name;
                             context.push(
-                              '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(item.source)}&category=${item.type.name}&url=${Uri.encodeComponent(item.id)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}&year=${item.year ?? ''}',
+                              '/content/${Uri.encodeComponent(item.title)}'
+                              '?source=${Uri.encodeComponent(item.source)}'
+                              '&category=${item.type.name}'
+                              '&url=${Uri.encodeComponent(item.id)}'
+                              '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
+                              '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
+                              '&year=${item.year ?? ''}'
+                              '&type=${Uri.encodeComponent(kind)}',
                               extra: item.toContentSeed(),
                             );
                           },
@@ -282,7 +291,7 @@ class ExploreScreen extends ConsumerWidget {
               ),
             
             if (selectedFilter != 'Calendario')
-              const SliverPadding(padding: EdgeInsets.only(bottom: 24)), // Solo aire al final si es el Grid
+              const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
           ],
         ),
       ),
@@ -368,5 +377,3 @@ class _FilterButton extends StatelessWidget {
     );
   }
 }
-
-

@@ -16,37 +16,29 @@ import 'package:auris_core/data/models/server/search_result.dart';
 /// vienen de fuentes de películas (GnulaHD) hacia el server de anime (3000).
 String inferOpenCategory(SearchResult result, [String fallback = 'all']) {
   final q = result.quality.toLowerCase();
-  final type = (result.type ?? '').toLowerCase();
-  final kind = (result.kind ?? '').toLowerCase();
-
-  if (q.contains('pelicula') ||
-      q.contains('película') ||
-      q.contains('movie') ||
-      q.contains('film') ||
-      type.contains('movie') ||
-      kind == 'movie') {
-    return 'movie';
-  }
-  if (q.contains('dorama') ||
-      q.contains('drama') ||
-      q.contains('serie') ||
-      q.contains('series') ||
-      q.contains('tv') ||
-      type.contains('tv') ||
-      kind == 'series') {
-    return 'series';
-  }
-  if (q.contains('anime') || type.contains('anime') || kind == 'anime') {
-    return 'anime';
-  }
-  // Algunos servidores (movies-series) no envían kind/type/category, pero la
-  // URL revela la categoría (p.ej. onlypelis.com/serie/... vs /pelicula/...).
+  final type = (result.type ?? '').toLowerCase().trim();
+  final kind = (result.kind ?? '').toLowerCase().trim();
   final url = (result.url ?? '').toLowerCase();
-  if (url.contains('serie') || url.contains('series') || url.contains('dorama')) {
-    return 'series';
-  }
-  if (url.contains('pelicula') || url.contains('película') || url.contains('movie') || url.contains('film')) {
-    return 'movie';
-  }
+
+  // 1. Prioridad: Metadatos explícitos del servidor (kind)
+  if (kind == 'movie' || kind == 'pelicula') return 'movie';
+  if (kind == 'series' || kind == 'serie' || kind == 'tv') return 'series';
+  if (kind == 'anime') return 'anime';
+
+  // 2. Prioridad: Calidad/Etiqueta visual (quality)
+  if (q.contains('pelicula') || q.contains('película') || q.contains('movie')) return 'movie';
+  if (q.contains('serie') || q.contains('series') || q.contains('tv') || q.contains('dorama') || q.contains('drama')) return 'series';
+  if (q.contains('anime')) return 'anime';
+
+  // 3. Prioridad: Estructura de la URL
+  if (url.contains('/pelicula/') || url.contains('/movie/')) return 'movie';
+  if (url.contains('/serie/') || url.contains('/series/') || url.contains('/dorama/') || url.contains('/tv/')) return 'series';
+  if (url.contains('/anime/')) return 'anime';
+
+  // 4. Prioridad: Metadato 'type'
+  if (type.contains('movie')) return 'movie';
+  if (type.contains('tv') || type.contains('series')) return 'series';
+  if (type.contains('anime')) return 'anime';
+
   return fallback;
 }

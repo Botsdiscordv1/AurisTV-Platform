@@ -202,13 +202,29 @@ final GoRouter appRouter = GoRouter(
         final title = state.pathParameters['title']!;
         final source = state.uri.queryParameters['source'] ?? '';
         final url = state.uri.queryParameters['url'] ?? '';
+        final quality = state.uri.queryParameters['quality'];
+        final type = state.uri.queryParameters['type'];
         final metadataTitle = state.uri.queryParameters['metadataTitle'];
         final banner = state.uri.queryParameters['banner'];
         final category = state.uri.queryParameters['category'] ?? 'all';
         final year = int.tryParse(state.uri.queryParameters['year'] ?? '');
-        final totalSeasons = int.tryParse(state.uri.queryParameters['totalSeasons'] ?? '');
-        final extraResult = state.extra is SearchResult ? state.extra as SearchResult : null;
-        return ContentScreen(title: title, source: source, url: url, metadataTitle: metadataTitle, banner: banner, category: category, year: year, totalSeasons: totalSeasons, result: extraResult);
+        final totalSeasons =
+            int.tryParse(state.uri.queryParameters['totalSeasons'] ?? '');
+        final extraResult =
+            state.extra is SearchResult ? state.extra as SearchResult : null;
+        return ContentScreen(
+          title: title,
+          source: source,
+          url: url,
+          quality: quality,
+          type: type,
+          metadataTitle: metadataTitle,
+          banner: banner,
+          category: category,
+          year: year,
+          totalSeasons: totalSeasons,
+          result: extraResult,
+        );
       },
     ),
     GoRoute(

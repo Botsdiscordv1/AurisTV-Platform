@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'api_endpoints.dart';
@@ -9,8 +11,8 @@ class ApiClient {
     _dio = Dio(
       BaseOptions(
         baseUrl: ApiEndpoints.baseUrl,
-        connectTimeout: const Duration(seconds: 10), 
-        receiveTimeout: const Duration(seconds: 60), 
+        connectTimeout: const Duration(seconds: 35), // Senior Fix: Subido a 35s para resolvers lentos
+        receiveTimeout: const Duration(seconds: 90), // Senior Fix: Subido a 90s para streams de datos largos
         headers: {
           'Accept': 'application/json',
           // Senior Web Fix: No definimos Content-Type global para evitar Preflight (OPTIONS) innecesarios en GET.
@@ -85,11 +87,13 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
     String? baseUrl,
     Options? options,
+    CancelToken? cancelToken,
   }) {
     return _dio.get<T>(
       _resolvePath(path, baseUrl),
       queryParameters: queryParameters,
       options: options,
+      cancelToken: cancelToken,
     );
   }
 
@@ -99,12 +103,14 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
     String? baseUrl,
     Options? options,
+    CancelToken? cancelToken,
   }) {
     return _dio.post<T>(
       _resolvePath(path, baseUrl),
       data: data,
       queryParameters: queryParameters,
       options: options ?? Options(contentType: Headers.jsonContentType),
+      cancelToken: cancelToken,
     );
   }
 
@@ -114,12 +120,38 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
     String? baseUrl,
     Options? options,
+    CancelToken? cancelToken,
   }) {
     return _dio.delete<T>(
       _resolvePath(path, baseUrl),
       data: data,
       queryParameters: queryParameters,
       options: options ?? Options(contentType: Headers.jsonContentType),
+      cancelToken: cancelToken,
     );
+  }
+
+  /// Abre una conexión de streaming para recibir datos fragmentados (NDJSON/SSE).
+  Stream<String> getStream(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    String? baseUrl,
+    CancelToken? cancelToken,
+  }) async* {
+    final response = await _dio.get<ResponseBody>(
+      _resolvePath(path, baseUrl),
+      queryParameters: queryParameters,
+      cancelToken: cancelToken,
+      options: Options(responseType: ResponseType.stream),
+    );
+
+    if (response.data != null) {
+      // Senior Fix: Transformar el stream de bytes en líneas de texto utf-8.
+      // Usamos un transformador que maneja correctamente los fragmentos parciales.
+      yield* response.data!.stream
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(LineSplitter());
+    }
   }
 }

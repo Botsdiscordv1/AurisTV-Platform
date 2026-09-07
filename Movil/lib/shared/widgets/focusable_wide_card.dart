@@ -42,7 +42,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.useMobileLayout;
 
     return Focus(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
@@ -151,7 +151,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                 // Senior Fix: Área de texto con altura fija para 2 líneas (Título + Subtítulo)
                 // Esto permite que el banner mantenga su información extra sin romper la alineación inferior.
                 SizedBox(
-                  height: isMobile ? ResponsiveUtils.sp(context, 42) : 52,
+                  height: ResponsiveUtils.sp(context, 42), // Senior Fix: Altura adaptativa
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -162,7 +162,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                           animate: isMobile ? true : isSelected,
                           style: GoogleFonts.poppins(
                             color: isSelected ? Colors.white : Colors.white.withOpacity(0.95),
-                            fontSize: isMobile ? ResponsiveUtils.sp(context, 14) : 17,
+                            fontSize: ResponsiveUtils.bannerTitleFontSize(context),
                             fontWeight: FontWeight.w700,
                             height: 1.2,
                             letterSpacing: 0.2,
@@ -179,7 +179,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.6),
-                              fontSize: isMobile ? ResponsiveUtils.sp(context, 13) : 15,
+                              fontSize: ResponsiveUtils.bannerTitleFontSize(context) - 2.0,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.2,
                             ),

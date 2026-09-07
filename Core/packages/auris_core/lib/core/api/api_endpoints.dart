@@ -84,15 +84,15 @@ class ApiEndpoints {
     if (c == 'kdrama' || c == 'kdramas' || c == 'dorama' || c == 'doramas') return kdramasBaseUrl;
     if (c == 'anime' || c == 'animes' || c == 'animé' ||
         c == 'anime-seasonal' || c == 'anime-movies' ||
-        c == 'movie_anime') return animeBaseUrl;
+        c == 'movie_anime') return animeBaseUrl; // Senior Fix: inicio removido, animes es el target
     return moviesSeriesBaseUrl;
   }
 
   static String baseUrlForSource(String source, [String? category]) {
     final s = source.toLowerCase();
     const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
-    const animeHints = ['jkanime', 'animeav1', 'aniyae', 'animelatino', 'fiuzidragon', 'animed23', 'animejara', 'katanime'];
-    const movieHints = ['gnula', 'gnulahd'];
+    const animeHints = ['jkanime', 'animeav1', 'animed23', 'animejara', 'themes'];
+    const movieHints = ['gnulahd', 'onlypelis', 'pelispedia'];
     if (kdramaHints.any(s.contains)) return kdramasBaseUrl;
     if (movieHints.any(s.contains)) return moviesSeriesBaseUrl;
     if (animeHints.any(s.contains)) return animeBaseUrl;
@@ -136,14 +136,14 @@ class ApiEndpoints {
 
   /// Pasa una imagen por el proxy del servidor si es necesario.
   /// Implementación Senior: Idempotente, Anti-Recursiva y con soporte de Weserv CDN.
+  /// [width] y [height] - Dimensiones deseadas para optimizar RAM y red.
   /// [highQuality] - Si es true, usa parámetros de máxima fidelidad (ideal para 4K/Backdrops).
-  static String proxyImage(String? url, {bool highQuality = false, String? fallbackUrl}) {
+  static String proxyImage(String? url, {int? width, int? height, bool highQuality = false, String? fallbackUrl}) {
     if (url == null || url.isEmpty) return '';
 
     String workingUrl = url;
 
-    // 1. DESENVOLVER (Unwrap) TOTAL:
-    // Limpiamos la URL de cualquier proxy previo (nuestro o externo) para evitar recursividad.
+    // ... (lógica de desunwrapping omitida para brevedad, sigue igual)
     while (workingUrl.contains('url=http') || workingUrl.contains('/api/proxy/image') || workingUrl.contains('weserv.nl')) {
        if (workingUrl.contains('url=http')) {
          final int index = workingUrl.lastIndexOf('url=http');
@@ -152,19 +152,12 @@ class ApiEndpoints {
          try {
            final uri = Uri.parse(workingUrl);
            final nested = uri.queryParameters['url'];
-           if (nested != null) {
-             workingUrl = nested;
-           } else {
-             break;
-           }
+           if (nested != null) workingUrl = nested; else break;
          } catch (_) { break; }
-       } else {
-         break; 
-       }
+       } else break; 
        
        try {
          workingUrl = Uri.decodeFull(workingUrl);
-         // Limpiar parámetros de Weserv que se queden pegados a la URL original
          if (workingUrl.contains('&output=')) workingUrl = workingUrl.split('&output=')[0];
          if (workingUrl.contains('?output=')) workingUrl = workingUrl.split('?output=')[0];
        } catch (_) {}
@@ -172,43 +165,51 @@ class ApiEndpoints {
 
     final String lowerUrl = workingUrl.toLowerCase();
 
-    // 2. EXCEPCIONES DE NUESTRO SERVIDOR (Bypass de Weserv):
-    // Si la URL ya es de nuestro servidor o es local, usamos fixUrl directamente.
     if (_isOurServer(workingUrl) || workingUrl.startsWith('/') || 
         lowerUrl.contains('localhost') || lowerUrl.contains('127.0.0.1')) {
       return fixUrl(workingUrl);
     }
 
-    // 3. MANEJO DE CDNs "SENSIBLES" (Anilist, WordPress):
-    // Estos CDNs bloquean agresivamente a Weserv y DEBEN usar nuestro VPS en Web.
-    const sensitiveCDNs = [
-      'anilist.co', 'wp.com', 'animed23.com'
-    ];
+    const sensitiveCDNs = ['anilist.co', 'wp.com', 'animed23.com'];
     if (sensitiveCDNs.any((k) => lowerUrl.contains(k))) {
-      if (kIsWeb) {
-        return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
-      }
-      return workingUrl; // Directo en Móvil/TV
+      if (kIsWeb) return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+      return workingUrl;
     }
 
-    // 4. TODO LO DEMÁS EXTERNO -> WESERV (Incluyendo TMDB, JKAnime, etc.)
-    // TMDB es amigable con Weserv y nos permite ahorrar ancho de banda masivo.
     if (workingUrl.startsWith('http')) {
+      final String fallbackParam = (fallbackUrl != null && fallbackUrl.isNotEmpty) 
+          ? '&errorredirect=${Uri.encodeComponent(fallbackUrl)}' 
+          : '';
+      
+      String params = '&output=webp';
       if (highQuality) {
-        return 'https://images.weserv.nl/?url=${Uri.encodeComponent(workingUrl)}&output=webp&q=95&il';
+        params += '&q=100&il';
       } else {
-        return 'https://images.weserv.nl/?url=${Uri.encodeComponent(workingUrl)}&output=webp&q=82';
+        params += '&q=82';
+        // Añadir dimensiones si se proveen
+        if (width != null) params += '&w=$width';
+        if (height != null) params += '&h=$height';
+        if (width != null || height != null) params += '&fit=cover';
       }
+          
+      return 'https://images.weserv.nl/?url=${Uri.encodeComponent(workingUrl)}$params$fallbackParam';
     }
 
     return workingUrl;
   }
 
   static const String search = '/api/search';
-  static String searchByCategory(String category) => '/api/search/$category';
+  static String searchByCategory(String category) {
+    final c = category.toLowerCase();
+    // Senior Fix: El servidor de anime no reconoce 'peliculas' o 'series' en el path.
+    // Siempre usamos el endpoint genérico /api/search/anime para búsquedas en el puerto 3000.
+    if (c == 'anime' || c == 'movie_anime') return '/api/search/anime';
+    return '/api/search/$c';
+  }
   static const String searchAnimeVariants = '/api/search/anime/variants';
   static const String detailAnime = '/api/detail/anime';
   static const String detailMovie = '/api/detail/movie';
+  static const String homeHero = '/api/home/hero'; // Senior Fix: Nuevo endpoint dedicado para HeroBanner
   static const String homeEditorial = '/api/home/editorial';
   static String homeRecent(int limit) => '/api/home/recent?limit=$limit';
   static String homeTop(int limit) => '/api/home/top?limit=$limit';

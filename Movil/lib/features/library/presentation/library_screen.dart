@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
+import '../widgets/library_media_card.dart';
+import '../../home/widgets/wide_content_row.dart';
 
 import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
@@ -35,26 +37,59 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     super.dispose();
   }
 
-  bool _isHighQualityThumbnail(String? url) {
-    if (url == null || url.isEmpty) return false;
-    final highResHints = ['tmdb.org', 'anilist.co', 'amazon.com', 'googleusercontent.com', 'blogspot.com'];
-    return highResHints.any((hint) => url.contains(hint));
+  WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
+    String displayTitle = h.title ?? 'Contenido';
+    final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
+    if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+      displayTitle = 'Ep ${h.episode} • $displayTitle';
+    }
+
+    String remainingText = '';
+    final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
+    if (remainingMs > 0) {
+      final minutes = (remainingMs / 60000).ceil();
+      remainingText = 'Quedan $minutes min';
+    }
+
+    return WideContentItem(
+      id: h.contentId,
+      title: displayTitle,
+      imageUrl: h.posterUrl ?? h.bannerUrl ?? '',
+      progress: h.progress,
+      subtitle: remainingText,
+      onDelete: () {
+        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+      },
+      originalItem: h,
+    );
+  }
+
+  void _onHistoryTap(BuildContext context, PlaybackHistory item) {
+    final uri = '/player/${Uri.encodeComponent(item.contentId)}'
+        '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
+        '&source=${Uri.encodeComponent(item.source ?? "")}'
+        '&episode=${item.episode ?? ""}'
+        '&season=${item.season ?? ""}'
+        '&startPosition=${item.positionInMilliseconds}'
+        '&category=${Uri.encodeComponent(item.category ?? "anime")}'
+        '&title=${Uri.encodeComponent(item.title ?? "")}'
+        '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
+        '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
+        '&language=${Uri.encodeComponent(item.language ?? "")}';
+    context.push(uri);
   }
 
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    final width = MediaQuery.of(context).size.width;
-    final hPadding = isMobile ? 16.0 : (width - 1000).clamp(32.0, double.infinity) / 2;
+    final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     
     final favorites = ref.watch(favoritesProvider);
     final historyAsync = ref.watch(playbackHistoryStateProvider);
     final user = ref.watch(authProvider);
 
-    // Senior Fix: Filtrado Inteligente basado en Procedencia y Categoría
     final filteredFavorites = favorites.where((f) {
       if (_activeFilter == 'todos') return true;
-      
       final source = f.source.toLowerCase();
       final cat = f.category.toLowerCase();
       const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
@@ -69,7 +104,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         return (cat.contains('movie') || cat.contains('pelicula') || movieHints.any((h) => source.contains(h))) && !cat.contains('anime');
       }
       if (_activeFilter == 'series') return cat.contains('serie') || cat.contains('tv');
-      
       return false;
     }).toList();
 
@@ -80,11 +114,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         preferredSize: const Size.fromHeight(60),
         child: ClipRect(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: _isScrolled ? 20 : 0, sigmaY: _isScrolled ? 20 : 0),
+            filter: ImageFilter.blur(sigmaX: _isScrolled ? 15.0 : 0.0, sigmaY: _isScrolled ? 15.0 : 0.0),
             child: AppBar(
               title: Text('Mi biblioteca', 
                 style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20)),
-              backgroundColor: _isScrolled ? const Color(0xFF0B0B0D).withValues(alpha: 0.5) : Colors.transparent,
+              backgroundColor: _isScrolled ? const Color(0xFF0B0B0D).withValues(alpha: 0.6) : Colors.transparent,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               centerTitle: false,
@@ -109,76 +143,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         slivers: [
           SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).padding.top + 60)),
           
-          // 1. SECCIÓN: CONTINUAR VIENDO (HISTORIAL)
+          // 1. SECCIÓN: CONTINUAR VIENDO (HISTORIAL UNIFICADO)
           historyAsync.when(
-            data: (history) {
-              if (history.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+            data: (items) {
+              if (items.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
               return SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 16),
-                      child: _SectionHeader(title: 'Recién vistos', count: history.length),
-                    ),
-                    SizedBox(
-                      height: 180,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: EdgeInsets.symmetric(horizontal: hPadding),
-                        itemCount: history.take(10).length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 16),
-                        itemBuilder: (context, index) {
-                          final h = history[index];
-                          
-                          // Senior Logic: Misma lógica de imagen que en Home
-                          final bool useEpisodeThumb = _isHighQualityThumbnail(h.posterUrl);
-                          final String finalImageUrl = useEpisodeThumb 
-                              ? (h.posterUrl ?? '') 
-                              : (h.bannerUrl ?? h.posterUrl ?? '');
-
-                          // Formateo de Título
-                          String displayTitle = h.title ?? 'Contenido';
-                          final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
-                          if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
-                            displayTitle = 'Ep ${h.episode} • $displayTitle';
-                          }
-
-                          // Tiempo restante
-                          String remainingText = '';
-                          final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
-                          if (remainingMs > 0) {
-                            final duration = Duration(milliseconds: remainingMs);
-                            final hours = duration.inHours;
-                            final minutes = duration.inMinutes % 60;
-                            if (hours > 0) {
-                              remainingText = '$hours h $minutes min restantes';
-                            } else {
-                              remainingText = '${minutes > 0 ? minutes : 1} min restantes';
-                            }
-                          }
-
-                          return _HistoryCard(
-                            item: h,
-                            displayTitle: displayTitle,
-                            imageUrl: finalImageUrl,
-                            remainingText: remainingText,
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                  ],
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 24, top: 12),
+                  child: WideContentRow(
+                    title: 'Continuar Viendo',
+                    items: items.map((h) => _mapHistoryToWide(ref, h)).toList(),
+                    onItemTap: (wideItem) => _onHistoryTap(context, wideItem.originalItem as PlaybackHistory),
+                  ),
                 ),
               );
             },
-            loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+            loading: () => SliverToBoxAdapter(child: RowSkeleton(isWide: true)),
             error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
           ),
 
           // 2. SECCIÓN: FAVORITOS CON FILTROS
           SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: hPadding),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             sliver: SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -207,22 +193,22 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             )
           else
             SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: hPadding),
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isMobile ? 3 : 6,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
                   mainAxisSpacing: 20,
                   crossAxisSpacing: 12,
                   childAspectRatio: 0.65,
                 ),
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) => _LibraryMediaCard(item: filteredFavorites[index]),
+                  (context, index) => LibraryMediaCard(item: filteredFavorites[index]),
                   childCount: filteredFavorites.length,
                 ),
               ),
             ),
           
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
       ),
     );
@@ -309,146 +295,3 @@ class _EmptyState extends StatelessWidget {
     ),
   );
 }
-
-class _HistoryCard extends StatelessWidget {
-  final PlaybackHistory item;
-  final String displayTitle;
-  final String imageUrl;
-  final String remainingText;
-
-  const _HistoryCard({
-    required this.item,
-    required this.displayTitle,
-    required this.imageUrl,
-    required this.remainingText,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        final uri = '/player/${Uri.encodeComponent(item.contentId)}'
-            '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
-            '&source=${Uri.encodeComponent(item.source ?? "")}'
-            '&episode=${item.episode ?? ""}'
-            '&season=${item.season ?? ""}'
-            '&startPosition=${item.positionInMilliseconds}'
-            '&category=${Uri.encodeComponent(item.category ?? "anime")}'
-            '&title=${Uri.encodeComponent(item.title ?? "")}'
-            '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-            '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
-            '&language=${Uri.encodeComponent(item.language ?? "")}';
-        context.push(uri);
-      },
-      child: SizedBox(
-        width: 260,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl: ApiEndpoints.proxyImage(imageUrl),
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(color: Colors.white10),
-                      errorWidget: (_, __, ___) => Container(color: Colors.white10),
-                    ),
-                    Positioned(
-                      bottom: 0, left: 0, right: 0,
-                      child: Container(
-                        height: 4, color: Colors.white24,
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: item.progress.clamp(0.0, 1.0),
-                          child: Container(color: const Color(0xFFEF7A1E)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis, 
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-            if (remainingText.isNotEmpty)
-              Text(remainingText, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LibraryMediaCard extends StatelessWidget {
-  final FavoriteItem item;
-  const _LibraryMediaCard({required this.item});
-
-  String _getDisplayCategory(FavoriteItem item) {
-    final source = item.source.toLowerCase();
-    // Senior Fix: Hints para identificar el servidor de procedencia
-    const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
-    const animeHints = ['jkanime', 'animeav1', 'animeflv', 'aniyae', 'animelatino', 'fiuzidragon', 'tioanime', 'animed23', 'animejara', 'katanime', 'animegratis'];
-    const movieHints = ['gnula', 'gnulahd'];
-
-    if (kdramaHints.any((h) => source.contains(h))) return 'KDRAMA';
-    if (animeHints.any((h) => source.contains(h))) return 'ANIME';
-    
-    // Senior Fix para fuentes de películas/series (GnulaHD)
-    if (movieHints.any((h) => source.contains(h))) {
-      if (item.category.toLowerCase().contains('anime')) return 'ANIME';
-      return 'PELÍCULA';
-    }
-    
-    // Para el puerto 3001 (Películas y Series)
-    final cat = item.category.toLowerCase();
-    if (cat.contains('movie') || cat.contains('pelicula')) return 'PELÍCULA';
-    if (cat.contains('serie') || cat.contains('tv')) return 'SERIE';
-    
-    return item.category.toUpperCase();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        final uri = '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(item.source)}&category=${Uri.encodeComponent(item.category)}&url=${Uri.encodeComponent(item.url)}&metadataTitle=${Uri.encodeComponent(item.title)}&banner=${Uri.encodeComponent(item.bannerUrl)}';
-        context.push(uri);
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4)),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
-                  imageUrl: ApiEndpoints.proxyImage(item.posterUrl),
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  placeholder: (_, __) => Container(color: Colors.white10),
-                  errorWidget: (_, __, ___) => Container(color: Colors.white10),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, 
-            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-          Text(_getDisplayCategory(item), style: const TextStyle(fontSize: 9, color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-        ],
-      ),
-    );
-  }
-}
-

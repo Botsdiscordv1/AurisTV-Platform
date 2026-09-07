@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../providers/search_provider.dart';
-import '../../../../shared/widgets/skeletons.dart';
+import '../../../../shared/widgets/focusable_poster_card.dart';
 
 class SearchHistorySection extends ConsumerWidget {
   final Function(String) onQueryTap;
@@ -97,39 +97,97 @@ class SearchGenresGrid extends StatelessWidget {
           itemCount: genres.length,
           itemBuilder: (context, index) {
             final genre = genres[index];
-            return InkWell(
+            return _GenreCard(
+              name: genre['name'] as String,
+              color: genre['color'] as Color,
+              icon: genre['icon'] as IconData,
               onTap: () => onGenreTap(genre['name'] as String),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: genre['color'] as Color,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.05)),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      right: -5,
-                      bottom: -5,
-                      child: Icon(genre['icon'] as IconData, size: 48, color: Colors.white.withOpacity(0.12)),
-                    ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 16.0),
-                        child: Text(
-                          genre['name'] as String,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             );
           },
         ),
       ],
+    );
+  }
+}
+
+class _GenreCard extends StatefulWidget {
+  final String name;
+  final Color color;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _GenreCard({
+    required this.name,
+    required this.color,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  State<_GenreCard> createState() => _GenreCardState();
+}
+
+class _GenreCardState extends State<_GenreCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedScale(
+        scale: _isHovered ? 1.05 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: widget.color,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _isHovered ? Colors.white24 : Colors.white.withValues(alpha: 0.05),
+                width: 1.2,
+              ),
+              boxShadow: _isHovered ? [
+                BoxShadow(
+                  color: widget.color.withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                )
+              ] : [],
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -5,
+                  bottom: -5,
+                  child: Icon(
+                    widget.icon,
+                    size: 48,
+                    color: Colors.white.withValues(alpha: _isHovered ? 0.35 : 0.25),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16.0),
+                    child: Text(
+                      widget.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

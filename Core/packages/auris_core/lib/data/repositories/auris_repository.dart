@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import '../models/server/anilist_media.dart';
 import '../models/server/editorial_section.dart';
 import '../models/server/episodes_response.dart';
@@ -13,7 +14,27 @@ import '../models/server/gallery.dart';
 import '../models/media_item.dart';
 
 abstract class AurisRepository {
-  Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase});
+  Future<SearchResponse> search(
+    String category, 
+    String query, {
+    int? year, 
+    String? server, 
+    String? phase,
+    String? imgSize,
+    CancelToken? cancelToken,
+  });
+
+  /// Realiza una búsqueda en tiempo real que emite resultados parciales conforme llegan (Streaming).
+  Stream<SearchResponse> searchStream(
+    String category, 
+    String query, {
+    int? year, 
+    String? server, 
+    String? phase,
+    String? imgSize,
+    CancelToken? cancelToken,
+  });
+
   Future<SearchResponse> searchAnimeVariants({
     required String q,
     String? display,
@@ -29,19 +50,27 @@ abstract class AurisRepository {
     int? year,
     int? season,
     String? kind,
+    String? url,
+    String? type,
+    String? imgSize,
   });
   Future<MovieDetail?> getMovieDetail({
     required String title,
     int? year,
     String? metadataTitle,
     String? url,
-    String? quality,
+    String? type,
     String category = 'movie',
     String? server,
+    String? kind,
+    String? imgSize,
   });
+
+  Future<List<MediaItem>> getHomeHero({String category = 'anime', String? imgSize});
+
   Future<ScheduleResponse> getSchedule();
   Future<List<SourceInfo>> getSources();
-  Future<EditorialResponse> getEditorial();
+  Future<EditorialResponse> getEditorial({String? imgSize});
   Future<AnimeTitleInfo> getAnimeTitles(String query);
   Future<MovieTitleInfo> getMovieTitles(String query);
   Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false});
@@ -53,4 +82,9 @@ abstract class AurisRepository {
   Future<List<MediaItem>> getHomeRecent(int limit);
   Future<List<MediaItem>> getHomeTop(int limit);
   Future<GalleryResponse> getGallery({int? tmdbId, String kind = 'tv', String? title, int? year});
+
+  // --- NOTIFICACIONES ---
+  Future<void> registerDeviceToken(String userId, String token, String platform);
+  Future<void> subscribeToTopic(String userId, String topic);
+  Future<void> unsubscribeFromTopic(String userId, String topic);
 }

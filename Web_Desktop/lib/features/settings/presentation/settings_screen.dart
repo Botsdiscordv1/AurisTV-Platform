@@ -13,6 +13,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sourcesAsync = ref.watch(sourcesProvider);
+    final settings = ref.watch(settingsProvider);
     const primaryColor = Color(0xFFEF7A1E);
     final isMobile = ResponsiveUtils.isMobile(context);
 
@@ -22,6 +23,16 @@ class SettingsScreen extends ConsumerWidget {
         title: const Text('Ajustes'),
         backgroundColor: const Color(0xFF0B0B0D),
         surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/inicio');
+            }
+          },
+        ),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -43,7 +54,7 @@ class SettingsScreen extends ConsumerWidget {
                         child: Row(
                           children: [
                             GestureDetector(
-                              onTap: () => context.push('/settings/avatar'),
+                              onTap: () => context.go('/settings/avatar'),
                               child: Stack(
                                 alignment: Alignment.bottomRight,
                                 children: [
@@ -97,7 +108,7 @@ class SettingsScreen extends ConsumerWidget {
                               )
                             else
                               ElevatedButton(
-                                onPressed: () => context.push('/login'),
+                                onPressed: () => context.go('/login'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: primaryColor,
                                   foregroundColor: Colors.black,
@@ -114,19 +125,19 @@ class SettingsScreen extends ConsumerWidget {
                         icon: Icons.switch_account_outlined,
                         title: 'Cambiar Perfil',
                         subtitle: 'Seleccionar otro integrante',
-                        onTap: () => context.push('/select-profile'),
+                        onTap: () => context.go('/select-profile'),
                       ),
                       _SettingsTile(
                         icon: Icons.hub_outlined,
                         title: 'Conexiones Externas',
                         subtitle: 'AniList, Simkl y más',
-                        onTap: () => context.push('/connections'),
+                        onTap: () => context.go('/connections'),
                       ),
                       _SettingsTile(
                         icon: Icons.video_library_outlined,
                         title: 'Mi espacio',
                         subtitle: 'Favoritos, historial y más',
-                        onTap: () => context.push('/settings/library'),
+                        onTap: () => context.go('/settings/library'),
                       ),
                     ],
                   );
@@ -135,18 +146,55 @@ class SettingsScreen extends ConsumerWidget {
 
               // SECCIÓN: REPRODUCCIÓN
               const _SectionHeader(title: 'Reproducción'),
-              const _SettingsCard(
+              _SettingsCard(
                 child: Column(
                   children: [
                     _SettingsTile(
                       icon: Icons.high_quality_outlined,
                       title: 'Calidad de reproducción',
-                      subtitle: 'Automático',
+                      subtitle: settings.preferredQuality.toUpperCase(),
+                      onTap: () => _showQualityDialog(context, ref),
                     ),
                     _SettingsTile(
                       icon: Icons.language_outlined,
-                      title: 'Idioma / subtítulos',
-                      subtitle: 'Español',
+                      title: 'Idioma preferido',
+                      subtitle: settings.preferredLanguage.toUpperCase(),
+                      onTap: () => _showLanguageDialog(context, ref),
+                    ),
+                    SwitchListTile(
+                      activeColor: primaryColor,
+                      secondary: const Icon(Icons.play_circle_outline, color: primaryColor),
+                      title: const Text('Auto-reproducir trailers', style: TextStyle(color: Colors.white, fontSize: 15)),
+                      value: settings.autoPlayTrailers,
+                      onChanged: (v) => ref.read(settingsProvider.notifier).setAutoPlayTrailers(v),
+                    ),
+                    SwitchListTile(
+                      activeColor: primaryColor,
+                      secondary: const Icon(Icons.next_plan_outlined, color: primaryColor),
+                      title: const Text('Auto-reproducir siguiente episodio', style: TextStyle(color: Colors.white, fontSize: 15)),
+                      value: settings.autoPlayNextEpisode,
+                      onChanged: (v) => ref.read(settingsProvider.notifier).setAutoPlayNextEpisode(v),
+                    ),
+                  ],
+                ),
+              ),
+
+              // SECCIÓN: SUBTÍTULOS
+              const _SectionHeader(title: 'Subtítulos'),
+              _SettingsCard(
+                child: Column(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.format_size,
+                      title: 'Tamaño de fuente',
+                      subtitle: '${(settings.subtitleSize * 100).toInt()}%',
+                      onTap: () => _showSubtitleSizeDialog(context, ref),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.palette_outlined,
+                      title: 'Color de subtítulos',
+                      subtitle: 'Personalizar color',
+                      onTap: () => _showSubtitleColorDialog(context, ref),
                     ),
                   ],
                 ),
@@ -210,16 +258,127 @@ class SettingsScreen extends ConsumerWidget {
 
               // SECCIÓN: SISTEMA
               const _SectionHeader(title: 'Almacenamiento'),
-              const _SettingsCard(
-                child: _SettingsTile(
-                  icon: Icons.storage_outlined,
-                  title: 'Almacenamiento y caché',
-                  subtitle: 'Gestionar datos locales',
+              _SettingsCard(
+                child: Column(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.storage_outlined,
+                      title: 'Almacenamiento y caché',
+                      subtitle: 'Gestionar datos locales',
+                      onTap: () {},
+                    ),
+                    _SettingsTile(
+                      icon: Icons.info_outline,
+                      title: 'Versión',
+                      subtitle: 'v2.1.0-alpha',
+                      onTap: () {},
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 40),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showQualityDialog(BuildContext context, WidgetRef ref) {
+    final settings = ref.read(settingsProvider);
+    final options = ['auto', '1080p', '720p', '480p'];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D24),
+        title: const Text('Calidad de reproducción', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: options.map((o) => _OptionTile(
+            label: o.toUpperCase(),
+            isSelected: settings.preferredQuality == o,
+            onTap: () {
+              ref.read(settingsProvider.notifier).setPreferredQuality(o);
+              Navigator.pop(context);
+            },
+          )).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showLanguageDialog(BuildContext context, WidgetRef ref) {
+    final settings = ref.read(settingsProvider);
+    final options = ['latino', 'subtitulado', 'castellano'];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D24),
+        title: const Text('Idioma preferido', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: options.map((o) => _OptionTile(
+            label: o.toUpperCase(),
+            isSelected: settings.preferredLanguage == o,
+            onTap: () {
+              ref.read(settingsProvider.notifier).setPreferredLanguage(o);
+              Navigator.pop(context);
+            },
+          )).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showSubtitleSizeDialog(BuildContext context, WidgetRef ref) {
+    final settings = ref.read(settingsProvider);
+    final sizes = [0.8, 1.0, 1.2, 1.5];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D24),
+        title: const Text('Tamaño de fuente', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: sizes.map((s) => _OptionTile(
+            label: '${(s * 100).toInt()}%',
+            isSelected: settings.subtitleSize == s,
+            onTap: () {
+              ref.read(settingsProvider.notifier).setSubtitleSize(s);
+              Navigator.pop(context);
+            },
+          )).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showSubtitleColorDialog(BuildContext context, WidgetRef ref) {
+    final settings = ref.read(settingsProvider);
+    final colors = [
+      {'name': 'Blanco', 'value': 0xFFFFFFFF},
+      {'name': 'Amarillo', 'value': 0xFFFFFF00},
+      {'name': 'Cian', 'value': 0xFF00FFFF},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D24),
+        title: const Text('Color de subtítulos', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: colors.map((c) => _OptionTile(
+            label: c['name'] as String,
+            isSelected: settings.subtitleColor == c['value'],
+            onTap: () {
+              ref.read(settingsProvider.notifier).setSubtitleColor(c['value'] as int);
+              Navigator.pop(context);
+            },
+          )).toList(),
         ),
       ),
     );
@@ -283,7 +442,7 @@ class _SettingsCard extends StatelessWidget {
         color: const Color(0xFF1A1D24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.white.withOpacity(0.05)),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
         ),
         clipBehavior: Clip.antiAlias,
         child: child,
@@ -316,6 +475,35 @@ class _SettingsTile extends StatelessWidget {
       title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
       subtitle: Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 13)),
       trailing: trailing ?? (onTap != null ? const Icon(Icons.chevron_right_rounded, color: Colors.white24) : null),
+      onTap: onTap,
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _OptionTile({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? const Color(0xFFEF7A1E) : Colors.white,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      trailing: isSelected
+          ? const Icon(Icons.check_circle, color: Color(0xFFEF7A1E), size: 20)
+          : null,
       onTap: onTap,
     );
   }

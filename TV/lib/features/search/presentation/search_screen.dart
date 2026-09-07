@@ -95,14 +95,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _onContentTap(SearchResult result) {
-    final displayTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
-    final metaTitle = result.metadataTitle ?? result.scrapedTitle ?? result.title;
+    final rawTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
+    final displayTitle = cleanTitleForDisplay(rawTitle);
+    final metaTitle = cleanTitleForDisplay(result.metadataTitle ?? result.scrapedTitle ?? result.title);
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
     final openCategory = inferOpenCategory(result, _selectedCategory);
-    context.push(
-      '/content/${Uri.encodeComponent(displayTitle)}?source=${Uri.encodeComponent(result.source)}&url=${Uri.encodeComponent(result.url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(result.banner ?? '')}&category=${Uri.encodeComponent(openCategory)}&year=${result.year ?? ''}&totalSeasons=${result.totalSeasons ?? ''}',
-      extra: result,
-    );
+
+    final uri = '/content/${Uri.encodeComponent(displayTitle)}'
+        '?source=${Uri.encodeComponent(result.source)}'
+        '&url=${Uri.encodeComponent(result.url)}'
+        '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
+        '&banner=${Uri.encodeComponent(result.banner ?? '')}'
+        '&category=${Uri.encodeComponent(openCategory)}'
+        '&year=${result.year ?? ''}'
+        '&totalSeasons=${result.totalSeasons ?? ''}'
+        '${result.kind != null ? '&type=${Uri.encodeComponent(result.kind!)}' : ''}';
+
+    context.push(uri, extra: result);
   }
 
 
@@ -233,8 +242,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 textAlign: TextAlign.left,
                 textAlignVertical: TextAlignVertical.center,
                 style: const TextStyle(fontSize: 15, color: Colors.white),
-                textCapitalization: TextCapitalization.words,
-                inputFormatters: [CapitalizeWordsFormatter()],
+                textCapitalization: TextCapitalization.sentences,
+                inputFormatters: [CapitalizeFirstLetterFormatter()],
                 decoration: InputDecoration(
                   hintText: _dynamicPlaceholder,
                   hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
@@ -419,14 +428,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           itemCount: results.length,
           itemBuilder: (context, index) {
             final result = results[index];
-            final info = _cardInfo(result, _selectedCategory);
+            final meta = result.resolveMetadata(_selectedCategory);
             return FocusablePosterCard(
               title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
-              posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
-              badge: info['format'] as String?,
-              badgeColor: info['formatColor'] as Color?,
-              subtitle: info['status'] as String?,
-              subtitleColor: info['statusColor'] as Color?,
+              posterUrl: ApiEndpoints.proxyImage(result.thumbnail, fallbackUrl: result.tmdbThumbnail),
+              badge: meta.label,
+              badgeColor: meta.labelColor,
+              subtitle: meta.status,
+              subtitleColor: meta.statusColor,
               activeBorderColor: const Color(0xFFE91E63),
               showInfo: true, // Títulos activados
               aspectRatio: isTV ? 1.5 : 2/3,
@@ -460,14 +469,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           itemCount: items.length,
           itemBuilder: (context, index) {
             final result = items[index];
-            final info = _cardInfo(result, _selectedCategory);
+            final meta = result.resolveMetadata(_selectedCategory);
             return FocusablePosterCard(
               title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
-              posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
-              badge: info['format'] as String?,
-              badgeColor: info['formatColor'] as Color?,
-              subtitle: info['status'] as String?,
-              subtitleColor: info['statusColor'] as Color?,
+              posterUrl: ApiEndpoints.proxyImage(result.thumbnail, fallbackUrl: result.tmdbThumbnail),
+              badge: meta.label,
+              badgeColor: meta.labelColor,
+              subtitle: meta.status,
+              subtitleColor: meta.statusColor,
               activeBorderColor: const Color(0xFFE91E63),
               showInfo: true, // Títulos activados
               aspectRatio: 1.5,
@@ -583,99 +592,6 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
     }
   }
   return grouped.values.toList();
-}
-
-Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
-  // Prioridad: type específico (Especial/OVA/ONA/Película desde AV1) > kind > quality > filtro.
-  // El type del server es más granular que kind (que solo distingue anime/movie),
-  // así que lo usamos cuando es un tipo concreto y no el genérico "ANIME"/"TV".
-  String? typeLabel;
-  final typeUp = (result.type ?? '').toUpperCase();
-  final hasSpecificType = result.type != null &&
-      result.type!.isNotEmpty &&
-      !typeUp.contains('ANIME') &&
-      !typeUp.contains('TV');
-  if (hasSpecificType) {
-    typeLabel = _labelFromType(result.type!, selectedCategory);
-  } else if (result.kind != null && result.kind!.isNotEmpty) {
-    typeLabel = _labelFromKind(result.kind!);
-  } else if (result.quality != null && result.quality!.isNotEmpty) {
-    typeLabel = _categoryFromQuality(result.quality!);
-  } else if (result.type != null && result.type!.isNotEmpty) {
-    typeLabel = _labelFromType(result.type!, selectedCategory);
-  } else {
-    typeLabel = _labelFromSearchCategory(selectedCategory);
-  }
-  final format = typeLabel;
-
-  // El estado va abajo a la izquierda.
-  String? statusLabel;
-  Color? statusColor;
-  final s = (result.status ?? '').toLowerCase();
-  if (s.contains('emisi')) {
-    statusLabel = 'EN EMISIÓN';
-    statusColor = const Color(0xFFEF7A1E); // AurisTV Brand Orange
-  } else if (s.contains('finaliz') || s.contains('complet')) {
-    statusLabel = 'FINALIZADO';
-    statusColor = Colors.black.withOpacity(0.9);
-  }
-
-  return {
-    'format': format,
-    'formatColor': const Color(0xFF1976D2), // Azul
-    'status': statusLabel,
-    'statusColor': statusColor,
-  };
-}
-
-String? _categoryFromQuality(String quality) {
-  final q = quality.toLowerCase();
-  if (q.contains('pelicula') || q.contains('película') || q.contains('movie') || q.contains('film')) {
-    return 'PELICULA';
-  }
-  if (q.contains('dorama') || q.contains('drama')) {
-    return 'DORAMA';
-  }
-  if (q.contains('serie') || q.contains('series') || q.contains('tv')) {
-    return 'SERIE';
-  }
-  if (q.contains('anime')) {
-    return 'ANIME';
-  }
-  return null;
-}
-
-String _labelFromType(String type, String selectedCategory) {
-  final up = type.toUpperCase();
-  if (up.contains('MOVIE') || up.contains('FILM') || up.contains('PELICULA') || up.contains('PELÍCULA')) return 'PELÍCULA';
-  if (up.contains('DORAMA') || up.contains('DRAMA')) return 'DORAMA';
-  if (up.contains('SERIE') || up == 'TV' || up.contains('TV')) {
-    return selectedCategory.toLowerCase() == 'anime' ? 'TV ANIME' : 'SERIE';
-  }
-  if (up.contains('ANIME')) return 'TV ANIME';
-  return up;
-}
-
-String _labelFromKind(String kind) {
-  final k = kind.toLowerCase();
-  if (k.contains('movie') || k.contains('film')) return 'PELÍCULA';
-  if (k.contains('drama') || k.contains('dorama')) return 'DORAMA';
-  if (k.contains('anime')) return 'TV ANIME';
-  if (k.contains('series') || k.contains('tv')) return 'SERIE';
-  return 'SERIE';
-}
-
-String? _labelFromSearchCategory(String category) {
-  switch (category.toLowerCase()) {
-    case 'peliculas':
-      return 'PELÍCULA';
-    case 'series':
-      return 'SERIE';
-    case 'anime':
-      return 'TV ANIME';
-    default:
-      return null;
-  }
 }
 
 class _TVSuggestionItem extends StatefulWidget {

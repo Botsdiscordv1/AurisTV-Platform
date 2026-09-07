@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:collection/collection.dart';
 
 import 'package:auris_core/auris_core.dart';
 import 'package:auristv_web/core/router/app_router.dart';
@@ -11,6 +12,8 @@ import 'package:auristv_web/core/utils/url_utils.dart';
 import 'package:auristv_web/shared/widgets/focusable_poster_card.dart';
 import 'package:auristv_web/features/search/presentation/providers/search_provider.dart';
 import 'package:auristv_web/features/search/presentation/widgets/search_widgets.dart';
+import 'package:auristv_web/features/home/widgets/wide_content_row.dart';
+import 'package:auristv_web/features/player/presentation/player_screen.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   final String initialQuery;
@@ -26,7 +29,7 @@ class SearchScreen extends ConsumerStatefulWidget {
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends ConsumerState<SearchScreen> {
+class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
   late final TextEditingController _searchController;
   final _focusNode = FocusNode();
   late String _selectedCategory;
@@ -34,6 +37,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   late String _currentQuery;
   bool _isFocused = false;
   bool _isNavigating = false;
+  bool _isTopRoute = true;
 
   @override
   void initState() {
@@ -45,9 +49,45 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _focusNode.addListener(_onFocusChange);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final modal = ModalRoute.of(context);
+    if (modal is PageRoute) {
+      routeObserver.subscribe(this, modal);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    if (mounted) {
+      _isTopRoute = false;
+      _debounce?.cancel();
+      // Senior Fix: Decoplar el desenfoque del ciclo de build para evitar crash 'inactive'
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _focusNode.unfocus();
+          if (mounted) setState(() => _isFocused = false);
+        }
+      });
+    }
+  }
+
+  @override
+  void didPopNext() {
+    if (mounted) {
+      setState(() => _isTopRoute = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _updateUrl();
+        }
+      });
+    }
+  }
+
   void _onFocusChange() {
-    // Senior Fix: Evitar tocar el estado si el widget ya no existe
-    if (!mounted || _isNavigating) return;
+    // Senior Guard: Solo actualizar si estamos visibles y estables
+    if (!mounted || _isNavigating || !_isTopRoute) return;
     setState(() => _isFocused = _focusNode.hasFocus);
   }
 
@@ -65,7 +105,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   void dispose() {
-    _isNavigating = true;
+    routeObserver.unsubscribe(this);
     _debounce?.cancel();
     _focusNode.removeListener(_onFocusChange);
     _searchController.dispose();
@@ -83,14 +123,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _updateUrl() {
-    // Senior Fix: Si estamos destruyendo la pantalla, nos callamos
-    if (!mounted || _isNavigating) return;
+    if (!mounted || _isNavigating || !_isTopRoute) return;
 
     final router = GoRouter.of(context);
-    final String currentGlobalPath = router.routeInformationProvider.value.uri.path;
-    if (currentGlobalPath != '/catalogo') return;
+    final currentUri = router.routeInformationProvider.value.uri;
+    
+    // Senior Fix: Verificamos que estemos en la ruta de catálogo antes de intentar reemplazar la URL
+    if (currentUri.path != '/catalogo') return;
 
-    final uri = Uri(
+    final newUri = Uri(
       path: '/catalogo',
       queryParameters: {
         if (_currentQuery.isNotEmpty) 'q': _currentQuery,
@@ -98,9 +139,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       },
     );
     
-    final String currentFullUrl = router.routeInformationProvider.value.uri.toString();
-    if (currentFullUrl != uri.toString()) {
-      router.replace(uri.toString());
+    // Senior Web Fix: Solo reemplazamos si los parámetros de búsqueda han cambiado realmente.
+    // Esto evita ciclos de actualización infinitos y mantiene el historial del navegador limpio.
+    if (currentUri.queryParameters['q'] != newUri.queryParameters['q'] || 
+        currentUri.queryParameters['cat'] != newUri.queryParameters['cat']) {
+      router.replace(newUri.toString());
     }
   }
 
@@ -112,7 +155,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      if (mounted && !_isNavigating) {
+      if (mounted && _isTopRoute) {
         setState(() => _currentQuery = value.trim());
         _updateUrl();
       }
@@ -141,9 +184,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _onContentTap(SearchResult result) {
-    // Senior Fix: Bloqueo total y transición atómica
-    _isNavigating = true;
     _debounce?.cancel();
+    // Bloqueamos el buscador antes de navegar para silenciar eventos residuales
+    _isNavigating = true;
     _focusNode.unfocus();
 
     final displayTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
@@ -156,10 +199,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       url: result.url,
       category: openCategory,
       year: result.year,
+      type: result.kind,
+      from: '/catalogo',
     );
 
-    // Senior Web Fix: Usamos .go para forzar la URL /media/ y limpiar el Shell.
-    context.go(shareableUri, extra: result);
+    // Senior Web Fix: Usamos context.push para mantener el estado del Shell y permitir un retorno limpio.
+    context.push(shareableUri, extra: result).then((_) {
+      if (mounted) {
+        setState(() => _isNavigating = false);
+      }
+    });
   }
 
   @override
@@ -177,14 +226,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: RepaintBoundary(
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  height: 46,
+                  height: 52,
                   decoration: BoxDecoration(
                     color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.05),
-                      width: 1.5,
+                      color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.08),
+                      width: _isFocused ? 1.8 : 1.5,
                     ),
+                    boxShadow: _isFocused ? [
+                      BoxShadow(
+                        color: const Color(0xFFEF7A1E).withValues(alpha: 0.12),
+                        blurRadius: 15,
+                        spreadRadius: 2,
+                      )
+                    ] : [],
                   ),
                   child: TextField(
                     controller: _searchController,
@@ -192,11 +248,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     textAlign: TextAlign.left,
                     textAlignVertical: TextAlignVertical.center,
                     style: const TextStyle(fontSize: 15, color: Colors.white),
-                    textCapitalization: TextCapitalization.words,
-                    inputFormatters: [CapitalizeWordsFormatter()],
+                    textCapitalization: TextCapitalization.sentences,
+                    inputFormatters: [CapitalizeFirstLetterFormatter()],
                     decoration: InputDecoration(
                       hintText: _dynamicPlaceholder,
-                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
+                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontSize: 14),
                       prefixIcon: Icon(Icons.search_rounded, 
                           color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
                           size: 20),
@@ -205,7 +261,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       focusedBorder: InputBorder.none,
                       filled: false,
                       isDense: true,
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 16), // Centrado perfecto para Container de 52px
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
@@ -221,12 +277,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
             const SizedBox(width: 12),
             Container(
-              height: 46,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -279,6 +335,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const _ContinueWatchingSection(),
                   RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
                   const SizedBox(height: 32),
                   RepaintBoundary(child: SearchTrendingSection(onTrendingTap: _onContentTap)),
@@ -286,7 +343,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
             ),
           ),
-          Container(width: 1, color: Colors.white.withOpacity(0.05), margin: const EdgeInsets.symmetric(vertical: 24)),
+          Container(width: 1, color: Colors.white.withValues(alpha: 0.05), margin: const EdgeInsets.symmetric(vertical: 24)),
           SizedBox(
             width: 340,
             child: SingleChildScrollView(
@@ -302,6 +359,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       padding: const EdgeInsets.only(bottom: 40),
       child: Column(
         children: [
+          const _ContinueWatchingSection(),
           RepaintBoundary(child: SearchHistorySection(onQueryTap: _performSearch)),
           RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
           const SizedBox(height: 16),
@@ -309,6 +367,81 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ],
       ),
     );
+  }
+}
+
+class _ContinueWatchingSection extends ConsumerWidget {
+  const _ContinueWatchingSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final continueWatchingAsync = ref.watch(continueWatchingProvider);
+
+    return continueWatchingAsync.when(
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 24, top: 12),
+          child: RepaintBoundary(
+            child: WideContentRow(
+              title: 'Continuar Viendo',
+              items: items.map((h) => _mapHistoryToWide(ref, h)).toList(),
+              onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
+            ),
+          ),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.only(bottom: 24, top: 12),
+        child: RowSkeleton(isWide: true),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
+    String displayTitle = h.title ?? 'Contenido';
+    final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
+    if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+      displayTitle = 'Ep ${h.episode} • $displayTitle';
+    }
+
+    String remainingText = '';
+    final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
+    if (remainingMs > 0) {
+      final minutes = (remainingMs / 60000).ceil();
+      remainingText = 'Quedan $minutes min';
+    }
+
+    return WideContentItem(
+      id: h.contentId,
+      title: displayTitle,
+      imageUrl: h.posterUrl ?? h.bannerUrl ?? '',
+      progress: h.progress,
+      subtitle: remainingText,
+      onDelete: () {
+        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+      },
+      originalItem: h,
+    );
+  }
+
+  void _onTap(BuildContext context, PlaybackHistory item) {
+    final player = PlayerScreen(
+      contentId: item.contentId,
+      sourceUrl: item.url ?? item.contentId,
+      source: item.source ?? "",
+      episode: item.episode ?? "1",
+      season: item.season,
+      startPosition: item.positionInMilliseconds,
+      category: item.category,
+      title: item.title,
+      posterUrl: item.posterUrl,
+      bannerUrl: item.bannerUrl,
+      language: item.language,
+    );
+    UrlUtils.openPlayer(context, player);
   }
 }
 
@@ -339,10 +472,15 @@ class _SearchResultsGrid extends ConsumerWidget {
 
         int crossAxisCount = 3;
         if (!isMobile) {
-          if (screenWidth > 1800) crossAxisCount = 8;
-          else if (screenWidth > 1400) crossAxisCount = 7;
-          else if (screenWidth > 1000) crossAxisCount = 6;
-          else crossAxisCount = 5;
+          if (screenWidth > 1800) {
+            crossAxisCount = 8;
+          } else if (screenWidth > 1400) {
+            crossAxisCount = 7;
+          } else if (screenWidth > 1000) {
+            crossAxisCount = 6;
+          } else {
+            crossAxisCount = 5;
+          }
         }
         
         return RepaintBoundary(
@@ -358,17 +496,39 @@ class _SearchResultsGrid extends ConsumerWidget {
             itemCount: results.length,
             itemBuilder: (context, index) {
               final result = results[index];
-              final info = _cardInfo(result, category);
-              return FocusablePosterCard(
+              final meta = result.resolveMetadata(category);
+
+              // Senior Fix: Obtener el progreso del historial si existe
+              final historyAsync = ref.watch(playbackHistoryStateProvider);
+              double? progress;
+              historyAsync.whenData((items) {
+                final match = items.firstWhereOrNull((h) => h.contentId == result.url);
+                if (match != null) progress = match.progress;
+              });
+
+              final card = FocusablePosterCard(
                 key: ValueKey('search_${result.url}_${result.source}'),
                 title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
                 posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
-                badge: info['format'] as String?,
-                badgeColor: info['formatColor'] as Color?,
-                subtitle: info['status'] as String?,
-                subtitleColor: info['statusColor'] as Color?,
+                badge: meta.label,
+                badgeColor: meta.labelColor,
+                subtitle: meta.status,
+                subtitleColor: meta.statusColor,
+                progress: progress,
                 onTap: () => onContentTap(result),
               );
+
+              // Senior Premium Fix: Animación escalonada persistente para evitar bloques negros al hacer scroll
+              if (index < 32) {
+                return _StaggeredResultItem(
+                  itemId: '${result.url}_${result.source}',
+                  sessionKey: '$query|$category',
+                  delay: Duration(milliseconds: index * 35), // Escalonamiento de 35ms
+                  child: card,
+                );
+              }
+
+              return card;
             },
           ),
         );
@@ -407,10 +567,101 @@ class _SearchResultsGrid extends ConsumerWidget {
   }
 }
 
+class _StaggeredResultItem extends StatefulWidget {
+  final Widget child;
+  final Duration delay;
+  final String itemId;
+  final String sessionKey;
+
+  const _StaggeredResultItem({
+    required this.child,
+    required this.delay,
+    required this.itemId,
+    required this.sessionKey,
+  });
+
+  @override
+  State<_StaggeredResultItem> createState() => _StaggeredResultItemState();
+}
+
+class _StaggeredResultItemState extends State<_StaggeredResultItem> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
+  Timer? _timer;
+
+  // Senior State Tracking: Mantenemos un registro global de qué ítems ya se animaron en esta sesión.
+  static final Set<String> _animatedIds = {};
+  static String _activeSession = '';
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Resetear historial si la sesión (búsqueda/categoría) cambió
+    if (_activeSession != widget.sessionKey) {
+      _animatedIds.clear();
+      _activeSession = widget.sessionKey;
+    }
+
+    final bool alreadyAnimated = _animatedIds.contains(widget.itemId);
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+      // Si ya se animó, empezamos al final (valor 1.0) para aparición instantánea
+      value: alreadyAnimated ? 1.0 : 0.0,
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.06), 
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 1.0, curve: Curves.easeOutCubic),
+    ));
+
+    if (!alreadyAnimated) {
+      _animatedIds.add(widget.itemId);
+      _timer = Timer(widget.delay, () {
+        if (mounted) {
+          _controller.forward();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 String _fuseKey(SearchResult r) {
   final t = r.title.toLowerCase();
+  final typeRe = RegExp(r'\b(movie|película|ova|special)\b');
+  final isMovieish = typeRe.hasMatch(t);
   final franchise = t.replaceAll(RegExp(r'\b(movie|película|ova|special)\b'), '').replaceAll(RegExp(r'[^a-z0-9]'), '');
-  return '$franchise#${r.type}';
+  final cat = inferOpenCategory(r, isMovieish ? 'movie' : 'series');
+  return '$franchise#$cat';
 }
 
 List<SearchResult> _deduplicate(List<SearchResult> results) {
@@ -454,25 +705,4 @@ List<SearchResult> _deduplicate(List<SearchResult> results) {
     }
   }
   return grouped.values.toList();
-}
-
-Map<String, dynamic> _cardInfo(SearchResult result, String selectedCategory) {
-  String? format = result.type?.toUpperCase() ?? selectedCategory.toUpperCase();
-  String? statusLabel;
-  Color? statusColor;
-  final s = (result.status ?? '').toLowerCase();
-  if (s.contains('emisi')) {
-    statusLabel = 'EN EMISIÓN';
-    statusColor = const Color(0xFFEF7A1E); 
-  } else if (s.contains('finaliz') || s.contains('complet')) {
-    statusLabel = 'FINALIZADO';
-    statusColor = Colors.black.withOpacity(0.9);
-  }
-
-  return {
-    'format': format,
-    'formatColor': const Color(0xFF1976D2), 
-    'status': statusLabel,
-    'statusColor': statusColor,
-  };
 }

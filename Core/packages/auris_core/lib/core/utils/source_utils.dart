@@ -7,35 +7,22 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
   final query = qIndex >= 0 ? trimmed.substring(qIndex) : '';
 
   String pathUrl;
-  if (source.toLowerCase().contains('animejara')) {
+  final s = source.toLowerCase();
+  
+  if (s.contains('animejara')) {
     final seasonMatch = RegExp(r'#season-(\d+)').firstMatch(baseUrl);
     final season = seasonMatch != null ? int.parse(seasonMatch.group(1)!) : 1;
     final cleanBase = baseUrl.split('#')[0].split('?')[0];
     final parts = cleanBase.replaceAll(RegExp(r'/+$'), '').split('/');
     final slug = parts.isNotEmpty ? parts.last : 'anime';
-    return 'https://animejara.com/episode/' + slug + '-' + season.toString() + 'x' + episode.toString() + '/';
-  } else if (source.toLowerCase().contains('katanime')) {
-    final parts = path.split('/');
-    final slug = parts.last;
-    final domain = parts.take(3).join('/');
-    pathUrl = '$domain/capitulo/$slug-$episode/';
-  } else if (source.toLowerCase().contains('animegratis')) {
-    final parts = path.split('/');
-    var slug = parts.last;
-    if (slug.endsWith('-anime')) {
-      slug = slug.substring(0, slug.length - 6);
-    }
-    final domain = parts.take(3).join('/');
-    pathUrl = '$domain/anime/$slug/episodio-$episode';
-  } else if (source.toLowerCase().contains('jkanime')) {
+    return 'https://animejara.com/episode/$slug-${season}x$episode/';
+  } else if (s.contains('jkanime')) {
     pathUrl = '$path/$episode/';
-  } else if (source.toLowerCase().contains('animed23')) {
+  } else if (s.contains('animed23')) {
     final parts = path.split('/');
     final slug = parts.last;
     final domain = parts.take(3).join('/');
     pathUrl = '$domain/capitulo/$slug-ep-$episode/';
-  } else if (source.toLowerCase().contains('aniyae')) {
-    return baseUrl;
   } else {
     pathUrl = '$path/$episode';
   }
@@ -44,20 +31,13 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
 
 String simplifySourceName(String name) {
   final l = name.toLowerCase();
-  if (l.contains('latinoyt')) return 'LYT';
   if (l.contains('av1')) return 'AV1';
   if (l.contains('jkanime')) return 'JKA';
-  if (l.contains('aniyae')) return 'ANY';
   if (l.contains('animed23')) return 'A23';
   if (l.contains('animejara')) return 'AJR';
-  if (l.contains('gnula')) return 'GNU';
-  if (l.contains('katanime')) return 'KAT';
   if (l.contains('onlypelis')) return 'OPS';
   if (l.contains('pelispedia')) return 'PPA';
-  if (l.contains('cuevana3')) return 'CV3';
   if (l.contains('gnulahd')) return 'GHD';
-  if (l.contains('lamovie')) return 'LMV';
-  if (l.contains('pelis24blog')) return 'P24';
   return name.toUpperCase();
 }
 
@@ -66,15 +46,9 @@ const Map<String, int> _sourceDisplayOrder = {
   'AJR': 3,
   'A23': 4,
   'JKA': 5,
-  'KAT': 6,
-  'GNU': 7,
-  'ANY': 8,
   'OPS': 9,
   'PPA': 10,
-  'CV3': 11,
   'GHD': 12,
-  'LMV': 13,
-  'P24': 14,
 };
 
 int sourceDisplayRank(String source) {
@@ -161,15 +135,28 @@ String languageCodeText(String quality) {
 }
 
 String cleanTitleForDisplay(String title) {
-  return title
-      .replaceAll(
-        RegExp(
-          r'\s*\((En emisión|En emision|Finalizado|Finalizada)\)\s*$',
-          caseSensitive: false,
-        ),
-        '',
-      )
-      .trim();
+  if (title.isEmpty) return title;
+  
+  // 1. Limpieza de estados al final: (En emisión), (Finalizado), etc.
+  final statusPattern = RegExp(r'\s*\((?:En emisi[oó]n|Finalizado|Finalizada)\)\s*$', caseSensitive: false);
+  
+  // 2. Limpieza de año al final: buscamos un año de 4 dígitos (19xx o 20xx)
+  // precedido por espacio y opcionalmente entre paréntesis/corchetes.
+  // Evitamos \b para prevenir problemas con caracteres unicode adyacentes.
+  final yearPattern = RegExp(r'[\s\(\[]+(?:19|20)\d{2}[\)\]]?\s*$', caseSensitive: false);
+
+  String cleaned = title.replaceAll(statusPattern, '');
+  cleaned = cleaned.replaceAll(yearPattern, '');
+  
+  cleaned = cleaned.trim();
+
+  // 3. Limpieza de puntuación huérfana al final (ej: "Kimi no Na wa.")
+  // Senior Fix: Eliminamos puntos, comas o guiones al final que ensucian la búsqueda en TMDB.
+  final trailingPunctuation = RegExp(r'[.\-\s]+$');
+  cleaned = cleaned.replaceAll(trailingPunctuation, '');
+
+  // Si después de limpiar el año y puntuación quedó vacío (era solo el año), devolvemos el original.
+  return cleaned.isEmpty ? title : cleaned;
 }
 
 String cleanTitleForMatching(String title) {
@@ -189,12 +176,21 @@ String cleanTitleForMatching(String title) {
       .replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '')
       .replaceAll(RegExp(r'audio latino|latino|sub español|subbed|vose|doblado', caseSensitive: false), '')
       .replaceAll(RegExp(r'season \d+|temporada \d+|part \d+|parte \d+|cour \d+', caseSensitive: false), '');
+  
   final buffer = StringBuffer();
   for (final r in base.runes) {
-    final isLatin = (r >= 0x61 && r <= 0x7A) || (r >= 0x30 && r <= 0x39);
-    final isKana = (r >= 0x3040 && r <= 0x30FF);
-    final isKanji = (r >= 0x3400 && r <= 0x9FFF);
-    if (isLatin || isKana || isKanji) buffer.writeCharCode(r);
+    // Permitir letras latinas (incluyendo bloques de acentos), números y CJK.
+    final isAlphanumeric = (r >= 0x30 && r <= 0x39) || // 0-9
+                           (r >= 0x61 && r <= 0x7A) || // a-z
+                           (r >= 0xC0 && r <= 0x24F);  // Latin-1 Supp + Latin Extended A/B (áéíóúüñ...)
+    
+    final isCJK = (r >= 0x3040 && r <= 0x30FF) || // Kana
+                  (r >= 0x3400 && r <= 0x9FFF);   // Kanji
+                  
+    // Para matching estricto removemos espacios, pero preservamos el carácter semántico.
+    if (isAlphanumeric || isCJK) {
+      buffer.writeCharCode(r);
+    }
   }
   return buffer.toString();
 }

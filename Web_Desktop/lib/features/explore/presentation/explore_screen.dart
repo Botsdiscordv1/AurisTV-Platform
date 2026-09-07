@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:collection/collection.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/url_utils.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../home/presentation/providers/home_provider.dart';
 import '../../schedule/presentation/schedule_screen.dart';
 
 final _exploreFilterProvider = StateProvider<String>((ref) => 'En Emisión');
@@ -98,9 +98,9 @@ class ExploreScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final width = MediaQuery.of(context).size.width;
-    final hPadding = isMobile ? 16.0 : (width - 1000).clamp(32.0, double.infinity) / 2;
+    final hPadding = isMobile ? 16.0 : (width - 1024).clamp(32.0, double.infinity) / 2;
     final selectedFilter = ref.watch(_exploreFilterProvider);
     final contentAsync = ref.watch(_exploreContentProvider);
     final scheduleAsync = ref.watch(scheduleProvider);
@@ -252,6 +252,15 @@ class ExploreScreen extends ConsumerWidget {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final item = items[index];
+
+                        // Senior Fix: Obtener el progreso del historial si existe
+                        final historyAsync = ref.watch(playbackHistoryStateProvider);
+                        double? progress;
+                        historyAsync.whenData((items) {
+                          final match = items.firstWhereOrNull((h) => h.contentId == item.id);
+                          if (match != null) progress = match.progress;
+                        });
+
                         return FocusablePosterCard(
                           title: item.title,
                           posterUrl: item.posterUrl,
@@ -261,6 +270,7 @@ class ExploreScreen extends ConsumerWidget {
                           subtitle: item.subtitle,
                           rating: formatRating(item.rating),
                           showInfo: true,
+                          progress: progress, // Senior Fix: Mostrar progreso en el grid de explorar
                           onTap: () {
                             final uri = UrlUtils.buildShareableUri(
                               title: item.title,
@@ -268,8 +278,10 @@ class ExploreScreen extends ConsumerWidget {
                               url: item.id,
                               category: item.type.name,
                               year: item.year,
+                              type: item.card?.kind ?? item.type.name,
+                              from: '/explore',
                             );
-                            context.push(uri, extra: item.toContentSeed());
+                            context.go(uri, extra: item.toContentSeed());
                           },
                         );
                       },

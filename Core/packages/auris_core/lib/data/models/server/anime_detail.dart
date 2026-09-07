@@ -1,8 +1,10 @@
 import '../../../core/utils/synopsis_cleaner.dart';
 import '../../../core/api/api_endpoints.dart';
+import 'shared_models.dart';
 
 class AnimeDetail {
   final String id;
+  final int? tmdbId;
   final String title;
   final String? titleEnglish;
   final String? titleJapanese;
@@ -30,11 +32,13 @@ class AnimeDetail {
   final List<AnimeThemeInfo> endings;
   final String? certification;
   final List<CharacterInfo> characters;
+  final List<PlatformInfo> platforms;
   final String? kind;
   final Map<int, String> backdropsBySeason;
 
   const AnimeDetail({
     required this.id,
+    this.tmdbId,
     required this.title,
     this.titleEnglish,
     this.titleJapanese,
@@ -62,6 +66,7 @@ class AnimeDetail {
     this.endings = const [],
     this.certification,
     this.characters = const [],
+    this.platforms = const [],
     this.kind,
     this.backdropsBySeason = const {},
   });
@@ -107,6 +112,9 @@ class AnimeDetail {
 
     return AnimeDetail(
       id: (anime['id'] ?? '').toString(),
+      tmdbId: (root['tmdbId'] ?? anime['tmdbId'] ?? root['tmdb_id'] ?? anime['tmdb_id']) is num 
+          ? (root['tmdbId'] ?? anime['tmdbId'] ?? root['tmdb_id'] ?? anime['tmdb_id']).toInt() 
+          : null,
       title: anime['title'] as String? ?? '',
       titleEnglish: anime['titleEnglish'] as String?,
       titleJapanese: anime['titleJapanese'] as String?,
@@ -165,6 +173,12 @@ class AnimeDetail {
       kind: root['kind'] as String?,
       characters: (root['characters'] as List<dynamic>?)
               ?.map((e) => CharacterInfo.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      platforms: (root['platforms'] as List<dynamic>? ?? 
+                  anime['platforms'] as List<dynamic>? ?? 
+                  visuals?['platforms'] as List<dynamic>?)
+              ?.map((e) => PlatformInfo.fromJson(Map<String, dynamic>.from(e as Map)))
               .toList() ??
           [],
       backdropsBySeason: backdropsBySeason,

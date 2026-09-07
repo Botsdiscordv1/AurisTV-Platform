@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import '../../../core/api/api_endpoints.dart';
 
 class SearchResult {
@@ -5,7 +6,9 @@ class SearchResult {
   final String url;
   final String quality;
   final String thumbnail;
+  final String? tmdbThumbnail;
   final String? banner;
+  final String? tmdbBanner;
   final String? logo;
   final String source;
   final String? romaji;
@@ -25,6 +28,7 @@ class SearchResult {
   final String? type;
   final int? season;
   final int? totalSeasons;
+  final List<String>? genres;
 
   final List<SourceItem> sources;
 
@@ -33,7 +37,9 @@ class SearchResult {
     required this.url,
     required this.quality,
     required this.thumbnail,
+    this.tmdbThumbnail,
     this.banner,
+    this.tmdbBanner,
     this.logo,
     required this.source,
     this.romaji,
@@ -53,15 +59,33 @@ class SearchResult {
     this.type,
     this.season,
     this.totalSeasons,
+    this.genres,
     this.sources = const [],
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SearchResult &&
+          url == other.url &&
+          source == other.source &&
+          const ListEquality<SourceItem>().equals(sources, other.sources);
+
+  @override
+  int get hashCode => Object.hash(
+        url,
+        source,
+        const ListEquality<SourceItem>().hash(sources),
+      );
 
   SearchResult copyWith({
     String? title,
     String? url,
     String? quality,
     String? thumbnail,
+    String? tmdbThumbnail,
     String? banner,
+    String? tmdbBanner,
     String? logo,
     String? source,
     String? romaji,
@@ -81,6 +105,7 @@ class SearchResult {
     String? type,
     int? season,
     int? totalSeasons,
+    List<String>? genres,
     List<SourceItem>? sources,
   }) {
     return SearchResult(
@@ -88,7 +113,9 @@ class SearchResult {
       url: url ?? this.url,
       quality: quality ?? this.quality,
       thumbnail: thumbnail ?? this.thumbnail,
+      tmdbThumbnail: tmdbThumbnail ?? this.tmdbThumbnail,
       banner: banner ?? this.banner,
+      tmdbBanner: tmdbBanner ?? this.tmdbBanner,
       logo: logo ?? this.logo,
       source: source ?? this.source,
       romaji: romaji ?? this.romaji,
@@ -108,6 +135,7 @@ class SearchResult {
       type: type ?? this.type,
       season: season ?? this.season,
       totalSeasons: totalSeasons ?? this.totalSeasons,
+      genres: genres ?? this.genres,
       sources: sources ?? this.sources,
     );
   }
@@ -123,9 +151,16 @@ class SearchResult {
         json['posterUrl'] as String? ?? 
         json['cover'] as String? ?? 
         json['coverImage'] as String? ?? 
-        json['image'] as String?
+        json['image'] as String?,
+        fallbackUrl: json['tmdbThumbnail'] as String?,
       ),
-      banner: ApiEndpoints.proxyImage(json['banner'] as String? ?? json['backdrop'] as String?, highQuality: true),
+      tmdbThumbnail: json['tmdbThumbnail'] as String?,
+      banner: ApiEndpoints.proxyImage(
+        json['banner'] as String? ?? json['backdrop'] as String?, 
+        highQuality: true,
+        fallbackUrl: json['tmdbBanner'] as String? ?? json['tmdbBackdrop'] as String?,
+      ),
+      tmdbBanner: json['tmdbBanner'] as String? ?? json['tmdbBackdrop'] as String?,
       logo: ApiEndpoints.proxyImage(json['logo'] as String?),
       source: json['source'] as String? ?? '',
       romaji: json['romaji'] as String?,
@@ -145,6 +180,7 @@ class SearchResult {
       type: json['type'] as String?,
       season: _parseInt(json['season']),
       totalSeasons: _parseInt(json['totalSeasons']),
+      genres: (json['genres'] as List?)?.map((e) => e.toString()).toList(),
       sources: (json['sources'] as List<dynamic>?)
               ?.map((e) => SourceItem.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -172,7 +208,9 @@ class SearchResult {
     'url': url,
     'quality': quality,
     'thumbnail': thumbnail,
+    'tmdbThumbnail': tmdbThumbnail,
       'banner': banner,
+    'tmdbBanner': tmdbBanner,
       'logo': logo,
     'source': source,
     'romaji': romaji,
@@ -192,6 +230,7 @@ class SearchResult {
     'type': type,
     'season': season,
     'totalSeasons': totalSeasons,
+    'genres': genres,
     'sources': sources.map((e) => e.toJson()).toList(),
   };
 }
@@ -201,13 +240,26 @@ class SourceItem {
   final String url;
   final String quality;
   final String? slug;
+  final String? type;
 
   const SourceItem({
     required this.source,
     required this.url,
     required this.quality,
     this.slug,
+    this.type,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SourceItem &&
+          url == other.url &&
+          source == other.source &&
+          quality == other.quality;
+
+  @override
+  int get hashCode => Object.hash(url, source, quality);
 
   factory SourceItem.fromJson(Map<String, dynamic> json) {
     return SourceItem(
@@ -215,15 +267,17 @@ class SourceItem {
       url: json['url'] as String? ?? '',
       quality: json['quality'] as String? ?? '',
       slug: json['slug'] as String?,
+      type: json['type'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'source': source,
-    'url': url,
-    'quality': quality,
-    'slug': slug,
-  };
+        'source': source,
+        'url': url,
+        'quality': quality,
+        'slug': slug,
+        'type': type,
+      };
 }
 
 class SearchResponse {

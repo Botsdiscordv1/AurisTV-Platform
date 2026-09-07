@@ -67,7 +67,6 @@ class AurisApp extends StatelessWidget {
       );
     }
 
-    // Para el resto de plataformas (Web, Android, iOS), usamos el Router nativo
     return MaterialApp.router(
       title: 'AurisTV',
       debugShowCheckedModeBanner: false,
@@ -76,14 +75,45 @@ class AurisApp extends StatelessWidget {
       builder: (context, child) {
         if (child == null) return const SizedBox.shrink();
         
-        return RemoteCommandListener(
-          child: MinWidthWrapper(
-            minWidth: 1024,
-            child: child,
+        return NotificationInitializer(
+          child: RemoteCommandListener(
+            child: MinWidthWrapper(
+              minWidth: 360, // Bajado de 1024 para permitir que la adaptabilidad (480/768/1024) sea visible
+              child: child,
+            ),
           ),
         );
       },
     );
+  }
+}
+
+class NotificationInitializer extends ConsumerStatefulWidget {
+  final Widget child;
+  const NotificationInitializer({super.key, required this.child});
+
+  @override
+  ConsumerState<NotificationInitializer> createState() => _NotificationInitializerState();
+}
+
+class _NotificationInitializerState extends ConsumerState<NotificationInitializer> {
+  @override
+  void initState() {
+    super.initState();
+    _initNotifications();
+  }
+
+  Future<void> _initNotifications() async {
+    // Senior Fix: Diferimos la inicialización para no bloquear el arranque
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      ref.read(notificationServiceProvider).init();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }
 

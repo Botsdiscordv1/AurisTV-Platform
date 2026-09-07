@@ -44,7 +44,7 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     final String location = GoRouterState.of(context).uri.path;
     
     // Rutas que consideramos "Raíz" de cada pestaña
-    final bool isRootPath = location == '/' || 
+    final bool isRootPath = location == '/inicio' || 
                             location == '/catalogo' || 
                             location == '/explore' || 
                             location == '/settings';
@@ -72,9 +72,10 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     final targetId = remoteState.activeTargetDeviceId;
     final target = remoteState.availableDevices.firstWhereOrNull((d) => d.id == targetId);
 
-    // Senior Web Fix: Detección segura de pantalla completa para evitar crashes de ciclo de vida.
-    final String location = GoRouterState.of(context).uri.path;
-    final bool isFullScreen = location.startsWith('/media/') || location.startsWith('/ver/');
+    // Senior Web Fix: Detección segura de ruta usando el Router global
+    // Esto es mucho más estable durante transiciones rápidas en la Web.
+    final String location = GoRouter.of(context).routeInformationProvider.value.uri.path;
+    final bool isFullScreen = location.startsWith('/detalles') || location.startsWith('/reproductor');
 
     if (!isTactic) {
       return Scaffold(

@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart'; // Senior Fix: Necesario para kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,11 +14,8 @@ import '../../../core/utils/url_utils.dart';
 import '../widgets/content_row.dart';
 import '../widgets/editorial_content_row.dart';
 import '../widgets/wide_content_row.dart';
-import '../widgets/hero_banner.dart';
 import 'package:auristv_web/features/player/presentation/player_screen.dart';
-import '../../../shared/widgets/skeletons.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
-import 'providers/home_provider.dart';
 
 /// Senior: Helpers de navegación globales para permitir acceso desde widgets externos
 /// sin depender de la instancia privada de _HomeScreenState.
@@ -35,39 +33,51 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
     _ => 'all',
   };
   final source = item.source.isNotEmpty ? item.source : category;
-  
-  final metaTitle = item.romaji ?? item.english ?? item.title;
+  final effectiveUrl = item.detailUrl ?? item.id;
 
   final uri = UrlUtils.buildShareableUri(
     title: item.title,
     source: source,
-    url: item.id,
+    url: effectiveUrl,
     category: category,
     year: item.year,
+    type: item.card?.kind,
+    from: '/inicio',
   );
       
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (context.mounted) context.push(uri, extra: item.toContentSeed());
-  });
+  if (context.mounted) {
+    context.push(uri, extra: item.toContentSeed());
+  }
 }
 
 void openHomeScheduleItem(BuildContext context, MediaItem item) {
-  final metaTitle = item.romaji ?? item.english ?? item.title;
-  final itemYear = item.year ?? (item.airingAt != null ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year : null);
+  final itemYear = item.year ??
+      (item.airingAt != null
+          ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year
+          : null);
+
+  final seed = item.card;
+  final source = seed?.source ?? item.source;
+  final url = seed?.url ?? item.id;
+
   final uri = UrlUtils.buildShareableUri(
     title: item.title,
-    source: '', 
-    url: '', // Se autodescubrirá o usará el título
+    source: source,
+    url: url,
     category: 'anime',
     year: itemYear,
+    type: item.card?.kind ?? (item.type == MediaType.anime ? 'anime' : null),
+    from: '/horario',
   );
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (context.mounted) context.push(uri, extra: item.toContentSeed());
-  });
+  
+  if (context.mounted) {
+    context.go(uri, extra: item.toContentSeed());
+  }
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  final String categoryPath;
+  const HomeScreen({super.key, this.categoryPath = 'inicio'});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -82,6 +92,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    
+    // Senior Sync: Sincronizar el provider de categoría con la ruta inicial
+    Future.microtask(() {
+      if (mounted) {
+        ref.read(homeCategoryProvider.notifier).state = widget.categoryPath;
+      }
+    });
+
+    // Senior Performance: Disparamos la precarga escalonada con delay inicial.
+    // Movido a initState para evitar múltiples disparos en re-builds.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) ref.read(homePrefetchProvider);
+      });
+    });
+  }
+
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Senior Sync: Si la ruta cambia (ej: botón atrás del browser), actualizamos el estado
+    if (oldWidget.categoryPath != widget.categoryPath) {
+      ref.read(homeCategoryProvider.notifier).state = widget.categoryPath;
+    }
   }
 
   @override
@@ -92,6 +126,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _onScroll() {
+    if (!mounted) return;
     final scrolled = _scrollController.offset > 5;
     if (scrolled != _isScrolled) {
       setState(() => _isScrolled = scrolled);
@@ -203,18 +238,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final currentCategory = ref.watch(homeCategoryProvider);
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final useMobileLayout = context.useMobileLayout;
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     
-    // Senior Performance: Disparamos la precarga escalonada con delay inicial.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) ref.read(homePrefetchProvider);
-      });
-    });
-    
     final layoutAsync = ref.watch(homeLayoutProvider);
-    final currentCategoryTrending = ref.watch(trendingListProvider(currentCategory));
+    final heroBannerItemsAsync = ref.watch(heroBannerItemsProvider(currentCategory));
     final editorialRowsAsync = ref.watch(editorialRowsProvider);
 
     if (!editorialRowsAsync.isLoading && !_splashRemoved) {
@@ -232,23 +260,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             controller: _scrollController,
             slivers: [
               SliverToBoxAdapter(
-                child: SizedBox(height: isMobile ? (MediaQuery.of(context).padding.top + 60) : 80),
+                child: SizedBox(height: useMobileLayout ? (MediaQuery.of(context).padding.top + 60) : 80),
               ),
 
-              // 1. Banner Principal
-              currentCategoryTrending.when(
-                data: (items) {
-                  final bannerItems = items.where((m) => m.bannerUrl != null && m.bannerUrl!.isNotEmpty).take(5).toList();
-                  final displayItems = bannerItems.isNotEmpty ? bannerItems : MockData.featuredItems;
+              // 1. Banner Principal (Conectado al Sistema Editorial del Servidor)
+              heroBannerItemsAsync.when(
+                data: (displayItems) {
+                  if (displayItems.isEmpty) {
+                    return const SliverToBoxAdapter(child: HeroBannerSkeleton());
+                  }
 
                   return SliverToBoxAdapter(
                     child: RepaintBoundary(
                       child: HeroBanner(
+                        key: ValueKey('hero_web_$currentCategory'), // Senior Fix: Reset total al cambiar categoría
                         autofocus: true,
                         items: displayItems,
                         currentCategory: currentCategory,
                         onPlay: (item) => openHomeDetails(context, item, currentCategory),
                         onDetails: (item) => openHomeDetails(context, item, currentCategory),
+                        onTrailer: (item) async {
+                          // Senior Fix: En Web, si el usuario pulsa "Tráiler", extraemos el stream directo
+                          // para usar el reproductor nativo (media_kit) y evitar el IFrame si es posible,
+                          // o simplemente delegamos a la lógica interna del HeroBanner si se prefiere.
+                          // Para consistencia con Móvil, usamos la extracción.
+                          final directUrl = await YoutubeResolver.getDirectStreamUrl(item.trailerKey!);
+                          if (directUrl != null && context.mounted) {
+                            final player = PlayerScreen(
+                              contentId: item.id,
+                              sourceUrl: directUrl,
+                              source: 'YouTube',
+                              episode: 'Trailer',
+                              serverName: 'YouTube',
+                              language: 'Trailer',
+                              category: item.type.name,
+                              title: item.title,
+                              posterUrl: item.posterUrl,
+                              bannerUrl: item.bannerUrl,
+                            );
+                            UrlUtils.openPlayer(context, player);
+                          }
+                        },
                       ),
                     ),
                   );
@@ -265,6 +317,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              
               // 2. Contenido dinámico
               if (currentCategory == 'inicio') 
                 layoutAsync.when(
@@ -279,7 +333,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                   loading: () => SliverToBoxAdapter(
-                    child: Column(children: List.generate(3, (index) => const RowSkeleton())),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 12), // Senior Fix: Separador de seguridad para el primer skeleton
+                        ...List.generate(3, (index) => const RowSkeleton()),
+                      ],
+                    ),
                   ),
                   error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
                 )
@@ -287,7 +346,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 SliverToBoxAdapter(child: _RecentEpisodesSection(title: 'Estrenos (Hoy)', horizontalPadding: horizontalPadding)),
                 SliverToBoxAdapter(child: _TrendingSection(category: 'animes', title: 'Populares esta temporada', horizontalPadding: horizontalPadding)),
                 ..._buildEditorialRows(editorialRowsAsync, 'animes', includeMovies: true, movieCategory: 'anime_movies'),
-                SliverToBoxAdapter(child: _AnimeMoviesSection(horizontalPadding: horizontalPadding)),
               ] else if (currentCategory == 'películas') ...[
                 SliverToBoxAdapter(child: _TrendingSection(category: 'películas', title: 'Cine Recomendado', horizontalPadding: horizontalPadding, isWide: true)),
               ] else if (currentCategory == 'series') ...[
@@ -302,25 +360,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           
           Positioned(
             top: 0, left: 0, right: 0,
-            child: _buildTopNavContent(context, ref, currentCategory, isMobile),
+            child: _buildTopNavContent(context, ref, currentCategory, useMobileLayout),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTopNavContent(BuildContext context, WidgetRef ref, String currentCategory, bool isMobile) {
+  Widget _buildTopNavContent(BuildContext context, WidgetRef ref, String currentCategory, bool useMobileLayout) {
     final width = MediaQuery.of(context).size.width;
-    // Senior: Refinamos umbrales para tablets verticales. 
-    // Si el ancho es < 920px entramos en modo Ultra-Compacto para evitar desbordamientos.
-    final isCompactDesktop = width < 1150;
-    final isUltraCompact = width < 920;
+    // Senior: Refinamos umbrales para tablets verticales y diferentes densidades.
+    final isCompactDesktop = context.breakpoint < Breakpoint.xl;
+    final isUltraCompact = context.breakpoint <= Breakpoint.lg;
     
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final logoHeight = isUltraCompact ? 24.0 : (isCompactDesktop ? 28.0 : 32.0);
     final navHeight = isCompactDesktop ? 70.0 : 80.0;
     
-    if (isMobile) {
+    if (useMobileLayout) {
       return ClipRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(
@@ -389,7 +446,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         child: _PillNavBar(
                                           currentCategory: currentCategory,
                                           hideHome: true,
-                                          onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
+                                          onCategoryChanged: _handleCategoryChange,
                                         ),
                                       ),
                                     ),
@@ -400,7 +457,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 key: const ValueKey('home_nav_filter'),
                                 children: [
                                   GestureDetector(
-                                    onTap: () => ref.read(homeCategoryProvider.notifier).state = 'inicio',
+                                    onTap: () => _handleCategoryChange('inicio'),
                                     child: Container(
                                       padding: const EdgeInsets.all(7),
                                       decoration: BoxDecoration(
@@ -464,7 +521,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   currentCategory: currentCategory,
                   isCompact: isCompactDesktop,
                   isUltraCompact: isUltraCompact,
-                  onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
+                  onCategoryChanged: _handleCategoryChange,
                 ),
                 const Spacer(),
                 const SizedBox(width: 4),
@@ -474,7 +531,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   onPressed: () => context.go('/catalogo'),
                 ),
                 // Senior: Ocultamos el selector de idioma en resoluciones intermedias para evitar overflow
-                if (width >= 1080) ...[
+                if (context.atLeast(Breakpoint.lg)) ...[
                   const SizedBox(width: 12),
                   const _LanguageSelector(),
                 ],
@@ -489,8 +546,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(width: 12),
                 ],
                 _buildUserAvatar(context, isUltraCompact ? true : isCompactDesktop),
-                // Senior: El botón de login se oculta si el espacio es crítico (< 950px) para priorizar navegación
-                if (width >= 950) ...[
+                // Senior: El botón de login se oculta si el espacio es crítico para priorizar navegación
+                if (context.atLeast(Breakpoint.lg)) ...[
                   const SizedBox(width: 20),
                   _AuthButton(isCompactDesktop: isCompactDesktop),
                 ],
@@ -500,6 +557,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
+  }
+
+  void _handleCategoryChange(String cat) {
+    // Senior Strategy: Actualizamos el estado interno en lugar de navegar a una nueva ruta
+    // para evitar errores de deep linking en la web y mantener la URL limpia.
+    ref.read(homeCategoryProvider.notifier).state = cat;
   }
 
   Widget _buildUserAvatar(BuildContext context, bool isCompact) {
@@ -512,11 +575,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           return _FocusIconButton(
             icon: Icons.person_outline_rounded,
             size: isUltra ? 20 : (isCompact ? 20 : 22),
-            onPressed: () => context.push('/settings'),
+            onPressed: () => context.go('/settings'),
           );
         }
         return _FocusIconButton(
-          onPressed: () => context.push('/settings'),
+          onPressed: () => context.go('/settings'),
           child: Container(
             width: isUltra ? 24 : (isCompact ? 28 : 32),
             height: isUltra ? 24 : (isCompact ? 28 : 32),
@@ -566,7 +629,7 @@ class _AuthButtonState extends State<_AuthButton> {
               boxShadow: _isHovered ? [BoxShadow(color: const Color(0xFFEF7A1E).withOpacity(0.5), blurRadius: 15, spreadRadius: 2)] : [],
             ),
             child: ElevatedButton(
-              onPressed: () => context.push('/login'),
+              onPressed: () => context.go('/login'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFEF7A1E),
                 foregroundColor: Colors.white,
@@ -926,52 +989,56 @@ class _ContinueWatchingSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final historyAsync = ref.watch(playbackHistoryStateProvider);
-    return historyAsync.when(
-      data: (history) {
-        final Set<String> seenContentIds = {};
-        final items = history.where((h) {
-          if (h.title == null || h.isCompleted) return false;
-          if (seenContentIds.contains(h.contentId)) return false;
-          seenContentIds.add(h.contentId);
-          return true;
-        }).take(10).toList();
+    final continueWatchingAsync = ref.watch(continueWatchingProvider);
 
+    return continueWatchingAsync.when(
+      data: (items) {
+        // Senior UX: Solo ocultamos con SizedBox.shrink si estamos SEGUROS de que no hay datos.
         if (items.isEmpty) return const SizedBox.shrink();
 
-        return RepaintBoundary(
-          child: WideContentRow(
-            title: 'Continuar Viendo',
-            items: items.map((h) => _mapHistoryToWide(h)).toList(),
-            onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: RepaintBoundary(
+            child: WideContentRow(
+              title: 'Continuar Viendo',
+              items: items.map((h) => _mapHistoryToWide(ref, h)).toList(),
+              onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
+            ),
           ),
         );
       },
-      loading: () => const RowSkeleton(isWide: true),
+      // Mientras carga (Hot Restart), mostramos el esqueleto para evitar saltos visuales
+      loading: () => Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: RowSkeleton(isWide: true),
+      ),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
 
-  WideContentItem _mapHistoryToWide(PlaybackHistory h) {
+  WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
     String displayTitle = h.title ?? 'Contenido';
     final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
     if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
       displayTitle = 'Ep ${h.episode} • $displayTitle';
     }
+
     String remainingText = '';
     final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
     if (remainingMs > 0) {
-      final duration = Duration(milliseconds: remainingMs);
-      final hours = duration.inHours;
-      final minutes = duration.inMinutes % 60;
-      remainingText = hours > 0 ? 'Quedan $hours h $minutes min' : 'Quedan $minutes min';
+      final minutes = (remainingMs / 60000).ceil();
+      remainingText = 'Quedan $minutes min';
     }
+
     return WideContentItem(
       id: h.contentId,
       title: displayTitle,
-      imageUrl: ApiEndpoints.proxyImage(h.posterUrl ?? h.bannerUrl ?? ''),
-      progress: h.progressPercentage,
+      imageUrl: h.posterUrl ?? h.bannerUrl ?? '',
+      progress: h.progress,
       subtitle: remainingText,
+      onDelete: () {
+        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+      },
       originalItem: h,
     );
   }

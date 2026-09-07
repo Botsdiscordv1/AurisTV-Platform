@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'marquee_text.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -147,13 +148,25 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                               scale: _isActive ? 1.12 : 1.0,
                               duration: const Duration(milliseconds: 400),
                               curve: Curves.easeOutCubic,
-                              child: CachedNetworkImage(
-                                imageUrl: widget.posterUrl,
-                                fit: BoxFit.cover,
-                                memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
-                                filterQuality: FilterQuality.medium,
-                                placeholder: (context, url) => _letterPlaceholder(widget.title),
-                                errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
+                              child: Builder(
+                                builder: (context) {
+                                  final dpr = MediaQuery.of(context).devicePixelRatio;
+                                  final targetWidth = (normalWidth * dpr).round();
+                                  final targetHeight = (targetWidth * 1.5).round();
+
+                                  return CachedNetworkImage(
+                                    imageUrl: ApiEndpoints.proxyImage(
+                                      widget.posterUrl,
+                                      width: targetWidth,
+                                      height: targetHeight,
+                                    ),
+                                    fit: BoxFit.cover,
+                                    memCacheWidth: targetWidth.clamp(1, 2048),
+                                    filterQuality: FilterQuality.medium,
+                                    placeholder: (context, url) => _letterPlaceholder(widget.title),
+                                    errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
+                                  );
+                                }
                               ),
                             ),
                             // Degradado inferior para legibilidad de subtítulos/badges

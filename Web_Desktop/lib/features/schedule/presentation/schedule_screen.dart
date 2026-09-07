@@ -5,10 +5,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/url_utils.dart';
 import '../../../core/utils/responsive_utils.dart';
+import 'package:auristv_web/core/router/app_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 
 final _scheduleProvider = FutureProvider<ScheduleResponse>((ref) async {
   final repo = ref.watch(aurisRepositoryProvider);
@@ -332,12 +332,33 @@ class _ScheduleRowState extends State<ScheduleRow> {
                             onTap: () {
                               final uri = UrlUtils.buildShareableUri(
                                 title: item.title,
-                                source: '',
-                                url: '',
+                                source: item.source ?? '',
+                                url: item.url ?? '',
                                 category: 'anime',
                                 year: itemYear,
+                                quality: item.quality,
+                                type: item.type,
+                                from: '/horario',
                               );
-                              context.push(uri);
+                              
+                              context.push(uri, extra: SearchResult(
+                                title: item.title,
+                                source: item.source ?? '',
+                                url: item.url ?? '',
+                                thumbnail: ApiEndpoints.proxyImage(item.coverImage),
+                                quality: item.quality ?? 'HD',
+                                kind: 'anime',
+                                type: item.type,
+                                slug: item.slug,
+                                year: itemYear,
+                                sources: item.sources.map((s) => SourceItem(
+                                  source: s.source,
+                                  url: s.url,
+                                  quality: s.quality,
+                                  slug: s.slug,
+                                  type: s.type,
+                                )).toList(),
+                              ));
                             },
                           ),
                         );

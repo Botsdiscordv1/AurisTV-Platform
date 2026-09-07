@@ -18,9 +18,7 @@ import 'package:auris_core/auris_core.dart';
 import 'package:auristv_web/core/utils/responsive_utils.dart';
 import 'package:auristv_web/core/utils/url_utils.dart';
 import 'package:auristv_web/shared/widgets/focusable_poster_card.dart';
-import 'package:auristv_web/shared/widgets/nav_arrow.dart';
 import 'package:auristv_web/shared/widgets/full_screen_viewer.dart';
-import 'package:auristv_web/shared/widgets/skeletons.dart';
 import 'package:auristv_web/features/player/presentation/player_screen.dart';
 import 'package:auristv_web/core/router/app_router.dart';
 
@@ -204,8 +202,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final String category;
   final String? poster; 
   final String? banner; 
-  final AsyncValue<dynamic> animeDetailAsync; 
-  final AsyncValue<dynamic> movieDetailAsync; 
+  final AsyncValue<ContentDetailResponse?> detailAsync;
   final SearchResult? currentSource; 
   final List<SearchResult> sources; 
   final Function(int) onSourceSelected; 
@@ -220,6 +217,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final PlaybackHistory? latestHistory;
   final Set<String>? unavailableSources;
   final int? season;
+  final String? from;
 
   const _ContentHeader({
     required this.title, 
@@ -228,8 +226,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
     required this.category,
     this.poster, 
     this.banner, 
-    required this.animeDetailAsync, 
-    required this.movieDetailAsync, 
+    required this.detailAsync,
     this.currentSource, 
     required this.sources, 
     required this.onSourceSelected, 
@@ -244,6 +241,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
     this.latestHistory,
     this.unavailableSources,
     this.season,
+    this.from,
   });
 
   @override ConsumerState<_ContentHeader> createState() => _ContentHeaderState();
@@ -255,6 +253,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   bool _revealed = false;
   Timer? _revealTimeout;
   bool _isSynopsisExpanded = false;
+  bool _isTrailerLoading = false;
 
   void _startTitleHideTimer() {
     if (!mounted) return;
@@ -281,21 +280,16 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     _checkAndInitTrailer(); 
 
     // Senior Fix: Solo revelamos si tenemos DATOS REALES (no null)
-    // o si ambas peticiones terminaron (aunque sean null) para no esperar al timeout.
-    final animeDone = widget.animeDetailAsync.hasValue;
-    final movieDone = widget.movieDetailAsync.hasValue;
-    final hasRealData = widget.animeDetailAsync.valueOrNull != null ||
-                        widget.movieDetailAsync.valueOrNull != null;
+    // o si la petición terminó (aunque sea null) para no esperar al timeout.
+    final hasRealData = widget.detailAsync.valueOrNull != null;
 
-    if (!_revealed && (hasRealData || (animeDone && movieDone))) {
+    if (!_revealed && (hasRealData || widget.detailAsync.hasValue)) {
       setState(() => _revealed = true);
     }
   }
   void _checkAndInitTrailer() {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final d = widget.category == 'movie_anime'
-        ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
-        : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
+    final isMobile = context.isMobile;
+    final d = widget.detailAsync.valueOrNull?.main;
     final k = (d is AnimeDetail) ? d.trailerKey : (d is MovieDetail ? d.trailerKey : null);
     if (k != null && k.isNotEmpty) { 
       if (k != _lastTrailerKey) { 
@@ -461,10 +455,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 
   Widget _buildHeaderContent(BuildContext context) {
-    final d = widget.category == 'movie_anime'
-        ? (widget.movieDetailAsync.valueOrNull ?? widget.animeDetailAsync.valueOrNull)
-        : (widget.animeDetailAsync.valueOrNull ?? widget.movieDetailAsync.valueOrNull);
-    final logoReady = widget.animeDetailAsync.hasValue || widget.movieDetailAsync.hasValue;
+    final d = widget.detailAsync.valueOrNull?.main;
+    final logoReady = widget.detailAsync.hasValue;
     final b = DetailBackdropResolver.resolve(
       detail: d,
       bannerParam: widget.banner,
@@ -473,7 +465,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     );
     final heroTitle = widget.title;
     final width = MediaQuery.of(context).size.width;
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
 
     if (isMobile) {
       return MouseRegion(
@@ -541,6 +533,28 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                   ),
                                 ),
                               ),
+                              
+                              // Senior UI Strategy: Máscaras Pro unificadas (Mismo sistema que Hero)
+                              
+                              // 1. DIMMING: Opacado general para quitar brillo
+                              Container(color: Colors.black.withValues(alpha: 0.2)),
+
+                              // 2. PROTECCIÓN SUPERIOR: Para el botón de "Atrás" y TopBar
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.black.withValues(alpha: 0.5),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.0, 0.3],
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -552,7 +566,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                           right: 20,
                           child: Stack(
                             children: [
-                              if (!_revealed) const SkeletonContainer(width: 180, height: 40),
+                              if (!_revealed) SkeletonContainer(width: 180, height: 40),
                               AnimatedOpacity(
                                 duration: const Duration(milliseconds: 1200), 
                                 curve: Curves.easeInOut, 
@@ -635,7 +649,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       );
     }
 
-    final isUltraCompact = width < 1050;
+    final isUltraCompact = context.breakpoint < Breakpoint.lg;
     final titleTop = isUltraCompact ? 40.0 : 45.0;
     final desktopBackTop = titleTop - 12;
 
@@ -732,7 +746,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                           ),
                         ),
                       
-                      // 2. Capa de Gradientes: Estos SIEMPRE llenan el 100% (Positioned.fill)
+                      // Senior UI Strategy: Dimming general para coherencia visual (Mismo que Hero)
+                      Container(color: Colors.black.withValues(alpha: 0.2)),
+
+                      // 3. Capa de Gradientes: Estos SIEMPRE llenan el 100% (Positioned.fill)
                       PointerInterceptor(
                         child: Stack(
                           fit: StackFit.expand, 
@@ -846,8 +863,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       ),
     );
   }  Widget _buildDesktopOverlay(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
-    final isUltraCompact = width < 1050; 
-    final isCompact = width >= 1050 && width < 1250;
+    final isUltraCompact = context.breakpoint < Breakpoint.lg;
+    final isCompact = context.breakpoint == Breakpoint.lg;
     final hPadding = ResponsiveUtils.horizontalPadding(context); 
     final titleSize = isUltraCompact ? 32.0 : (isCompact ? 40.0 : 56.0);
     final titleTop = isUltraCompact ? 50.0 : 64.0; // Senior Spacing (más aire arriba)
@@ -991,23 +1008,31 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           _DetailIconButton(
             icon: (isMobile || !_showPlayer) ? Icons.movie_outlined : Icons.videocam_off_outlined,
             label: (isMobile || !_showPlayer) ? 'Ver tráiler' : 'Quitar tráiler',
-            onPressed: () {
+            isLoading: _isTrailerLoading,
+            onPressed: () async {
+              if (_isTrailerLoading) return;
               if (isMobile) {
-                // Senior Logic: En móvil, abrir tráiler en el reproductor a pantalla completa
-                final trailerUrl = 'https://www.youtube.com/watch?v=$_lastTrailerKey';
-                final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(widget.poster ?? '')}&bannerUrl=${Uri.encodeComponent(widget.banner ?? '')}';
-                final player = PlayerScreen(
-                  contentId: widget.title,
-                  sourceUrl: trailerUrl,
-                  source: 'YouTube',
-                  episode: 'Trailer',
-                  serverName: 'YouTube',
-                  language: 'Trailer',
-                  totalEpisodes: 1,
-                  posterUrl: widget.poster,
-                  bannerUrl: widget.banner,
-                );
-                UrlUtils.openPlayer(context, player);
+                setState(() => _isTrailerLoading = true);
+                try {
+                  // Senior Logic: En móvil, abrir tráiler en el reproductor a pantalla completa
+                  final directUrl = await YoutubeResolver.getDirectStreamUrl(_lastTrailerKey!);
+                  if (directUrl != null && context.mounted) {
+                    final player = PlayerScreen(
+                      contentId: widget.title,
+                      sourceUrl: directUrl,
+                      source: 'YouTube',
+                      episode: 'Trailer',
+                      serverName: 'YouTube',
+                      language: 'Trailer',
+                      totalEpisodes: 1,
+                      posterUrl: widget.poster,
+                      bannerUrl: widget.banner,
+                    );
+                    UrlUtils.openPlayer(context, player);
+                  }
+                } finally {
+                  if (mounted) setState(() => _isTrailerLoading = false);
+                }
               } else {
                 if (_showPlayer) {
                   _disposeController();
@@ -1238,12 +1263,12 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 Text(d.substring(0, 4), style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)),
                 const SizedBox(width: 12),
               ] else if (!_revealed) ...[
-                const SkeletonContainer(width: 40, height: 18),
+                SkeletonContainer(width: 40, height: 18),
                 const SizedBox(width: 12),
               ],
               Stack(
                 children: [
-                  if (!_revealed) const SkeletonContainer(width: 60, height: 18),
+                  if (!_revealed) SkeletonContainer(width: 60, height: 18),
                   AnimatedOpacity(
                     duration: const Duration(milliseconds: 1200),
                     curve: Curves.easeInOut,
@@ -1252,7 +1277,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (widget.showRatingSkeleton && r == null) ...[
-                          const SkeletonContainer(width: 44, height: 18), 
+                          SkeletonContainer(width: 44, height: 18),
                           const SizedBox(width: 12)
                         ] else if (r != null && r > 0) ...[
                           const Icon(Icons.star_rounded, color: Colors.amber, size: 18), 
@@ -1270,7 +1295,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               ] else if (widget.totalSeasons > 1) ...[
                 Text('${widget.totalSeasons} temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)),
               ] else if (!_revealed) ...[
-                const SkeletonContainer(width: 80, height: 18),
+                SkeletonContainer(width: 80, height: 18),
               ],
             ]
           ),
@@ -1318,7 +1343,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 Text(d.substring(0, 4)),
                 _buildDotSeparator(),
               ] else if (!_revealed) ...[
-                const SkeletonContainer(width: 50, height: 20),
+                SkeletonContainer(width: 50, height: 20),
                 _buildDotSeparator(),
               ],
               if (g != null && g.isNotEmpty) ...[
@@ -1328,7 +1353,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 )),
                 _buildDotSeparator(),
               ] else if (!_revealed) ...[
-                const SkeletonContainer(width: 80, height: 20),
+                SkeletonContainer(width: 80, height: 20),
                 _buildDotSeparator(),
               ],
               // [Senior Logic] Duración para películas, Temporadas para series
@@ -1341,12 +1366,12 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 Text('${widget.totalSeasons} temporadas'),
                 _buildDotSeparator(),
               ] else if (!_revealed) ...[
-                const SkeletonContainer(width: 100, height: 20),
+                SkeletonContainer(width: 100, height: 20),
                 _buildDotSeparator(),
               ],
               Stack(
                 children: [
-                  if (!_revealed) const SkeletonContainer(width: 60, height: 20),
+                  if (!_revealed) SkeletonContainer(width: 60, height: 20),
                   AnimatedOpacity(
                     duration: const Duration(milliseconds: 1200),
                     curve: Curves.easeInOut,
@@ -1492,7 +1517,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
   
   Widget _buildUpperButtons(BuildContext context, {double? desktopTop}) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     return Stack(
       children: [
         Positioned(
@@ -1501,10 +1526,17 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           child: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), 
             onPressed: () { 
-              // Senior Web Fix: Al usar navegación atómica (go), el botón atrás
-              // simplemente nos devuelve al catálogo. El sistema recuperará el
-              // estado de búsqueda automáticamente desde la URL.
-              context.go('/catalogo');
+              if (mounted) {
+                // Senior Web Fix: Preferimos .pop() si es posible para mantener el estado del Shell.
+                // Si no, volvemos a la ruta de origen o al inicio.
+                if (context.canPop()) {
+                  context.pop();
+                } else if (widget.from != null && widget.from!.isNotEmpty) {
+                  context.go(widget.from!);
+                } else {
+                  context.go('/inicio');
+                }
+              }
             }
           ),
         ),
@@ -2264,7 +2296,7 @@ class _ThemeCardState extends State<_ThemeCard> {
   bool _isHovered = false;
 
   @override Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context); 
+    final isMobile = context.isMobile; 
     String? img = ApiEndpoints.proxyImage((widget.theme.imageUrl?.isNotEmpty == true) ? widget.theme.imageUrl! : widget.fallbackImage);
     final bool isSelected = !isMobile && _isHovered;
 
@@ -2513,7 +2545,7 @@ class _DetailButton extends StatelessWidget {
   final VoidCallback? onPressed; final IconData icon; final String label; final bool isPrimary; final bool compact; final bool isLoading;
   const _DetailButton({required this.onPressed, required this.icon, required this.label, this.isPrimary = false, this.compact = false, this.isLoading = false});
   @override Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final bool isDisabled = onPressed == null || isLoading;
 
     return Container(
@@ -2567,7 +2599,8 @@ class _DetailButton extends StatelessWidget {
 
 class _DetailIconButton extends StatefulWidget {
   final IconData icon; final VoidCallback onPressed; final String label; final bool isMobile; final double? size; final double? iconSize; final Color? color;
-  const _DetailIconButton({required this.icon, required this.onPressed, required this.label, this.isMobile = false, this.size, this.iconSize, this.color});
+  final bool isLoading;
+  const _DetailIconButton({required this.icon, required this.onPressed, required this.label, this.isMobile = false, this.size, this.iconSize, this.color, this.isLoading = false});
   @override State<_DetailIconButton> createState() => _DetailIconButtonState();
 }
 
@@ -2576,7 +2609,7 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
   @override Widget build(BuildContext context) {
     if (widget.isMobile) {
       return InkWell(
-        onTap: widget.onPressed, 
+        onTap: widget.isLoading ? null : widget.onPressed,
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -2588,10 +2621,16 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, color: widget.color ?? Colors.white, size: 20),
+              if (widget.isLoading)
+                SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: widget.color ?? Colors.white),
+                )
+              else
+                Icon(widget.icon, color: widget.color ?? Colors.white, size: 20),
               const SizedBox(width: 8),
               Text(
-                widget.label, 
+                widget.isLoading ? 'Cargando...' : widget.label,
                 style: GoogleFonts.poppins(
                   color: Colors.white, 
                   fontSize: 13, 
@@ -2619,10 +2658,12 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
               shape: BoxShape.circle, 
               border: Border.all(color: widget.color ?? Colors.white24)
             ), 
-            child: IconButton(
-              icon: Icon(widget.icon, color: widget.color ?? Colors.white, size: widget.iconSize ?? 28), 
-              onPressed: widget.onPressed
-            )
+            child: widget.isLoading
+              ? Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: widget.color ?? Colors.white)))
+              : IconButton(
+                  icon: Icon(widget.icon, color: widget.color ?? Colors.white, size: widget.iconSize ?? 28),
+                  onPressed: widget.onPressed
+                )
           )
         )
       )
@@ -2638,13 +2679,41 @@ class _DetailInfoCard extends StatelessWidget {
 // --- MAIN WIDGETS ---
 
 class ContentScreen extends ConsumerStatefulWidget {
-  final String title; final String source; final String url; final String? metadataTitle; final String? banner; final String category; final int? year; final int? totalSeasons;
+  final String title;
+  final String source;
+  final String url;
+  final String? quality;
+  final String? type;
+  final String? metadataTitle;
+  final String? banner;
+  final String category;
+  final int? year;
+  final int? totalSeasons;
+
   /// Card abierta (con sus fuentes/servidores). Se usa para sembrar al instante la
   /// lista de servidores sin re-raspear en vivo. Para deep-links (sin card) es null
   /// y se reconstruye una sola fuente desde title/source/url.
   final SearchResult? result;
-  const ContentScreen({super.key, required this.title, required this.source, required this.url, this.metadataTitle, this.banner, this.category = 'all', this.year, this.totalSeasons, this.result});
-  @override ConsumerState<ContentScreen> createState() => _ContentScreenState();
+  final String? from;
+
+  const ContentScreen({
+    super.key,
+    required this.title,
+    required this.source,
+    required this.url,
+    this.quality,
+    this.type,
+    this.metadataTitle,
+    this.banner,
+    this.category = 'all',
+    this.year,
+    this.totalSeasons,
+    this.result,
+    this.from,
+  });
+
+  @override
+  ConsumerState<ContentScreen> createState() => _ContentScreenState();
 }
 
 class _ContentScreenState extends ConsumerState<ContentScreen> {
@@ -2669,19 +2738,19 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   // parpadeo A23 -> AV1 cuando AV1/AnimeJara llegan tarde vía búsqueda suplementaria.
   String? _frozenDefaultKey;
   String? _userSelectedSourceKey;
+  GroupedEpisodesResult? _lastEpisodes;
 
   void _openPlayer(PlayerScreen player) {
     UrlUtils.openPlayer(context, player);
   }
-
   @override void initState() {
     super.initState();
-
-    // Senior Web Fix: Enforcer de URL de Detalles.
-    // Al entrar por push, obligamos al navegador a mostrar la URL de identidad.
-    // Esto gana la batalla contra el Shell (Search) que intenta mantener su URL.
+    
+    // [Senior Web Fix] Reclamador de URL. 
+    // Si por algún glitch el router no actualizó la barra de direcciones, 
+    // Detalles fuerza el cambio a su URL única nada más nacer.
     if (kIsWeb) {
-      Future.delayed(const Duration(milliseconds: 100), () {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           final shareableUri = UrlUtils.buildShareableUri(
             title: widget.title,
@@ -2689,12 +2758,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             url: widget.url,
             category: widget.category,
             year: widget.year,
+            from: widget.from,
           );
-          appRouter.replace(shareableUri);
+          final currentPath = appRouter.routeInformationProvider.value.uri.path;
+          if (currentPath != '/detalles') {
+            appRouter.replace(shareableUri);
+          }
         }
       });
     }
-    
+
     _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () {
       if (mounted) setState(() => _showContent = true);
     });
@@ -2790,105 +2863,82 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   @override Widget build(BuildContext context) {
     try {
       final width = MediaQuery.of(context).size.width;
-      final isMobile = ResponsiveUtils.isMobile(context);
+      final isMobile = context.isMobile;
       final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
       final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
     final episodesCrossAxisCount = isMobile ? 1 : (width < 1000 ? 2 : (width < 1400 ? 3 : (width < 2100 ? 4 : (width < 2800 ? 5 : 6))));
     final episodesAspectRatio = isMobile ? 1.15 : (width < 1000 ? 1.25 : 1.1);
 
     // Clasificación pre-carga (solo categoría, porque aún no tenemos el payload).
-    final isAnimeCatFetch = widget.category == 'anime';
-    final isMovieCatFetch = widget.category == 'movie' || widget.category == 'series' || widget.category == 'movie_anime' || _isMovieLikeTitle(widget.title) || widget.result?.kind?.toLowerCase() == 'movie' || widget.result?.kind?.toLowerCase() == 'series';
-    // Una movie_anime es una Pel\u00EDcula de anime: tambi\u00E9n queremos el detalle de
-    // anime (AniList) para mostrar la franquicia en "Relacionado" + sus OP/ED.
-    // 'all' (b\u00FAsqueda global) tambi\u00E9n incluye anime, as\u00ED que lo pedimos igual.
-    final fetchAnimeDetail = isAnimeCatFetch || widget.category == 'movie_anime' || widget.category == 'all';
+    final isMovieishPre = (widget.category == 'movie' ||
+            widget.category == 'series' ||
+            widget.category == 'movie_anime' ||
+            _isMovieLikeTitle(widget.title) ||
+            widget.result?.kind?.toLowerCase() == 'movie' ||
+            widget.result?.kind?.toLowerCase() == 'series') &&
+        widget.result?.kind?.toLowerCase() != 'anime';
 
-    // Servidor de origen de la tarjeta: si llegó de una búsqueda global ('all'),
-    // usamos el source del resultado para dirigir el detalle y las fuentes al
-    // servidor correcto y NO hacer fan-out a 3001/3002. Si no hay source y la
-    // categoría es concreta, la usamos. Si todo es 'all' sin source, seguimos
-    // con el fan-out original (comportamiento previo).
-    //
-    // Excepción: los proveedores de metadata (AniList, TMDB, Trakt, MAL, Jikan)
-    // no son fuentes de scraping y NO indican a qué servidor pertenece el
-    // contenido. Usarlos para elegir servidor mandaba la búsqueda de fuentes al
-    // puerto de Películas (3001) para animes abiertos desde "Relacionado",
-    // dejando la lista de servidores vacía (DioException de conexión). Para
-    // ellos resolvemos por categoría concreta, como si no hubiera source.
-    const metadataSourceHints = {'anilist', 'tmdb', 'trakt', 'mal', 'jikan'};
-    final isMetadataOriginSource = widget.source.isNotEmpty &&
-        metadataSourceHints.contains(widget.source.toLowerCase());
-    final String? originServer = (widget.source.isNotEmpty && !isMetadataOriginSource)
-        ? ApiEndpoints.baseUrlForSource(widget.source)
-        : (widget.category.toLowerCase() != 'all'
-            ? ApiEndpoints.baseUrlForCategory(widget.category)
-            : null);
+    // Temporada de la pantalla abierta, inferida del título.
+    // Senior Fix: Si detectamos que es película o similar, NO forzamos temporada 1.
+    final openedSeasonN = isMovieishPre
+        ? null
+        : (widget.result?.season
+            ?? _extractSeason(widget.result?.title)
+            ?? _extractSeason(widget.title)
+            ?? _extractSeason(widget.metadataTitle)
+            ?? _extractSeason(widget.url)
+            ?? 1);
 
-    // Temporada de la pantalla abierta, inferida del título. Se usa para fijar
-    // la fuente y la temporada OMDB a la temporada correcta (evita que una S2
-    // abierta caiga a la S1 por defecto).
-    final openedSeasonN = widget.result?.season
-        ?? _extractSeason(widget.result?.title)
-        ?? _extractSeason(widget.title)
-        ?? _extractSeason(widget.metadataTitle)
-        ?? 1;
+    final openedDetailAsync = ref.watch(unifiedContentDetailProvider(UnifiedDetailParams(
+      title: widget.title,
+      metadataTitle: widget.metadataTitle,
+      category: widget.category,
+      kind: widget.result?.kind ?? widget.type,
+      year: widget.year,
+      season: openedSeasonN,
+      source: widget.source,
+      url: widget.url,
+      type: widget.type,
+    )));
 
-    final animeDetailAsync = !fetchAnimeDetail
-        ? const AsyncValue<AnimeDetail?>.data(null)
-        : ref.watch(animeDetailProvider(AnimeDetailParams(
-            title: _stripSeasonSuffix(widget.title),
-            metadataTitle: widget.metadataTitle != null ? _stripSeasonSuffix(widget.metadataTitle!) : null,
+    final seasonSwitched = _selectedSeason != null && _selectedSeason != openedSeasonN;
+
+    final seasonDetailAsync = seasonSwitched
+        ? ref.watch(unifiedContentDetailProvider(UnifiedDetailParams(
+            title: widget.title,
+            metadataTitle: widget.metadataTitle,
+            category: widget.category,
+            kind: widget.result?.kind ?? widget.type,
             year: widget.year,
-            season: openedSeasonN,
-            kind: widget.result?.kind,
-          )));
+            season: _selectedSeason,
+            source: widget.source,
+            url: widget.url,
+            type: widget.type,
+          )))
+        : openedDetailAsync;
 
-    // Para category='all' no sabemos de antemano si es anime o movie. Pedimos
-    // el detalle de anime primero y solo consultamos /api/detail/movie como
-    // fallback si el anime no resolvió nada, evitando la doble llamada
-    // innecesaria para animes abiertos desde la búsqueda global/Relacionado.
-    final needMovieFallback = !isAnimeCatFetch &&
-        !isMovieCatFetch &&
-        !animeDetailAsync.isLoading &&
-        animeDetailAsync.valueOrNull == null;
+    // Al cambiar de temporada, el detalle (año, estado, OP/ED, sinopsis...) debe
+    // corresponder a la temporada seleccionada, no al de la temporada con la que
+    // se abrió la pantalla. Pedimos el detalle de la temporada concreta y, mientras
+    // carga, seguimos mostrando el detalle abierto para no romper el hero.
+    final detailAsync = (seasonSwitched && seasonDetailAsync.valueOrNull != null)
+        ? seasonDetailAsync
+        : openedDetailAsync;
 
-    final movieDetailAsync = isAnimeCatFetch
-        ? const AsyncValue<MovieDetail?>.data(null)
-        : (isMovieCatFetch || needMovieFallback)
-            ? ref.watch(movieDetailProvider(MovieDetailParams(
-                title: _stripSeasonSuffix(widget.title),
-                metadataTitle: widget.metadataTitle != null ? _stripSeasonSuffix(widget.metadataTitle!) : null,
-                category: widget.category,
-                server: originServer,
-              )))
-            : const AsyncValue<MovieDetail?>.data(null);
+    final detailData = detailAsync.valueOrNull?.main;
+    final isMovieish = detailAsync.valueOrNull?.isMovieish ?? isMovieishPre;
 
-    // Para las Pel\u00EDculas de anime el detalle "principal" es el de Pel\u00EDcula
-    // (runtime, plataformas, directores...); el de anime se usa solo para el tab
-    // Relacionado. Para el resto de animes, el principal es el de anime.
-    final detailData = isMovieCatFetch
-        ? (movieDetailAsync.valueOrNull ?? animeDetailAsync.valueOrNull)
-        : (animeDetailAsync.valueOrNull ?? movieDetailAsync.valueOrNull);
-
-    // Tipo resuelto a partir del payload (kind) y no solo de la categoría, para
-    // no confundir backend/categoría al abrir contenido de 3000/3001/3002.
     final resolvedKind = (detailData is AnimeDetail
             ? detailData.kind
             : (detailData is MovieDetail ? detailData.kind : null)) ??
         widget.result?.kind ??
         widget.category;
     final isAnimeCategory = resolvedKind == 'anime';
-    final isMovieCategory = resolvedKind == 'movie' ||
-        widget.result?.kind?.toLowerCase() == 'movie' ||
-        _isMovieLikeTitle(widget.title);
-    // categor\u00EDa efectiva: si el t\u00EDtulo es de Pel\u00EDcula pero lleg\u00F3 con category="all"
-    // (p.ej. abierto desde la b\u00FAsqueda "Todo"), el provider debe tratarlo como movie
-    // y no como serie, o descartaría los resultados de movie y pediría episodios de la
-    // serie. El server etiqueta kind:'movie' y acota la búsqueda a Películas.
-    final effectiveCategory = isMovieCategory ? 'movie_anime' : widget.category;
+    final isMovieCategory = isMovieish;
 
-    final detailLoading = (isMovieCategory ? movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null : animeDetailAsync.isLoading) || (isAnimeCategory ? false : movieDetailAsync.isLoading && animeDetailAsync.valueOrNull == null);
+    final effectiveCategory = detailAsync.valueOrNull?.effectiveCategory ?? widget.category;
+
+    final detailLoading = detailAsync.isLoading && detailAsync.valueOrNull == null;
 
     // [Senior] Semilla instantánea: la card abierta ya es un SearchResult con sus
     // servidores en `.sources`, así que la lista de servidores se muestra de inmediato
@@ -2898,42 +2948,67 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ? [widget.result!]
         : [SearchResult(title: widget.title, url: widget.url, quality: 'TV', thumbnail: widget.banner ?? '', source: widget.source, romaji: widget.metadataTitle, year: widget.year, slug: null)];
 
-    final sourcesParams = DiscoveredSourcesParams(title: widget.title, metadataTitle: widget.metadataTitle, category: effectiveCategory, year: widget.year, season: openedSeasonN, server: originServer, initialSources: initialSources);
+    const metadataSourceHints = {'anilist', 'tmdb', 'trakt', 'mal', 'jikan'};
+    final isMetadataOriginSource = widget.source.isNotEmpty &&
+        metadataSourceHints.contains(widget.source.toLowerCase());
+    final String? originServer = (widget.source.isNotEmpty && !isMetadataOriginSource)
+        ? ApiEndpoints.baseUrlForSource(widget.source)
+        : (widget.category.toLowerCase() != 'all'
+            ? ApiEndpoints.baseUrlForCategory(widget.category)
+            : null);
+
+    final rawTitle = widget.result?.title ?? widget.title;
+    final cleanTitle = cleanTitleForDisplay(_stripSeasonSuffix(rawTitle));
+    final cleanMetadata = widget.metadataTitle != null ? cleanTitleForDisplay(_stripSeasonSuffix(widget.metadataTitle!)) : null;
+
+    final sourcesParams = DiscoveredSourcesParams(
+      title: cleanTitle,
+      metadataTitle: cleanMetadata,
+      category: effectiveCategory,
+      year: widget.year,
+      season: openedSeasonN,
+      kind: widget.result?.kind ?? widget.type,
+      source: widget.source,
+      url: widget.url,
+      type: widget.type,
+      server: originServer,
+      initialSources: initialSources,
+    );
     final searchSources = ref.watch(discoveredSourcesProvider(sourcesParams));
 
-    // AnimeJara expone todas las temporadas en la URL base vía `#season-N`, por
-    // lo que no depende de la re-búsqueda por temporada (que en ese proveedor
-    // puede devolver resultados erróneos). Reusamos la fuente base de la
-    // búsqueda original y le anexamos la temporada seleccionada, manteniéndola
-    // siempre disponible en el selector de servidores.
-    final effectiveSeasonForUrl = _selectedSeason ?? (openedSeasonN > 1 ? openedSeasonN : null);
+    final effectiveSeasonForUrl = _selectedSeason ?? ((openedSeasonN ?? 0) > 1 ? openedSeasonN : null);
 
-    // [Senior] El switch de temporada reusa la búsqueda base ya cacheada (mismo
-    // título SIN sufijo de temporada) y solo cambia el filtro `season`: así NO se
-    // hace un re-scrapeo lento de "X 2nd Season" y la lista de la otra temporada
-    // aparece al instante, porque sus fuentes ya vinieron en la búsqueda base
-    // (AV1/JKAnime traen youjo-senki-ii; GnulaHD/AnimeJara unifican vía #season-N).
-    // El scrapeo de episodios sólo usa la URL correcta de la temporada por fuente.
-    final seasonSwitched = _selectedSeason != null && _selectedSeason != openedSeasonN;
-    // [Senior] El switch busca el título DE LA TEMPORADA (p.ej. "youjo senki 2nd
-    // Season") y NO solo la base: la búsqueda base "youjo senki" no devuelve la S2
-    // de forma fiable, así que filtrar la base por temporada 2 daba lista vacía y
-    // solo cargaba AnimeJara (vía #season-N). El provider ya busca searchQuery
-    // (temporada) + baseSearchQuery (base, cacheada) y fusiona, así S2 se encuentra
-    // por query específica y S1 sale instantáneo desde la base cacheada.
-    final seasonTitle = seasonSwitched ? _seasonTitleFor(_stripSeasonSuffix(widget.title), _selectedSeason!) : null;
-    final seasonSourcesParams = seasonTitle != null
-        ? DiscoveredSourcesParams(title: seasonTitle, metadataTitle: seasonTitle, category: effectiveCategory, year: widget.year, season: _selectedSeason, server: originServer, initialSources: initialSources)
+    // [Senior] El switch busca el título DE LA TEMPORADA (p.ej. "youjo senki 2nd Season")
+    final seasonTitle = seasonSwitched ? _seasonTitleFor(cleanTitle, _selectedSeason!) : null;
+
+    // [Senior Optimization] Si no hay cambio de temporada, reusamos el provider original
+    // evitando una doble petición idéntica al servidor.
+    final seasonSourcesParams = (seasonSwitched)
+        ? DiscoveredSourcesParams(
+            title: seasonTitle!,
+            metadataTitle: seasonTitle,
+            category: effectiveCategory,
+            year: widget.year,
+            season: _selectedSeason,
+            kind: widget.result?.kind ?? widget.type,
+            source: widget.source,
+            url: widget.url,
+            type: widget.type,
+            server: originServer,
+            initialSources: initialSources,
+          )
         : sourcesParams;
-    final seasonSources = ref.watch(discoveredSourcesProvider(seasonSourcesParams));
+
+    final seasonSources = (seasonSwitched)
+        ? ref.watch(discoveredSourcesProvider(seasonSourcesParams))
+        : searchSources;
+
+    // Senior Fix: Sincronizar las fuentes encontradas con el player para que estén
+    // disponibles al abrir el selector de servidores.
     ref.listen(discoveredSourcesProvider(seasonSourcesParams), (prev, next) {
       final nextList = next;
       if (nextList != null && nextList.isNotEmpty) {
-        // AnimeJara/GnulaHD se derivan del mismo `next` que se está fusionando.
-        // Antes se derivaba de `searchSources`, que por el timing asíncrono de los
-        // providers puede no haber resuelto AJR todavía cuando este listener
-        // dispara, dejando a AnimeJara fuera del player (veías 4 de 5).
-        final ajr = nextList
+        final seasonUnified = nextList
             .where((s) => _isSeasonUnified(s.source))
             .map((s) => _withSeasonUnified(s, effectiveSeasonForUrl))
             .where((s) => s != null)
@@ -2941,45 +3016,21 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             .toList();
         final merged = <SearchResult>[
           ...nextList.where((s) => !_isSeasonUnified(s.source)),
-          ...ajr,
+          ...seasonUnified,
         ];
+
+        // Sincronización inmediata con el player
         ref.read(activeContentSourcesProvider.notifier).state = merged;
       }
-    });
+    }); // Senior Fix: Eliminado fireImmediately no soportado en WidgetRef.listen. La sincronización inicial se maneja en el flujo de build.
 
-    // Al cambiar de temporada, el detalle (año, estado, OP/ED, sinopsis...) debe
-    // corresponder a la temporada seleccionada, no al de la temporada con la que
-    // se abrió la pantalla. Pedimos el detalle de la temporada concreta y, mientras
-    // carga, seguimos mostrando el detalle abierto para no romper el hero.
-    // El metadato de la temporada debe usar el título de la temporada concreta
-    // (seasonTitle), no el del card con el que se abrió (widget.metadataTitle).
-    // Si se abre el card S2 (metadataTitle="Youjo Senki II") y se switchea a S1,
-    // mantener widget.metadataTitle obligaba al server a resolver S2 aunque el
-    // title fuera la base, dejando el detalle/header en S2 (bug #S2→S1).
-    // Pasamos además `season: _selectedSeason` para que el server resuelva la
-    // temporada de forma determinística (sin él, un título base ambiguo como
-    // "Youjo Senki" devuelve S1 o S2 según el ranking de AniList).
-    final seasonAnimeDetailAsync = seasonTitle != null
-        ? ref.watch(animeDetailProvider(AnimeDetailParams(
-            title: _stripSeasonSuffix(widget.title),
-            metadataTitle: _stripSeasonSuffix(widget.title),
-            year: null,
-            season: _selectedSeason,
-            kind: null,
-          )))
-        : animeDetailAsync;
-    final displayAnimeDetailAsync = seasonSwitched
-        ? (seasonAnimeDetailAsync.valueOrNull != null ? seasonAnimeDetailAsync : animeDetailAsync)
-        : animeDetailAsync;
-    final displayDetail = isMovieCatFetch
-        ? (movieDetailAsync.valueOrNull ?? displayAnimeDetailAsync.valueOrNull)
-        : displayAnimeDetailAsync.valueOrNull;
+    final displayDetail = detailData;
 
     // Tab "Extras" (OP/ED): solo se muestra si el detalle trae openings/endings.
     // _syncExtras actualiza _hasExtras y re-mapea _selectedTabIndex (sin recrear
     // ningún TabController, evitando crashes de lifecycle al ocultar/mostrar el tab).
     final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
-    final _detailForExtras = displayAnimeDetailAsync.valueOrNull;
+    final _detailForExtras = detailAsync.valueOrNull?.anime;
     final _desiredExtras = _detailForExtras != null &&
         (_detailForExtras.openings.isNotEmpty || _detailForExtras.endings.isNotEmpty);
     if (_detailForExtras != null && _desiredExtras != _hasExtras && !_tabRebuildPending) {
@@ -3022,6 +3073,19 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     // Orden de display/fuente por defecto: AnimeAV1 -> AnimeJara -> AnimeD23 ->
     // JKAnime -> Aniyae (al final, catálogos incompletos).
     activeSources.sort((a, b) => sourceDisplayRank(a.source).compareTo(sourceDisplayRank(b.source)));
+
+    // Senior Web Fix: Sincronización proactiva de la semilla inicial con el player.
+    // Esto asegura que si venimos del calendario con 4 fuentes, el player las vea
+    // desde el primer frame, sin esperar a que el listener de cambios se dispare.
+    if (activeSources.isNotEmpty) {
+      final currentInPlayer = ref.read(activeContentSourcesProvider);
+      // Solo actualizamos si hay una diferencia real para evitar loops de renderizado
+      if (currentInPlayer.length != activeSources.length) {
+        Future.microtask(() {
+          if (mounted) ref.read(activeContentSourcesProvider.notifier).state = activeSources;
+        });
+      }
+    }
 
     final searchQueryForLoading = widget.metadataTitle ?? widget.title;
     final searchLoading = ref.watch(contentSearchProvider(ContentSearchParams(
@@ -3078,6 +3142,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final episodesSource = currentSource?.source ?? widget.source;
     final initialThumbnail = ApiEndpoints.proxyImage(currentSource?.thumbnail);
     
+    final platforms = (detailData is MovieDetail) ? detailData.platforms : <PlatformInfo>[];
+
     // Para anime, el "N" de temporada lo manda el server en animeDetail.season
     // (curado por IdentityResolver a partir del título, p.ej. "2nd Season" -> 2).
     final animeSeasonN = (detailData is AnimeDetail && detailData.season != null)
@@ -3091,9 +3157,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     // Al cambiar de temporada, la metadata (títulos, miniaturas, año) de los
     // episodios debe corresponder a la temporada seleccionada, no a la temporada
     // con la que se abrió la pantalla.
-    final seasonDetail = seasonAnimeDetailAsync.valueOrNull is AnimeDetail
-        ? seasonAnimeDetailAsync.valueOrNull as AnimeDetail
-        : null;
+    final seasonDetail = seasonDetailAsync.valueOrNull?.anime;
 
     final initialBanner = ApiEndpoints.proxyImage(
       DetailBackdropResolver.resolve(
@@ -3130,13 +3194,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     // "episodio" sintético que apunta a la URL de la fuente (la Pel\u00EDcula misma) para
     // que el reproductor pueda hacer /api/extract directamente contra ella.
     //
-    // Guard: si la fuente es un proveedor de metadatos (AniList, TMDB, Trakt),
-    // NO hacemos la petición de episodios — no tienen un endpoint de scraping real.
-    // Esto evita que la app llame al puerto 3001 con source=AniList y una URL numérica,
-    // lo que causaba un DioException de conexión. En su lugar devolvemos loading
-    // para que la UI muestre el esqueleto mientras searchSources se rellena.
+    // Guard: si la fuente es un proveedor de metadatos (AniList, TMDB, Trakt)
+    // o si la URL es un ID numérico o un path interno de API, NO hacemos la
+    // petición de episodios todavía. Debemos esperar a que
+    // discoveredSourcesProvider encuentre la URL real del scraper.
     const metadataSources = {'anilist', 'tmdb', 'trakt', 'mal', 'jikan'};
-    final isMetadataSource = metadataSources.contains(episodesSource.toLowerCase());
+    final bool isNumericId = int.tryParse(episodesUrl) != null;
+    final bool isApiPath = episodesUrl.startsWith('/api/');
+    final isMetadataSource = metadataSources.contains(episodesSource.toLowerCase()) || isNumericId || isApiPath;
 
     // Parámetros de la petición de episodios CONGELADOS a los valores conocidos al
     // abrir la pantalla (widget) y a la temporada abierta, salvo al switchear de
@@ -3215,16 +3280,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               category: widget.category,
               poster: initialThumbnail, 
               banner: heroBanner, 
-              animeDetailAsync: displayAnimeDetailAsync, 
-              movieDetailAsync: movieDetailAsync, 
+              detailAsync: detailAsync,
               currentSource: currentSource, 
               sources: activeSources, 
-              season: currentSeason,
+              season: currentSeason ?? 1,
               sourceRating: currentSource?.score, 
               showRatingSkeleton: currentSource?.score == null && detailLoading, 
               isLoadingSources: searchLoading && activeSources.isEmpty,
               totalSeasons: totalSeasons, 
-              currentSeason: currentSeason, 
+              currentSeason: currentSeason ?? 1,
               onSourceSelected: (index) {
                 if (activeSources.isEmpty) return;
                 setState(() {
@@ -3236,6 +3300,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, 
               latestHistory: ref.watch(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull, 
               unavailableSources: isMovieCategory ? _movieAvail.entries.where((e) => e.value == false).map((e) => e.key).toSet() : null, 
+              from: widget.from,
               onPlay: () {
                 // Pel\u00EDcula: elegir la primera fuente disponible si la seleccionada
                 // no entrega stream (degradaci\u00F3n elegante del extractor).
@@ -3294,8 +3359,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             if (isMobile) SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _ExpandableText(text: (detailData as dynamic)?.overview ?? 'No hay sinopsis disponible.', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 16), maxLines: 3),
               const SizedBox(height: 16),
-              if (detailData is MovieDetail && detailData.platforms.isNotEmpty) ...[
-                Wrap(spacing: 8, runSpacing: 8, children: detailData.platforms.take(5).map<Widget>((p) => _PlatformLogo(platform: p, size: 24)).toList()),
+              if (detailData is MovieDetail && platforms.isNotEmpty) ...[
+                Wrap(spacing: 8, runSpacing: 8, children: platforms.take(5).map<Widget>((p) => _PlatformLogo(platform: p, size: 24)).toList()),
                 const SizedBox(height: 16),
               ],
               Container(padding: const EdgeInsets.symmetric(vertical: 16), decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12), bottom: BorderSide(color: Colors.white12))), child: Row(children: [
@@ -3309,11 +3374,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 _buildTabBar(tabLabels, selectedTabIndex, hPadding, isMobile),
                 const SizedBox(height: 16),
               ]))),
-              if (selectedTabIndex == episodesTabIndex) episodesAsync.when(
-                data: (epBundle) {
-                  final epData = epBundle?.response;
-                  if (epData == null) return const SliverToBoxAdapter(child: SizedBox.shrink());
+              if (selectedTabIndex == episodesTabIndex) () {
+                // Senior Visual Persistence: Mantener la lista visible mientras se carga el enriquecimiento
+                final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
+                if (epBundle != null) {
+                  _lastEpisodes = epBundle;
+                  final epData = epBundle.response;
                   final omdbEpisodes = omdbSeasonAsync.valueOrNull ?? [];
+
                   return SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverMainAxisGroup(slivers: [
                     SliverToBoxAdapter(
                       child: Padding(
@@ -3332,11 +3400,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                       final ep = index < epData.episodes.length ? epData.episodes[index] : null; final omdb = index < omdbEpisodes.length ? omdbEpisodes[index] : null;
                       final epNum = (ep?.number ?? index + 1).toString();
                       final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                      final epSource = epBundle?.sourceForIndex(index) ?? currentSource;
+                      final epSource = epBundle.sourceForIndex(index) ?? currentSource;
                       final epQuality = ep?.quality ?? epSource?.quality ?? '';
                       return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? omdb?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? omdb?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? omdb?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate ?? omdb?.released, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : omdb?.duration), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
                         final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                        final tapSource = epBundle?.sourceForIndex(index) ?? currentSource;
+                        final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? omdb?.thumbnail ?? tapSource?.thumbnail ?? '';
                         final player = PlayerScreen(
                           contentId: widget.title,
@@ -3360,11 +3428,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                       final ep = index < epData.episodes.length ? epData.episodes[index] : null; final omdb = index < omdbEpisodes.length ? omdbEpisodes[index] : null;
                       final epNum = (ep?.number ?? index + 1).toString();
                       final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                      final epSource = epBundle?.sourceForIndex(index) ?? currentSource;
+                      final epSource = epBundle.sourceForIndex(index) ?? currentSource;
                       final epQuality = ep?.quality ?? epSource?.quality ?? '';
                       return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? omdb?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? omdb?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? omdb?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate ?? omdb?.released, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : omdb?.duration), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
                         final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                        final tapSource = epBundle?.sourceForIndex(index) ?? currentSource;
+                        final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? omdb?.thumbnail ?? tapSource?.thumbnail ?? '';
                         final player = PlayerScreen(
                           contentId: widget.title,
@@ -3448,17 +3516,21 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                     ],
                     SliverToBoxAdapter(child: SizedBox(height: isMobile ? 32 : 150)),
                   ]));
-                },
-                loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: _buildEpisodesSkeleton(context, isMobile)),
-                error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))),
-              ),
+                }
+
+                return episodesAsync.when(
+                  data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                  loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: _buildEpisodesSkeleton(context, isMobile)),
+                  error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))),
+                );
+              }(),
               // Para Películas (sin Episodios) las pestañas se desplazan: Relacionado = 0, Extras = 1, Detalles = 2.
               if (selectedTabIndex == relatedTabIndex) ..._buildRelatedTab(
                 hPadding, 
                 unifiedRelations: unifiedRelationsAsync.valueOrNull,
                 currentSource: currentSource,
               ),
-    if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(displayAnimeDetailAsync.valueOrNull, hPadding),
+    if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(detailAsync.valueOrNull?.anime, hPadding),
     if (selectedTabIndex == detailsTabIndex) ..._buildDetailsTab(displayDetail, hPadding, inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, sourceRating: currentSource?.score, showRatingSkeleton: currentSource?.score == null && detailLoading),
     if (selectedTabIndex == galleryTabIndex) ..._buildGalleryTab(
       hPadding,
@@ -3630,16 +3702,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       return [const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 40), child: Center(child: CircularProgressIndicator(color: Colors.white24))))];
     }
     
-    final isMobile = ResponsiveUtils.isMobile(context); 
+    final isMobile = context.isMobile; 
     
     // Extraemos las categorías unificadas de las fuentes
     final List<RelatedInfo> franchiseSource = unifiedRelations['franchise'] ?? [];
-    final List<RelatedInfo> genreSource = unifiedRelations['genre'] ?? [];
+    final List<RelatedInfo> similarSource = unifiedRelations['similar'] ?? [];
     final List<RelatedInfo> recommendedSource = unifiedRelations['recommended'] ?? [];
 
     // Solo se muestran los relacionados extraídos de los servidores (URLs
     // directas). No se consulta AniList para esta sección.
-    if (franchiseSource.isEmpty && genreSource.isEmpty && recommendedSource.isEmpty) {
+    if (franchiseSource.isEmpty && similarSource.isEmpty && recommendedSource.isEmpty) {
       return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay contenido relacionado disponible', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
     }
 
@@ -3671,13 +3743,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ),
         ),
 
-      // 3. Carrusel: mismo Género (UNIFICADO)
-      if (genreSource.isNotEmpty)
+      // 3. Carrusel: Similares a [TITULO] (UNIFICADO)
+      if (similarSource.isNotEmpty)
         SliverToBoxAdapter(
           child: _RelatedCarouselRow(
-            title: 'Mismo G\u00E9nero',
+            title: 'Similares a ${cleanTitleForDisplay(stripSeasonSuffix(widget.title))}',
             hPadding: hPadding,
-            items: genreSource.map((r) => _RelatedCardData(
+            items: similarSource.map((r) => _RelatedCardData(
               title: _cleanRelatedTitle(r.title), 
               poster: r.cover, 
               subtitle: r.relation,
@@ -3698,8 +3770,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 source: result.source,
                 url: result.url,
                 category: 'anime',
+                from: widget.from ?? '/inicio',
               );
-              context.push(uri, extra: result);
+              context.go(uri, extra: result);
             },
             )).toList(),
           ),
@@ -3746,8 +3819,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             source: result.source,
             url: result.url,
             category: 'anime',
+            from: widget.from ?? '/inicio',
           );
-          context.push(uri, extra: result);
+          context.go(uri, extra: result);
         },
       );
     }
@@ -3786,7 +3860,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   List<Widget> _buildExtrasTab(AnimeDetail? detail, double hPadding) {
     if (detail == null) return [const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 40), child: Center(child: CircularProgressIndicator(color: Colors.white24))))];
-    final isMobile = ResponsiveUtils.isMobile(context); final ops = detail.openings; final eds = detail.endings;
+    final isMobile = context.isMobile; final ops = detail.openings; final eds = detail.endings;
     if (ops.isEmpty && eds.isEmpty) return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay temas musicales disponibles', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
     return [
       if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: detail.banner ?? detail.backdrop), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
@@ -3796,7 +3870,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   List<Widget> _buildDetailsTab(dynamic detail, double hPadding, {String? inferredSeasonAirDate, double? sourceRating, bool showRatingSkeleton = false}) {
     if (detail == null) return [const SliverToBoxAdapter(child: SizedBox.shrink())];
-    final isMobile = ResponsiveUtils.isMobile(context);     final rating = formatRating((detail.rating as double?) ?? sourceRating);
+    final isMobile = context.isMobile;     final rating = formatRating((detail.rating as double?) ?? sourceRating);
     final effectiveDate = _pickDisplayDate((detail is AnimeDetail ? detail.firstAirDate : detail.releaseDate), inferredSeasonAirDate);
     final year = effectiveDate?.split('-').first ?? 'N/A';
     String sInfo = _isMovieContent(detail) ? _formatRuntime(_getRuntime(detail)) : (detail is AnimeDetail ? '${detail.episodes ?? 0} episodios' : (detail is MovieDetail ? '${detail.totalSeasons ?? 1} temporadas' : ''));
@@ -3804,7 +3878,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     if (detail is MovieDetail) { dir = detail.directors; cast = detail.cast.take(5).map((e) => e.name).toList(); std = detail.productionCompanies; }
     else if (detail is AnimeDetail) { std = detail.studios; }
     final cert = (detail is MovieDetail ? detail.certification : (detail is AnimeDetail ? detail.certification : null)) ?? 'NR';
-    final platforms = detail is MovieDetail ? detail.platforms : <PlatformInfo>[];
+    final platforms = (detail is MovieDetail) ? detail.platforms : (detail is AnimeDetail ? detail.platforms : <PlatformInfo>[]);
     final status = detail is MovieDetail ? detail.status : (detail is AnimeDetail ? detail.status : null);
     final languages = detail is MovieDetail ? detail.languages : <String>[];
 
@@ -3875,7 +3949,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   List<Widget> _buildCharacterSection(dynamic detail, double hPadding) {
     if (detail is! AnimeDetail || detail.characters.isEmpty) return [];
     final width = MediaQuery.of(context).size.width;
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final isCompactDesktop = width >= 800 && width < 1100;
     
     return [
@@ -3901,7 +3975,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   List<Widget> _buildCastSection(dynamic detail, double hPadding) {
     if (detail is! MovieDetail || detail.cast.isEmpty) return [];
     final width = MediaQuery.of(context).size.width;
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final isCompactDesktop = width >= 800 && width < 1100;
 
     return [
@@ -3995,7 +4069,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     
     final cardWidth = isMobile ? 140.0 : 200.0;
     final carouselHeight = isMobile ? 255.0 : 370.0; 
@@ -4142,7 +4216,7 @@ class _CharacterCarouselState extends State<_CharacterCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final cardWidth = isMobile ? 110.0 : 160.0;
     final carouselHeight = isMobile ? 220.0 : 320.0;
 
@@ -4278,7 +4352,7 @@ class _CastCarouselState extends State<_CastCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final cardWidth = isMobile ? 110.0 : 160.0;
     final carouselHeight = isMobile ? 220.0 : 320.0;
 
@@ -4338,7 +4412,7 @@ class _CastCard extends StatelessWidget {
   const _CastCard({super.key, required this.member, required this.width});
 
   @override Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     
     return Container(
       width: width,
@@ -4395,7 +4469,7 @@ class _CharacterCard extends StatelessWidget {
   }
 
   @override Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final voiceActor = character.voiceActors.firstWhereOrNull((va) => va.language == 'Japanese') ?? character.voiceActors.firstOrNull;
     
     return Container(
@@ -4468,7 +4542,7 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
   Widget build(BuildContext context) {
     final params = GalleryParams(kind: widget.kind, title: _stripSeasonSuffix(widget.title), year: widget.year);
     final async = ref.watch(galleryProvider(params));
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
 
     return async.when(
       loading: () => Padding(
@@ -4685,7 +4759,7 @@ class _GalleryItemState extends State<_GalleryItem> {
   @override
   Widget build(BuildContext context) {
     final url = ApiEndpoints.proxyImage(widget.image.url);
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
 
     return MouseRegion(
       onEnter: (_) { if (mounted) setState(() => _isHovered = true); },

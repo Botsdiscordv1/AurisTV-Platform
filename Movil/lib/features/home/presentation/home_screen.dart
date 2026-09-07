@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -12,10 +11,7 @@ import '../../../core/utils/web_utils.dart';
 import '../widgets/content_row.dart';
 import '../widgets/editorial_content_row.dart';
 import '../widgets/wide_content_row.dart';
-import '../widgets/hero_banner.dart';
-import '../../../shared/widgets/skeletons.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
-import 'providers/home_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -52,7 +48,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _openDetails(BuildContext context, MediaItem item, String uiCategory) {
     // Senior Logic: Si estamos en Inicio, el tipo de contenido (Anime/Movie/Drama)
     // manda sobre la categoría de la UI para asegurar que el detalle abra el servidor correcto.
-    final category = switch (uiCategory) {
+    final String category = switch (uiCategory) {
       'inicio' => switch (item.type) {
         MediaType.movie => 'movie',
         MediaType.kdrama => 'kdrama',
@@ -64,12 +60,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       'kdrama' => 'kdrama',
       _ => 'all',
     };
-    final source = item.source.isNotEmpty ? item.source : category;
     
-    // Prioridad de Identidad: Romaji > Inglés > Título Local
+    final source = item.source.isNotEmpty ? item.source : category;
     final metaTitle = item.romaji ?? item.english ?? item.title;
+    final effectiveUrl = item.detailUrl ?? item.id;
+    final String? kind = item.card?.kind;
 
-    final uri = '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(source)}&category=${Uri.encodeComponent(category)}&url=${Uri.encodeComponent(item.id)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}&year=${item.year ?? ''}';
+    final uri = '/content/${Uri.encodeComponent(item.title)}'
+        '?source=${Uri.encodeComponent(source)}'
+        '&category=${Uri.encodeComponent(category)}'
+        '&url=${Uri.encodeComponent(effectiveUrl)}'
+        '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
+        '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
+        '&year=${item.year ?? ''}'
+        '${kind != null ? '&type=${Uri.encodeComponent(kind)}' : ''}';
+        
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.mounted) context.push(uri, extra: item.toContentSeed());
     });
@@ -119,7 +124,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return list;
       },
       loading: () => List.generate(3, (index) => const SliverToBoxAdapter(
-        child: RowSkeleton(isWide: false),
+        child: const RowSkeleton(isWide: false),
       )),
       error: (err, _) => [
         SliverToBoxAdapter(child: Center(child: Text('Error editorial: $err', style: const TextStyle(color: Colors.white24)))),
@@ -130,77 +135,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildSection(HomeLayoutSection section, double horizontalPadding) {
     switch (section.type) {
       case HomeSectionType.continueWatching:
-        final historyAsync = ref.watch(playbackHistoryStateProvider);
+        final continueWatchingAsync = ref.watch(continueWatchingProvider);
         
-        // Senior Logic: Filtrar historial para mostrar solo el episodio más reciente de cada serie
-        // y que no esté completado.
-        final Set<String> seenContentIds = {};
-        final continueWatching = historyAsync.valueOrNull?.where((h) {
-          if (h.title == null || h.isCompleted) return false;
-          if (seenContentIds.contains(h.contentId)) return false;
-          seenContentIds.add(h.contentId);
-          return true;
-        }).take(10).toList() ?? [];
+        return continueWatchingAsync.when(
+          data: (items) {
+            if (items.isEmpty) return const SizedBox.shrink();
 
-        if (continueWatching.isEmpty) return const SizedBox.shrink();
+            return WideContentRow(
+              title: 'Continuar Viendo',
+              items: items.map((h) {
+                final bool useEpisodeThumb = _isHighQualityThumbnail(h.posterUrl);
+                final String finalImageUrl = useEpisodeThumb ? (h.posterUrl ?? '') : (h.bannerUrl ?? h.posterUrl ?? '');
 
-        return WideContentRow(
-          title: 'Continuar Viendo',
-          items: continueWatching.map((h) {
-            final bool useEpisodeThumb = _isHighQualityThumbnail(h.posterUrl);
-            final String finalImageUrl = useEpisodeThumb ? (h.posterUrl ?? '') : (h.bannerUrl ?? h.posterUrl ?? '');
+                String displayTitle = h.title ?? 'Contenido';
+                final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
+                if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+                  displayTitle = 'Ep ${h.episode} • $displayTitle';
+                }
 
-            String displayTitle = h.title ?? 'Contenido';
-            final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
-            if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
-              displayTitle = 'Ep ${h.episode} • $displayTitle';
-            }
+                String remainingText = '';
+                final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
+                if (remainingMs > 0) {
+                  final minutes = (remainingMs / 60000).ceil();
+                  remainingText = 'Quedan $minutes min';
+                }
 
-            // Senior UI: Formateo de tiempo restante más profesional
-            String remainingText = '';
-            final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
-            if (remainingMs > 0) {
-              final duration = Duration(milliseconds: remainingMs);
-              final hours = duration.inHours;
-              final minutes = duration.inMinutes % 60;
-              
-              if (hours > 0) {
-                remainingText = 'Quedan $hours h $minutes min';
-              } else if (minutes > 0) {
-                remainingText = 'Quedan $minutes min';
-              } else {
-                remainingText = 'Menos de 1 min restante';
-              }
-            }
-
-            return WideContentItem(
-              id: h.contentId,
-              title: displayTitle,
-              imageUrl: ApiEndpoints.proxyImage(finalImageUrl),
-              progress: h.progressPercentage,
-              subtitle: remainingText,
-              onDelete: () {
-                // Feedback táctico/visual: eliminamos el item del estado de Riverpod
-                ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+                return WideContentItem(
+                  id: h.contentId,
+                  title: displayTitle,
+                  imageUrl: finalImageUrl,
+                  progress: h.progress,
+                  subtitle: remainingText,
+                  onDelete: () {
+                    ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+                  },
+                  originalItem: h,
+                );
+              }).toList(),
+              onItemTap: (wideItem) {
+                final item = wideItem.originalItem as PlaybackHistory;
+                final uri = '/player/${Uri.encodeComponent(item.contentId)}'
+                    '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
+                    '&source=${Uri.encodeComponent(item.source ?? "")}'
+                    '&episode=${item.episode ?? ""}'
+                    '&season=${item.season ?? ""}'
+                    '&startPosition=${item.positionInMilliseconds}'
+                    '&category=${Uri.encodeComponent(item.category ?? "anime")}'
+                    '&title=${Uri.encodeComponent(item.title ?? "")}'
+                    '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
+                    '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
+                    '&language=${Uri.encodeComponent(item.language ?? "")}';
+                context.push(uri);
               },
-              originalItem: h,
             );
-          }).toList(),
-          onItemTap: (wideItem) {
-            final item = wideItem.originalItem as PlaybackHistory;
-            final uri = '/player/${Uri.encodeComponent(item.contentId)}'
-                '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
-                '&source=${Uri.encodeComponent(item.source ?? "")}'
-                '&episode=${item.episode ?? ""}'
-                '&season=${item.season ?? ""}'
-                '&startPosition=${item.positionInMilliseconds}'
-                '&category=${Uri.encodeComponent(item.category ?? "anime")}'
-                '&title=${Uri.encodeComponent(item.title ?? "")}'
-                '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-                '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
-                '&language=${Uri.encodeComponent(item.language ?? "")}';
-            context.push(uri);
           },
+          loading: () => RowSkeleton(isWide: true),
+          error: (_, __) => const SizedBox.shrink(),
         );
 
       case HomeSectionType.editorial:
@@ -229,7 +219,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             badge: EditorialBadge.mythical,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           ),
-          loading: () => const RowSkeleton(),
+          loading: () => RowSkeleton(),
           error: (err, _) => const SizedBox.shrink(),
         );
 
@@ -242,7 +232,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             horizontalPadding: horizontalPadding,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           ),
-          loading: () => const RowSkeleton(),
+          loading: () => RowSkeleton(),
           error: (err, _) => const SizedBox.shrink(),
         );
 
@@ -255,7 +245,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             horizontalPadding: horizontalPadding,
             onItemTap: (item) => _openDetails(context, item, 'animes'),
           ),
-          loading: () => const RowSkeleton(),
+          loading: () => RowSkeleton(),
           error: (err, _) => const SizedBox.shrink(),
         );
 
@@ -267,7 +257,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             items: items.map((m) => _wideItemFromMedia(m)).toList(),
             onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'películas'),
           ),
-          loading: () => const RowSkeleton(isWide: true),
+          loading: () => RowSkeleton(isWide: true),
           error: (err, _) => const SizedBox.shrink(),
         );
 
@@ -282,16 +272,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             )).toList(),
             onItemTap: (wideItem) => _openScheduleItem(context, wideItem.originalItem as MediaItem),
           ),
-          loading: () => const RowSkeleton(isWide: true),
+          loading: () => RowSkeleton(isWide: true),
           error: (err, _) => const SizedBox.shrink(),
         );
     }
   }
 
-void _openScheduleItem(BuildContext context, MediaItem item) {
+  void _openScheduleItem(BuildContext context, MediaItem item) {
     final metaTitle = item.romaji ?? item.english ?? item.title;
-    final itemYear = item.year ?? (item.airingAt != null ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year : null);
-    final uri = '/content/${Uri.encodeComponent(item.title)}?source=&category=anime&url=&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=&year=${itemYear ?? ''}';
+    final itemYear = item.year ??
+        (item.airingAt != null
+            ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year
+            : null);
+
+    final seed = item.card;
+    final source = seed?.source ?? item.source;
+    final url = seed?.url ?? item.id;
+    final quality = seed?.quality ?? '';
+    final type = seed?.type ?? '';
+
+    final uri =
+        '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(source)}&category=anime&url=${Uri.encodeComponent(url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=&year=${itemYear ?? ''}&quality=${Uri.encodeComponent(quality)}&type=${Uri.encodeComponent(type)}';
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.mounted) context.push(uri, extra: item.toContentSeed());
     });
@@ -323,7 +325,6 @@ void _openScheduleItem(BuildContext context, MediaItem item) {
 
     // Breakpoints granulares para escritorio (Navbar / Spacer)
     final isCompactDesktop = width >= 800 && width < 1100;
-    final navHeight = isCompactDesktop ? 70.0 : 80.0;
 
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     
@@ -335,10 +336,9 @@ void _openScheduleItem(BuildContext context, MediaItem item) {
       });
     });
     
-    final historyAsync = ref.watch(playbackHistoryStateProvider);
-    
     // Providers de datos reales
     final layoutAsync = ref.watch(homeLayoutProvider);
+    final heroBannerItemsAsync = ref.watch(heroBannerItemsProvider(currentCategory));
     final trendingAsync = ref.watch(trendingListProvider(currentCategory));
     final recentAsync = ref.watch(recentEpisodesProvider);
     final movieTrendingAsync = ref.watch(trendingListProvider('películas'));
@@ -354,25 +354,9 @@ void _openScheduleItem(BuildContext context, MediaItem item) {
     }
 
     // Datos con fallback automático a MockData para que el diseño NUNCA se rompa
-    final rawFiltered = trendingAsync.valueOrNull
-        ?.where((m) => m.bannerUrl != null && m.bannerUrl!.isNotEmpty)
-        .take(5)
-        .toList();
-    final bannerItems = (rawFiltered != null && rawFiltered.isNotEmpty)
-        ? rawFiltered
-        : MockData.featuredItems;
     final trendingItems = (trendingAsync.valueOrNull != null && trendingAsync.valueOrNull!.isNotEmpty)
         ? trendingAsync.valueOrNull!
         : MockData.anime;
-    final recentItems = (recentAsync.valueOrNull != null && recentAsync.valueOrNull!.isNotEmpty)
-        ? recentAsync.valueOrNull!
-        : MockData.anime;
-    final movieItems = (movieTrendingAsync.valueOrNull != null && movieTrendingAsync.valueOrNull!.isNotEmpty)
-        ? movieTrendingAsync.valueOrNull!
-        : MockData.movies;
-    final animeMovieItems = (animeMoviesAsync.valueOrNull != null && animeMoviesAsync.valueOrNull!.isNotEmpty)
-        ? animeMoviesAsync.valueOrNull!
-        : MockData.movies;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D), // Senior Recomienda: Rich Black para evitar OLED Smearing
@@ -389,15 +373,33 @@ void _openScheduleItem(BuildContext context, MediaItem item) {
                 ),
               ),
 
-              // 1. Banner Principal
-              trendingAsync.when(
-                data: (_) => SliverToBoxAdapter(
+              // 1. Banner Principal con Datos Curados por Categoría
+              heroBannerItemsAsync.when(
+                data: (displayItems) => SliverToBoxAdapter(
                   child: HeroBanner(
+                    key: ValueKey('hero_mob_$currentCategory'), // Senior Fix: Reset total al cambiar categoría
                     autofocus: true,
-                    items: bannerItems,
+                    items: displayItems,
                     currentCategory: currentCategory,
                     onPlay: (item) => _openDetails(context, item, currentCategory),
                     onDetails: (item) => _openDetails(context, item, currentCategory),
+                    onTrailer: (item) async {
+                      // Senior Fix: Extraer Stream Directo para el Player Nativo
+                      final directUrl = await YoutubeResolver.getDirectStreamUrl(item.trailerKey!);
+                      if (directUrl != null && context.mounted) {
+                        final posterParam = '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? '')}&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? '')}';
+                        final uri = '/player/${Uri.encodeComponent(item.title)}'
+                            '?source=YouTube'
+                            '&url=${Uri.encodeComponent(directUrl)}'
+                            '&episode=Trailer'
+                            '&serverName=YouTube'
+                            '&language=Trailer'
+                            '&totalEpisodes=1'
+                            '&category=${item.type.name}'
+                            '$posterParam';
+                        context.push(uri);
+                      }
+                    },
                   ),
                 ),
                 loading: () => const SliverToBoxAdapter(child: HeroBannerSkeleton()),
@@ -411,6 +413,8 @@ void _openScheduleItem(BuildContext context, MediaItem item) {
                   ),
                 ),
               ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
               // 2. Contenido dinámico con Server-Driven UI Lite
               if (currentCategory == 'inicio') 
@@ -426,7 +430,10 @@ void _openScheduleItem(BuildContext context, MediaItem item) {
                   ),
                   loading: () => SliverToBoxAdapter(
                     child: Column(
-                      children: List.generate(3, (index) => const RowSkeleton()),
+                      children: [
+                        const SizedBox(height: 12), // Senior Fix: Separador para el primer skeleton
+                        ...List.generate(3, (index) => const RowSkeleton()),
+                      ],
                     ),
                   ),
                   error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
@@ -446,7 +453,7 @@ void _openScheduleItem(BuildContext context, MediaItem item) {
                       onItemTap: (wideItem) => _openScheduleItem(context, wideItem.originalItem as MediaItem),
                     ),
                   ),
-                  loading: () => const SliverToBoxAdapter(child: RowSkeleton(isWide: true)),
+                  loading: () => SliverToBoxAdapter(child: RowSkeleton(isWide: true)),
                   error: (err, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
                 ),
                 
@@ -460,35 +467,20 @@ void _openScheduleItem(BuildContext context, MediaItem item) {
                       onItemTap: (item) => _openDetails(context, item, 'animes'),
                     ),
                   ),
-                  loading: () => const SliverToBoxAdapter(child: RowSkeleton()),
+                  loading: () => SliverToBoxAdapter(child: RowSkeleton()),
                   error: (err, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
                 ),
 
                 ..._buildEditorialRows(editorialRowsAsync, _openDetails,
                     'animes', includeMovies: true,
                     movieCategory: 'anime_movies'),
-
-                animeMoviesAsync.when(
-                  data: (items) => SliverToBoxAdapter(
-                    child: RepaintBoundary(
-                      child: WideContentRow(
-                        key: const ValueKey('anime_movies'),
-                        title: 'Películas de Anime',
-                        items: items.map((m) => _wideItemFromMedia(m)).toList(),
-                        onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'anime_movies'),
-                      ),
-                    ),
-                  ),
-                  loading: () => const SliverToBoxAdapter(child: RowSkeleton(isWide: true)),
-                  error: (err, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-                ),
               ]
 else if (currentCategory == 'películas') ...[
                 SliverToBoxAdapter(
                   child: WideContentRow(
                     key: const ValueKey('trending_movies'),
                     title: 'Cine Recomendado',
-                    items: trendingItems.map((m) => _wideItemFromMedia(m as MediaItem)).toList(),
+                    items: trendingItems.map((m) => _wideItemFromMedia(m)).toList(),
                     onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'películas'),
                   ),
                 ),
@@ -533,11 +525,8 @@ else if (currentCategory == 'películas') ...[
     
     // Breakpoints granulares para escritorio
     final isCompactDesktop = width >= 800 && width < 1100;
-    final isNarrowDesktop = width >= 1100 && width < 1300;
     
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final navItemSpacing = isCompactDesktop ? 2.0 : 4.0;
-    final navFontSize = isCompactDesktop ? 14.0 : 16.0;
     final logoHeight = isCompactDesktop ? 28.0 : 32.0;
     final navHeight = isCompactDesktop ? 70.0 : 80.0;
     
@@ -812,7 +801,7 @@ class _AuthButtonState extends State<_AuthButton> {
               borderRadius: BorderRadius.circular(4),
               boxShadow: _isHovered ? [
                 BoxShadow(
-                  color: const Color(0xFFEF7A1E).withOpacity(0.5),
+                  color: const Color(0xFFEF7A1E).withValues(alpha: 0.5),
                   blurRadius: 15,
                   spreadRadius: 2,
                 )
@@ -880,11 +869,11 @@ class _CategoryChipState extends State<_CategoryChip> {
           decoration: BoxDecoration(
             color: isSelected 
                 ? const Color(0xFF505459) 
-                : (_isHovered ? Colors.white.withOpacity(0.05) : Colors.transparent),
+                : (_isHovered ? Colors.white.withValues(alpha: 0.05) : Colors.transparent),
             borderRadius: BorderRadius.circular(12),
             boxShadow: isSelected ? [
               BoxShadow(
-                color: Colors.black.withOpacity(0.18),
+                color: Colors.black.withValues(alpha: 0.18),
                 blurRadius: 12,
                 offset: const Offset(0, 3),
               ),
@@ -1152,7 +1141,6 @@ class _LanguageSelector extends StatefulWidget {
 
 class _LanguageSelectorState extends State<_LanguageSelector> {
   final LayerLink _layerLink = LayerLink();
-  bool _isHovered = false;
   OverlayEntry? _overlayEntry;
 
   void _showOverlay() {
@@ -1230,11 +1218,9 @@ class _LanguageSelectorState extends State<_LanguageSelector> {
       link: _layerLink,
       child: MouseRegion(
         onEnter: (_) {
-          setState(() => _isHovered = true);
           _showOverlay();
         },
         onExit: (_) {
-          setState(() => _isHovered = false);
           _hideOverlay();
         },
         child: _FocusTextButton(
