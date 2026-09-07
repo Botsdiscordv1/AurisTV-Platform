@@ -2618,7 +2618,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return;
     }
 
-    if (_isFullscreen && !ResponsiveUtils.isMobile(context)) {
+    if (_isFullscreen && !ResponsiveUtils.isTactic(context)) {
       _toggleFullscreen();
       return;
     }
