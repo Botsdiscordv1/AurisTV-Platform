@@ -724,7 +724,20 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
     }
     final rClean = cleanTitleForMatching(r.title);
     final rRomajiClean = cleanTitleForMatching(r.romaji ?? '');
-    return (rClean == qBase || rClean == metaBase) || (rRomajiClean == qBase || rRomajiClean == metaBase);
+    if ((rClean == qBase || rClean == metaBase) || (rRomajiClean == qBase || rRomajiClean == metaBase)) return true;
+    // Tarjeta abierta en otro idioma (ej. S2 titulada en EN con resultados en
+    // romaji): comparar también contra los títulos del detail (romaji/english
+    // nativo). Sin esto, AV1/D23 en romaji se descartaban y solo quedaban la
+    // fuente inicial + unificadas.
+    if (detail != null) {
+      final detailTitles = <String>{
+        cleanTitleForMatching(detail.title),
+        if ((detail.titleEnglish?.isNotEmpty ?? false)) cleanTitleForMatching(detail.titleEnglish!),
+        if ((detail.titleJapanese?.isNotEmpty ?? false)) cleanTitleForMatching(detail.titleJapanese!),
+      }..removeWhere((e) => e.isEmpty);
+      if (detailTitles.contains(rClean) || detailTitles.contains(rRomajiClean)) return true;
+    }
+    return false;
   }
   bool isValidFamilyMatch(String candidate, String base) {
     if (base.contains(candidate) || candidate.contains(base)) {
@@ -826,7 +839,11 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
   }
   for (final r in eligible) {
     final isAjr = isSeasonUnified(r.source) || r.sources.any((s) => isSeasonUnified(s.source));
-    if ((isAjr && familyMatch(r)) || strictMatch(r) || (r.kind?.toLowerCase() == 'movie' && familyMatch(r))) addResult(r);
+    // familyMatch también suma en anime (no solo unificadas): cubre resultados
+    // cross-idioma que strictMatch no ve (ej. tarjeta EN con fuentes romaji).
+    // seasonMatches ya acotó la temporada, así que no entra basura de otra
+    // season; y lo no emparentado sigue fuera.
+    if ((isAjr && familyMatch(r)) || strictMatch(r) || (!isMovieCategory && familyMatch(r)) || (r.kind?.toLowerCase() == 'movie' && familyMatch(r))) addResult(r);
   }
   if (searchSources.isEmpty) { for (final r in eligible) { if (familyMatch(r)) addResult(r); } }
 
