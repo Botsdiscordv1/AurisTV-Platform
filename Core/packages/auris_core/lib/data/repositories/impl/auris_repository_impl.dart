@@ -768,6 +768,27 @@ class AurisRepositoryImpl implements AurisRepository {
     return OmdbEpisode.fromJson(response.data as Map<String, dynamic>);
   }
 
+  @override
+  Future<void> updateCatalogSources({required String title, required List<SourceItem> sources, int? season}) async {
+    if (sources.isEmpty) return;
+    try {
+      await _client.post(
+        ApiEndpoints.catalogSources,
+        data: {
+          'title': title,
+          if (season != null) 'season': season,
+          'sources': sources.map((s) => {
+            'source': s.source,
+            'url': s.url,
+          }).toList(),
+        },
+        baseUrl: ApiEndpoints.animeBaseUrl,
+      );
+    } catch (e) {
+      debugPrint('[AurisRepo] Error updating catalog sources: $e');
+    }
+  }
+
   // --- NOTIFICACIONES ---
   
   @override

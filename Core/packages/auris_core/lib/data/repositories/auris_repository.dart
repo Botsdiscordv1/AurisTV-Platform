@@ -83,6 +83,11 @@ abstract class AurisRepository {
   Future<List<MediaItem>> getHomeTop(int limit);
   Future<GalleryResponse> getGallery({int? tmdbId, String kind = 'tv', String? title, int? year});
 
+  /// Reporta fuentes encontradas al catálogo global.
+  /// [season] (opcional): temporada de la tarjeta abierta. El server acumula
+  /// en la fila base de la franquicia y registra URLs en el índice de seasons.
+  Future<void> updateCatalogSources({required String title, required List<SourceItem> sources, int? season});
+
   // --- NOTIFICACIONES ---
   Future<void> registerDeviceToken(String userId, String token, String platform);
   Future<void> subscribeToTopic(String userId, String topic);

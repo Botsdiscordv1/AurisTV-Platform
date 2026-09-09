@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
@@ -515,6 +516,31 @@ final groupedEpisodesProvider = FutureProvider.family<GroupedEpisodesResult?, Gr
   );
 });
 
+/// Senior Optimization: Lógica de precarga de imágenes para evitar "cuadros grises".
+/// Se encarga de descargar silenciosamente las miniaturas de los episodios
+/// que el usuario probablemente verá a continuación.
+final episodeImagePrefetchProvider = Provider.family<void, ({List<EpisodeInfo> episodes, int startFrom})>((ref, params) {
+  // Senior Strategy: Limitamos la precarga a una ventana de 12 episodios
+  // para no saturar la RAM ni la red en series largas (One Piece, Black Clover, etc.)
+  final windowSize = 12;
+  final endAt = (params.startFrom + windowSize).clamp(0, params.episodes.length);
+  final targetEpisodes = params.episodes.sublist(
+    params.startFrom.clamp(0, params.episodes.length), 
+    endAt
+  );
+
+  for (final ep in targetEpisodes) {
+    if (ep.thumbnail != null && ep.thumbnail!.isNotEmpty) {
+      // Usamos el API de Flutter para bajar la imagen al cache de disco/RAM
+      // sin pintarla todavía en la UI.
+      precacheImage(
+        NetworkImage(ep.thumbnail!), 
+        ref.read(navigatorKeyProvider).currentContext!,
+      ).catchError((_) => null); // Senior Resilience: Fallos de red individuales no bloquean el resto
+    }
+  }
+});
+
 final discoveredSourcesProvider = Provider.family<List<SearchResult>, DiscoveredSourcesParams>((ref, params) {
   // Senior Fix: Si la categoría es 'all', esperamos a que el orquestador resuelva.
   if (params.category.toLowerCase() == 'all' || params.category.isEmpty) {
@@ -548,6 +574,69 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
     requestCategory = 'anime';
   }
 
+  // --- CATALOG SYNC SIDE EFFECT ---
+  // Senior Fix: Reportar fuentes al catálogo global conforme se descubren.
+  // Contrato con el server: título BASE de la franquicia + season N (igual que
+  // el detail). El server acumula en una sola fila por obra.
+  final isAnime = isAnimeKind || isAnimeCat || isFromAnimeServer;
+  if (isAnime) {
+    final repo = ref.read(aurisRepositoryProvider);
+    final catalogTitle = stripSeasonSuffix(params.title);
+    void syncResults(AsyncValue<SearchResponse> asyncValue) {
+      if (asyncValue.hasValue) {
+        final List<SourceItem> toSync = [];
+        for (final r in asyncValue.value!.results) {
+          if (r.sources.isNotEmpty) {
+            toSync.addAll(r.sources);
+          } else if (r.source.isNotEmpty && r.url.isNotEmpty) {
+            toSync.add(SourceItem(source: r.source, url: r.url, quality: r.quality, slug: r.slug, type: r.type));
+          }
+        }
+        if (toSync.isNotEmpty) {
+          repo.updateCatalogSources(
+            title: catalogTitle.isNotEmpty ? catalogTitle : params.title,
+            season: params.season,
+            sources: toSync,
+          );
+        }
+      }
+    }
+
+    final searchParams = ContentSearchParams(query: searchQuery, category: requestCategory, year: params.year, server: effectiveServer);
+    ref.listen<AsyncValue<SearchResponse>>(contentSearchProvider(searchParams), (prev, next) => syncResults(next));
+
+    final bq = stripSeasonSuffix(searchQuery);
+    if (bq.isNotEmpty && bq != searchQuery) {
+      ref.listen<AsyncValue<SearchResponse>>(
+        contentSearchProvider(ContentSearchParams(query: bq, category: requestCategory, year: params.year, server: effectiveServer)),
+        (prev, next) => syncResults(next),
+      );
+    }
+
+    final rq = (params.season != null && params.season! > 1) ? seasonTitleFor(stripSeasonSuffix(searchQuery), params.season!) : null;
+    if (rq != null && rq.toLowerCase() != searchQuery.toLowerCase()) {
+      ref.listen<AsyncValue<SearchResponse>>(
+        contentSearchProvider(ContentSearchParams(query: rq, category: requestCategory, year: params.year, server: effectiveServer)),
+        (prev, next) => syncResults(next),
+      );
+    }
+
+    if (params.initialSources != null && params.initialSources!.isNotEmpty) {
+      Future.microtask(() {
+        final List<SourceItem> initial = [];
+        for (var r in params.initialSources!) {
+          if (r.sources.isNotEmpty) initial.addAll(r.sources);
+          else initial.add(SourceItem(source: r.source, url: r.url, quality: r.quality, slug: r.slug, type: r.type));
+        }
+        if (initial.isNotEmpty) repo.updateCatalogSources(
+          title: catalogTitle.isNotEmpty ? catalogTitle : params.title,
+          season: params.season,
+          sources: initial,
+        );
+      });
+    }
+  }
+
   // Senior Optimization: Solo bloqueamos la búsqueda si ya recibimos una lista 
   // "autoritativa" de fuentes (más de una fuente o una fuente que ya trae sub-fuentes).
   // Esto permite que el Calendario sea instantáneo pero que la Búsqueda Normal 
@@ -564,9 +653,12 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
       ? ref.watch(contentSearchProvider(ContentSearchParams(query: baseSearchQuery, category: requestCategory, year: params.year, server: effectiveServer)))
       : null;
 
-  final romanQuery = (params.season != null && params.season! > 1) ? seasonTitleRoman(stripSeasonSuffix(searchQuery), params.season!) : null;
-  final romanSearchAsync = (romanQuery != null && romanQuery.toLowerCase() != searchQuery.toLowerCase())
-      ? ref.watch(contentSearchProvider(ContentSearchParams(query: romanQuery, category: requestCategory, year: params.year, server: effectiveServer)))
+  // Query de temporada con ordinal ("X 2nd Season"): coincide con los slugs de
+  // las fuentes (JKAnime/AV1/Jara/D23 usan "-2nd-season"). El sufijo roman
+  // ("X ii") no existe en ningún catálogo y devolvía basura o mezclaba S1+S2.
+  final seasonQuery = (params.season != null && params.season! > 1) ? seasonTitleFor(stripSeasonSuffix(searchQuery), params.season!) : null;
+  final seasonSearchAsync = (seasonQuery != null && seasonQuery.toLowerCase() != searchQuery.toLowerCase())
+      ? ref.watch(contentSearchProvider(ContentSearchParams(query: seasonQuery, category: requestCategory, year: params.year, server: effectiveServer)))
       : null;
 
   // 4. Detalle de Anime (Enriquecimiento)
@@ -716,15 +808,15 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
     }
     if (extras.isNotEmpty) mergedResults = [...mergedResults, ...extras];
   }
-  final romanData = romanSearchAsync?.valueOrNull;
-  if (romanData != null && romanData.results.isNotEmpty) {
+  final seasonData = seasonSearchAsync?.valueOrNull;
+  if (seasonData != null && seasonData.results.isNotEmpty) {
     final seenUrls = <String>{ for (final r in mergedResults) (r.url.isNotEmpty ? r.url : r.title).toLowerCase(), };
-    final romanExtras = <SearchResult>[];
-    for (final r in romanData.results) {
+    final seasonExtras = <SearchResult>[];
+    for (final r in seasonData.results) {
       final key = (r.url.isNotEmpty ? r.url : r.title).toLowerCase();
-      if (seenUrls.add(key)) romanExtras.add(r);
+      if (seenUrls.add(key)) seasonExtras.add(r);
     }
-    if (romanExtras.isNotEmpty) mergedResults = [...mergedResults, ...romanExtras];
+    if (seasonExtras.isNotEmpty) mergedResults = [...mergedResults, ...seasonExtras];
   }
   if (mergedResults.isEmpty && searchSources.isEmpty) return [];
   final eligible = mergedResults.where((r) => seasonMatches(r) && yearMatches(r)).toList();
