@@ -235,7 +235,7 @@ class EpisodesParams {
   int get hashCode => Object.hash(url, source);
 }
 
-final episodesProvider = FutureProvider.family<EpisodesResponse?, EpisodesParams>((ref, params) async {
+final episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, EpisodesParams>((ref, params) async {
   if (params.url.isEmpty) return null;
   final repo = ref.watch(aurisRepositoryProvider);
   return repo.getEpisodes(
@@ -364,7 +364,7 @@ class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<Map<String, Lis
   }
 }
 
-final groupedEpisodesProvider = FutureProvider.family<GroupedEpisodesResult?, GroupedEpisodesParams>((ref, params) async {
+final groupedEpisodesProvider = FutureProvider.autoDispose.family<GroupedEpisodesResult?, GroupedEpisodesParams>((ref, params) async {
   if (params.sources.isEmpty) return null;
   
   // Evitar mezclar temporadas distintas de la misma familia
