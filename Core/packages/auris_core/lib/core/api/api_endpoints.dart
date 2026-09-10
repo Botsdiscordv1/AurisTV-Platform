@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'image_policy.dart';
 
 class ApiEndpoints {
   static const Map<String, String> _servers = {
@@ -138,16 +139,43 @@ class ApiEndpoints {
   /// Implementación Senior: Idempotente, Anti-Recursiva y con soporte de Weserv CDN.
   /// [width] y [height] - Dimensiones deseadas para optimizar RAM y red.
   /// [highQuality] - Si es true, usa parámetros de máxima fidelidad (ideal para 4K/Backdrops).
-  static String proxyImage(String? url, {int? width, int? height, bool highQuality = false, String? fallbackUrl}) {
+  /// [policy] - Política de redimensionamiento predefinida (opcional).
+  static String proxyImage(String? url, {
+    int? width, 
+    int? height, 
+    bool highQuality = false, 
+    String? fallbackUrl,
+    ImageSize? policy,
+  }) {
     if (url == null || url.isEmpty) return '';
 
     String workingUrl = url;
+    
+    // Si hay una política, ella manda sobre los parámetros manuales
+    int? targetWidth = width;
+    int targetQuality = highQuality ? 100 : 82;
 
-    // ... (lógica de desunwrapping omitida para brevedad, sigue igual)
+    if (policy != null) {
+      targetWidth = policy.width;
+      targetQuality = AurisImagePolicy.getQuality(policy);
+    }
+
+    // ... (resto de la lógica de limpieza)
     while (workingUrl.contains('url=http') || workingUrl.contains('/api/proxy/image') || workingUrl.contains('weserv.nl')) {
        if (workingUrl.contains('url=http')) {
          final int index = workingUrl.lastIndexOf('url=http');
          workingUrl = workingUrl.substring(index + 4);
+       } else if (workingUrl.contains('/api/proxy/image')) {
+         // URLs ya proxiedas por el server (nested SIEMPRE va encoded):
+         // extraer la original para re-enrutarla (directa/weserv) en vez de
+         // pagar doble proxy en el VPS. Sin 'url' válida, se deja como está.
+         try {
+           final uri = Uri.parse(workingUrl);
+           final nested = uri.queryParameters['url'];
+           if (nested != null && nested.isNotEmpty) {
+             workingUrl = nested;
+           } else break;
+         } catch (_) { break; }
        } else if (workingUrl.contains('weserv.nl')) {
          try {
            final uri = Uri.parse(workingUrl);
@@ -177,20 +205,22 @@ class ApiEndpoints {
     }
 
     if (workingUrl.startsWith('http')) {
-      final String fallbackParam = (fallbackUrl != null && fallbackUrl.isNotEmpty) 
-          ? '&errorredirect=${Uri.encodeComponent(fallbackUrl)}' 
-          : '';
+      // Fallback por defecto: el proxy del VPS con la imagen ORIGINAL.
+      // Si weserv falla (dominio bloqueado, caída), redirige ahí y la imagen
+      // igual carga. Un fallbackUrl explícito (otra imagen) tiene prioridad.
+      final String effectiveFallback = (fallbackUrl != null && fallbackUrl.isNotEmpty)
+          ? fallbackUrl
+          : '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+      final String fallbackParam = '&errorredirect=${Uri.encodeComponent(effectiveFallback)}';
       
-      String params = '&output=webp';
-      if (highQuality) {
-        params += '&q=100&il';
-      } else {
-        params += '&q=82';
-        // Añadir dimensiones si se proveen
-        if (width != null) params += '&w=$width';
-        if (height != null) params += '&h=$height';
-        if (width != null || height != null) params += '&fit=cover';
+      String params = '&output=webp&q=$targetQuality';
+      if (highQuality && policy == null) {
+        params += '&il';
       }
+      
+      if (targetWidth != null) params += '&w=$targetWidth';
+      if (height != null) params += '&h=$height';
+      if (targetWidth != null || height != null) params += '&fit=cover';
           
       return 'https://images.weserv.nl/?url=${Uri.encodeComponent(workingUrl)}$params$fallbackParam';
     }
@@ -218,6 +248,7 @@ class ApiEndpoints {
   static String subscriptions(String userId) => '/api/subscriptions/$userId';
   static const String titlesAnime = '/api/titles/anime';
   static const String titlesMovie = '/api/titles/movie';
+  static const String catalogSources = '/api/catalog/sources';
   static const String extract = '/api/extract';
   static const String episodes = '/api/episodes';
   static const String resolveEpisode = '/api/resolve-episode';
