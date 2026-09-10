@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:collection/collection.dart';
 import '../../auris_core.dart';
 import '../../core/utils/content_logic.dart';
 import '../../core/utils/source_utils.dart';
@@ -23,15 +22,6 @@ class ContentSearchParams {
   const ContentSearchParams({required this.query, required this.category, this.year, this.server});
   @override bool operator ==(Object other) => identical(this, other) || other is ContentSearchParams && query == other.query && category == other.category && year == other.year && server == other.server;
   @override int get hashCode => Object.hash(query, category, year, server);
-}
-
-class GalleryParams {
-  final String kind;
-  final String? title;
-  final int? year;
-  const GalleryParams({required this.kind, this.title, this.year});
-  @override bool operator ==(Object other) => identical(this, other) || other is GalleryParams && kind == other.kind && title == other.title && year == other.year;
-  @override int get hashCode => Object.hash(kind, title, year);
 }
 
 class DiscoveredSourcesParams {
@@ -89,7 +79,7 @@ class GroupedEpisodesParams {
   final int? tmdbId;
   final String familyKey;
   final String currentSourceUrl;
-  final String sourcesSignature; // Senior Fix: Firma de texto para estabilidad absoluta
+  final String sourcesSignature;
 
   const GroupedEpisodesParams({
     required this.title,
@@ -178,15 +168,12 @@ final episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, Ep
 final groupedEpisodesProvider = FutureProvider.autoDispose.family<GroupedEpisodesResult?, GroupedEpisodesParams>((ref, arg) async {
   final repo = ref.watch(aurisRepositoryProvider);
   
-  // Senior Fix: Carga del primario con prioridad.
-  // No usamos ref.read(...).future para no perder la reactividad si el repo cambia.
   final primaryRes = await repo.getEpisodes(
     arg.currentSourceUrl, arg.familyKey, category: arg.category,
     title: arg.title, fullTitle: arg.metadataTitle, tmdbId: arg.tmdbId,
     season: arg.season, year: arg.year,
   );
 
-  // Traducciones en background real
   Future.microtask(() {
     final ctManager = ref.read(communityTranslationManagerProvider);
     for (final ep in primaryRes.episodes) {
@@ -241,10 +228,43 @@ class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<UnifiedRelation
   }
 }
 
+/// Guardia anti-variantes: si las fuentes curadas (calendario/búsqueda) ya
+/// cubren una familia (JKAnime, AnimeAV1...), un descubierto de la MISMA
+/// familia con distinto slug Y distinta url es otra obra (mini, spin-off,
+/// especial) y se descarta. Sin curadas, o coincidiendo slug/url, se conserva
+/// (incluye splits SUB/LATINO, que comparten slug+url).
+bool isRogueVariant(SourceItem s, List<SearchResult>? initialSources) {
+  if (initialSources == null || initialSources.isEmpty) return false;
+  if (s.url.isEmpty) return false;
+  final fam = simplifySourceName(s.source);
+  if (fam.isEmpty) return false;
+  var familySeen = false;
+  for (final r in initialSources) {
+    final items = r.sources.isNotEmpty
+        ? r.sources
+        : [
+            SourceItem(
+                source: r.source,
+                url: r.url,
+                quality: r.quality,
+                slug: r.slug)
+          ];
+    for (final c in items) {
+      if (simplifySourceName(c.source) != fam) continue;
+      if (c.url.isEmpty) continue;
+      familySeen = true;
+      final sameSlug =
+          (s.slug?.isNotEmpty ?? false) && s.slug == c.slug;
+      if (sameSlug || s.url == c.url) return false;
+    }
+  }
+  return familySeen;
+}
+
 final discoveredSourcesProvider = Provider.family<List<SearchResult>, DiscoveredSourcesParams>((ref, params) {
   if (params.category.toLowerCase() == 'all' || params.category.isEmpty) return const <SearchResult>[];
   
-  // Senior Fix: Solo modo autoritativo si tiene sub-fuentes verificadas.
+  // Senior Fix: Consideramos autoritativo SOLO si la tarjeta tiene un combo verificado.
   final bool isAuthoritative = params.initialSources != null && 
       params.initialSources!.any((s) => s.sources.length > 1);
 
@@ -262,9 +282,11 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
   void addResult(SearchResult r) {
     final itemSources = r.sources.isNotEmpty ? r.sources : [SourceItem(source: r.source, url: r.url, quality: r.quality)];
     for (final s in itemSources) {
-      if (s.source.toUpperCase() == 'TMDB' || s.source.toUpperCase() == 'ANILIST') continue;
+      if (s.source.toUpperCase() == 'TMDB' || s.source.toUpperCase() == 'ANILIST' || s.source.toUpperCase() == 'TRAKT') continue;
+      // Variantes descubiertas (mini/spin-off) no pisan la lista curada.
+      if (isRogueVariant(s, params.initialSources)) continue;
       
-      // Senior Fix: Relajamos filtro de temporada para no perder fuentes en S2+
+      // Senior Fix: Filtro de temporada ultra-relajado para no perder nada.
       final rSeason = r.season ?? extractSeason(r.title) ?? extractSeason(r.url);
       if (targetSeason != null && rSeason != null && rSeason != targetSeason && !isSeasonUnified(s.source)) continue;
       
@@ -277,6 +299,15 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
   if (searchData != null) { for (final r in searchData.results) { addResult(r); } }
   return searchSources;
 });
+
+class GalleryParams {
+  final String kind;
+  final String? title;
+  final int? year;
+  const GalleryParams({required this.kind, this.title, this.year});
+  @override bool operator ==(Object other) => identical(this, other) || other is GalleryParams && kind == other.kind && title == other.title && year == other.year;
+  @override int get hashCode => Object.hash(kind, title, year);
+}
 
 final galleryProvider = FutureProvider.family<GalleryResponse, GalleryParams>((ref, params) async {
   final repo = ref.watch(aurisRepositoryProvider);
