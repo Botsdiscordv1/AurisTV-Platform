@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import '../../auris_core.dart';
 import '../../core/utils/content_logic.dart';
 import '../../core/utils/source_utils.dart';
@@ -24,6 +25,15 @@ class ContentSearchParams {
   @override int get hashCode => Object.hash(query, category, year, server);
 }
 
+class GalleryParams {
+  final String kind;
+  final String? title;
+  final int? year;
+  const GalleryParams({required this.kind, this.title, this.year});
+  @override bool operator ==(Object other) => identical(this, other) || other is GalleryParams && kind == other.kind && title == other.title && year == other.year;
+  @override int get hashCode => Object.hash(kind, title, year);
+}
+
 class DiscoveredSourcesParams {
   final String title;
   final String? metadataTitle;
@@ -40,7 +50,7 @@ class DiscoveredSourcesParams {
   const DiscoveredSourcesParams({
     required this.title,
     this.metadataTitle,
-    required this.category,
+    this.category = 'all',
     this.year,
     this.season,
     this.kind,
@@ -80,6 +90,9 @@ class GroupedEpisodesParams {
   final String familyKey;
   final String currentSourceUrl;
   final String sourcesSignature;
+  /// Nombre real de la fuente (p. ej. "AnimeAV1"). Antes se mandaba familyKey
+  /// ("animeav1") como source y se dependía de que el server lo normalizara.
+  final String? source;
 
   const GroupedEpisodesParams({
     required this.title,
@@ -91,6 +104,7 @@ class GroupedEpisodesParams {
     required this.familyKey,
     required this.currentSourceUrl,
     required this.sourcesSignature,
+    this.source,
   });
 
   @override
@@ -105,10 +119,34 @@ class GroupedEpisodesParams {
           tmdbId == other.tmdbId &&
           familyKey == other.familyKey &&
           currentSourceUrl == other.currentSourceUrl &&
-          sourcesSignature == other.sourcesSignature;
+          sourcesSignature == other.sourcesSignature &&
+          source == other.source;
 
   @override
-  int get hashCode => Object.hash(title, metadataTitle, category, year, season, tmdbId, familyKey, currentSourceUrl, sourcesSignature);
+  int get hashCode => Object.hash(title, metadataTitle, category, year, season, tmdbId, familyKey, currentSourceUrl, sourcesSignature, source);
+}
+
+/// Firma de identidad para la carga de episodios: depende SOLO de la fuente
+/// seleccionada (+temporada). La lista de descubiertas crece con cada chunk
+/// del search progresivo; si entrara en la firma, el provider se re-dispararía
+/// (spinner infinito + refetch por chunk) aunque el usuario no cambie nada.
+String episodesSignature(String selectedUrl, int? season) =>
+    '$selectedUrl|${season ?? 0}';
+
+class UnifiedRelationsParams {
+  final List<SearchResult> sources;
+  final String signature;
+
+  const UnifiedRelationsParams({required this.sources, required this.signature});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UnifiedRelationsParams &&
+          signature == other.signature;
+
+  @override
+  int get hashCode => signature.hashCode;
 }
 
 class GroupedEpisodesResult {
@@ -167,27 +205,27 @@ final episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, Ep
 
 final groupedEpisodesProvider = FutureProvider.autoDispose.family<GroupedEpisodesResult?, GroupedEpisodesParams>((ref, arg) async {
   final repo = ref.watch(aurisRepositoryProvider);
-  
   final primaryRes = await repo.getEpisodes(
-    arg.currentSourceUrl, arg.familyKey, category: arg.category,
+    arg.currentSourceUrl, arg.source?.isNotEmpty == true ? arg.source! : arg.familyKey, category: arg.category,
     title: arg.title, fullTitle: arg.metadataTitle, tmdbId: arg.tmdbId,
     season: arg.season, year: arg.year,
   );
 
+  if (primaryRes == null) return null;
+
   Future.microtask(() {
     final ctManager = ref.read(communityTranslationManagerProvider);
     for (final ep in primaryRes.episodes) {
-      if (ep.description == null || ep.description!.isEmpty) {
-        unawaited(ctManager.processEpisodeTranslation(tmdbId: primaryRes.tmdbId ?? arg.tmdbId, season: arg.season ?? primaryRes.season, episode: ep));
-      }
+      if (!ep.needsTranslation) continue;
+      unawaited(ctManager.processEpisodeTranslation(tmdbId: primaryRes.tmdbId ?? arg.tmdbId, season: arg.season ?? primaryRes.season, episode: ep));
     }
   });
 
   return GroupedEpisodesResult(response: primaryRes, sources: List.filled(primaryRes.episodes.length, null));
 });
 
-final unifiedRelationsProvider = StateNotifierProvider.autoDispose.family<_UnifiedRelationsNotifier, AsyncValue<UnifiedRelationsMap>, List<SearchResult>>((ref, sources) {
-  return _UnifiedRelationsNotifier(ref, sources);
+final unifiedRelationsProvider = StateNotifierProvider.autoDispose.family<_UnifiedRelationsNotifier, AsyncValue<UnifiedRelationsMap>, UnifiedRelationsParams>((ref, params) {
+  return _UnifiedRelationsNotifier(ref, params.sources);
 });
 
 class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<UnifiedRelationsMap>> {
@@ -264,7 +302,6 @@ bool isRogueVariant(SourceItem s, List<SearchResult>? initialSources) {
 final discoveredSourcesProvider = Provider.family<List<SearchResult>, DiscoveredSourcesParams>((ref, params) {
   if (params.category.toLowerCase() == 'all' || params.category.isEmpty) return const <SearchResult>[];
   
-  // Senior Fix: Consideramos autoritativo SOLO si la tarjeta tiene un combo verificado.
   final bool isAuthoritative = params.initialSources != null && 
       params.initialSources!.any((s) => s.sources.length > 1);
 
@@ -285,11 +322,8 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
       if (s.source.toUpperCase() == 'TMDB' || s.source.toUpperCase() == 'ANILIST' || s.source.toUpperCase() == 'TRAKT') continue;
       // Variantes descubiertas (mini/spin-off) no pisan la lista curada.
       if (isRogueVariant(s, params.initialSources)) continue;
-      
-      // Senior Fix: Filtro de temporada ultra-relajado para no perder nada.
       final rSeason = r.season ?? extractSeason(r.title) ?? extractSeason(r.url);
       if (targetSeason != null && rSeason != null && rSeason != targetSeason && !isSeasonUnified(s.source)) continue;
-      
       searchSources.add(r.copyWith(url: s.url, quality: cleanQuality(s.quality), source: s.source));
     }
   }
@@ -299,15 +333,6 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
   if (searchData != null) { for (final r in searchData.results) { addResult(r); } }
   return searchSources;
 });
-
-class GalleryParams {
-  final String kind;
-  final String? title;
-  final int? year;
-  const GalleryParams({required this.kind, this.title, this.year});
-  @override bool operator ==(Object other) => identical(this, other) || other is GalleryParams && kind == other.kind && title == other.title && year == other.year;
-  @override int get hashCode => Object.hash(kind, title, year);
-}
 
 final galleryProvider = FutureProvider.family<GalleryResponse, GalleryParams>((ref, params) async {
   final repo = ref.watch(aurisRepositoryProvider);

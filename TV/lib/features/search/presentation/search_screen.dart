@@ -434,6 +434,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               posterUrl: ApiEndpoints.proxyImage(result.thumbnail, fallbackUrl: result.tmdbThumbnail),
               badge: meta.label,
               badgeColor: meta.labelColor,
+              badgeOverlay: result.season != null && result.season! > 1 
+                  ? SeasonBadge(
+                      season: result.season!,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        bottomRight: Radius.circular(11),
+                      ),
+                    ) 
+                  : null,
               subtitle: meta.status,
               subtitleColor: meta.statusColor,
               activeBorderColor: const Color(0xFFE91E63),
@@ -475,6 +484,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               posterUrl: ApiEndpoints.proxyImage(result.thumbnail, fallbackUrl: result.tmdbThumbnail),
               badge: meta.label,
               badgeColor: meta.labelColor,
+              badgeOverlay: result.season != null && result.season! > 1 
+                  ? SeasonBadge(
+                      season: result.season!,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        bottomRight: Radius.circular(11),
+                      ),
+                    ) 
+                  : null,
               subtitle: meta.status,
               subtitleColor: meta.statusColor,
               activeBorderColor: const Color(0xFFE91E63),

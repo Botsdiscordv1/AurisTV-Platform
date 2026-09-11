@@ -70,7 +70,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
 
   Future<void> _setOffline() async {
     final current = state.currentDevice;
-    if (current == null) return;
+    if (current == null || current.userId == 'guest_user') return;
     try {
       await _supabase.from('remote_sessions').update({
         'is_online': false,
@@ -87,7 +87,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
 
   Future<void> _setOnline() async {
     final current = state.currentDevice;
-    if (current == null) return;
+    if (current == null || current.userId == 'guest_user') return;
     try {
       await _supabase.from('remote_sessions').update({
         'is_online': true,
@@ -105,9 +105,9 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
   Future<void> _init() async {
     // Escuchar cambios de autenticación para reiniciar o detener
     _ref.listen(authProvider, (previous, next) {
-      if (next != null && previous == null) {
+      if (next != null && next.id != 'guest_user') {
         _initSession(next);
-      } else if (next == null && previous != null) {
+      } else {
         _stopRemote();
       }
     }, fireImmediately: true);
@@ -191,7 +191,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
   }
 
   Future<void> _registerDevice() async {
-    if (state.currentDevice == null) return;
+    if (state.currentDevice == null || state.currentDevice!.userId == 'guest_user') return;
     try {
       await _supabase.from('remote_sessions').upsert(
         state.currentDevice!.toJson(),
@@ -332,6 +332,9 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
     );
 
     state = state.copyWith(currentDevice: updated);
+
+    // Senior Fix: No enviar actualizaciones de estado si es invitado
+    if (current.userId == 'guest_user') return;
 
     try {
       await _supabase.from('remote_sessions').update(updated.toJson()).match({

@@ -20,7 +20,11 @@ import '../../shared/widgets/main_navigation_wrapper.dart';
 /// Observador global para detectar cambios de ruta y gestionar estados de widgets (ej: trailers)
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
+/// Clave global para el Navigator Raíz (Senior Fix: Necesario para pre-fetching)
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final GoRouter appRouter = GoRouter(
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/splash',
   observers: [routeObserver],
   routes: [

@@ -96,10 +96,10 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     
     final double posterHeight = ResponsiveUtils.posterHeight(context);
     final double cardWidth = ResponsiveUtils.posterWidth(context);
-    final double rowHeight = ResponsiveUtils.rowHeight(context);
+    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: true);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 32 : 48), // Padding unificado
+      padding: EdgeInsets.only(bottom: isMobile ? 12 : 24), // Senior Fix: Reducido de 32/48 para compactar secciones
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -140,7 +140,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                           cacheExtent: 1000,
                           clipBehavior: Clip.none,
                           scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
+                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Zero padding
                           itemCount: widget.items.length,
                           separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
                           itemBuilder: (context, index) {
@@ -163,8 +163,8 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                                   title: item.title,
                                   posterUrl: item.posterUrl,
                                   rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
-                                  subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : item.subtitle,
-                                  showInfo: true,
+                                  subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : null, // Senior: Ocultar año pero mantener episodios
+                                  showInfo: false,
                                   onTap: () => widget.onItemTap(item),
                                 ),
                               ),

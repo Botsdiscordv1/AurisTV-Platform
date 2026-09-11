@@ -61,6 +61,7 @@ class FocusablePosterCard extends StatefulWidget {
   final bool showInfo;
   final Color? activeBorderColor;
   final double aspectRatio;
+  final Widget? airingOverlay; // Senior Fix: Slot para esquina superior izquierda
 
   const FocusablePosterCard({
     super.key,
@@ -76,6 +77,7 @@ class FocusablePosterCard extends StatefulWidget {
     this.showInfo = true,
     this.activeBorderColor,
     this.aspectRatio = 2 / 3,
+    this.airingOverlay,
   });
 
   @override
@@ -127,147 +129,145 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
             children: [
               AspectRatio(
                 aspectRatio: widget.aspectRatio,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // 1. EL POSTER (Contenido Base)
-                    Container(
-                      decoration: BoxDecoration(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: _isActive
+                        ? [BoxShadow(color: (widget.activeBorderColor ?? Colors.white).withOpacity(0.12), blurRadius: 12, spreadRadius: 1)]
+                        : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // 1. EL PÓSTER (Base)
+                      ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: _isActive
-                            ? [BoxShadow(color: (widget.activeBorderColor ?? Colors.white).withOpacity(0.12), blurRadius: 12, spreadRadius: 1)]
-                            : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            AnimatedScale(
-                              scale: _isActive ? 1.12 : 1.0,
-                              duration: const Duration(milliseconds: 400),
-                              curve: Curves.easeOutCubic,
-                              child: Builder(
-                                builder: (context) {
-                                  final dpr = MediaQuery.of(context).devicePixelRatio;
-                                  final targetWidth = (normalWidth * dpr).round();
-                                  final targetHeight = (targetWidth * 1.5).round();
+                        clipBehavior: Clip.antiAliasWithSaveLayer,
+                        child: AnimatedScale(
+                          scale: _isActive ? 1.12 : 1.0,
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeOutCubic,
+                          child: Builder(
+                            builder: (context) {
+                              final dpr = MediaQuery.of(context).devicePixelRatio;
+                              final targetWidth = (normalWidth * dpr).round();
+                              final targetHeight = (targetWidth * 1.5).round();
 
-                                  return CachedNetworkImage(
-                                    imageUrl: ApiEndpoints.proxyImage(
-                                      widget.posterUrl,
-                                      width: targetWidth,
-                                      height: targetHeight,
-                                    ),
-                                    fit: BoxFit.cover,
-                                    memCacheWidth: targetWidth.clamp(1, 2048),
-                                    filterQuality: FilterQuality.medium,
-                                    placeholder: (context, url) => _letterPlaceholder(widget.title),
-                                    errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
-                                  );
-                                }
+                              return CachedNetworkImage(
+                                imageUrl: ApiEndpoints.proxyImage(
+                                  widget.posterUrl,
+                                  policy: ImageSize.poster,
+                                ),
+                                fit: BoxFit.cover,
+                                memCacheWidth: targetWidth.clamp(1, 2048),
+                                filterQuality: FilterQuality.medium,
+                                placeholder: (context, url) => _letterPlaceholder(widget.title),
+                                errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
+                              );
+                            }
+                          ),
+                        ),
+                      ),
+
+                      // Degradado inferior para legibilidad de subtítulos/badges
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Colors.transparent, Colors.black.withOpacity(0.6)],
+                                stops: const [0.7, 1.0],
                               ),
                             ),
-                            // Degradado inferior para legibilidad de subtítulos/badges
-                            Positioned.fill(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [Colors.transparent, Colors.black.withOpacity(0.6)],
-                                    stops: const [0.7, 1.0],
+                          ),
+                        ),
+                      ),
+
+                      // 2. OVERLAYS (Clipeados individualmente o por el Stack)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAliasWithSaveLayer, // Senior Fix: Máxima calidad de recorte
+                        child: Stack(
+                          children: [
+                            // TOP-LEFT: Airing
+                            if (widget.airingOverlay != null)
+                              Positioned(
+                                top: -1, left: -1, // Senior Fix: Sangrado para evitar fugas en la curva
+                                child: widget.airingOverlay!
+                              ),
+
+                            // TOP-RIGHT: Category
+                            if (widget.badge != null)
+                              Positioned(
+                                top: -1, right: -1, // Senior Fix: Sangrado
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: widget.badgeColor ?? const Color(0xFF1E1E26).withOpacity(0.9),
+                                    borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8)),
+                                    border: Border.all(color: Colors.white10, width: 0.5),
+                                  ),
+                                  child: Text(
+                                    widget.badge!, 
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white, 
+                                      fontSize: 10, 
+                                      fontWeight: FontWeight.w800, 
+                                      letterSpacing: 0.5
+                                    )
                                   ),
                                 ),
                               ),
-                            ),
+
+                            // BOTTOM-RIGHT: Season
+                            if (widget.badgeOverlay != null)
+                              Positioned(bottom: -1, right: -1, child: widget.badgeOverlay!), // Senior Fix: Sangrado
+
+                            // BOTTOM-LEFT: Episode/Status
+                            if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
+                              Positioned(
+                                bottom: -1, left: -1, // Senior Fix: Sangrado
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: widget.subtitleColor ?? const Color(0xFF1E1E26).withOpacity(0.95),
+                                    borderRadius: const BorderRadius.only(topRight: Radius.circular(8)),
+                                    border: Border.all(color: Colors.white10, width: 0.5),
+                                  ),
+                                  child: Text(
+                                    widget.subtitle!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                    ),
-                    
-                    // 2. EL BORDE (Capa Superior para evitar Shifting)
-                    IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _isActive ? (widget.activeBorderColor ?? Colors.white) : Colors.white12, 
-                            width: _isActive ? 2.0 : 1.0, // Idéntico a Home
-                          ),
-                        ),
-                      ),
-                    ),
 
-                    // 3. OVERLAYS (Badges, Ratings, etc)
-                    if (widget.badgeOverlay != null)
-                      Positioned(top: 8, left: 8, child: widget.badgeOverlay!)
-                    else if (widget.badge != null)
-                      Positioned(
-                        top: 0, right: 0,
+                      // 3. EL BORDE (Capa Superior para sellar imperfecciones)
+                      IgnorePointer(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: widget.badgeColor ?? Colors.black.withOpacity(0.8),
-                            borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8), topRight: Radius.circular(11)),
-                            border: Border.all(color: Colors.white12, width: 0.5),
-                          ),
-                          child: Text(
-                            widget.badge!, 
-                            style: GoogleFonts.poppins(
-                              color: Colors.white, 
-                              fontSize: 10, 
-                              fontWeight: FontWeight.w800, 
-                              letterSpacing: 0.5
-                            )
-                          ),
-                        ),
-                      ),
-                    if (widget.rating != null && widget.badge == null)
-                      Positioned(
-                        top: 8, right: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.8), 
-                            borderRadius: BorderRadius.circular(4), 
-                            border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 0.8)
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.star, color: Color(0xFFFFC107), size: 10),
-                              const SizedBox(width: 4),
-                              Text(widget.rating!, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
-                      Positioned(
-                        bottom: 0, left: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: widget.subtitleColor ?? Colors.black.withOpacity(0.85),
-                            borderRadius: const BorderRadius.only(topRight: Radius.circular(8), bottomLeft: Radius.circular(11)),
-                            border: Border.all(color: Colors.white12, width: 0.5),
-                          ),
-                          child: Text(
-                            widget.subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _isActive ? (widget.activeBorderColor ?? Colors.white) : Colors.white12,
+                              width: _isActive ? 2.0 : 1.0,
                             ),
                           ),
                         ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               if (widget.showInfo) ...[

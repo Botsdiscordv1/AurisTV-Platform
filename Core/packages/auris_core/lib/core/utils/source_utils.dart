@@ -150,12 +150,7 @@ String cleanTitleForDisplay(String title) {
   
   cleaned = cleaned.trim();
 
-  // 3. Limpieza de puntuación huérfana al final (ej: "Kimi no Na wa.")
-  // Senior Fix: Eliminamos puntos, comas o guiones al final que ensucian la búsqueda en TMDB.
-  final trailingPunctuation = RegExp(r'[.\-\s]+$');
-  cleaned = cleaned.replaceAll(trailingPunctuation, '');
-
-  // Si después de limpiar el año y puntuación quedó vacío (era solo el año), devolvemos el original.
+  // Si después de limpiar el año quedó vacío (era solo el año), devolvemos el original.
   return cleaned.isEmpty ? title : cleaned;
 }
 

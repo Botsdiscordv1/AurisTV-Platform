@@ -137,6 +137,7 @@ class EpisodeInfo {
   final String? episodeType;
 
   final int? tmdbSpecialNumber;
+  final bool needsTranslation;
 
   const EpisodeInfo({
     required this.number,
@@ -151,6 +152,7 @@ class EpisodeInfo {
     this.quality,
     this.episodeType,
     this.tmdbSpecialNumber,
+    this.needsTranslation = false,
   });
 
   factory EpisodeInfo.fromJson(Map<String, dynamic> json) {
@@ -171,6 +173,7 @@ class EpisodeInfo {
       quality: json['quality'] as String?,
       episodeType: json['episodeType'] as String?,
       tmdbSpecialNumber: int.tryParse(json['tmdbSpecialNumber']?.toString() ?? ''),
+      needsTranslation: json['needsTranslation'] as bool? ?? false,
     );
   }
 }

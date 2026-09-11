@@ -729,6 +729,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildServerSelectorContent({bool isSidebar = false}) {
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool useCompact = isMobile && isLandscape && screenHeight < 500;
+
     final servers = _groupedSources.keys.toList()
       ..sort((a, b) => sourceDisplayRank(a).compareTo(sourceDisplayRank(b)));
     if (servers.isEmpty) {
@@ -738,61 +743,62 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ));
     }
 
-    return ListView.builder(
+    return ListView.separated(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(horizontal: 16) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
       itemCount: servers.length,
+      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1, indent: 64),
       itemBuilder: (context, index) {
         final sName = servers[index];
         final isCurrent = sName == simplifySourceName(_currentSource);
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              onTap: () {
-                if (!isSidebar) Navigator.pop(context);
-                else setState(() => _activeOverlay = PlayerOverlay.none);
-                
-                if (!isCurrent) {
-                  _switchSource(_groupedSources[sName]!.first);
-                }
-              },
-              leading: Container(
-                width: 44, height: 44, // Senior Fix: Unificado tamaño con selector de idiomas
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                  border: isCurrent ? Border.all(color: const Color(0xFFEF7A1E), width: 2) : null,
-                ),
-                child: const Center(
-                  child: Icon(Symbols.dns, color: Colors.white70, size: 20),
+        return Material(
+          color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.08) : Colors.transparent,
+          child: ListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            onTap: () {
+              if (!isSidebar) Navigator.pop(context);
+              else setState(() => _activeOverlay = PlayerOverlay.none);
+              
+              if (!isCurrent) {
+                _switchSource(_groupedSources[sName]!.first);
+              }
+            },
+            leading: Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Center(
+                child: Icon(
+                  Symbols.dns, 
+                  color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white54, 
+                  size: 16,
+                  fill: isCurrent ? 1 : 0,
                 ),
               ),
-              title: Text(
-                sName,
-                style: TextStyle(
-                  color: isCurrent ? Colors.white : Colors.white.withOpacity(0.9),
-                  fontSize: 15,
-                  fontWeight: isCurrent ? FontWeight.w900 : FontWeight.bold,
-                ),
-              ),
-              subtitle: Text(
-                '${_groupedSources[sName]!.length} opciones disponibles',
-                style: TextStyle(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.8) : Colors.white38,
-                  fontSize: 12,
-                ),
-              ),
-              trailing: isCurrent 
-                ? const Icon(Symbols.check_circle, color: Color(0xFFEF7A1E))
-                : const Icon(Symbols.arrow_forward_ios, color: Colors.white12, size: 14),
             ),
+            title: Text(
+              sName,
+              style: GoogleFonts.poppins(
+                color: isCurrent ? Colors.white : Colors.white.withOpacity(0.8),
+                fontSize: 14,
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+            subtitle: Text(
+              '${_groupedSources[sName]!.length} opciones',
+              style: GoogleFonts.poppins(
+                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.6) : Colors.white24,
+                fontSize: 11,
+              ),
+            ),
+            trailing: isCurrent 
+              ? Icon(Symbols.check_circle, color: const Color(0xFFEF7A1E), size: 18, fill: 1)
+              : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.1), size: 16),
           ),
         );
       },
@@ -860,10 +866,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Widget _buildQualitySelectorContent({bool isSidebar = false}) {
     final List<Map<String, dynamic>> options = _qualityMenuOptions;
 
-    return ListView.builder(
+    return ListView.separated(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
       itemCount: options.length,
+      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1, indent: 64),
       itemBuilder: (context, index) {
         final option = options[index];
         final String key = option['key'] as String;
@@ -873,49 +880,47 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final bool isAvailable = url != null && url.isNotEmpty;
         final bool isCurrent = _selectedQuality == key;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              enabled: isAvailable,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              onTap: () {
-                if (!isSidebar) Navigator.pop(context);
-                else setState(() => _activeOverlay = PlayerOverlay.none);
-                
-                if (isAvailable && !isCurrent) {
-                  _changeQuality(key);
-                }
-              },
-              leading: Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.white.withOpacity(0.05),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isCurrent ? Icons.check_circle_rounded : Icons.hd_rounded,
-                  color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white70 : Colors.white24),
-                  size: 24,
-                ),
+        return Material(
+          color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.08) : Colors.transparent,
+          child: ListTile(
+            enabled: isAvailable,
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            onTap: () {
+              if (!isSidebar) Navigator.pop(context);
+              else setState(() => _activeOverlay = PlayerOverlay.none);
+              
+              if (isAvailable && !isCurrent) {
+                _changeQuality(key);
+              }
+            },
+            leading: Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(6),
               ),
-              title: Text(
-                label,
-                style: TextStyle(
-                  color: isCurrent ? Colors.white : (isAvailable ? Colors.white70 : Colors.white24),
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                ),
+              child: Icon(
+                isCurrent ? Symbols.check_circle : Symbols.hd,
+                color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white54 : Colors.white12),
+                size: 16,
+                fill: isCurrent ? 1 : 0,
               ),
-              subtitle: Text(
-                isAvailable ? sub : 'No disponible para este tema',
-                style: TextStyle(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.7) : Colors.white38,
-                  fontSize: 12,
-                ),
+            ),
+            title: Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: isCurrent ? Colors.white : (isAvailable ? Colors.white.withOpacity(0.8) : Colors.white12),
+                fontSize: 14,
+                fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+            subtitle: Text(
+              isAvailable ? sub : 'No disponible para este tema',
+              style: GoogleFonts.poppins(
+                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.6) : Colors.white24,
+                fontSize: 11,
               ),
             ),
           ),
@@ -1104,7 +1109,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildLanguageSelectorContent({bool isSidebar = false}) {
-    final isMobile = ResponsiveUtils.isMobile(context);
     final sourceOptions = _getLanguageOptions();
     if (sourceOptions.isEmpty) {
       return const Center(child: Padding(
@@ -1113,44 +1117,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ));
     }
 
-    return ListView.builder(
+    return ListView.separated(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
       itemCount: sourceOptions.length,
+      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1, indent: 64),
       itemBuilder: (context, index) {
         final entry = sourceOptions[index];
         final s = entry.result;
-        final serverName = entry.server;
-        final quality = s.quality.toUpperCase();
         final type = trackQualityType(s.quality);
-        final isLatino = type != 'SUB';
-        final isCastellano = type == 'CAST';
-
-
-        final accentColor = isLatino
-            ? Colors.greenAccent
-            : (isCastellano ? Colors.orangeAccent : Colors.blueAccent);
+        final accentColor = type != 'SUB' ? Colors.greenAccent : Colors.blueAccent;
         
-        // Senior Logic: Identificación precisa de la fuente actual
-        // Si es un track (sub-fuente), comparamos por índice.
-        // Si es una fuente base (servidor), comparamos por URL.
         final bool isCurrent = entry.isTrack 
             ? entry.trackIndex == _selectedTrackIndex
             : s.url == _currentSourceUrl;
 
-        final String? trackBadge = entry.isTrack
-            ? _allTracks[entry.trackIndex].label.toUpperCase()
-            : null;
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        return Material(
+          color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.08) : Colors.transparent,
+          child: ListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
             onTap: () {
               if (!isSidebar) Navigator.pop(context);
               else setState(() => _activeOverlay = PlayerOverlay.none);
@@ -1163,101 +1150,49 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 }
               }
             },
-            leading: Stack(
-              children: [
-                Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(
+            leading: Container(
+              width: 36, height: 28,
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: accentColor.withOpacity(0.3), width: 1),
+              ),
+              child: Center(
+                child: Text(
+                  type,
+                  style: GoogleFonts.poppins(
                     color: accentColor,
-                    shape: BoxShape.circle,
-                    border: isCurrent ? Border.all(color: Colors.white, width: 2) : null,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                if (isCurrent)
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(color: Color(0xFF0B0B0D), shape: BoxShape.circle),
-                      child: const Icon(Icons.check_circle, color: Color(0xFFEF7A1E), size: 16),
-                    ),
-                  ),
-              ],
+              ),
             ),
-            title: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!isMobile || trackBadge == null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      serverName,
-                      style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                if (trackBadge != null) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFC107).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 1),
-                    ),
-                    child: Text(
-                      trackBadge,
-                      style: const TextStyle(color: Color(0xFFFFC107), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                    ),
-                  ),
-                ],
-                // Idioma/calidad como badge para TODAS las opciones, incluido SUB
-                // (antes los SUB solo mostraban la bandera, sin etiqueta de texto,
-                // por lo que parecía que todo era DUB). SUB en azul, resto en naranja.
-                if (quality.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: (trackQualityType(s.quality) == 'SUB')
-                          ? Colors.blueAccent.withOpacity(0.14)
-                          : const Color(0xFFEF7A1E).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      quality,
-                      style: TextStyle(
-                        color: (trackQualityType(s.quality) == 'SUB')
-                            ? Colors.blueAccent
-                            : const Color(0xFFEF7A1E),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+            title: Text(
+              '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source}',
+              style: GoogleFonts.poppins(
+                color: isCurrent ? Colors.white : Colors.white.withOpacity(0.8),
+                fontSize: 14,
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            subtitle: null,
+            subtitle: Text(
+              entry.server,
+              style: GoogleFonts.poppins(
+                color: Colors.white24,
+                fontSize: 10,
+              ),
+              maxLines: 1,
+            ),
             trailing: isCurrent 
-              ? Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF7A1E).withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.play_arrow_rounded, color: Color(0xFFEF7A1E), size: 20),
-                )
-              : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white12, size: 14),
+              ? Icon(Symbols.check_circle, color: const Color(0xFFEF7A1E), size: 18, fill: 1)
+              : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.1), size: 16),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
   }
 
   void _showLanguageSelector() {
@@ -4188,11 +4123,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildMobileHeader() {
-    final bool hideBack = _isFullscreen && !_isMobileDevice;
-    final double iconSize = _isMobileDevice ? 24 : 30;
-    final double spacing = _isMobileDevice ? 8 : 12;
+    final bool isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
 
-    return Positioned(top: 0, left: 0, right: 0, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+    final bool hideBack = _isFullscreen && !isMobile;
+    final double iconSize = useMobileLayout ? (isLandscape ? 22 : 24) : 30;
+    final double spacing = useMobileLayout ? (isLandscape ? 6 : 8) : 12;
+
+    return Positioned(
+      top: 0, 
+      left: 0, 
+      right: 0, 
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: useMobileLayout ? 24 : 48, 
+          vertical: useMobileLayout ? (isLandscape ? 8 : 12) : 12
+        ), 
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center, 
+          children: [
             if (!hideBack) ...[
               IconButton(iconSize: iconSize, icon: const Icon(Symbols.arrow_back, color: Colors.white), onPressed: _handleBackNavigation),
               SizedBox(width: spacing),
@@ -4209,7 +4160,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     children: [
                       Text(
                         _displayTitle,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18),
+                        style: TextStyle(
+                          color: Colors.white, 
+                          fontWeight: FontWeight.w700, 
+                          fontSize: useMobileLayout ? (isLandscape ? 15 : 18) : 18
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -4227,7 +4182,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       else if (_activeEpisode != null && !_isMovie)
                         Text(
                           _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
-                          style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Colors.white70, 
+                            fontSize: useMobileLayout ? (isLandscape ? 12 : 14) : 14, 
+                            fontWeight: FontWeight.bold
+                          ),
                         )
                     ],
                   );
@@ -4240,17 +4199,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     ? _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0]
                     : null;
 
-                // Senior Fix: Usar la etiqueta de idioma (quality) con fallback al estado actual
-                // para asegurar visibilidad constante en Web y durante la carga inicial.
                 String label = currentTrack?.quality ?? _currentTrackQuality;
                 if (label.isEmpty) label = _currentLanguage ?? widget.language ?? '';
 
-                // Senior Logic: Usar color del servidor (track) o fallback por tipo
                 Color color = const Color(0xFFEF7A1E);
                 if (currentTrack?.color != null) {
                   color = Color(currentTrack!.color!);
                 } else {
-                  // Fallback visual por tipo de contenido
                   final type = trackQualityType(label);
                   if (type == 'SUB') color = Colors.blueAccent;
                 }
@@ -4263,7 +4218,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               },
             ),
             const SizedBox(width: 16),
-          ])));
+          ]
+        )
+      )
+    );
   }
 
   Widget _buildPlayPauseButton({double? size}) {
@@ -4466,43 +4424,54 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildMobileCenterControls() {
+    final bool isTablet = ResponsiveUtils.isTablet(context);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
     if (!_isMobileDevice) return const SizedBox.shrink();
     
-    final double iconSize = _isMobileDevice ? 44 : 56;
-    final double playSize = _isMobileDevice ? 64 : 90;
-    // Senior UI: Espaciado aumentado para evitar toques accidentales en el botón central en móviles
-    final double spacing = _isMobileDevice ? 56 : 40;
+    // Senior Adaptive Scaling: Refinado para un balance óptimo (Dieta sutil)
+    final double iconSize = isTablet ? 48 : 38;
+    final double playSize = isTablet ? 72 : 56;
+    final double spacing = isTablet ? 44 : 50;
 
-    return Center(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+    return Center(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center, 
+        children: [
           _buildCircularCenterAction(icon: Symbols.replay_10, size: iconSize, onTap: _skipBackward),
           SizedBox(width: spacing), 
           _buildPlayPauseButton(size: playSize),
           SizedBox(width: spacing),
           _buildCircularCenterAction(icon: Symbols.forward_10, size: iconSize, onTap: _skipForward),
-        ]));
+        ]
+      )
+    );
   }
 
   Widget _buildCircularCenterAction({required IconData icon, required double size, required VoidCallback onTap}) {
     return _buildCircularButton(
       icon: icon,
       onTap: onTap,
-      size: size + 20, // Ajuste para el padding del contenedor circular
+      size: size + 20, 
       fill: true,
-      backgroundColor: _isMobileDevice ? Colors.black.withValues(alpha: 0.15) : Colors.transparent,
+      backgroundColor: Colors.black.withValues(alpha: 0.15),
       iconSize: size,
     );
   }
 
   Widget _buildMobileBottomBar() {
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
     final screenWidth = MediaQuery.sizeOf(context).width;
     final bool showLabels = screenWidth > 750;
 
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final double vPadding = _isMobileDevice && isLandscape ? 8 : 16;
-    
-    final double iconSize = _isMobileDevice ? 24 : 30;
-    final double spacing = _isMobileDevice ? 8 : 12;
-    final double playSize = _isMobileDevice ? 28 : 44; // Unificado a 44px
+    final double vPadding = useMobileLayout && isLandscape ? 10 : 16;
+    final double iconSize = useMobileLayout ? (isLandscape ? 24 : 24) : 30;
+    final double spacing = useMobileLayout ? (isLandscape ? 8 : 8) : 12;
+    final double playSize = useMobileLayout ? 28 : 44; 
 
     // Senior Navigation Shield: Verificar si existen episodios anterior/siguiente
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
@@ -4531,12 +4500,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       left: 0,
       right: 0,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: vPadding),
+        padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 24 : 48, vertical: vPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildMobileTimeline(),
-            SizedBox(height: isLandscape ? 4 : 12),
+            SizedBox(height: isLandscape ? 2 : 12),
             // Senior: Usar SingleChildScrollView para evitar overflow en pantallas pequeñas/anchas
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -4558,7 +4527,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           ),
                           onPressed: _toggleFullscreen,
                         ),
-                        // Controles desktop solo si no estamos en móvil (donde se usan gestos y centro)
                         if (!_isMobileDevice) ...[
                           SizedBox(width: spacing),
                           _buildPlayPauseButton(size: playSize),
@@ -4571,7 +4539,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           const SizedBox(width: 12),
                           _buildDurationCapsule(),
                         ],
-                        // Rotación (Nativo y Web Móvil)
                         if (_isMobileDevice) ...[
                           SizedBox(width: spacing),
                           IconButton(
@@ -4600,7 +4567,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           icon: Symbols.skip_previous,
                           label: showLabels ? 'Anterior' : '',
                         ),
-                        if (hasPrevious && hasNext) const SizedBox(width: 12),
+                        if (hasPrevious && hasNext) const SizedBox(width: 8),
                         if (hasNext)
                         _PlayerTextButton(
                           onPressed: () => _navigateToEpisode(true),
@@ -4619,14 +4586,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             setState(() {
                               const speeds = [0.5, 0.7, 1.0, 1.2, 1.5, 1.7, 2.0];
                               int currentIndex = speeds.indexOf(_playbackSpeed);
-                              if (currentIndex == -1) currentIndex = 2; // Default a 1.0 si hay un valor intermedio
+                              if (currentIndex == -1) currentIndex = 2; 
                               
                               _playbackSpeed = speeds[(currentIndex + 1) % speeds.length];
                               _player?.setRate(_playbackSpeed);
                             });
                           },
                         ),
-                        Text('${_playbackSpeed.toStringAsFixed(1)}x', style: TextStyle(color: Colors.white, fontSize: _isMobileDevice ? 13 : 14, fontWeight: FontWeight.w900)),
+                        Text('${_playbackSpeed.toStringAsFixed(1)}x', style: TextStyle(color: Colors.white, fontSize: useMobileLayout ? (isLandscape ? 11 : 13) : 14, fontWeight: FontWeight.w900)),
                         SizedBox(width: spacing),
                         if (!_isOpEd) ...[
                           IconButton(iconSize: iconSize, icon: const Icon(Symbols.dns, color: Colors.white), onPressed: _showServerSelector),
@@ -4833,7 +4800,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildLockToggle() {
-    return Positioned(top: 60, right: 16, child: IconButton(icon: Icon(_isLocked ? Icons.lock : Icons.lock_open, color: Colors.white), onPressed: () { setState(() { _isLocked = !_isLocked; if (_isLocked) _showControls = false; else { _showControls = true; _startHideTimer(); } }); }));
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    return Positioned(
+      top: isLandscape ? 45 : 60, 
+      right: 16, 
+      child: IconButton(
+        icon: Icon(_isLocked ? Icons.lock : Icons.lock_open, color: Colors.white), 
+        onPressed: () { 
+          setState(() { 
+            _isLocked = !_isLocked; 
+            if (_isLocked) _showControls = false; 
+            else { _showControls = true; _startHideTimer(); } 
+          }); 
+        }
+      )
+    );
   }
 }
 
@@ -4847,6 +4828,13 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
   bool _isHovered = false;
   @override Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
+    final double fontSize = useMobileLayout ? (isLandscape ? 12 : 12) : 16;
+    final double iconSize = useMobileLayout ? (isLandscape ? 20 : 20) : 30;
+
     return MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
@@ -4857,15 +4845,18 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
                 onTap: widget.onPressed,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: isMobile ? (widget.label.isEmpty ? 6 : 10) : 24, vertical: isMobile ? 6 : 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: useMobileLayout ? (widget.label.isEmpty ? 6 : 10) : 24, 
+                      vertical: useMobileLayout ? (isLandscape ? 6 : 6) : 12
+                    ),
                     decoration: BoxDecoration(
                         color: widget.useBackground ? (_isHovered ? Colors.white24 : Colors.white10) : (_isHovered ? Colors.white10 : Colors.transparent),
                         borderRadius: BorderRadius.circular(8)),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(widget.icon, color: Colors.white, size: isMobile ? 20 : 30),
+                      Icon(widget.icon, color: Colors.white, size: iconSize),
                       if (widget.label.isNotEmpty) ...[
-                        SizedBox(width: isMobile ? 6 : 8),
-                        Text(widget.label, style: TextStyle(color: Colors.white, fontSize: isMobile ? 12 : 16, fontWeight: widget.isBold ? FontWeight.w900 : FontWeight.bold)),
+                        SizedBox(width: useMobileLayout ? 4 : 8),
+                        Text(widget.label, style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: widget.isBold ? FontWeight.w900 : FontWeight.bold)),
                       ]
                     ])))));
   }
@@ -4939,7 +4930,11 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    
+    // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
+    final bool useMobileLayout = isMobile || screenHeight < 500;
     
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
@@ -4951,8 +4946,8 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
     return Container(
       width: double.infinity,
       padding: EdgeInsets.only(
-        bottom: isMobile ? 0 : 12, // Senior Fix: Eliminado padding inferior en móvil para máximo aprovechamiento
-        top: isMobile ? (isLandscape ? 5 : 60) : 40 
+        bottom: useMobileLayout ? 0 : 12, 
+        top: useMobileLayout ? (isLandscape ? 5 : 60) : 40 
       ), 
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -4972,7 +4967,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 48),
+            padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 24 : 48),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -4983,7 +4978,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                       'EPISODIOS',
                       style: TextStyle(
                         color: const Color(0xFFEF7A1E), 
-                        fontSize: isMobile ? (isLandscape ? 11 : 13) : 15, 
+                        fontSize: useMobileLayout ? (isLandscape ? 10 : 13) : 15, 
                         fontWeight: FontWeight.w900, 
                         letterSpacing: 2
                       ),
@@ -4993,7 +4988,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                       'TEMPORADA ${widget.season}',
                       style: TextStyle(
                         color: Colors.white, 
-                        fontSize: isMobile ? (isLandscape ? 16 : 18) : 26, 
+                        fontSize: useMobileLayout ? (isLandscape ? 15 : 18) : 26, 
                         fontWeight: FontWeight.w900
                       ),
                     ),
@@ -5002,19 +4997,19 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: Icon(Symbols.close, color: Colors.white, size: isMobile ? (isLandscape ? 28 : 36) : 48),
+                  icon: Icon(Symbols.close, color: Colors.white, size: useMobileLayout ? (isLandscape ? 28 : 36) : 48),
                   onPressed: widget.onClose,
                 ),
               ],
             ),
           ),
           
-          SizedBox(height: isMobile ? 2 : 16), // Senior Fix: Reducido al mínimo el espacio bajo el título
+          SizedBox(height: useMobileLayout ? 2 : 16), 
           
           Stack(
             children: [
               SizedBox(
-                height: isMobile ? (isLandscape ? 250 : 280) : 440, // Senior Fix: Ajustado a 250px en landscape para eliminar aire inferior
+                height: useMobileLayout ? (isLandscape ? 230 : 280) : 440, // Senior Fix: Ajustado a 230px en landscape para 2 líneas de texto
                 child: episodesAsync.when(
                   data: (data) {
                     if (data == null || data.episodes.isEmpty) {
@@ -5025,9 +5020,9 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                       scrollDirection: Axis.horizontal,
                       clipBehavior: Clip.none,
                       padding: EdgeInsets.only(
-                        left: isMobile ? 24 : 48, 
-                        right: isMobile ? 24 : 48,
-                        top: isLandscape ? 5 : 10, // Senior Fix: Reducido espacio superior en horizontal
+                        left: useMobileLayout ? 24 : 48, 
+                        right: useMobileLayout ? 24 : 48,
+                        top: isLandscape ? 5 : 10, 
                         bottom: 0,
                       ),
                       itemCount: data.episodes.length,
@@ -5050,12 +5045,11 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                 ),
               ),
 
-              // Senior: Flechas de Navegación Proactivas
-              if (!isMobile) ...[
+              if (!useMobileLayout) ...[
                 Positioned(
                   left: 0, 
                   top: 0, 
-                  bottom: 180, // Senior Fix: Ajustado al área de la imagen
+                  bottom: 180, 
                   child: AnimatedOpacity(
                     opacity: _showLeftArrow ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),
@@ -5070,7 +5064,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                 Positioned(
                   right: 0, 
                   top: 0, 
-                  bottom: 180, // Senior Fix: Ajustado al área de la imagen
+                  bottom: 180, 
                   child: AnimatedOpacity(
                     opacity: _showRightArrow ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),
@@ -5169,10 +5163,14 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     
+    // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+    
     // Senior UI Adaptive logic:
-    final double cardWidth = isMobile ? 240.0 : 440.0;
+    final double cardWidth = useMobileLayout ? (isLandscape ? 200.0 : 240.0) : 440.0;
     final bool isActive = _isHovered || _isFocused;
     
     return Focus(
@@ -5188,7 +5186,7 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
             curve: Curves.easeOut,
             child: Container(
               width: cardWidth,
-              margin: EdgeInsets.only(right: isMobile ? 20 : 32), 
+              margin: EdgeInsets.only(right: useMobileLayout ? 20 : 32), 
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -5197,21 +5195,21 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                     aspectRatio: 16 / 9,
                     child: Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(isMobile ? 10 : 16),
+                        borderRadius: BorderRadius.circular(useMobileLayout ? 10 : 16),
                         border: Border.all(
                           color: widget.isCurrent ? const Color(0xFFEF7A1E) : (isActive ? Colors.white : Colors.white.withOpacity(0.1)), 
-                          width: widget.isCurrent ? (isMobile ? 3 : 5) : (isActive ? 3 : 1)
+                          width: widget.isCurrent ? (useMobileLayout ? 3 : 5) : (isActive ? 3 : 1)
                         ),
                         boxShadow: (widget.isCurrent || isActive) ? [
                           BoxShadow(
                             color: (widget.isCurrent ? const Color(0xFFEF7A1E) : Colors.white).withOpacity(0.4), 
-                            blurRadius: isMobile ? 15 : 30, 
+                            blurRadius: useMobileLayout ? 15 : 30, 
                             spreadRadius: 1
                           )
                         ] : [],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(isMobile ? 8 : 13),
+                        borderRadius: BorderRadius.circular(useMobileLayout ? 8 : 13),
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
@@ -5223,23 +5221,23 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                                 errorWidget: (context, url, error) => Container(color: Colors.black26),
                               )
                             else
-                              Container(color: Colors.white.withOpacity(0.05), child: Icon(Icons.movie_outlined, color: Colors.white10, size: isMobile ? 48 : 72)),
+                              Container(color: Colors.white.withOpacity(0.05), child: Icon(Icons.movie_outlined, color: Colors.white10, size: useMobileLayout ? 48 : 72)),
                             
                             if (widget.isCurrent)
                               Positioned.fill(
                                 child: Container(
-                                  color: const Color(0xFFEF7A1E).withOpacity(0.15), // Senior: Tinte sutil en lugar de icono play
+                                  color: const Color(0xFFEF7A1E).withOpacity(0.15), 
                                 ),
                               ),
                             
                             // Badge de EP (Esquina inferior derecha)
                             Positioned(
-                              bottom: isMobile ? 8 : 12, 
-                              right: isMobile ? 8 : 12,
+                              bottom: useMobileLayout ? 8 : 12, 
+                              right: useMobileLayout ? 8 : 12,
                               child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 12, vertical: isMobile ? 2 : 5),
-                                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(isMobile ? 4 : 8)),
-                                child: Text('EP ${widget.number}', style: TextStyle(color: Colors.white, fontSize: isMobile ? 10 : 14, fontWeight: FontWeight.w900)),
+                                padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 6 : 12, vertical: useMobileLayout ? 2 : 5),
+                                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(useMobileLayout ? 4 : 8)),
+                                child: Text('EP ${widget.number}', style: TextStyle(color: Colors.white, fontSize: useMobileLayout ? 10 : 14, fontWeight: FontWeight.w900)),
                               ),
                             ),
                           ],
@@ -5247,12 +5245,11 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12), // Senior Fix: Más compacto
+                  const SizedBox(height: 12), 
                   // Información del episodio
                   Builder(
                     builder: (context) {
                       final String rawTitle = widget.title ?? "Episodio ${widget.number}";
-                      // Senior Clean Logic: Evitamos duplicados si el título ya trae el número o la palabra Episodio/EP
                       final bool startsWithNumber = rawTitle.startsWith('${widget.number}') || 
                                                   rawTitle.startsWith('0${widget.number}') ||
                                                   rawTitle.toLowerCase().startsWith('episodio') ||
@@ -5267,7 +5264,7 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: widget.isCurrent || isActive ? Colors.white : Colors.white.withOpacity(0.9),
-                          fontSize: isMobile ? 14 : 22, 
+                          fontSize: useMobileLayout ? (isLandscape ? 12 : 14) : 22, 
                           fontWeight: widget.isCurrent || isActive ? FontWeight.w900 : FontWeight.bold,
                         ),
                       );
@@ -5276,11 +5273,11 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                   const SizedBox(height: 6),
                   Text(
                     widget.description ?? 'Sin descripción disponible para este episodio.',
-                    maxLines: isMobile ? 2 : 3,
+                    maxLines: useMobileLayout ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.55), 
-                      fontSize: isMobile ? 11 : 17, 
+                      fontSize: useMobileLayout ? (isLandscape ? 10 : 11) : 17, 
                       height: 1.4,
                       fontWeight: FontWeight.w500
                     ),
@@ -5311,57 +5308,80 @@ class _PlayerSidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
     final bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
     
     // Senior UI Adaptive logic:
-    // En móvil landscape o tablet, el ancho es 380. En desktop 450.
-    final double panelWidth = isMobile ? (isLandscape ? 380 : MediaQuery.of(context).size.width * 0.85) : width;
-    final double padding = isMobile ? 12 : 24;
+    // En móvil landscape reducimos a 320. En móvil portrait ~85% del ancho. En desktop 450.
+    final double panelWidth = useMobileLayout 
+        ? (isLandscape ? 280.0 : MediaQuery.of(context).size.width * 0.85) 
+        : width;
+    final double padding = useMobileLayout ? (isLandscape ? 8.0 : 12.0) : 24.0;
 
     return Align(
       alignment: Alignment.centerRight,
       child: Padding(
         padding: EdgeInsets.all(padding),
-        child: Material(
-          color: const Color(0xFF16161C),
-          borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
-          elevation: 10,
-          shadowColor: Colors.black.withOpacity(0.6),
-          clipBehavior: Clip.antiAlias,
-          child: Container(
-            width: panelWidth,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min, // Senior: Permitir que el panel sea más corto si hay pocos items
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(isMobile ? 20 : 32, isMobile ? 20 : 32, 16, 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        title.toUpperCase(),
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: isMobile ? 12 : 14,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.0,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: onClose,
-                        icon: Icon(Icons.close_rounded, color: Colors.white54, size: isMobile ? 20 : 24),
-                      ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(useMobileLayout ? 12 : 32),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Material(
+              color: const Color(0xCC16161C), 
+              elevation: 0, 
+              child: Container(
+                width: panelWidth,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(useMobileLayout ? 12 : 32),
+                  border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withOpacity(0.05),
+                      Colors.transparent,
                     ],
                   ),
                 ),
-                const Divider(color: Colors.white10, height: 1),
-                Flexible(child: child),
-              ],
+                child: Column(
+                  mainAxisSize: MainAxisSize.min, 
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        useMobileLayout ? 16 : 32, 
+                        useMobileLayout ? (isLandscape ? 12 : 24) : 32, 
+                        12, 
+                        useMobileLayout ? 4 : 12
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            title.toUpperCase(),
+                            style: GoogleFonts.poppins(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: useMobileLayout ? (isLandscape ? 10 : 13) : 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: onClose,
+                            icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.4), size: useMobileLayout ? 18 : 26),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(color: Colors.white10, height: 1, indent: 16, endIndent: 16),
+                    Flexible(child: child),
+                    SizedBox(height: useMobileLayout ? 4 : 12),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

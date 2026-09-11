@@ -2,9 +2,132 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../data/models/search_history.dart';
 import '../providers/search_provider.dart';
+
+class SearchCategorySelector extends StatelessWidget {
+  final String selectedCategory;
+  final ValueChanged<String> onCategoryChanged;
+
+  const SearchCategorySelector({
+    super.key,
+    required this.selectedCategory,
+    required this.onCategoryChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = ResponsiveUtils.isMobile(context);
+    
+    final categories = [
+      {'id': 'all', 'label': 'Todo'},
+      {'id': 'peliculas', 'label': 'Películas'},
+      {'id': 'series', 'label': 'Series'},
+      {'id': 'anime', 'label': 'Anime'},
+    ];
+
+    final double spacing = isMobile ? 8.0 : 12.0;
+    final double height = isMobile ? 38.0 : 46.0;
+    final double fontSize = isMobile ? 14.0 : 16.0;
+    
+    final Map<String, double> itemWidths = isMobile ? {
+      'all': 65.0,
+      'peliculas': 95.0,
+      'series': 80.0,
+      'anime': 80.0,
+    } : {
+      'all': 90.0,
+      'peliculas': 130.0,
+      'series': 110.0,
+      'anime': 110.0,
+    };
+
+    final activeIndex = categories.indexWhere((c) => c['id'] == selectedCategory);
+    
+    double leftOffset = 0;
+    for (int i = 0; i < activeIndex; i++) {
+      leftOffset += itemWidths[categories[i]['id']]! + spacing;
+    }
+
+    return SizedBox(
+      height: height,
+      child: ShaderMask(
+        shaderCallback: (Rect rect) {
+          return const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [Colors.black, Colors.transparent],
+            stops: [0.92, 1.0],
+          ).createShader(rect);
+        },
+        blendMode: BlendMode.dstIn,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.only(right: isMobile ? 32 : 48),
+          child: Stack(
+            children: [
+              // FONDO DESLIZANTE (PÍLDORA)
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOutCubic,
+                left: leftOffset,
+                child: Container(
+                  width: itemWidths[selectedCategory],
+                  height: height,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(height / 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // ITEMS DE TEXTO
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: categories.map((cat) {
+                  final isSelected = cat['id'] == selectedCategory;
+                  return Padding(
+                    padding: EdgeInsets.only(right: spacing),
+                    child: GestureDetector(
+                      onTap: () => onCategoryChanged(cat['id']!),
+                      child: Container(
+                        width: itemWidths[cat['id']],
+                        height: height,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(height / 2),
+                        ),
+                        child: AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 250),
+                          style: GoogleFonts.poppins(
+                            color: isSelected ? Colors.black : Colors.white70,
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          child: Text(cat['label']!),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class SearchHistorySection extends ConsumerWidget {
   final Function(String) onQueryTap;
@@ -19,7 +142,7 @@ class SearchHistorySection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -35,14 +158,22 @@ class SearchHistorySection extends ConsumerWidget {
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
           itemCount: history.length,
           itemBuilder: (context, index) {
             final item = history[index];
             return ListTile(
-              leading: const Icon(Icons.history_rounded, color: Colors.white38, size: 22),
-              title: Text(item.query, style: const TextStyle(color: Colors.white70, fontSize: 15)),
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              leading: const Icon(Icons.history_rounded, color: Color(0xFFEF7A1E), size: 20),
+              title: Text(
+                item.query, 
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white70, fontSize: 15)
+              ),
               trailing: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+                icon: const Icon(Icons.close_rounded, color: Colors.white24, size: 18),
                 onPressed: () => ref.read(searchHistoryProvider.notifier).removeQuery(item.query),
               ),
               onTap: () => onQueryTap(item.query),
@@ -80,7 +211,7 @@ class SearchGenresGrid extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Text('Explorar géneros',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
         ),
@@ -192,7 +323,7 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.fromLTRB(32, 32, 16, 16),
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Text('Lo más buscado hoy',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
         ),
@@ -205,7 +336,7 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
                 children: [
                   ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     scrollDirection: Axis.horizontal,
                     itemCount: items.length,
                     itemBuilder: (context, index) {

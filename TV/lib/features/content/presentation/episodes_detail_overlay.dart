@@ -183,6 +183,14 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
         final eps = result?.response.episodes ?? [];
         if (eps.isEmpty) return const Center(child: CircularProgressIndicator(color: Colors.white24));
 
+        // Senior Instant-Load Logic: Precarga especulativa de miniaturas
+        final int startEp = ref.read(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title)?.episode != null
+            ? (int.tryParse(ref.read(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title)!.episode!) ?? 1)
+            : 1;
+        
+        // Disparamos la precarga de la ventana de episodios (actual + 12)
+        ref.listenManual(episodeImagePrefetchProvider((episodes: eps, startFrom: startEp - 1)), (_, __) {});
+
         return ListView.separated(
           controller: _episodesScrollController,
           itemCount: eps.length,

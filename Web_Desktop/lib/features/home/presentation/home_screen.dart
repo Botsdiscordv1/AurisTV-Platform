@@ -71,7 +71,7 @@ void openHomeScheduleItem(BuildContext context, MediaItem item) {
   );
   
   if (context.mounted) {
-    context.go(uri, extra: item.toContentSeed());
+    context.push(uri, extra: item.toContentSeed());
   }
 }
 
@@ -538,7 +538,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _FocusIconButton(
                     icon: Icons.grid_view_rounded,
                     size: isCompactDesktop ? 22 : 26,
-                    onPressed: () => context.go('/horario'),
+                    onPressed: () => context.push('/horario'),
                   ),
                   const SizedBox(width: 12),
                 ],

@@ -1,11 +1,11 @@
-import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../models/server/episodes_response.dart';
 import '../../core/api/providers.dart';
+import '../../core/api/api_endpoints.dart';
 import 'auth_provider.dart';
 
 final communityTranslationManagerProvider = Provider<CommunityTranslationManager>((ref) {
@@ -17,22 +17,43 @@ class CommunityTranslationManager {
 
   CommunityTranslationManager(this.ref);
 
-  bool _isGenericTitle(String? title) {
+  static bool isGenericTitle(String? title) {
     if (title == null || title.isEmpty) return true;
     final lower = title.toLowerCase().trim();
     final regex = RegExp(r'^(episode|episodio|ep|capitulo|capítulo|chapter)\s*\d+$');
     return regex.hasMatch(lower);
   }
 
-  bool _containsCjk(String text) {
+  static bool containsCjk(String text) {
     return RegExp(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7A3]').hasMatch(text);
   }
 
-  String _detectSourceLanguage(String text) {
+  static String detectSourceLanguage(String text) {
     if (RegExp(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]').hasMatch(text)) {
       return 'ja';
     }
     return 'en';
+  }
+
+  /// UUID de instalación estable para cuota per-dispositivo (se genera una
+  /// vez y persiste en Hive). Evita el bucket compartido de 'guest_user'.
+  static Future<String> deviceUserId(Box box) async {
+    var id = box.get('device_user_id') as String?;
+    if (id == null || id.isEmpty) {
+      id = const Uuid().v4();
+      await box.put('device_user_id', id);
+    }
+    return id;
+  }
+
+  /// Decide si hay algo que traducir. Falso cuando no hay texto fuente
+  /// (título genérico + sinopsis vacía): el server lo rechazaría igual.
+  static bool shouldAttempt({String? title, String? overview}) {
+    final hasTitle = title != null && title.trim().isNotEmpty;
+    final hasOverview = overview != null && overview.trim().isNotEmpty;
+    if (!hasTitle && !hasOverview) return false;
+    if (isGenericTitle(title) && !hasOverview) return false;
+    return true;
   }
 
   /// Procesa la traducción silenciosa de un episodio en segundo plano si cumple con los triggers.
@@ -48,12 +69,7 @@ class CommunityTranslationManager {
     final srcOverview = episode.description;
 
     // 1. Validar que exista texto fuente real
-    if ((srcTitle == null || srcTitle.trim().isEmpty) && (srcOverview == null || srcOverview.trim().isEmpty)) {
-      return;
-    }
-
-    // Si el título es plantilla genérica y la sinopsis está vacía -> saltar
-    if (_isGenericTitle(srcTitle) && (srcOverview == null || srcOverview.trim().isEmpty)) {
+    if (!shouldAttempt(title: srcTitle, overview: srcOverview)) {
       return;
     }
 
@@ -76,14 +92,16 @@ class CommunityTranslationManager {
 
       // 4. Determinar idioma fuente (JA o EN)
       final textForDetection = (srcOverview != null && srcOverview.isNotEmpty) ? srcOverview : (srcTitle ?? '');
-      final sourceLang = _detectSourceLanguage(textForDetection);
+      final sourceLang = detectSourceLanguage(textForDetection);
 
-      // Aviso de descarga de modelo ML Kit offline bajo demanda una sola vez en móvil con WiFi
+      // Traducción vía endpoint Google con la IP del dispositivo (cuota fresca
+      // por teléfono; ML Kit offline queda como optimización futura).
       if (!kIsWeb) {
-        if (Platform.isAndroid || Platform.isIOS) {
-          final noticeKey = 'mlkit_notice_shown';
+        final p = defaultTargetPlatform;
+        if (p == TargetPlatform.android || p == TargetPlatform.iOS) {
+          final noticeKey = 'perdevice_notice_shown';
           if (box.get(noticeKey) != true) {
-            debugPrint('*** [Aviso ML Kit] Descarga de modelo de traducción offline iniciada bajo demanda (Solo WiFi recomendado). ***');
+            debugPrint('[CommunityTranslation] Traduciendo con la IP del dispositivo (cuota propia).');
             await box.put(noticeKey, true);
           }
         }
@@ -93,7 +111,7 @@ class CommunityTranslationManager {
       String? translatedTitle;
       String? translatedOverview;
 
-      if (srcTitle != null && srcTitle.trim().isNotEmpty && !_isGenericTitle(srcTitle)) {
+      if (srcTitle != null && srcTitle.trim().isNotEmpty && !isGenericTitle(srcTitle)) {
         translatedTitle = await _translateText(srcTitle, sourceLang);
       } else {
         translatedTitle = srcTitle;
@@ -109,21 +127,23 @@ class CommunityTranslationManager {
 
       // Validar longitud máxima y ausencia de caracteres CJK en texto traducido
       if (translatedTitle != null) {
-        if (translatedTitle.length > 200 || _containsCjk(translatedTitle)) {
+        if (translatedTitle.length > 200 || containsCjk(translatedTitle)) {
           translatedTitle = null;
         }
       }
       if (translatedOverview != null) {
-        if (translatedOverview.length > 2000 || _containsCjk(translatedOverview)) {
+        if (translatedOverview.length > 2000 || containsCjk(translatedOverview)) {
           translatedOverview = null;
         }
       }
 
       if (translatedTitle == null && translatedOverview == null) return;
 
-      // 7. Obtener userId actual de la cuenta o guest por defecto
+      // 7. userId: cuenta logueada o UUID de instalación estable (persistido).
+      // Nunca 'guest_user' literal: el server lo trata como ausente y cae a
+      // IP, pero en CGNAT/móviles la IP rota y la cuota se comparte.
       final userAccount = ref.read(authProvider);
-      final userId = userAccount?.id ?? 'guest_user';
+      final userId = userAccount?.id ?? await deviceUserId(box);
 
       // 8. Enviar al VPS
       final payload = {
@@ -137,12 +157,17 @@ class CommunityTranslationManager {
       };
 
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.post('/api/translations/community', data: payload);
+      final response = await apiClient.post(
+        '/api/translations/community',
+        data: payload,
+        baseUrl: ApiEndpoints.animeBaseUrl,
+      );
 
       final data = response.data;
+      // El server envuelve en {success, data:{saved}}; aceptar ambas formas.
       bool saved = false;
       if (data is Map) {
-        saved = data['saved'] == true;
+        saved = data['saved'] == true || (data['data'] is Map && data['data']['saved'] == true);
       }
 
       if (saved) {
@@ -150,7 +175,7 @@ class CommunityTranslationManager {
         await box.put(dayCountKey, currentDayCount + 1);
         debugPrint('[CommunityTranslation] Traducción enviada exitosamente para S${season}E${episode.number}');
       } else {
-        final reason = (data is Map) ? data['reason'] : 'Motivo desconocido';
+        final reason = (data is Map) ? (data['reason'] ?? (data['data'] is Map ? data['data']['reason'] : null) ?? 'Motivo desconocido') : 'Motivo desconocido';
         debugPrint('[CommunityTranslation] Servidor rechazó traducción: $reason');
       }
     } catch (e) {

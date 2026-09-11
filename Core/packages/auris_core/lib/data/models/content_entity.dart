@@ -22,6 +22,7 @@ class ContentEntity {
   final double? rating;
   final String? synopsis;
   final List<String> genres;
+  final int? airingAt;
   
   /// El objeto original del servidor si está disponible.
   final SearchResult? rawResult;
@@ -42,6 +43,7 @@ class ContentEntity {
     this.rating,
     this.synopsis,
     this.genres = const [],
+    this.airingAt,
     this.rawResult,
   });
 
@@ -87,8 +89,6 @@ class ContentEntity {
       rawResult: item.card,
     );
   }
-  
-  final int? airingAt;
 
   static MediaType _inferType(SearchResult r) {
     final k = r.kind?.toLowerCase() ?? '';

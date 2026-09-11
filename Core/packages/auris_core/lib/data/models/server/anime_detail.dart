@@ -1,5 +1,6 @@
 import '../../../core/utils/synopsis_cleaner.dart';
 import '../../../core/api/api_endpoints.dart';
+import '../../../core/api/image_policy.dart';
 import 'shared_models.dart';
 
 class AnimeDetail {
@@ -105,7 +106,7 @@ class AnimeDetail {
       backdropsData.forEach((key, value) {
         final seasonNum = int.tryParse(key.toString());
         if (seasonNum != null && value != null) {
-          backdropsBySeason[seasonNum] = ApiEndpoints.proxyImage(value.toString(), highQuality: true);
+          backdropsBySeason[seasonNum] = ApiEndpoints.proxyImage(value.toString(), policy: ImageSize.full);
         }
       });
     }
@@ -127,14 +128,23 @@ class AnimeDetail {
             anime['description'] as String? ??
             root['overview'] as String?,
       ),
-      poster: ApiEndpoints.proxyImage(visuals?['poster'] as String? ??
-          root['poster'] as String? ??
-          root['thumbnail'] as String?),
-      backdrop: ApiEndpoints.proxyImage(visuals?['backdrop'] as String? ??
-          root['backdrop'] as String? ??
-          root['banner'] as String?, highQuality: true),
-      banner: ApiEndpoints.proxyImage(visuals?['banner'] as String? ?? root['banner'] as String?, highQuality: true),
-      logo: ApiEndpoints.proxyImage(visuals?['logo'] as String? ?? root['logo'] as String?),
+      poster: ApiEndpoints.proxyImage(
+        visuals?['poster'] as String? ??
+        root['poster'] as String? ??
+        root['thumbnail'] as String?,
+        policy: ImageSize.poster
+      ),
+      backdrop: ApiEndpoints.proxyImage(
+        visuals?['backdrop'] as String? ??
+        root['backdrop'] as String? ??
+        root['banner'] as String?, 
+        policy: ImageSize.full
+      ),
+      banner: ApiEndpoints.proxyImage(
+        visuals?['banner'] as String? ?? root['banner'] as String?, 
+        policy: ImageSize.banner
+      ),
+      logo: ApiEndpoints.proxyImage(visuals?['logo'] as String? ?? root['logo'] as String?, policy: ImageSize.tiny),
       rating: (anime['score'] as num?)?.toDouble(),
       episodes: anime['episodes'] as int?,
       genres: (anime['genres'] as List<dynamic>?)
@@ -288,7 +298,8 @@ class RelationInfo {
         v['img'] as String? ??
         json['poster'] as String? ??
         json['posterUrl'] as String? ??
-        json['image'] as String?
+        json['image'] as String?,
+        policy: ImageSize.poster
       ),
     );
   }
@@ -320,7 +331,8 @@ class RecommendationInfo {
         v['img'] as String? ??
         json['poster'] as String? ??
         json['posterUrl'] as String? ??
-        json['image'] as String?
+        json['image'] as String?,
+        policy: ImageSize.poster
       ),
       score: (json['score'] as num?)?.toDouble(),
     );

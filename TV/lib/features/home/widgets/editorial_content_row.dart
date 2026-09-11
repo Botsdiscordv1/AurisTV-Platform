@@ -85,6 +85,9 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     final width = MediaQuery.of(context).size.width;
     final isCompactDesktop = width >= 800 && width < 1100;
     
+    final double cardWidth = ResponsiveUtils.posterWidth(context);
+    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false);
+
     final bool isMythical = widget.badge == EditorialBadge.mythical;
 
     if (isMythical) {
@@ -92,7 +95,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     }
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 24 : 32), // Padding reducido
+      padding: EdgeInsets.only(bottom: isMobile ? 12 : 16), // Senior Fix: Reducido drásticamente para TV
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -110,7 +113,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _buildStandardRow(isMobile, horizontalPadding),
         ],
       ),
@@ -124,7 +127,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       child: Stack(
         children: [
           SizedBox(
-            height: isMobile ? ResponsiveUtils.sp(context, 250) : 290, // Reducido de 355
+            height: rowHeight, // Usamos la altura calculada dinámicamente
             child: _buildFadedWrapper(
               horizontalPadding: horizontalPadding,
               child: ListView.separated(
@@ -138,13 +141,14 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
                   return SizedBox(
-                    width: isMobile ? ResponsiveUtils.sp(context, 140) : 160, // Reducido de 200
+                    width: cardWidth,
                     child: FocusablePosterCard(
                       key: ValueKey(item.id),
                       title: item.title,
                       posterUrl: item.posterUrl,
                       rating: formatRating(item.rating),
-                      subtitle: item.subtitle,
+                      subtitle: null, // Senior Fix: Ocultar año en editorial
+                      showInfo: false,
                       onTap: () => widget.onItemTap(item),
                     ),
                   );
@@ -159,12 +163,13 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   Widget _buildMythicalTopRow(bool isMobile, double horizontalPadding) {
-    // Senior Fix: Dimensiones reducidas para TV (Bajo DPI)
-    final double posterHeight = isMobile ? ResponsiveUtils.sp(context, 210) : 240; // Reducido de 310
-    final double titleAreaHeight = isMobile ? 40 : 40; 
+    // Senior Fix: Sincronizamos con Core
+    final double posterHeight = ResponsiveUtils.posterHeight(context);
+    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false);
+    final double titleAreaHeight = 0; // Senior Fix: Eliminado offset ya que no hay títulos debajo
     
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 24 : 32), // Gap reducido
+      padding: EdgeInsets.only(bottom: isMobile ? 12 : 16), // Senior Fix: Sincronizado
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -182,14 +187,14 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               ),
             ),
           ),
-          SizedBox(height: isMobile ? 12 : 18),
+          const SizedBox(height: 8),
           MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
             child: Stack(
               children: [
                 SizedBox(
-                  height: isMobile ? ResponsiveUtils.sp(context, 250) : 290, // Unificado con posters estándar (290px)
+                  height: rowHeight, // Unificado con posters estándar
                   child: _buildFadedWrapper(
                     horizontalPadding: horizontalPadding,
                     child: ListView.builder(
@@ -197,7 +202,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                       scrollDirection: Axis.horizontal,
                       primary: false, // Senior Fix: Evita que el ScrollView intente capturar el foco
                       clipBehavior: Clip.none, 
-                      padding: EdgeInsets.fromLTRB(horizontalPadding, 5, horizontalPadding, 5),
+                      padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 0), // Senior: Zero padding
                       itemCount: widget.items.length.clamp(0, 10),
                       itemBuilder: (context, index) {
                         final item = widget.items[index];
@@ -205,7 +210,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                           index: index,
                           item: item,
                           height: posterHeight,
-                          textOffset: titleAreaHeight,
+                          textOffset: 0,
                           onTap: () => widget.onItemTap(item),
                         );
                       },
@@ -361,7 +366,7 @@ class _MythicTopItem extends StatelessWidget {
           Positioned(
             left: isDoubleDigit ? 4 : 0,
             // BASE ALINEADA AL PÓSTER
-            bottom: textOffset + (isMobileDevice ? 5 : 0), 
+            bottom: textOffset, // Senior Fix: Pegado a la base
             child: Stack(
               children: [
                 // Borde gris vivo
@@ -425,7 +430,8 @@ class _MythicTopItem extends StatelessWidget {
                 title: item.title,
                 posterUrl: item.posterUrl,
                 rating: formatRating(item.rating),
-                subtitle: '', // Senior: Limpiamos subtítulo para que el número luzca más
+                subtitle: null, // Senior: Limpiamos overlay de año
+                showInfo: false, // Senior: Ocultar título debajo en fila mítica
                 onTap: onTap,
               ),
             ),

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
@@ -5,6 +6,12 @@ import '../../data/models/playback_history.dart';
 import '../../data/repositories/auris_repository.dart';
 import '../../data/repositories/impl/auris_repository_impl.dart';
 import 'api_client.dart';
+
+/// Senior Fix: Provider global para el navigator key, permitiendo acceder al 
+/// contexto desde los proveedores de datos (necesario para precacheImage).
+final navigatorKeyProvider = Provider<GlobalKey<NavigatorState>>((ref) {
+  return GlobalKey<NavigatorState>();
+});
 
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient();

@@ -39,7 +39,15 @@ Future<void> main() async {
   // Inicializa el motor de video
   MediaKit.ensureInitialized();
 
-  runApp(const ProviderScope(child: AurisApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        // Senior Fix: Sincronizamos el navigatorKey del Core con el de GoRouter
+        navigatorKeyProvider.overrideWithValue(rootNavigatorKey),
+      ],
+      child: const AurisApp(),
+    ),
+  );
 }
 
 class AurisApp extends StatelessWidget {

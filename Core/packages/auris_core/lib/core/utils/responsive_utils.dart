@@ -93,6 +93,15 @@ class ResponsiveUtils {
   static bool isTablet(BuildContext context) => getDeviceType(context) == DeviceType.tablet;
   static bool isDesktop(BuildContext context) => getDeviceType(context) == DeviceType.desktop;
 
+  /// Senior UI Strategy: Número de columnas para la pantalla de búsqueda.
+  static int searchGridColumns(BuildContext context) {
+    final b = getBreakpoint(context);
+    if (b < Breakpoint.md) return 2;
+    if (b < Breakpoint.lg) return 3;
+    if (b < Breakpoint.xl) return 4;
+    return 5;
+  }
+
   static double horizontalPadding(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final b = getBreakpoint(context);
@@ -115,16 +124,23 @@ class ResponsiveUtils {
     return 200.0;
   }
 
-  /// Altura proporcional al ancho (AspectRatio ~0.65 para posters).
+  /// Altura proporcional al ancho (AspectRatio 2:3 perfecto).
   static double posterHeight(BuildContext context) {
-    return (posterWidth(context) / 0.65).roundToDouble();
+    return (posterWidth(context) * 1.5).roundToDouble();
   }
 
-  /// Altura del contenedor de la fila (incluyendo texto y paddings).
-  static double rowHeight(BuildContext context) {
+  /// Altura del contenedor de la fila.
+  /// [hasInfo] - Si es true (Búsqueda/Explorar), reserva espacio para el texto.
+  /// Si es false (Home), colapsa el espacio al mínimo para la sombra/foco.
+  static double rowHeight(BuildContext context, {bool hasInfo = false}) {
     final b = getBreakpoint(context);
-    final double baseHeight = posterHeight(context) + (b < Breakpoint.md ? 45.0 : 65.0);
-    return baseHeight;
+    final double posterH = posterHeight(context);
+    if (!hasInfo) {
+      // Senior Tuning: Reducido al mínimo matemático para el zoom 1.12x (H * 0.06) + sombra
+      return posterH + (b < Breakpoint.md ? 15.0 : 25.0);
+    }
+    // Espacio para póster + Gap (8) + Texto (22-28) + Margen foco
+    return posterH + (b < Breakpoint.md ? 55.0 : 75.0);
   }
 
   /// Senior UI Strategy: Ancho de banners (Wide Cards) adaptativo.

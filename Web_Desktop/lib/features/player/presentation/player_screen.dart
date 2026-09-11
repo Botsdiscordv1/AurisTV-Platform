@@ -704,14 +704,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final isCurrent = sName == simplifySourceName(_currentSource);
 
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
           child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.12) : Colors.white.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(16),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               onTap: () {
                 if (!isSidebar) Navigator.pop(context);
                 else setState(() => _activeOverlay = PlayerOverlay.none);
@@ -721,34 +721,40 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 }
               },
               leading: Container(
-                width: 44, height: 44, // Senior Fix: Unificado tamaño con selector de idiomas
+                width: 48, height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                  border: isCurrent ? Border.all(color: const Color(0xFFEF7A1E), width: 2) : null,
+                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: isCurrent ? Border.all(color: const Color(0xFFEF7A1E).withOpacity(0.5), width: 1.5) : null,
                 ),
-                child: const Center(
-                  child: Icon(Symbols.dns, color: Colors.white70, size: 20),
+                child: Center(
+                  child: Icon(
+                    Symbols.dns,
+                    color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white60,
+                    size: 22,
+                    fill: isCurrent ? 1 : 0,
+                  ),
                 ),
               ),
               title: Text(
                 sName,
-                style: TextStyle(
-                  color: isCurrent ? Colors.white : Colors.white.withOpacity(0.9),
-                  fontSize: 15,
-                  fontWeight: isCurrent ? FontWeight.w900 : FontWeight.bold,
+                style: GoogleFonts.poppins(
+                  color: isCurrent ? Colors.white : Colors.white.withOpacity(0.85),
+                  fontSize: 16,
+                  fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
               subtitle: Text(
                 '${_groupedSources[sName]!.length} opciones disponibles',
-                style: TextStyle(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.8) : Colors.white38,
+                style: GoogleFonts.poppins(
+                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.8) : Colors.white30,
                   fontSize: 12,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
               trailing: isCurrent 
-                ? const Icon(Symbols.check_circle, color: Color(0xFFEF7A1E))
-                : const Icon(Symbols.arrow_forward_ios, color: Colors.white12, size: 14),
+                ? const Icon(Symbols.check_circle, color: Color(0xFFEF7A1E), size: 24, fill: 1)
+                : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.15), size: 20),
             ),
           ),
         );
@@ -831,15 +837,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final bool isCurrent = _selectedQuality == key;
 
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
           child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.12) : Colors.white.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(16),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
               enabled: isAvailable,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               onTap: () {
                 if (!isSidebar) Navigator.pop(context);
                 else setState(() => _activeOverlay = PlayerOverlay.none);
@@ -849,28 +855,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 }
               },
               leading: Container(
-                width: 44, height: 44,
+                width: 48, height: 48,
                 decoration: BoxDecoration(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.white.withOpacity(0.05),
-                  shape: BoxShape.circle,
+                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isCurrent ? Icons.check_circle_rounded : Icons.hd_rounded,
+                  isCurrent ? Symbols.check_circle : Symbols.hd,
                   color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white70 : Colors.white24),
                   size: 24,
+                  fill: isCurrent ? 1 : 0,
                 ),
               ),
               title: Text(
                 label,
-                style: TextStyle(
-                  color: isCurrent ? Colors.white : (isAvailable ? Colors.white70 : Colors.white24),
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                style: GoogleFonts.poppins(
+                  color: isCurrent ? Colors.white : (isAvailable ? Colors.white.withOpacity(0.85) : Colors.white24),
+                  fontSize: 16,
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
                 ),
               ),
               subtitle: Text(
                 isAvailable ? sub : 'No disponible para este tema',
-                style: TextStyle(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.7) : Colors.white38,
+                style: GoogleFonts.poppins(
+                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.7) : Colors.white30,
                   fontSize: 12,
                 ),
               ),
@@ -1108,121 +1116,109 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             : null;
 
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
           child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
+            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.12) : Colors.white.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(16),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            onTap: () {
-              if (!isSidebar) Navigator.pop(context);
-              else setState(() => _activeOverlay = PlayerOverlay.none);
-              
-              if (!isCurrent) {
-                if (entry.isTrack) {
-                  _switchTrack(entry.trackIndex);
-                } else {
-                  _switchSource(s);
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              onTap: () {
+                if (!isSidebar) Navigator.pop(context);
+                else setState(() => _activeOverlay = PlayerOverlay.none);
+
+                if (!isCurrent) {
+                  if (entry.isTrack) {
+                    _switchTrack(entry.trackIndex);
+                  } else {
+                    _switchSource(s);
+                  }
                 }
-              }
-            },
-            leading: Stack(
-              children: [
-                Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(
-                    color: accentColor,
-                    shape: BoxShape.circle,
-                    border: isCurrent ? Border.all(color: Colors.white, width: 2) : null,
+              },
+              leading: Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: isCurrent ? Border.all(color: accentColor, width: 2) : null,
+                ),
+                child: Center(
+                  child: Text(
+                    type,
+                    style: GoogleFonts.poppins(
+                      color: accentColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
-                if (isCurrent)
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(color: Color(0xFF0B0B0D), shape: BoxShape.circle),
-                      child: const Icon(Icons.check_circle, color: Color(0xFFEF7A1E), size: 16),
+              ),
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source}',
+                      style: GoogleFonts.poppins(
+                        color: isCurrent ? Colors.white : Colors.white.withOpacity(0.85),
+                        fontSize: 15,
+                        fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-              ],
-            ),
-            title: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!isMobile || trackBadge == null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      serverName,
-                      style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                if (trackBadge != null) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFC107).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 1),
-                    ),
-                    child: Text(
-                      trackBadge,
-                      style: const TextStyle(color: Color(0xFFFFC107), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                    ),
-                  ),
-                ],
-                // Idioma/calidad como badge para TODAS las opciones, incluido SUB
-                // (antes los SUB solo mostraban la bandera, sin etiqueta de texto,
-                // por lo que parecía que todo era DUB). SUB en azul, resto en naranja.
-                if (quality.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: (trackQualityType(s.quality) == 'SUB')
-                          ? Colors.blueAccent.withOpacity(0.14)
-                          : const Color(0xFFEF7A1E).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      quality,
-                      style: TextStyle(
-                        color: (trackQualityType(s.quality) == 'SUB')
-                            ? Colors.blueAccent
-                            : const Color(0xFFEF7A1E),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
+                  if (trackBadge != null) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFC107).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 1),
+                      ),
+                      child: Text(
+                        trackBadge,
+                        style: const TextStyle(color: Color(0xFFFFC107), fontSize: 9, fontWeight: FontWeight.w900),
                       ),
                     ),
-                  ),
+                  ],
+                  if (quality.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: (type == 'SUB' ? Colors.blueAccent : const Color(0xFFEF7A1E)).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        quality,
+                        style: TextStyle(
+                          color: (type == 'SUB' ? Colors.blueAccent : const Color(0xFFEF7A1E)),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
+              subtitle: Text(
+                entry.isTrack ? 'Pista de audio interna' : 'Fuente de servidor externo ($serverName)',
+                style: GoogleFonts.poppins(
+                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.8) : Colors.white30,
+                  fontSize: 11,
+                ),
+              ),
+              trailing: isCurrent
+                ? const Icon(Symbols.check_circle, color: Color(0xFFEF7A1E), size: 24, fill: 1)
+                : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.15), size: 20),
             ),
-            subtitle: null,
-            trailing: isCurrent 
-              ? Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF7A1E).withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.play_arrow_rounded, color: Color(0xFFEF7A1E), size: 20),
-                )
-              : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white12, size: 14),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
   }
 
   void _showLanguageSelector() {
@@ -4204,8 +4200,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               },
             ),
             const SizedBox(width: 16),
-            if (!_isMobileDevice) // Senior UI: Quitamos el cast superior en Móvil/Tablet como pidió el usuario
-              _buildCastIcon(iconSize),
           ])));
   }
 
@@ -5278,46 +5272,59 @@ class _PlayerSidePanel extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: Padding(
         padding: EdgeInsets.all(padding),
-        child: Material(
-          color: const Color(0xFF16161C),
-          borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
-          elevation: 10,
-          shadowColor: Colors.black.withOpacity(0.6),
-          clipBehavior: Clip.antiAlias,
-          child: Container(
-            width: panelWidth,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min, // Senior: Permitir que el panel sea más corto si hay pocos items
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(isMobile ? 20 : 32, isMobile ? 20 : 32, 16, 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        title.toUpperCase(),
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: isMobile ? 12 : 14,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.0,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: onClose,
-                        icon: Icon(Icons.close_rounded, color: Colors.white54, size: isMobile ? 20 : 24),
-                      ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(isMobile ? 24 : 32),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Material(
+              color: const Color(0xCC16161C), // Semi-transparente estilo YouTube
+              elevation: 0,
+              child: Container(
+                width: panelWidth,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(isMobile ? 24 : 32),
+                  border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withOpacity(0.05),
+                      Colors.transparent,
                     ],
                   ),
                 ),
-                const Divider(color: Colors.white10, height: 1),
-                Flexible(child: child),
-              ],
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(isMobile ? 24 : 32, isMobile ? 24 : 32, 16, 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            title.toUpperCase(),
+                            style: GoogleFonts.poppins(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: isMobile ? 13 : 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: onClose,
+                            icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.4), size: isMobile ? 22 : 26),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(color: Colors.white10, height: 1, indent: 24, endIndent: 24),
+                    const SizedBox(height: 8),
+                    Flexible(child: child),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

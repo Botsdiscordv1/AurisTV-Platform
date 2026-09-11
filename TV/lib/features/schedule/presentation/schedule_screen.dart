@@ -314,7 +314,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                           child: FocusablePosterCard(
                             title: item.title,
                             posterUrl: ApiEndpoints.proxyImage(item.coverImage),
-                            badgeOverlay: item.airingAt != null
+                            airingOverlay: item.airingAt != null
                                 ? AiringCountdownBadge(airingAt: item.airingAt!, aired: item.aired)
                                 : null,
                             subtitle: _buildSubtitle(item),

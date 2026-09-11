@@ -95,11 +95,11 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final isCompactDesktop = width >= 800 && width < 1100;
     
-    // Senior Fix: Altura reducida para TV (Bajo DPI) para evitar desbordes
-    final double posterHeight = isMobile ? ResponsiveUtils.sp(context, 200) : 240; // Reducido de 310
+    final double cardWidth = ResponsiveUtils.posterWidth(context);
+    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 24 : 32), // Padding reducido
+      padding: EdgeInsets.only(bottom: isMobile ? 12 : 16), // Senior Fix: Reducido drásticamente para TV
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -130,7 +130,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                     final double fadeSize = 40 / width; // 40px de suavizado
 
                     return SizedBox(
-                      height: isMobile ? ResponsiveUtils.sp(context, 250) : 290, // Reducido de 355
+                      height: rowHeight,
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           _updateScrollIndicators();
@@ -167,20 +167,20 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                             clipBehavior: Clip.none,
                             scrollDirection: Axis.horizontal,
                             primary: false, // Senior Fix: Evita que el ScrollView intente capturar el foco
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
+                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Zero padding
                             itemCount: widget.items.length,
                             separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 16),
                             itemBuilder: (context, index) {
                               final item = widget.items[index];
                               return SizedBox(
-                                width: isMobile ? ResponsiveUtils.sp(context, 140) : 160, // Reducido de 200
+                                width: cardWidth,
                                 child: FocusablePosterCard(
                                   key: ValueKey(item.id),
                                   title: item.title,
                                   posterUrl: item.posterUrl,
                                   rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
-                                  subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : item.subtitle,
-                                  showInfo: true,
+                                  subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : null, // Senior: Ocultar año
+                                  showInfo: false,
                                   onTap: () => widget.onItemTap(item),
                                 ),
                               );

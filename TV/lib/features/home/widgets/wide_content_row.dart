@@ -85,7 +85,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
     final cardHeight = isMobile ? ResponsiveUtils.sp(context, 160.0) : 180.0; // Reducido de 240
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 24 : 32), // Padding reducido
+      padding: EdgeInsets.only(bottom: isMobile ? 12 : 16), // Senior Fix: Reducido para TV
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

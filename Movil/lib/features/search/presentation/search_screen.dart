@@ -7,7 +7,6 @@ import 'package:collection/collection.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../home/widgets/wide_content_row.dart';
 import 'providers/search_provider.dart';
 import 'widgets/search_widgets.dart';
 
@@ -109,6 +108,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveUtils.isMobile(context);
     final resultsAsync = ref.watch(
       searchResultsProvider(
         SearchParams(category: _selectedCategory, query: _currentQuery),
@@ -121,82 +121,60 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         backgroundColor: const Color(0xFF0B0B0D),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        toolbarHeight: 80,
-        title: Row(
+        toolbarHeight: isMobile ? 108 : 124,
+        title: Column(
           children: [
-            // BARRA DE BÚSQUEDA
-            Expanded(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 46,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.05),
-                    width: 1.5,
-                  ),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _focusNode,
-                  textAlign: TextAlign.left,
-                  textAlignVertical: TextAlignVertical.center,
-                  style: const TextStyle(fontSize: 15, color: Colors.white),
-                  textCapitalization: TextCapitalization.sentences,
-                  inputFormatters: [CapitalizeFirstLetterFormatter()],
-                  decoration: InputDecoration(
-                    hintText: _dynamicPlaceholder,
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
-                    prefixIcon: Icon(Icons.search_rounded, 
-                        color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
-                        size: 20),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
-                            onPressed: _clearSearch,
-                          )
-                        : null,
-                  ),
-                  onChanged: _onSearchChanged,
-                  onSubmitted: _onSearchSubmitted,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            
-            // DROPDOWN DE FILTRO
-            Container(
+            // BARRA DE BÚSQUEDA (ANCHO COMPLETO)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               height: 46,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedCategory,
-                  dropdownColor: const Color(0xFF1A1A1A),
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38, size: 20),
-                  borderRadius: BorderRadius.circular(12),
-                  style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Todo')),
-                    DropdownMenuItem(value: 'peliculas', child: Text('Películas')),
-                    DropdownMenuItem(value: 'series', child: Text('Series')),
-                    DropdownMenuItem(value: 'anime', child: Text('Anime')),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) setState(() => _selectedCategory = v);
-                  },
+                border: Border.all(
+                  color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.05),
+                  width: 1.5,
                 ),
+              ),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _focusNode,
+                textAlign: TextAlign.left,
+                textAlignVertical: TextAlignVertical.center,
+                style: const TextStyle(fontSize: 15, color: Colors.white),
+                textCapitalization: TextCapitalization.sentences,
+                inputFormatters: [CapitalizeFirstLetterFormatter()],
+                decoration: InputDecoration(
+                  hintText: _dynamicPlaceholder,
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, 
+                      color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
+                      size: 20),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+                          onPressed: _clearSearch,
+                        )
+                      : null,
+                ),
+                onChanged: _onSearchChanged,
+                onSubmitted: _onSearchSubmitted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            // SELECTOR DE CATEGORÍAS (PILL STYLE)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SearchCategorySelector(
+                selectedCategory: _selectedCategory,
+                onCategoryChanged: (v) => setState(() => _selectedCategory = v),
               ),
             ),
           ],
@@ -213,13 +191,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Widget _buildPreSearchState() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 40),
+      padding: const EdgeInsets.only(top: 0, bottom: 40),
       child: Column(
         children: [
-          const _ContinueWatchingSection(),
           SearchHistorySection(onQueryTap: _performSearch),
           SearchGenresGrid(onGenreTap: _performSearch),
-          const SizedBox(height: 16),
           SearchTrendingSection(onTrendingTap: _onContentTap),
         ],
       ),
@@ -271,8 +247,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               posterUrl: ApiEndpoints.proxyImage(result.thumbnail, fallbackUrl: result.tmdbThumbnail),
               badge: meta.label,
               badgeColor: meta.labelColor,
+              badgeOverlay: result.season != null && result.season! > 1
+                  ? SeasonBadge(season: result.season!)
+                  : null,
               subtitle: meta.status,
               subtitleColor: meta.statusColor,
+              showInfo: true,
               progress: progress,
               onTap: () => _onContentTap(result),
             );
@@ -331,76 +311,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-class _ContinueWatchingSection extends ConsumerWidget {
-  const _ContinueWatchingSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final continueWatchingAsync = ref.watch(continueWatchingProvider);
-
-    return continueWatchingAsync.when(
-      data: (items) {
-        if (items.isEmpty) return const SizedBox.shrink();
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 24, top: 12),
-          child: WideContentRow(
-            title: 'Continuar Viendo',
-            items: items.map((h) => _mapHistoryToWide(ref, h)).toList(),
-            onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
-          ),
-        );
-      },
-      loading: () => Padding(
-        padding: const EdgeInsets.only(bottom: 24, top: 12),
-        child: RowSkeleton(isWide: true),
-      ),
-      error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-
-  WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
-    String displayTitle = h.title ?? 'Contenido';
-    final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
-    if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
-      displayTitle = 'Ep ${h.episode} • $displayTitle';
-    }
-
-    String remainingText = '';
-    final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
-    if (remainingMs > 0) {
-      final minutes = (remainingMs / 60000).ceil();
-      remainingText = 'Quedan $minutes min';
-    }
-
-    return WideContentItem(
-      id: h.contentId,
-      title: displayTitle,
-      imageUrl: h.posterUrl ?? h.bannerUrl ?? '',
-      progress: h.progress,
-      subtitle: remainingText,
-      onDelete: () {
-        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
-      },
-      originalItem: h,
-    );
-  }
-
-  void _onTap(BuildContext context, PlaybackHistory item) {
-    final uri = '/player/${Uri.encodeComponent(item.contentId)}'
-        '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
-        '&source=${Uri.encodeComponent(item.source ?? "")}'
-        '&episode=${item.episode ?? ""}'
-        '&season=${item.season ?? ""}'
-        '&startPosition=${item.positionInMilliseconds}'
-        '&category=${Uri.encodeComponent(item.category ?? "anime")}'
-        '&title=${Uri.encodeComponent(item.title ?? "")}'
-        '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-        '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
-        '&language=${Uri.encodeComponent(item.language ?? "")}';
-    context.push(uri);
-  }
-}
 
 class _StaggeredResultItem extends StatefulWidget {
   final Widget child;

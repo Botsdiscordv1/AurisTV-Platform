@@ -108,7 +108,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
     final rowHeight = ResponsiveUtils.bannerRowHeight(context);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 32 : 48), // Padding unificado
+      padding: EdgeInsets.only(bottom: isMobile ? 12 : 24), // Senior Fix: Reducido de 32/48 para compactar secciones
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

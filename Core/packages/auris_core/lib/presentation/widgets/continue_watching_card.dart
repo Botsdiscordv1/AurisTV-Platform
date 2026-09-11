@@ -10,25 +10,27 @@ class ContinueWatchingCard extends StatelessWidget {
   final PlaybackHistory history;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
-  final double width;
-  final double height;
+  final double? width;
+  final double? height;
 
   const ContinueWatchingCard({
     super.key,
     required this.history,
     this.onTap,
     this.onDelete,
-    this.width = 440,
-    this.height = 280, // Ajustado para incluir el texto inferior
+    this.width,
+    this.height,
   });
 
   @override
   Widget build(BuildContext context) {
     const brandOrange = Color(0xFFEF7A1E);
     const textPrimary = Color(0xFFF5F5F5);
-    const textSecondary = Color(0xFFA5A5AA);
     const progressTrack = Color(0xFF39393D);
 
+    // Senior Strategy: Dimensiones dinámicas basadas en el Core
+    final double effectiveWidth = width ?? ResponsiveUtils.bannerWidth(context);
+    
     final String? imageUrl = history.bannerUrl ?? history.posterUrl;
     
     // Cálculo de tiempo restante (minutos)
@@ -38,7 +40,7 @@ class ContinueWatchingCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: width,
+        width: effectiveWidth,
         margin: const EdgeInsets.only(right: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,18 +141,18 @@ class ContinueWatchingCard extends StatelessWidget {
 
             // Área de Texto
             SizedBox(
-              height: 52, // Altura fija para alineación
+              height: context.isMobile ? 48 : 58, // Altura adaptativa para el contenedor de texto
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Título: Ep 7 • Nombre
+                  // Título: Ep 7 • Nombre (Tamaño dinámico)
                   Text(
                     '${history.episode != null ? 'Ep ${history.episode} • ' : ''}${history.title ?? ''}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: textPrimary,
-                      fontSize: 16,
+                      fontSize: ResponsiveUtils.bannerTitleFontSize(context),
                       fontWeight: FontWeight.w700,
                       height: 1.2,
                     ),
@@ -158,13 +160,13 @@ class ContinueWatchingCard extends StatelessWidget {
                   
                   const SizedBox(height: 4),
 
-                  // Subtítulo: Quedan X min
+                  // Subtítulo: Quedan X min (Escalado relativo)
                   if (remainingMin > 0)
                     Text(
                       'Quedan $remainingMin min',
                       style: TextStyle(
                         color: textPrimary.withOpacity(0.6),
-                        fontSize: 14,
+                        fontSize: ResponsiveUtils.bannerTitleFontSize(context) - 2,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -177,3 +179,4 @@ class ContinueWatchingCard extends StatelessWidget {
     );
   }
 }
+

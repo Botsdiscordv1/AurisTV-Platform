@@ -2297,7 +2297,10 @@ class _ThemeCardState extends State<_ThemeCard> {
 
   @override Widget build(BuildContext context) {
     final isMobile = context.isMobile; 
-    String? img = ApiEndpoints.proxyImage((widget.theme.imageUrl?.isNotEmpty == true) ? widget.theme.imageUrl! : widget.fallbackImage);
+    String? img = ApiEndpoints.proxyImage(
+      (widget.theme.imageUrl?.isNotEmpty == true) ? widget.theme.imageUrl! : widget.fallbackImage,
+      width: 1280,
+    );
     final bool isSelected = !isMobile && _isHovered;
 
     return MouseRegion(
@@ -2717,57 +2720,18 @@ class ContentScreen extends ConsumerStatefulWidget {
 }
 
 class _ContentScreenState extends ConsumerState<ContentScreen> {
-  int _selectedSourceIndex = 0; int? _selectedSeason;
-  // Selección de pestaña simple (int sobre la lista de tabs visibles). Se usa una
-  // tab bar propia en vez de TabController/TabBar para poder mostrar/ocultar el
-  // tab "Extras" sin recrear un TabController (lo que provocaba crashes de lifecycle).
   int _selectedTabIndex = 0;
-  bool _hasExtras = false; bool _tabRebuildPending = false;
-  // Pel\u00EDculas: disponibilidad de cada servidor (por nombre) validada contra el
-  // extractor real. Permite deshabilitar la fuente que no devuelve stream y que
-  // el "Reproducir" global elija autom\u00E1ticamente la primera que s\u00ED da stream.
-  final Map<String, bool> _movieAvail = {};
-  bool _movieValidating = false;
-  bool _movieValidated = false;
-  bool _movieValidationScheduled = false;
   final ScrollController _scrollController = ScrollController();
   bool _showContent = false;
   Timer? _loadTimer;
-  // Fuente por defecto congelada al abrir (mejor por rank presente en ese
-  // momento) y clave de la fuente elegida manualmente por el usuario. Evitan el
-  // parpadeo A23 -> AV1 cuando AV1/AnimeJara llegan tarde vía búsqueda suplementaria.
-  String? _frozenDefaultKey;
-  String? _userSelectedSourceKey;
   GroupedEpisodesResult? _lastEpisodes;
 
   void _openPlayer(PlayerScreen player) {
     UrlUtils.openPlayer(context, player);
   }
+
   @override void initState() {
     super.initState();
-    
-    // [Senior Web Fix] Reclamador de URL. 
-    // Si por algún glitch el router no actualizó la barra de direcciones, 
-    // Detalles fuerza el cambio a su URL única nada más nacer.
-    if (kIsWeb) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          final shareableUri = UrlUtils.buildShareableUri(
-            title: widget.title,
-            source: widget.source,
-            url: widget.url,
-            category: widget.category,
-            year: widget.year,
-            from: widget.from,
-          );
-          final currentPath = appRouter.routeInformationProvider.value.uri.path;
-          if (currentPath != '/detalles') {
-            appRouter.replace(shareableUri);
-          }
-        }
-      });
-    }
-
     _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () {
       if (mounted) setState(() => _showContent = true);
     });
@@ -2779,64 +2743,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     super.dispose();
   }
 
-  // Sincroniza _hasExtras con la disponibilidad de OP/ED y re-mapea _selectedTabIndex
-  // por semántica (el tab Extras se inserta en el medio) para que el usuario no
-  // "salte" de pestaña al aparecer/desaparecer. No recrea ningún controlador.
-  void _syncExtras(bool desired) {
-    if (_hasExtras == desired) return;
-    final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
-    final extrasInsertIndex = (hasEpisodesTab ? 1 : 0) + 1;
-    int idx = _selectedTabIndex;
-    if (_hasExtras && !desired) {
-      idx = idx > extrasInsertIndex ? idx - 1 : (idx == extrasInsertIndex ? extrasInsertIndex - 1 : idx);
-    } else {
-      idx = idx >= extrasInsertIndex ? idx + 1 : idx;
-    }
-    _hasExtras = desired;
-    _selectedTabIndex = idx.clamp(0, (hasEpisodesTab ? 1 : 0) + 1 + (desired ? 1 : 0) + 1 - 1);
-    setState(() {});
-  }
-
-  // Valida cada servidor de la pel\u00EDcula contra el extractor real. Las fuentes que
-  // no devuelven stream se marcan como no disponibles; luego auto-seleccionamos la
-  // primera disponible para el "Reproducir" global. Solo se ejecuta una vez.
-  void _validateMovieSources(List<SearchResult> sources) {
-    if (sources.isEmpty || _movieValidated || _movieValidating) return;
-    _movieValidating = true;
-    final repo = ref.read(aurisRepositoryProvider);
-    Future.wait(sources.map((s) async {
-      final name = simplifySourceName(s.source);
-      if (_movieAvail.containsKey(name)) return;
-      try {
-        final r = await repo.extractVideo(s.url ?? widget.url, s.source, category: widget.category, direct: !kIsWeb);
-        final ok = (r.url.isNotEmpty && !r.url.contains('embed-undef')) ||
-            r.tracks.any((t) => t.url.isNotEmpty) ||
-            r.qualities.any((q) => q.url.isNotEmpty);
-        _movieAvail[name] = ok;
-      } catch (_) {
-        // Error de red transitorio: mantenemos la fuente como disponible para no
-        // ocultar fuentes que s\u00ED funcionan. Solo marcamos "no disponible" cuando el
-        // extractor responde de forma definitiva sin stream (ok == false).
-        _movieAvail[name] = true;
-      }
-    })).then((_) {
-      _movieValidating = false;
-      _movieValidated = true;
-      // Auto-seleccionar la primera fuente disponible.
-      final idx = sources.indexWhere((s) => _movieAvail[simplifySourceName(s.source)] == true);
-      if (idx >= 0) {
-        final curName = sources.isNotEmpty
-            ? simplifySourceName(sources[_selectedSourceIndex % sources.length].source)
-            : '';
-        if (!_movieAvail.containsKey(curName) || _movieAvail[curName] != true) {
-          _selectedSourceIndex = idx;
-        }
-      }
-      if (mounted) setState(() {});
-    });
-  }
-
-  // Tab bar propia (sin TabController): selecci\u00F3n con int y subrayado animado.
   Widget _buildTabBar(List<String> labels, int selectedIndex, double hPadding, bool isMobile) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -2866,684 +2772,353 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       final isMobile = context.isMobile;
       final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
       final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
-    final episodesCrossAxisCount = isMobile ? 1 : (width < 1000 ? 2 : (width < 1400 ? 3 : (width < 2100 ? 4 : (width < 2800 ? 5 : 6))));
-    final episodesAspectRatio = isMobile ? 1.15 : (width < 1000 ? 1.25 : 1.1);
+      final episodesCrossAxisCount = isMobile ? 1 : (width < 1000 ? 2 : (width < 1400 ? 3 : (width < 2100 ? 4 : (width < 2800 ? 5 : 6))));
+      final episodesAspectRatio = isMobile ? 1.15 : (width < 1000 ? 1.25 : 1.1);
 
-    // Clasificación pre-carga (solo categoría, porque aún no tenemos el payload).
-    final isMovieishPre = (widget.category == 'movie' ||
-            widget.category == 'series' ||
-            widget.category == 'movie_anime' ||
-            _isMovieLikeTitle(widget.title) ||
-            widget.result?.kind?.toLowerCase() == 'movie' ||
-            widget.result?.kind?.toLowerCase() == 'series') &&
-        widget.result?.kind?.toLowerCase() != 'anime';
+      final detailParams = UnifiedDetailParams(
+        title: widget.title,
+        metadataTitle: widget.metadataTitle,
+        category: widget.category,
+        kind: widget.result?.kind ?? widget.type,
+        year: widget.year,
+        season: widget.result?.season,
+        source: widget.source,
+        url: widget.url,
+        type: widget.type,
+        initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
+      );
 
-    // Temporada de la pantalla abierta, inferida del título.
-    // Senior Fix: Si detectamos que es película o similar, NO forzamos temporada 1.
-    final openedSeasonN = isMovieishPre
-        ? null
-        : (widget.result?.season
-            ?? _extractSeason(widget.result?.title)
-            ?? _extractSeason(widget.title)
-            ?? _extractSeason(widget.metadataTitle)
-            ?? _extractSeason(widget.url)
-            ?? 1);
+      final detailState = ref.watch(unifiedContentProvider(detailParams));
 
-    final openedDetailAsync = ref.watch(unifiedContentDetailProvider(UnifiedDetailParams(
-      title: widget.title,
-      metadataTitle: widget.metadataTitle,
-      category: widget.category,
-      kind: widget.result?.kind ?? widget.type,
-      year: widget.year,
-      season: openedSeasonN,
-      source: widget.source,
-      url: widget.url,
-      type: widget.type,
-    )));
-
-    final seasonSwitched = _selectedSeason != null && _selectedSeason != openedSeasonN;
-
-    final seasonDetailAsync = seasonSwitched
-        ? ref.watch(unifiedContentDetailProvider(UnifiedDetailParams(
-            title: widget.title,
-            metadataTitle: widget.metadataTitle,
-            category: widget.category,
-            kind: widget.result?.kind ?? widget.type,
-            year: widget.year,
-            season: _selectedSeason,
-            source: widget.source,
-            url: widget.url,
-            type: widget.type,
-          )))
-        : openedDetailAsync;
-
-    // Al cambiar de temporada, el detalle (año, estado, OP/ED, sinopsis...) debe
-    // corresponder a la temporada seleccionada, no al de la temporada con la que
-    // se abrió la pantalla. Pedimos el detalle de la temporada concreta y, mientras
-    // carga, seguimos mostrando el detalle abierto para no romper el hero.
-    final detailAsync = (seasonSwitched && seasonDetailAsync.valueOrNull != null)
-        ? seasonDetailAsync
-        : openedDetailAsync;
-
-    final detailData = detailAsync.valueOrNull?.main;
-    final isMovieish = detailAsync.valueOrNull?.isMovieish ?? isMovieishPre;
-
-    final resolvedKind = (detailData is AnimeDetail
-            ? detailData.kind
-            : (detailData is MovieDetail ? detailData.kind : null)) ??
-        widget.result?.kind ??
-        widget.category;
-    final isAnimeCategory = resolvedKind == 'anime';
-    final isMovieCategory = isMovieish;
-
-    final effectiveCategory = detailAsync.valueOrNull?.effectiveCategory ?? widget.category;
-
-    final detailLoading = detailAsync.isLoading && detailAsync.valueOrNull == null;
-
-    // [Senior] Semilla instantánea: la card abierta ya es un SearchResult con sus
-    // servidores en `.sources`, así que la lista de servidores se muestra de inmediato
-    // y la búsqueda suplementaria (discoveredSourcesProvider) solo la enriquece/fusiona
-    // cuando termine de raspear. Evita el "corta a la mitad" si el server tarda.
-    final List<SearchResult> initialSources = widget.result != null
-        ? [widget.result!]
-        : [SearchResult(title: widget.title, url: widget.url, quality: 'TV', thumbnail: widget.banner ?? '', source: widget.source, romaji: widget.metadataTitle, year: widget.year, slug: null)];
-
-    const metadataSourceHints = {'anilist', 'tmdb', 'trakt', 'mal', 'jikan'};
-    final isMetadataOriginSource = widget.source.isNotEmpty &&
-        metadataSourceHints.contains(widget.source.toLowerCase());
-    final String? originServer = (widget.source.isNotEmpty && !isMetadataOriginSource)
-        ? ApiEndpoints.baseUrlForSource(widget.source)
-        : (widget.category.toLowerCase() != 'all'
-            ? ApiEndpoints.baseUrlForCategory(widget.category)
-            : null);
-
-    final rawTitle = widget.result?.title ?? widget.title;
-    final cleanTitle = cleanTitleForDisplay(_stripSeasonSuffix(rawTitle));
-    final cleanMetadata = widget.metadataTitle != null ? cleanTitleForDisplay(_stripSeasonSuffix(widget.metadataTitle!)) : null;
-
-    final sourcesParams = DiscoveredSourcesParams(
-      title: cleanTitle,
-      metadataTitle: cleanMetadata,
-      category: effectiveCategory,
-      year: widget.year,
-      season: openedSeasonN,
-      kind: widget.result?.kind ?? widget.type,
-      source: widget.source,
-      url: widget.url,
-      type: widget.type,
-      server: originServer,
-      initialSources: initialSources,
-    );
-    final searchSources = ref.watch(discoveredSourcesProvider(sourcesParams));
-
-    final effectiveSeasonForUrl = _selectedSeason ?? ((openedSeasonN ?? 0) > 1 ? openedSeasonN : null);
-
-    // [Senior] El switch busca el título DE LA TEMPORADA (p.ej. "youjo senki 2nd Season")
-    final seasonTitle = seasonSwitched ? _seasonTitleFor(cleanTitle, _selectedSeason!) : null;
-
-    // [Senior Optimization] Si no hay cambio de temporada, reusamos el provider original
-    // evitando una doble petición idéntica al servidor.
-    final seasonSourcesParams = (seasonSwitched)
-        ? DiscoveredSourcesParams(
-            title: seasonTitle!,
-            metadataTitle: seasonTitle,
-            category: effectiveCategory,
-            year: widget.year,
-            season: _selectedSeason,
-            kind: widget.result?.kind ?? widget.type,
-            source: widget.source,
-            url: widget.url,
-            type: widget.type,
-            server: originServer,
-            initialSources: initialSources,
-          )
-        : sourcesParams;
-
-    final seasonSources = (seasonSwitched)
-        ? ref.watch(discoveredSourcesProvider(seasonSourcesParams))
-        : searchSources;
-
-    // Senior Fix: Sincronizar las fuentes encontradas con el player para que estén
-    // disponibles al abrir el selector de servidores.
-    ref.listen(discoveredSourcesProvider(seasonSourcesParams), (prev, next) {
-      final nextList = next;
-      if (nextList != null && nextList.isNotEmpty) {
-        final seasonUnified = nextList
-            .where((s) => _isSeasonUnified(s.source))
-            .map((s) => _withSeasonUnified(s, effectiveSeasonForUrl))
-            .where((s) => s != null)
-            .cast<SearchResult>()
-            .toList();
-        final merged = <SearchResult>[
-          ...nextList.where((s) => !_isSeasonUnified(s.source)),
-          ...seasonUnified,
-        ];
-
-        // Sincronización inmediata con el player
-        ref.read(activeContentSourcesProvider.notifier).state = merged;
-      }
-    }); // Senior Fix: Eliminado fireImmediately no soportado en WidgetRef.listen. La sincronización inicial se maneja en el flujo de build.
-
-    final displayDetail = detailData;
-
-    // Tab "Extras" (OP/ED): solo se muestra si el detalle trae openings/endings.
-    // _syncExtras actualiza _hasExtras y re-mapea _selectedTabIndex (sin recrear
-    // ningún TabController, evitando crashes de lifecycle al ocultar/mostrar el tab).
-    final hasEpisodesTab = widget.category != 'movie' && widget.category != 'movie_anime' && !_isMovieLikeTitle(widget.title);
-    final _detailForExtras = detailAsync.valueOrNull?.anime;
-    final _desiredExtras = _detailForExtras != null &&
-        (_detailForExtras.openings.isNotEmpty || _detailForExtras.endings.isNotEmpty);
-    if (_detailForExtras != null && _desiredExtras != _hasExtras && !_tabRebuildPending) {
-      _tabRebuildPending = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _tabRebuildPending = false;
-        if (mounted) _syncExtras(_desiredExtras);
+      // Senior Sync Fix: Sincronizar fuentes con el player de forma segura (sin microtasks)
+      ref.listen<UnifiedContentState>(unifiedContentProvider(detailParams), (prev, next) {
+        if (next.allSources.isNotEmpty) {
+          final currentInPlayer = ref.read(activeContentSourcesProvider);
+          if (!const ListEquality().equals(currentInPlayer, next.allSources)) {
+            ref.read(activeContentSourcesProvider.notifier).state = next.allSources;
+          }
+        }
       });
-    }
-    int _ti = 0;
-    final episodesTabIndex = hasEpisodesTab ? _ti++ : -1;
-    final relatedTabIndex = _ti++;
-    final extrasTabIndex = _hasExtras ? _ti++ : -1;
-    final detailsTabIndex = _ti++;
-    final galleryTabIndex = _ti++;
 
-    final tabLabels = <String>[
-      if (hasEpisodesTab) 'Episodios',
-      'Relacionado',
-      if (_hasExtras) 'Extras',
-      'Detalles',
-      'Galería',
-    ];
-    final selectedTabIndex = _selectedTabIndex.clamp(0, tabLabels.length - 1);
+      final detailAsync = detailState.detail;
+      final detailData = detailAsync.valueOrNull?.main;
+      final isMovieCategory = detailState.isMovieish;
+      final currentSeason = detailState.currentSeason;
+      final totalSeasons = detailState.totalSeasons;
+      final activeSources = detailState.allSources;
+      final currentSource = detailState.selectedSource;
+      final episodesAsync = detailState.episodes;
+      final unifiedRelationsAsync = detailState.relations;
+      final seasonTitle = detailState.seasonTitle;
 
-    final seasonUnifiedSources = searchSources
-        .where((s) => _isSeasonUnified(s.source))
-        .map((s) => _withSeasonUnified(s, effectiveSeasonForUrl))
-        .where((s) => s != null)
-        .cast<SearchResult>()
-        .toList();
-
-    // AnimeJara/GnulaHD se mantienen desde la búsqueda base (con `#season-N`);
-    // el resto de fuentes usa la re-búsqueda por temporada.
-    final baseActive = seasonSources.isNotEmpty ? seasonSources : searchSources;
-    final activeSources = <SearchResult>[
-      ...baseActive.where((s) => !_isSeasonUnified(s.source)),
-      ...seasonUnifiedSources,
-    ];
-    // Orden de display/fuente por defecto: AnimeAV1 -> AnimeJara -> AnimeD23 ->
-    // JKAnime -> Aniyae (al final, catálogos incompletos).
-    activeSources.sort((a, b) => sourceDisplayRank(a.source).compareTo(sourceDisplayRank(b.source)));
-
-    // Senior Web Fix: Sincronización proactiva de la semilla inicial con el player.
-    // Esto asegura que si venimos del calendario con 4 fuentes, el player las vea
-    // desde el primer frame, sin esperar a que el listener de cambios se dispare.
-    if (activeSources.isNotEmpty) {
-      final currentInPlayer = ref.read(activeContentSourcesProvider);
-      // Solo actualizamos si hay una diferencia real para evitar loops de renderizado
-      if (currentInPlayer.length != activeSources.length) {
-        Future.microtask(() {
-          if (mounted) ref.read(activeContentSourcesProvider.notifier).state = activeSources;
+      final dataReady = detailAsync.hasValue || activeSources.isNotEmpty;
+      if (dataReady && !_showContent) {
+        _loadTimer?.cancel();
+        _loadTimer = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _showContent = true);
         });
       }
-    }
 
-    final searchQueryForLoading = widget.metadataTitle ?? widget.title;
-    final searchLoading = ref.watch(contentSearchProvider(ContentSearchParams(
-      query: searchQueryForLoading, 
-      category: widget.category, 
-      year: widget.year
-    ))).isLoading;
+      if (!_showContent) {
+        return Scaffold(backgroundColor: const Color(0xFF0B0B0D), body: _buildPageSkeleton(context, isMobile));
+      }
 
-    final dataReady = detailData != null || activeSources.isNotEmpty;
-    if (dataReady && !_showContent) {
-      _loadTimer?.cancel();
-      _loadTimer = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _showContent = true);
-      });
-    }
+      final hasEpisodesTab = !isMovieCategory;
+      int _ti = 0;
+      final episodesTabIndex = hasEpisodesTab ? _ti++ : -1;
+      final relatedTabIndex = _ti++;
+      final extrasTabIndex = (detailData is AnimeDetail && (detailData.openings.isNotEmpty || detailData.endings.isNotEmpty)) ? _ti++ : -1;
+      final detailsTabIndex = _ti++;
+      final galleryTabIndex = _ti++;
 
-    if (!_showContent) {
-      return Scaffold(backgroundColor: const Color(0xFF0B0B0D), body: _buildPageSkeleton(context, isMobile));
-    }
+      final tabLabels = <String>[
+        if (hasEpisodesTab) 'Episodios',
+        'Relacionado',
+        if (extrasTabIndex != -1) 'Extras',
+        'Detalles',
+        'Galería',
+      ];
+      final selectedTabIndex = _selectedTabIndex.clamp(0, tabLabels.length - 1);
 
-    // Pel\u00EDculas: validar disponibilidad de cada servidor una sola vez al mostrar la UI.
-    if (isMovieCategory && activeSources.isNotEmpty && !_movieValidationScheduled) {
-      _movieValidationScheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _validateMovieSources(activeSources);
-      });
-    }
+      final certification = detailData != null ? ((detailData is MovieDetail ? (detailData as MovieDetail).certification : (detailData is AnimeDetail ? (detailData as AnimeDetail).certification : null)) ?? 'NR') : 'NR';
+      final platforms = (detailData is MovieDetail) ? (detailData as MovieDetail).platforms : <PlatformInfo>[];
 
-    // Selección de fuente estable: se congela la MEJOR fuente disponible al abrir
-    // (por rank) para que, cuando AV1/AnimeJara lleguen tarde vía la búsqueda
-    // suplementaria, la tarjeta no "parpadee" de A23 -> AV1. Los episodios se
-    // cargan al instante desde esta fuente congelada; AV1 queda en el selector
-    // para elegirla manualmente. La elección del usuario (_userSelectedSourceKey)
-    // siempre tiene prioridad.
-    String? _sourceKeyOf(SearchResult s) => '${s.source}|${s.url}';
-    String? selectedKey = _userSelectedSourceKey ?? _frozenDefaultKey;
-    if (_frozenDefaultKey == null && activeSources.isNotEmpty) {
-      final ranked = [...activeSources]
-        ..sort((a, b) => sourceDisplayRank(a.source).compareTo(sourceDisplayRank(b.source)));
-      _frozenDefaultKey = _sourceKeyOf(ranked.first);
-      selectedKey ??= _frozenDefaultKey;
-    }
-    int selIndex = 0;
-    if (selectedKey != null && activeSources.isNotEmpty) {
-      final found = activeSources.indexWhere((s) => _sourceKeyOf(s) == selectedKey);
-      selIndex = found >= 0 ? found : (_selectedSourceIndex % activeSources.length);
-    } else if (activeSources.isNotEmpty) {
-      selIndex = _selectedSourceIndex % activeSources.length;
-    }
-    final rawCurrentSource = activeSources.isNotEmpty ? activeSources[selIndex] : null;
-    final currentSource = _withSeasonUnified(rawCurrentSource, effectiveSeasonForUrl);
-    final episodesUrl = currentSource?.url ?? widget.url;
-    final episodesSource = currentSource?.source ?? widget.source;
-    final initialThumbnail = ApiEndpoints.proxyImage(currentSource?.thumbnail);
-    
-    final platforms = (detailData is MovieDetail) ? detailData.platforms : <PlatformInfo>[];
+      final heroBanner = ApiEndpoints.proxyImage(
+        DetailBackdropResolver.resolve(
+          detail: detailData,
+          bannerParam: widget.banner,
+          sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
+          season: currentSeason,
+        ),
+        highQuality: true,
+      );
 
-    // Para anime, el "N" de temporada lo manda el server en animeDetail.season
-    // (curado por IdentityResolver a partir del título, p.ej. "2nd Season" -> 2).
-    final animeSeasonN = (detailData is AnimeDetail && detailData.season != null)
-        ? (int.tryParse(detailData.season!) ?? openedSeasonN)
-        : openedSeasonN;
-    final currentSeason = _selectedSeason ??
-        (detailData is MovieDetail
-            ? (detailData.seasons.isNotEmpty ? detailData.seasons.first.seasonNumber : 1)
-            : animeSeasonN);
+      final historyAsync = ref.watch(playbackHistoryStateProvider);
+      final history = historyAsync.valueOrNull ?? [];
+      final detailLoading = detailAsync.isLoading && detailAsync.valueOrNull == null;
 
-    // Al cambiar de temporada, la metadata (títulos, miniaturas, año) de los
-    // episodios debe corresponder a la temporada seleccionada, no a la temporada
-    // con la que se abrió la pantalla.
-    final seasonDetail = seasonDetailAsync.valueOrNull?.anime;
-
-    final initialBanner = ApiEndpoints.proxyImage(
-      DetailBackdropResolver.resolve(
-        detail: seasonDetail ?? detailData, // Preferimos el detalle de la temporada actual
-        bannerParam: widget.banner,
-        sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
-        season: currentSeason,
-      ),
-      highQuality: true,
-    );
-    
-    // Senior Web Fix: Backdrop dinámico por temporada. 
-    // Ya no congelamos el banner para permitir que cambie al navegar entre temporadas.
-    final heroBanner = initialBanner;
-    final familySourcesRaw = currentSource != null ? _familySourcesFor(currentSource, activeSources) : <SearchResult>[];
-    final familySources = familySourcesRaw.map((s) => _withSeasonUnified(s, effectiveSeasonForUrl)!).toList();
-
-    final historyAsync = ref.watch(playbackHistoryStateProvider);
-    final history = historyAsync.valueOrNull ?? [];
-    
-    // Senior Unified Relations: Obtenemos relacionados de TODAS las fuentes disponibles
-    final unifiedRelationsAsync = ref.watch(unifiedRelationsProvider(searchSources));
-    
-    final certification = detailData != null ? ((detailData is MovieDetail ? (detailData as MovieDetail).certification : (detailData is AnimeDetail ? (detailData as AnimeDetail).certification : null)) ?? 'NR') : 'NR';
-
-    final episodeLookupTitle = seasonSwitched
-        ? (seasonDetail?.titleEnglish?.isNotEmpty == true
-            ? seasonDetail!.titleEnglish!
-            : seasonTitle!)
-        : (widget.metadataTitle?.isNotEmpty == true ? widget.metadataTitle! : (detailData is AnimeDetail && detailData.titleEnglish?.isNotEmpty == true ? detailData.titleEnglish! : widget.title));
-
-    // Una Pel\u00EDcula (movie/movie_anime) no tiene capítulos: no tiene sentido pedir
-    // títulos/metadata/thumbnails de episodios al servidor. Construimos un único
-    // "episodio" sintético que apunta a la URL de la fuente (la Pel\u00EDcula misma) para
-    // que el reproductor pueda hacer /api/extract directamente contra ella.
-    //
-    // Guard: si la fuente es un proveedor de metadatos (AniList, TMDB, Trakt)
-    // o si la URL es un ID numérico o un path interno de API, NO hacemos la
-    // petición de episodios todavía. Debemos esperar a que
-    // discoveredSourcesProvider encuentre la URL real del scraper.
-    const metadataSources = {'anilist', 'tmdb', 'trakt', 'mal', 'jikan'};
-    final bool isNumericId = int.tryParse(episodesUrl) != null;
-    final bool isApiPath = episodesUrl.startsWith('/api/');
-    final isMetadataSource = metadataSources.contains(episodesSource.toLowerCase()) || isNumericId || isApiPath;
-
-    // Parámetros de la petición de episodios CONGELADOS a los valores conocidos al
-    // abrir la pantalla (widget) y a la temporada abierta, salvo al switchear de
-    // temporada. NO dependen de `detailData` (la cabecera/hero): los episodios se
-    // scrapean por URL de fuente, y `year`/`titleEnglish` solo alimentan el
-    // enriquecimiento TMDB/OMDB. Si usáramos `detailData.year`/`titleEnglish` aquí,
-    // al cargar la cabecera cambiaría la clave del provider y se RE-SCRAPEARÍAN
-    // todas las fuentes innecesariamente (los episodios ya venían enriquecidos).
-    final episodeReqYear = seasonSwitched
-        ? (seasonDetail?.year ?? widget.year)
-        : widget.year;
-    final episodeReqMetaTitle = seasonSwitched
-        ? (seasonDetail?.titleEnglish?.isNotEmpty == true
-            ? seasonDetail!.titleEnglish!
-            : seasonTitle ?? widget.metadataTitle ?? widget.title)
-        : (widget.metadataTitle?.isNotEmpty == true ? widget.metadataTitle! : widget.title);
-    final episodeReqSeason = seasonSwitched ? _selectedSeason! : openedSeasonN;
-
-    final episodesAsync = (isMovieCategory || widget.category == 'movie_anime')
-        ? AsyncValue<GroupedEpisodesResult?>.data(GroupedEpisodesResult(
-            response: EpisodesResponse(
-              source: episodesSource,
-              url: episodesUrl,
-              slug: '',
-              total: 1,
-              episodes: [EpisodeInfo(number: 1, id: 0, url: episodesUrl, title: 'Pel\u00EDcula', thumbnail: initialThumbnail)],
-            ),
-            sources: [currentSource ?? SearchResult(title: widget.title, url: episodesUrl, quality: '', thumbnail: initialThumbnail ?? '', source: episodesSource)],
-          ))
-        : isMetadataSource
-            // Fuente de metadatos sin endpoint de episodios: mostrar skeleton
-            // mientras las fuentes de scraping (JKAnime, AnimeAV1, Aniyae) terminan de cargarse.
-            ? const AsyncValue<GroupedEpisodesResult?>.loading()
-                : ref.watch(groupedEpisodesProvider(GroupedEpisodesParams(
-                title: seasonSwitched ? (seasonTitle ?? widget.title) : widget.title,
-                metadataTitle: episodeReqMetaTitle,
+      return Scaffold(
+        backgroundColor: const Color(0xFF0B0B0D),
+        body: AnimatedOpacity(
+          key: const ValueKey('content'),
+          opacity: 1.0,
+          duration: const Duration(milliseconds: 400),
+          child: CustomScrollView(
+            controller: _scrollController,
+            physics: const ClampingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: _ContentHeader(
+                title: widget.title,
+                source: widget.source,
+                url: widget.url,
                 category: widget.category,
-                year: episodeReqYear,
-                season: episodeReqSeason,
-                tmdbId: detailData is MovieDetail ? int.tryParse((detailData as MovieDetail).tmdbId) : null,
-                familyKey: currentSource != null ? simplifySourceName(currentSource.source) : simplifySourceName(widget.source),
-                currentSourceUrl: episodesUrl,
-                sources: activeSources.isNotEmpty ? activeSources : (currentSource != null ? [currentSource] : <SearchResult>[]),
-              )));
-
-    SearchResult? episodeSourceFor(int episodeNumber) => episodesAsync.valueOrNull?.sourceForNumber(episodeNumber) ?? currentSource;
-    // Las Pel\u00EDculas no tienen temporadas/episodios en TMDB: evitar búsquedas innecesarias de OMDB.
-    final omdbSeasonAsync = isMovieCategory
-        ? const AsyncValue<List<OmdbEpisode>>.data([])
-        : ref.watch(omdbSeasonProvider(OmdbSeasonParams(title: episodeLookupTitle, season: currentSeason)));
-
-    int totalSeasons = (detailData is MovieDetail)
-        ? (detailData.totalSeasons ?? detailData.seasons.length)
-        : (detailData is AnimeDetail ? (detailData.totalSeasons ?? 1) : 1);
-    // Respaldo del search: si el detail (AniList) no trajo totalSeasons,
-    // usamos el que el server calculó por franquicia desde el campo `season`.
-    if (widget.totalSeasons != null && widget.totalSeasons! > totalSeasons) {
-      totalSeasons = widget.totalSeasons!;
-    }
-    if (totalSeasons == 0) totalSeasons = 1;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D), 
-      body: AnimatedOpacity(
-        key: const ValueKey('content'), 
-        opacity: 1.0, 
-        duration: const Duration(milliseconds: 400), 
-        child: CustomScrollView(
-          controller: _scrollController, 
-          physics: const ClampingScrollPhysics(), 
-          slivers: [
-            SliverToBoxAdapter(child: _ContentHeader(
-              title: widget.title, 
-              source: widget.source, 
-              url: widget.url, 
-              category: widget.category,
-              poster: initialThumbnail, 
-              banner: heroBanner, 
-              detailAsync: detailAsync,
-              currentSource: currentSource, 
-              sources: activeSources, 
-              season: currentSeason ?? 1,
-              sourceRating: currentSource?.score, 
-              showRatingSkeleton: currentSource?.score == null && detailLoading, 
-              isLoadingSources: searchLoading && activeSources.isEmpty,
-              totalSeasons: totalSeasons, 
-              currentSeason: currentSeason ?? 1,
-              onSourceSelected: (index) {
-                if (activeSources.isEmpty) return;
-                setState(() {
-                  _selectedSourceIndex = index;
-                  _userSelectedSourceKey = '${activeSources[index].source}|${activeSources[index].url}';
-                });
-              },
-              onSeasonSelected: (s) => setState(() => _selectedSeason = s), 
-              inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, 
-              latestHistory: ref.watch(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull, 
-              unavailableSources: isMovieCategory ? _movieAvail.entries.where((e) => e.value == false).map((e) => e.key).toSet() : null, 
-              from: widget.from,
-              onPlay: () {
-                // Pel\u00EDcula: elegir la primera fuente disponible si la seleccionada
-                // no entrega stream (degradaci\u00F3n elegante del extractor).
-                SearchResult? playSource = currentSource;
-                if (isMovieCategory && playSource != null && _movieAvail[simplifySourceName(playSource.source)] == false) {
-                  playSource = activeSources.firstWhereOrNull((s) => _movieAvail[simplifySourceName(s.source)] == true) ?? playSource;
-                }
-                final src = playSource?.source ?? widget.source;
-                final url = playSource?.url ?? widget.url;
-                final playEpisodesUrl = playSource?.url ?? widget.url;
-                
-                String targetUri = '';
-
-                if (isMovieCategory) {
-                  final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Pel\u00EDcula', thumbnail: initialThumbnail);
-                  final player = PlayerScreen(
-                    contentId: widget.title,
-                    sourceUrl: _episodeUrlFor(ep, playEpisodesUrl, src, 1),
-                    source: src,
-                    episode: '1',
-                    serverName: simplifySourceName(src),
-                    language: ((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
-                    category: widget.category,
-                    totalEpisodes: 1,
-                    posterUrl: playSource?.thumbnail,
-                    bannerUrl: heroBanner,
-                  );
-                  UrlUtils.openPlayer(context, player);
-                } else {
-                  final latest = ref.read(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull;
-                  int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
-                  final epData = episodesAsync.valueOrNull?.response;
-                  final epSource = episodeSourceFor(epNum) ?? currentSource;
-                  final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
+                poster: ApiEndpoints.proxyImage(currentSource?.thumbnail),
+                banner: heroBanner,
+                detailAsync: detailAsync,
+                currentSource: currentSource,
+                sources: activeSources,
+                season: currentSeason,
+                sourceRating: currentSource?.score,
+                showRatingSkeleton: currentSource?.score == null && detailLoading,
+                isLoadingSources: detailAsync.isLoading && activeSources.isEmpty,
+                totalSeasons: totalSeasons,
+                currentSeason: currentSeason,
+                onSourceSelected: (index) => ref.setSource(detailParams, activeSources[index]),
+                onSeasonSelected: (s) => ref.setSeason(detailParams, s),
+                inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate,
+                latestHistory: history.where((h) => h.contentId == widget.title).firstOrNull,
+                unavailableSources: null,
+                from: widget.from,
+                onPlay: () {
+                  SearchResult? playSource = currentSource;
+                  final effectiveSrc = playSource?.source ?? widget.source;
+                  final playEpisodesUrl = playSource?.url ?? widget.url;
                   
-                  final episodeThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
-                  final player = PlayerScreen(
-                    contentId: widget.title,
-                    sourceUrl: _episodeUrlFor(ep, epSource?.url ?? url, epSource?.source ?? src, epNum),
-                    source: epSource?.source ?? src,
-                    episode: epNum.toString(),
-                    season: latest?.season ?? currentSeason,
-                    serverName: simplifySourceName(epSource?.source ?? src),
-                    language: (epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB',
-                    startPosition: latest?.positionInMilliseconds,
-                    category: widget.category,
-                    totalEpisodes: epData?.total ?? 0,
-                    title: seasonTitle ?? widget.title,
-                    posterUrl: episodeThumb,
-                    bannerUrl: heroBanner,
-                  );
-                  UrlUtils.openPlayer(context, player);
-                }
-              }
-            )),
-            if (isMobile) SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _ExpandableText(text: (detailData as dynamic)?.overview ?? 'No hay sinopsis disponible.', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 16), maxLines: 3),
-              const SizedBox(height: 16),
-              if (detailData is MovieDetail && platforms.isNotEmpty) ...[
-                Wrap(spacing: 8, runSpacing: 8, children: platforms.take(5).map<Widget>((p) => _PlatformLogo(platform: p, size: 24)).toList()),
-                const SizedBox(height: 16),
-              ],
-              Container(padding: const EdgeInsets.symmetric(vertical: 16), decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12), bottom: BorderSide(color: Colors.white12))), child: Row(children: [
-                Expanded(child: Column(children: [const Text('Lanzamientos', style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text((detailData is AnimeDetail ? detailData.firstAirDate : (detailData is MovieDetail ? detailData.releaseDate : null))?.split('-').first ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))])),
-                Expanded(child: Column(children: [Text(isMovieCategory ? 'Duraci\u00F3n' : 'Temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text(isMovieCategory ? (detailData != null ? _formatRuntime(_getRuntime(detailData) ?? 0) : 'N/A') : '$totalSeasons', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))]))
-              ])),
-              const SizedBox(height: 24),
-            ]))),
-            SliverMainAxisGroup(slivers: [
-              SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _buildTabBar(tabLabels, selectedTabIndex, hPadding, isMobile),
-                const SizedBox(height: 16),
-              ]))),
-              if (selectedTabIndex == episodesTabIndex) () {
-                // Senior Visual Persistence: Mantener la lista visible mientras se carga el enriquecimiento
-                final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
-                if (epBundle != null) {
-                  _lastEpisodes = epBundle;
-                  final epData = epBundle.response;
-                  final omdbEpisodes = omdbSeasonAsync.valueOrNull ?? [];
+                  if (isMovieCategory) {
+                    final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Película', thumbnail: ApiEndpoints.proxyImage(playSource?.thumbnail));
+                    final player = PlayerScreen(
+                      contentId: widget.title,
+                      sourceUrl: _episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1),
+                      source: effectiveSrc,
+                      episode: '1',
+                      serverName: simplifySourceName(effectiveSrc),
+                      language: ((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                      category: widget.category,
+                      totalEpisodes: 1,
+                      posterUrl: playSource?.thumbnail,
+                      bannerUrl: heroBanner,
+                    );
+                    UrlUtils.openPlayer(context, player);
+                  } else {
+                    final latest = history.where((h) => h.contentId == widget.title).firstOrNull;
+                    int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
+                    final epData = episodesAsync.valueOrNull?.response;
+                    final epSource = episodesAsync.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
+                    final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
 
-                  return SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverMainAxisGroup(slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.only(bottom: isMobile ? 6 : 32),
-                        child: Text(
-                          '${epData.total} episodios', 
-                          style: TextStyle(
-                            color: const Color(0xFFA5A5A5), 
-                            fontSize: isMobile ? 15 : 20,
-                            fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal,
-                          )
-                        )
-                      )
-                    ),
-                    if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
-                      final ep = index < epData.episodes.length ? epData.episodes[index] : null; final omdb = index < omdbEpisodes.length ? omdbEpisodes[index] : null;
-                      final epNum = (ep?.number ?? index + 1).toString();
-                      final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                      final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                      final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? omdb?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? omdb?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? omdb?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate ?? omdb?.released, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : omdb?.duration), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
-                        final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                        final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                        final epThumb = ep?.thumbnail ?? omdb?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final player = PlayerScreen(
-                          contentId: widget.title,
-                          sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1),
-                          source: tapSource?.source ?? currentSource?.source ?? widget.source,
-                          episode: (ep?.number ?? index + 1).toString(),
-                          season: currentSeason,
-                          serverName: simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source),
-                          language: (epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
-                          startPosition: hist?.positionInMilliseconds,
-                          category: widget.category,
-                          totalEpisodes: epData.total,
-                          title: seasonTitle ?? widget.title,
-                          posterUrl: epThumb,
-                          bannerUrl: heroBanner,
-                        );
-                        UrlUtils.openPlayer(context, player);
-                      });
-                    }, childCount: epData.total))
-                    else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
-                      final ep = index < epData.episodes.length ? epData.episodes[index] : null; final omdb = index < omdbEpisodes.length ? omdbEpisodes[index] : null;
-                      final epNum = (ep?.number ?? index + 1).toString();
-                      final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                      final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                      final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? omdb?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? omdb?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? omdb?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate ?? omdb?.released, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : omdb?.duration), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
-                        final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                        final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                        final epThumb = ep?.thumbnail ?? omdb?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final player = PlayerScreen(
-                          contentId: widget.title,
-                          sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1),
-                          source: tapSource?.source ?? currentSource?.source ?? widget.source,
-                          episode: (ep?.number ?? index + 1).toString(),
-                          season: currentSeason,
-                          serverName: simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source),
-                          language: (epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
-                          startPosition: hist?.positionInMilliseconds,
-                          category: widget.category,
-                          totalEpisodes: epData.total,
-                          title: seasonTitle ?? widget.title,
-                          posterUrl: epThumb,
-                          bannerUrl: heroBanner,
-                        );
-                        UrlUtils.openPlayer(context, player);
-                      });
-                    }, childCount: epData.total)),
-                      if (epData.specials.isNotEmpty) ...[
+                    final episodeThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
+                    final player = PlayerScreen(
+                      contentId: widget.title,
+                      sourceUrl: _episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum),
+                      source: epSource?.source ?? effectiveSrc,
+                      episode: epNum.toString(),
+                      season: latest?.season ?? currentSeason,
+                      serverName: simplifySourceName(epSource?.source ?? effectiveSrc),
+                      language: (epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB',
+                      startPosition: latest?.positionInMilliseconds,
+                      category: widget.category,
+                      totalEpisodes: epData?.total ?? 0,
+                      title: seasonTitle ?? widget.title,
+                      posterUrl: episodeThumb,
+                      bannerUrl: heroBanner,
+                    );
+                    UrlUtils.openPlayer(context, player);
+                  }
+                }
+              )),
+              if (isMobile) SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _ExpandableText(text: (detailData as dynamic)?.overview ?? 'No hay sinopsis disponible.', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 16), maxLines: 3),
+                const SizedBox(height: 16),
+                Container(padding: const EdgeInsets.symmetric(vertical: 16), decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12), bottom: BorderSide(color: Colors.white12))), child: Row(children: [
+                  Expanded(child: Column(children: [const Text('Lanzamientos', style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text((detailData is AnimeDetail ? detailData.firstAirDate : (detailData is MovieDetail ? detailData.releaseDate : null))?.split('-').first ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))])),
+                  Expanded(child: Column(children: [Text(isMovieCategory ? 'Duración' : 'Temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text(isMovieCategory ? (detailData != null ? _formatRuntime(_getRuntime(detailData) ?? 0) : 'N/A') : '$totalSeasons', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))]))
+                ])),
+                const SizedBox(height: 24),
+              ]))),
+              SliverMainAxisGroup(slivers: [
+                SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _buildTabBar(tabLabels, selectedTabIndex, hPadding, isMobile),
+                  const SizedBox(height: 16),
+                ]))),
+                if (selectedTabIndex == episodesTabIndex) () {
+                  final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
+
+                  if (epBundle != null) {
+                    _lastEpisodes = epBundle;
+                    final epData = epBundle.response;
+
+                    return SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverMainAxisGroup(slivers: [
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.only(top: isMobile ? 28 : 40, bottom: isMobile ? 16 : 32),
+                          padding: EdgeInsets.only(bottom: isMobile ? 6 : 32),
                           child: Text(
-                            'Temporada 0',
+                            '${epData.total} episodios',
                             style: TextStyle(
                               color: const Color(0xFFA5A5A5),
                               fontSize: isMobile ? 15 : 20,
                               fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal,
+                            )
+                          )
+                        )
+                      ),
+                      if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
+                        final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                        final epNum = (ep?.number ?? index + 1).toString();
+                        final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                        final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                        final epQuality = ep?.quality ?? epSource?.quality ?? '';
+                        return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
+                          final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                          final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                          final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                          final player = PlayerScreen(
+                            contentId: widget.title,
+                            sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? widget.url, tapSource?.source ?? (currentSource?.source ?? widget.source), ep?.number ?? index + 1),
+                            source: tapSource?.source ?? (currentSource?.source ?? widget.source),
+                            episode: (ep?.number ?? index + 1).toString(),
+                            season: currentSeason,
+                            serverName: simplifySourceName(tapSource?.source ?? (currentSource?.source ?? widget.source)),
+                            language: (epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                            startPosition: hist?.positionInMilliseconds,
+                            category: widget.category,
+                            totalEpisodes: epData.total,
+                            title: seasonTitle ?? widget.title,
+                            posterUrl: epThumb,
+                            bannerUrl: heroBanner,
+                          );
+                          UrlUtils.openPlayer(context, player);
+                        });
+                      }, childCount: epData.total))
+                      else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
+                        final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                        final epNum = (ep?.number ?? index + 1).toString();
+                        final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                        final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                        final epQuality = ep?.quality ?? epSource?.quality ?? '';
+                        return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
+                          final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                          final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                          final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                          final player = PlayerScreen(
+                            contentId: widget.title,
+                            sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? widget.url, tapSource?.source ?? (currentSource?.source ?? widget.source), ep?.number ?? index + 1),
+                            source: tapSource?.source ?? (currentSource?.source ?? widget.source),
+                            episode: (ep?.number ?? index + 1).toString(),
+                            season: currentSeason,
+                            serverName: simplifySourceName(tapSource?.source ?? (currentSource?.source ?? widget.source)),
+                            language: (epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                            startPosition: hist?.positionInMilliseconds,
+                            category: widget.category,
+                            totalEpisodes: epData.total,
+                            title: seasonTitle ?? widget.title,
+                            posterUrl: epThumb,
+                            bannerUrl: heroBanner,
+                          );
+                          UrlUtils.openPlayer(context, player);
+                        });
+                      }, childCount: epData.total)),
+                        if (epData.specials.isNotEmpty) ...[
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: isMobile ? 28 : 40, bottom: isMobile ? 16 : 32),
+                            child: Text(
+                              'Temporada 0',
+                              style: TextStyle(
+                                color: const Color(0xFFA5A5A5),
+                                fontSize: isMobile ? 15 : 20,
+                                fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
-                        final sp = epData.specials[index];
-                        final spNum = sp.number;
-                        final spSource = currentSource;
-                        final spQuality = sp.quality ?? spSource?.quality ?? '';
-                        return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, isMobile: true, scrollController: _scrollController, onTap: () {
-                          final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                          final player = PlayerScreen(
-                            contentId: widget.title,
-                            sourceUrl: _episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number),
-                            source: spSource?.source ?? currentSource?.source ?? widget.source,
-                            episode: spNum.toString(),
-                            season: 0,
-                            serverName: simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source),
-                            language: (spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
-                            category: widget.category,
-                            totalEpisodes: epData.total,
-                            title: seasonTitle ?? widget.title,
-                            posterUrl: epThumb,
-                            bannerUrl: heroBanner,
-                          );
-                          UrlUtils.openPlayer(context, player);
-                        });
-                      }, childCount: epData.specials.length))
-                      else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
-                        final sp = epData.specials[index];
-                        final spSource = currentSource;
-                        final spQuality = sp.quality ?? spSource?.quality ?? '';
-                        return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, onTap: () {
-                          final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                          final player = PlayerScreen(
-                            contentId: widget.title,
-                            sourceUrl: _episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number),
-                            source: spSource?.source ?? currentSource?.source ?? widget.source,
-                            episode: sp.number.toString(),
-                            season: 0,
-                            serverName: simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source),
-                            language: (spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
-                            category: widget.category,
-                            totalEpisodes: epData.total,
-                            title: seasonTitle ?? widget.title,
-                            posterUrl: epThumb,
-                            bannerUrl: heroBanner,
-                          );
-                          UrlUtils.openPlayer(context, player);
-                        });
-                      }, childCount: epData.specials.length)),
-                    ],
-                    SliverToBoxAdapter(child: SizedBox(height: isMobile ? 32 : 150)),
-                  ]));
-                }
+                        if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
+                          final sp = epData.specials[index];
+                          final spNum = sp.number;
+                          final spSource = currentSource;
+                          final spQuality = sp.quality ?? spSource?.quality ?? '';
+                          return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, isMobile: true, scrollController: _scrollController, onTap: () {
+                            final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
+                            final player = PlayerScreen(
+                              contentId: widget.title,
+                              sourceUrl: _episodeUrlFor(sp, spSource?.url ?? widget.url, spSource?.source ?? (currentSource?.source ?? widget.source), sp.number),
+                              source: spSource?.source ?? (currentSource?.source ?? widget.source),
+                              episode: spNum.toString(),
+                              season: 0,
+                              serverName: simplifySourceName(spSource?.source ?? (currentSource?.source ?? widget.source)),
+                              language: (spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                              category: widget.category,
+                              totalEpisodes: epData.total,
+                              title: seasonTitle ?? widget.title,
+                              posterUrl: epThumb,
+                              bannerUrl: heroBanner,
+                            );
+                            UrlUtils.openPlayer(context, player);
+                          });
+                        }, childCount: epData.specials.length))
+                        else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
+                          final sp = epData.specials[index];
+                          final spSource = currentSource;
+                          final spQuality = sp.quality ?? spSource?.quality ?? '';
+                          return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, onTap: () {
+                            final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
+                            final player = PlayerScreen(
+                              contentId: widget.title,
+                              sourceUrl: _episodeUrlFor(sp, spSource?.url ?? widget.url, spSource?.source ?? (currentSource?.source ?? widget.source), sp.number),
+                              source: spSource?.source ?? (currentSource?.source ?? widget.source),
+                              episode: sp.number.toString(),
+                              season: 0,
+                              serverName: simplifySourceName(spSource?.source ?? (currentSource?.source ?? widget.source)),
+                              language: (spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
+                              category: widget.category,
+                              totalEpisodes: epData.total,
+                              title: seasonTitle ?? widget.title,
+                              posterUrl: epThumb,
+                              bannerUrl: heroBanner,
+                            );
+                            UrlUtils.openPlayer(context, player);
+                          });
+                        }, childCount: epData.specials.length)),
+                      ],
+                      SliverToBoxAdapter(child: SizedBox(height: isMobile ? 32 : 150)),
+                    ]));
+                  }
 
-                return episodesAsync.when(
-                  data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-                  loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: _buildEpisodesSkeleton(context, isMobile)),
-                  error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))),
-                );
-              }(),
-              // Para Películas (sin Episodios) las pestañas se desplazan: Relacionado = 0, Extras = 1, Detalles = 2.
-              if (selectedTabIndex == relatedTabIndex) ..._buildRelatedTab(
-                hPadding, 
-                unifiedRelations: unifiedRelationsAsync.valueOrNull,
-                currentSource: currentSource,
-              ),
-    if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(detailAsync.valueOrNull?.anime, hPadding),
-    if (selectedTabIndex == detailsTabIndex) ..._buildDetailsTab(displayDetail, hPadding, inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, sourceRating: currentSource?.score, showRatingSkeleton: currentSource?.score == null && detailLoading),
-    if (selectedTabIndex == galleryTabIndex) ..._buildGalleryTab(
-      hPadding,
-      isMovieCategory ? 'movie' : 'tv',
-      episodeReqMetaTitle,
-      episodeReqYear,
-    ),
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            ]),
-          ],
+                  return episodesAsync.when(
+                    data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                    loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: _buildEpisodesSkeleton(context, isMobile)),
+                    error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))),
+                  );
+                }(),
+                if (selectedTabIndex == relatedTabIndex) ..._buildRelatedTab(
+                  hPadding,
+                  unifiedRelations: unifiedRelationsAsync.valueOrNull,
+                  currentSource: currentSource,
+                ),
+                if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(detailAsync.valueOrNull?.anime, hPadding),
+                if (selectedTabIndex == detailsTabIndex) ..._buildDetailsTab(detailData, hPadding, inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, sourceRating: currentSource?.score, showRatingSkeleton: currentSource?.score == null && detailLoading),
+                if (selectedTabIndex == galleryTabIndex) ..._buildGalleryTab(
+                  hPadding,
+                  isMovieCategory ? 'movie' : 'tv',
+                  detailData?.title ?? widget.title,
+                  detailData is AnimeDetail ? (detailData as AnimeDetail).year : widget.year,
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              ]),
+            ],
+          ),
         ),
-      ),
-    );
+      );
     } catch (e, stack) {
       return Scaffold(
         backgroundColor: const Color(0xFF0B0B0D),

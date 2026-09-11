@@ -234,7 +234,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
     final hPadding = ResponsiveUtils.horizontalPadding(context);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 12 : 48),
+      padding: EdgeInsets.only(bottom: isMobile ? 12 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -279,14 +279,14 @@ class _ScheduleRowState extends State<ScheduleRow> {
               ],
             ),
           ),
-          SizedBox(height: isMobile ? 8 : 24),
+          SizedBox(height: isMobile ? 8 : 12),
           MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
             child: Stack(
               children: [
                 SizedBox(
-                  height: isMobile ? ResponsiveUtils.sp(context, 220) : 380, // Senior Fix: Ajustado para ancho de 125
+                  height: ResponsiveUtils.rowHeight(context, hasInfo: true),
                   child: NotificationListener<ScrollNotification>(
                     onNotification: (notification) {
                       _updateScrollIndicators();
@@ -309,11 +309,11 @@ class _ScheduleRowState extends State<ScheduleRow> {
                         final metaTitle = item.romaji ?? item.english ?? item.title;
                         final itemYear = item.year ?? (item.airingAt != null ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year : null);
                         return SizedBox(
-                          width: isMobile ? ResponsiveUtils.sp(context, 125) : 200,
+                          width: ResponsiveUtils.posterWidth(context),
                           child: FocusablePosterCard(
                             title: item.title,
                             posterUrl: ApiEndpoints.proxyImage(item.coverImage),
-                            badgeOverlay: item.airingAt != null
+                            airingOverlay: item.airingAt != null
                                 ? AiringCountdownBadge(airingAt: item.airingAt!, aired: item.aired)
                                 : null,
                             subtitle: _buildSubtitle(item),
@@ -357,7 +357,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                 Positioned(
                   left: 0,
                   top: 0,
-                  height: isMobile ? 210 : 300, // Sincronizado con el alto del póster (ancho * 1.5)
+                  height: ResponsiveUtils.posterHeight(context),
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),
@@ -379,7 +379,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                 Positioned(
                   right: 0,
                   top: 0,
-                  height: isMobile ? 210 : 300, // Sincronizado con el alto del póster
+                  height: ResponsiveUtils.posterHeight(context),
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),

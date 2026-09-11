@@ -90,11 +90,11 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
           fg = Colors.white;
         } else if (dayDiff == 1) {
           label = 'MAÑANA $time';
-          bg = Colors.black.withOpacity(0.6);
+          bg = const Color(0xFF1E1E26);
           fg = Colors.white;
         } else {
           label = time;
-          bg = Colors.black.withOpacity(0.6);
+          bg = const Color(0xFF1E1E26);
           fg = Colors.white;
         }
       }
@@ -102,10 +102,14 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: const BorderRadius.only(
+          bottomRight: Radius.circular(8),
+          // Senior Pixel-Perfect Fix: Dejamos la esquina superior izquierda a 0
+          // para que el ClipRRect de la tarjeta la recorte con precisión quirúrgica.
+        ),
         border: urgent ? Border.all(color: Colors.white, width: 1) : null,
       ),
       child: Row(

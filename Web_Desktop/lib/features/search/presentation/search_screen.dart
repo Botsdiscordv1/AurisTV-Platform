@@ -512,8 +512,12 @@ class _SearchResultsGrid extends ConsumerWidget {
                 posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
                 badge: meta.label,
                 badgeColor: meta.labelColor,
+                badgeOverlay: result.season != null && result.season! > 1
+                    ? SeasonBadge(season: result.season!)
+                    : null,
                 subtitle: meta.status,
                 subtitleColor: meta.statusColor,
+                showInfo: true,
                 progress: progress,
                 onTap: () => onContentTap(result),
               );

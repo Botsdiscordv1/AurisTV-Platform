@@ -242,15 +242,26 @@ class ExploreScreen extends ConsumerWidget {
               SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: hPadding),
                 sliver: contentAsync.when(
-                  data: (items) => SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: isMobile ? 3 : 5,
-                      mainAxisSpacing: isMobile ? 12 : 24, // Senior Fix: Compactado igual que el calendario
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.55, // Senior Fix: Proporción ajustada para evitar aire muerto
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
+                  data: (items) {
+                    final b = context.breakpoint;
+                    final int crossAxisCount = switch (b) {
+                      Breakpoint.base => 3,
+                      Breakpoint.sm => 4,
+                      Breakpoint.md => 5,
+                      Breakpoint.lg => 6,
+                      Breakpoint.xl => 7,
+                      Breakpoint.xxl => 8,
+                    };
+
+                    return SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        mainAxisSpacing: b < Breakpoint.md ? 12 : 24, 
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.55, 
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
                         final item = items[index];
 
                         // Senior Fix: Obtener el progreso del historial si existe
@@ -281,21 +292,22 @@ class ExploreScreen extends ConsumerWidget {
                               type: item.card?.kind ?? item.type.name,
                               from: '/explore',
                             );
-                            context.go(uri, extra: item.toContentSeed());
+                            context.push(uri, extra: item.toContentSeed());
                           },
                         );
                       },
                       childCount: items.length,
                     ),
-                  ),
-                  loading: () => const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (err, _) => SliverFillRemaining(
-                    child: Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white54))),
-                  ),
+                  );
+                },
+                loading: () => const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (err, _) => SliverFillRemaining(
+                  child: Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white54))),
                 ),
               ),
+            ),
             
             if (selectedFilter != 'Calendario')
               const SliverPadding(padding: EdgeInsets.only(bottom: 24)), // Solo aire al final si es el Grid

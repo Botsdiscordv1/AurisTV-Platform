@@ -130,16 +130,18 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     _disposeController();
 
     // 1. OCULTAR TODO EL CONTENIDO
-    setState(() {
-      _contentIndex = -1;
-      _showTrailerLayer = false;
-      _videoReady = false;
-    });
+    if (mounted) {
+      setState(() {
+        _contentIndex = -1;
+        _showTrailerLayer = false;
+        _videoReady = false;
+      });
+    }
 
     // 2. CAMBIAR FONDO (Tras 400ms de desvanecimiento)
     _delayTimer = Timer(const Duration(milliseconds: 400), () {
       if (!mounted || !_isAppActive) return;
-      setState(() => _backgroundIndex = nextIndex);
+      if (mounted) setState(() => _backgroundIndex = nextIndex);
       
       // Senior Fix: Precargar el siguiente incluso antes de que llegue su turno
       _precacheNextImage();
@@ -147,7 +149,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       // 3. MOSTRAR NUEVO CONTENIDO (Damos 350ms para que la imagen cargue)
       _delayTimer = Timer(const Duration(milliseconds: 350), () {
         if (!mounted || !_isAppActive) return;
-        setState(() => _contentIndex = nextIndex);
+        if (mounted) setState(() => _contentIndex = nextIndex);
 
         // 4. REINICIAR TRAILER
         _delayTimer = Timer(const Duration(seconds: 1), () {
@@ -160,7 +162,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
   void _startCycle({Duration delay = const Duration(seconds: 2)}) {
     if (!_isAppActive) return;
-    setState(() { _showTrailerLayer = false; _videoReady = false; });
+    if (mounted) {
+      setState(() { _showTrailerLayer = false; _videoReady = false; });
+    }
     
     // Senior Fix: Respetar la preferencia de Autoplay de Trailers del usuario
     final settings = ref.read(settingsProvider);
@@ -184,7 +188,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   void _stopCycle() {
     _delayTimer?.cancel();
     _disposeController();
-    setState(() { _showTrailerLayer = false; _videoReady = false; });
+    // Senior Fix: Evitar setState si el widget ya está siendo desmontado (dispose)
+    if (mounted) {
+      setState(() { _showTrailerLayer = false; _videoReady = false; });
+    }
   }
 
   void _initController() async {
@@ -207,16 +214,24 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       ctrl.listen((state) {
         if (state.playerState == yt.PlayerState.cued && mounted) ctrl.playVideo();
         if (state.playerState == yt.PlayerState.playing && mounted && !_videoReady) {
-          Future.delayed(const Duration(milliseconds: 400), () { if (mounted) setState(() => _videoReady = true); });
+          Future.delayed(const Duration(milliseconds: 400), () { 
+            if (mounted) setState(() => _videoReady = true); 
+          });
         }
-        if (state.playerState == yt.PlayerState.ended && mounted) { setState(() { _showTrailerLayer = false; _videoReady = false; }); }
+        if (state.playerState == yt.PlayerState.ended && mounted) { 
+          setState(() { _showTrailerLayer = false; _videoReady = false; }); 
+        }
       });
       _ytSubscription = ctrl.videoStateStream.listen((state) {
+        if (!mounted) return;
         final duration = ctrl.value.metaData.duration.inSeconds;
         final position = state.position.inSeconds;
         if (position > 0.5 && !_videoReady && mounted) setState(() => _videoReady = true);
         if (position > 5 && duration > 30 && (duration - position) < 12) {
-          if (_showTrailerLayer && mounted) { setState(() { _showTrailerLayer = false; _videoReady = false; }); _fadeOutAudio(ctrl); }
+          if (_showTrailerLayer && mounted) { 
+            setState(() { _showTrailerLayer = false; _videoReady = false; }); 
+            _fadeOutAudio(ctrl); 
+          }
         }
       });
       if (mounted) {
@@ -341,8 +356,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     final HeroBannerLayout layout = widget.layout ?? (useMobileLayout ? HeroBannerLayout.mobile : HeroBannerLayout.cinematic);
 
     return VisibilityDetector(
-      key: const ValueKey('hero_banner_visibility'),
+      key: ValueKey('hero_visibility_${widget.currentCategory}'),
       onVisibilityChanged: (info) {
+        if (!mounted) return;
         final visible = info.visibleFraction > 0.1; // Senior Fix: 10% de visibilidad para considerar activo
         if (visible != _isVisible) {
           setState(() => _isVisible = visible);
@@ -356,12 +372,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         }
       },
       child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
+        onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
+        onExit: (_) { if (mounted) setState(() => _isHovered = false); },
         child: Focus(
           autofocus: widget.autofocus,
           onFocusChange: (focused) {
-            setState(() { if (focused) _stopAutoPlay(); else _startAutoPlay(); });
+            if (mounted) setState(() { if (focused) _stopAutoPlay(); else _startAutoPlay(); });
           },
           onKeyEvent: (node, event) {
             if (event is KeyDownEvent) {
@@ -765,7 +781,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                   : Text(
                       item.title.toUpperCase(), 
                       style: TextStyle(
-                        fontSize: context.breakpoint < Breakpoint.sm ? 22 : 26, 
+                        fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.sm ? 22 : 26), 
                         fontWeight: FontWeight.w900, 
                         color: Colors.white, 
                         height: 1.1
@@ -788,14 +804,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                           border: Border.all(color: Colors.white54, width: 1),
                           borderRadius: BorderRadius.circular(2),
                         ),
-                        child: Text(item.certification!, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                        child: Text(item.certification!, style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 10), fontWeight: FontWeight.w900)),
                       ),
                       const SizedBox(width: 6),
                     ],
                     if (item.rating != null && item.rating! > 0) ...[
                       const Icon(Icons.star_rounded, color: Color(0xFFEF7A1E), size: 14),
                       const SizedBox(width: 2),
-                      Text(item.rating!.toStringAsFixed(1), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text(item.rating!.toStringAsFixed(1), style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 12), fontWeight: FontWeight.bold)),
                     ],
                   ],
                 ),
@@ -817,12 +833,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)),
-                child: const Text('PRÓXIMAMENTE', style: TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                child: Text('PRÓXIMAMENTE', style: TextStyle(color: Colors.white60, fontSize: ResponsiveUtils.sp(context, 10), fontWeight: FontWeight.w900, letterSpacing: 1)),
               )
             else if (item.episode != null)
               Text(
                 'NUEVO EPISODIO ${item.episode}', 
-                style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.5)
+                style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w900, letterSpacing: 0.5)
               )
             else
               const SizedBox.shrink(),
@@ -831,7 +847,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             if (item.genres.isNotEmpty)
               Text(
                 item.genres.take(2).join(' • ').toUpperCase(), 
-                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.w500)
+                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w500)
               ),
           ],
         ),
@@ -934,7 +950,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               item.type.name.toUpperCase(), 
               style: TextStyle(
                 color: Colors.white, 
-                fontSize: context.breakpoint < Breakpoint.xl ? 12 : 13, 
+                fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.xl ? 12 : 13), 
                 fontWeight: FontWeight.w900, 
                 letterSpacing: 1.5
               )
@@ -949,7 +965,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                 'NUEVO EPISODIO ${item.episode}', 
                 style: TextStyle(
                   color: const Color(0xFFEF7A1E), 
-                  fontSize: context.breakpoint < Breakpoint.xl ? 12 : 13, 
+                  fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.xl ? 12 : 13), 
                   fontWeight: FontWeight.w900, 
                   letterSpacing: 0.5
                 )
@@ -967,7 +983,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                 item.rating!.toStringAsFixed(1), 
                 style: TextStyle(
                   color: Colors.white, 
-                  fontSize: context.breakpoint < Breakpoint.xl ? 13 : 14, 
+                  fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.xl ? 13 : 14), 
                   fontWeight: FontWeight.w900
                 )
               ),
@@ -983,7 +999,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                 decoration: BoxDecoration(border: Border.all(color: Colors.white38), borderRadius: BorderRadius.circular(2)),
                 child: Text(
                   item.certification!, 
-                  style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)
+                  style: TextStyle(color: Colors.white70, fontSize: ResponsiveUtils.sp(context, 10), fontWeight: FontWeight.bold)
                 ),
               ),
             ],
@@ -997,7 +1013,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                 item.genres.take(3).join('  •  '), 
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.6), 
-                  fontSize: context.breakpoint < Breakpoint.xl ? 12 : 13, 
+                  fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.xl ? 12 : 13), 
                   fontWeight: FontWeight.w600
                 )
               ),

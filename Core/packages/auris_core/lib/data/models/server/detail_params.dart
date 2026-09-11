@@ -1,3 +1,6 @@
+import 'search_result.dart';
+import 'package:collection/collection.dart';
+
 class UnifiedDetailParams {
   final String title;
   final String? metadataTitle;
@@ -8,6 +11,7 @@ class UnifiedDetailParams {
   final String source;
   final String? url;
   final String? type;
+  final List<SearchResult>? initialSources;
 
   const UnifiedDetailParams({
     required this.title,
@@ -19,6 +23,7 @@ class UnifiedDetailParams {
     this.source = '',
     this.url,
     this.type,
+    this.initialSources,
   });
 
   @override
@@ -33,11 +38,21 @@ class UnifiedDetailParams {
           season == other.season &&
           source == other.source &&
           url == other.url &&
-          type == other.type;
+          type == other.type &&
+          const ListEquality().equals(initialSources, other.initialSources);
 
   @override
-  int get hashCode => Object.hash(title, metadataTitle, category, kind, year,
-      season, source, url, type);
+  int get hashCode => Object.hash(
+      title,
+      metadataTitle,
+      category,
+      kind,
+      year,
+      season,
+      source,
+      url,
+      type,
+      const ListEquality().hash(initialSources));
 }
 
 class AnimeDetailParams {

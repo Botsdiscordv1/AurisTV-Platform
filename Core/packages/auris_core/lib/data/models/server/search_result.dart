@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import '../../../core/api/api_endpoints.dart';
+import '../../../core/api/image_policy.dart';
 
 class SearchResult {
   final String title;
@@ -152,12 +153,13 @@ class SearchResult {
         json['cover'] as String? ?? 
         json['coverImage'] as String? ?? 
         json['image'] as String?,
+        policy: ImageSize.poster,
         fallbackUrl: json['tmdbThumbnail'] as String?,
       ),
       tmdbThumbnail: json['tmdbThumbnail'] as String?,
       banner: ApiEndpoints.proxyImage(
         json['banner'] as String? ?? json['backdrop'] as String?, 
-        highQuality: true,
+        policy: ImageSize.banner,
         fallbackUrl: json['tmdbBanner'] as String? ?? json['tmdbBackdrop'] as String?,
       ),
       tmdbBanner: json['tmdbBanner'] as String? ?? json['tmdbBackdrop'] as String?,

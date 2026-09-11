@@ -17,7 +17,9 @@ class NotificationService {
   NotificationService(this.ref);
 
   Future<void> init() async {
-    // 1. Inicializar Firebase (Solo si no está inicializado)
+    // Web: el SW de FCM falla en localhost sin MIME correcto y revienta el
+    // zone de Riverpod (episodios en loading eterno). Si falla, abortar
+    // notificaciones pero NUNCA propagar el error al caller.
     try {
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp(
@@ -26,6 +28,16 @@ class NotificationService {
       }
     } catch (e) {
       debugPrint('[Notifications] Firebase init error: $e');
+      return;
+    }
+    if (kIsWeb) {
+      try {
+        await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('[Notifications] Web FCM token skipped (SW not ready): $e');
+      }
+      // No suscribir a tópicos ni handlers en Web si el SW no está; el resto
+      // de la app (episodios, detalle) debe seguir funcionando.
       return;
     }
 

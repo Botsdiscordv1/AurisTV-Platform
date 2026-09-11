@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_endpoints.dart';
+import '../../../core/api/image_policy.dart';
 import '../../../core/utils/category_utils.dart';
 import '../../../core/utils/content_logic.dart';
 import '../../models/server/anilist_media.dart';
@@ -23,6 +24,11 @@ import '../auris_repository.dart';
 
 class AurisRepositoryImpl implements AurisRepository {
   final ApiClient _client;
+  
+  // Senior Cache Layer: Guardamos los detalles en memoria para evitar skeletons
+  // al navegar hacia atrás o re-abrir contenidos.
+  final Map<String, AnimeDetail> _animeCache = {};
+  final Map<String, MovieDetail> _movieCache = {};
 
   AurisRepositoryImpl(this._client);
 
@@ -332,6 +338,12 @@ class AurisRepositoryImpl implements AurisRepository {
     String? type,
     String? imgSize, // Senior Fix: Soporte para el nuevo parámetro &img del servidor
   }) async {
+    final cacheKey = '$title|$year|$season|$url';
+    if (_animeCache.containsKey(cacheKey)) {
+      debugPrint('[AurisRepo] Cache HIT for Anime: $title');
+      return _animeCache[cacheKey];
+    }
+
     final params = <String, dynamic>{'title': title};
     if (malId != null) params['malId'] = malId;
     if (metadataTitle != null) params['metadataTitle'] = metadataTitle;
@@ -352,7 +364,9 @@ class AurisRepositoryImpl implements AurisRepository {
       ),
     );
     if (response.statusCode == 404) return null;
-    return AnimeDetail.fromJson(response.data as Map<String, dynamic>);
+    final detail = AnimeDetail.fromJson(response.data as Map<String, dynamic>);
+    _animeCache[cacheKey] = detail;
+    return detail;
   }
 
   @override
@@ -367,7 +381,15 @@ class AurisRepositoryImpl implements AurisRepository {
     String? kind,
     String? imgSize, // Senior Fix: Soporte para &img en películas y series
   }) async {
+    final cacheKey = '$title|$year|$url|$category';
+    if (_movieCache.containsKey(cacheKey)) {
+      debugPrint('[AurisRepo] Cache HIT for Movie: $title');
+      return _movieCache[cacheKey];
+    }
+
     final params = <String, dynamic>{'title': title};
+    if (year != null) params['year'] = year;
+    if (metadataTitle != null) params['metadataTitle'] = metadataTitle;
     if (year != null) params['year'] = year;
     if (metadataTitle != null) params['metadataTitle'] = metadataTitle;
     if (url != null) params['url'] = url;
@@ -385,7 +407,9 @@ class AurisRepositoryImpl implements AurisRepository {
       ),
     );
     if (response.statusCode == 404) return null;
-    return MovieDetail.fromJson(response.data as Map<String, dynamic>);
+    final detail = MovieDetail.fromJson(response.data as Map<String, dynamic>);
+    _movieCache[cacheKey] = detail;
+    return detail;
   }
 
   @override
@@ -468,10 +492,10 @@ class AurisRepositoryImpl implements AurisRepository {
 
           final String? bannerSource = m['bannerUrl'] ?? m['banner'] ?? m['backdrop'];
           
-          // Senior Optimization: Aplicar FHD real (1920x1080) vía Proxy si se solicita 1080
+          // Senior Optimization: Aplicar políticas de imagen centralizadas
           final String bannerUrl = isFHD 
-              ? ApiEndpoints.proxyImage(bannerSource, width: 1920, height: 1080)
-              : ApiEndpoints.proxyImage(bannerSource, highQuality: imgSize == 'original');
+              ? ApiEndpoints.proxyImage(bannerSource, policy: ImageSize.full)
+              : ApiEndpoints.proxyImage(bannerSource, policy: imgSize == 'original' ? ImageSize.original : ImageSize.banner);
 
           final card = SearchResult(
             title: m['title'] ?? '',

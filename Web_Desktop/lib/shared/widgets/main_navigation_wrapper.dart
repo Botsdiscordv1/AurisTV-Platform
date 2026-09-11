@@ -72,9 +72,9 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     final targetId = remoteState.activeTargetDeviceId;
     final target = remoteState.availableDevices.firstWhereOrNull((d) => d.id == targetId);
 
-    // Senior Web Fix: Detección segura de ruta usando el Router global
-    // Esto es mucho más estable durante transiciones rápidas en la Web.
-    final String location = GoRouter.of(context).routeInformationProvider.value.uri.path;
+    // Senior Web Fix: Usamos GoRouterState para una detección reactiva y segura de la ruta.
+    final state = GoRouterState.of(context);
+    final String location = state.uri.path;
     final bool isFullScreen = location.startsWith('/detalles') || location.startsWith('/reproductor');
 
     if (!isTactic) {

@@ -34,7 +34,7 @@ class RowSkeleton extends StatelessWidget {
     
     final double totalHeight = isWide 
         ? ResponsiveUtils.bannerRowHeight(context)
-        : ResponsiveUtils.rowHeight(context);
+        : ResponsiveUtils.rowHeight(context, hasInfo: isWide); // Si no es Wide, asumimos Home (no info)
 
     final double spacing = isMobile ? 12.0 : 18.0;
 
@@ -77,14 +77,14 @@ class RowSkeleton extends StatelessWidget {
                       clipBehavior: Clip.antiAlias,
                       child: const SkeletonContainer(width: double.infinity, height: double.infinity),
                     ),
-                    const SizedBox(height: 8),
-                    // Título dinámico
-                    SkeletonContainer(
-                      width: cardWidth * 0.8,
-                      height: isWide
-                          ? ResponsiveUtils.bannerTitleFontSize(context)
-                          : ResponsiveUtils.posterTitleFontSize(context)
-                    ),
+                    // Título dinámico (Solo para filas Wide / Banners)
+                    if (isWide) ...[
+                      const SizedBox(height: 8),
+                      SkeletonContainer(
+                        width: cardWidth * 0.8,
+                        height: ResponsiveUtils.bannerTitleFontSize(context),
+                      ),
+                    ],
                   ],
                 ),
               ),

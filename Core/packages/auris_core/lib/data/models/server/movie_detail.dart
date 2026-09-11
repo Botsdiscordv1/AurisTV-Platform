@@ -1,5 +1,6 @@
 import '../../../core/utils/synopsis_cleaner.dart';
 import '../../../core/api/api_endpoints.dart';
+import '../../../core/api/image_policy.dart';
 import 'shared_models.dart';
 
 class MovieDetail {
@@ -72,9 +73,9 @@ class MovieDetail {
       title: json['title'] as String? ?? '',
       originalTitle: json['originalTitle'] as String?,
       overview: SynopsisCleaner.clean(json['overview'] as String?),
-      poster: ApiEndpoints.proxyImage(json['poster'] as String?),
-      backdrop: ApiEndpoints.proxyImage(json['backdrop'] as String?, highQuality: true),
-      logo: ApiEndpoints.proxyImage(json['logo'] as String?),
+      poster: ApiEndpoints.proxyImage(json['poster'] as String?, policy: ImageSize.poster),
+      backdrop: ApiEndpoints.proxyImage(json['backdrop'] as String?, policy: ImageSize.full),
+      logo: ApiEndpoints.proxyImage(json['logo'] as String?, policy: ImageSize.tiny),
       rating: (json['rating'] as num?)?.toDouble(),
       voteCount: json['voteCount'] as int?,
       releaseDate: json['releaseDate'] as String?,

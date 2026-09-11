@@ -58,6 +58,7 @@ class FocusablePosterCard extends StatefulWidget {
   final Color? subtitleColor;
   final String? rating;
   final Color? badgeColor;
+  final Widget? airingOverlay; // Senior Fix: Slot para esquina superior izquierda
   final bool showInfo;
   final double? progress; // Senior Fix: Soporte para barra de progreso en póster
 
@@ -72,6 +73,7 @@ class FocusablePosterCard extends StatefulWidget {
     this.subtitleColor,
     this.rating,
     this.badgeColor,
+    this.airingOverlay,
     this.showInfo = true,
     this.progress,
   });
@@ -88,8 +90,8 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final double normalWidth = isMobile ? ResponsiveUtils.sp(context, 125) : 200;
+    final isMobile = context.useMobileLayout;
+    final double normalWidth = ResponsiveUtils.posterWidth(context);
 
     return MouseRegion(
       onEnter: (_) { if (mounted) setState(() => _hovered = true); },
@@ -118,20 +120,18 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    border: _isActive
-                        ? Border.all(color: Colors.white, width: 3)
-                        : Border.all(color: Colors.white12, width: 1),
                     boxShadow: _isActive
                         ? [BoxShadow(color: Colors.white.withOpacity(0.2), blurRadius: 15, spreadRadius: 1)]
                         : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        AnimatedScale(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // 1. EL PÓSTER (Base)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAliasWithSaveLayer,
+                        child: AnimatedScale(
                           scale: _isActive ? 1.12 : 1.0,
                           duration: const Duration(milliseconds: 400),
                           curve: Curves.easeOutCubic,
@@ -144,113 +144,125 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                               return CachedNetworkImage(
                                 imageUrl: ApiEndpoints.proxyImage(
                                   widget.posterUrl,
-                                  width: targetWidth,
-                                  height: targetHeight,
+                                  policy: ImageSize.poster,
                                 ),
                                 fit: BoxFit.cover,
                                 memCacheWidth: targetWidth.clamp(1, 2048),
-                                filterQuality: FilterQuality.low,
+                                filterQuality: FilterQuality.medium,
                                 placeholder: (context, url) => _letterPlaceholder(widget.title),
                                 errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
                               );
                             }
                           ),
                         ),
-                        if (widget.badgeOverlay != null)
-                          Positioned(top: 8, left: 8, child: widget.badgeOverlay!)
-                        else if (widget.badge != null)
-                          Positioned(
-                            top: 0, right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: widget.badgeColor ?? Colors.black.withOpacity(0.8),
-                                borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8)),
-                                border: Border.all(color: Colors.white12, width: 0.5),
+                      ),
+
+                      // 2. OVERLAYS (Clipeados individualmente o por el Stack)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        clipBehavior: Clip.antiAliasWithSaveLayer, // Senior Fix: Máxima calidad de recorte
+                        child: Stack(
+                          children: [
+                            // TOP-LEFT: Airing
+                            if (widget.airingOverlay != null)
+                              Positioned(
+                                top: -1, left: -1, // Senior Fix: Sangrado para evitar fugas en la curva
+                                child: widget.airingOverlay!
                               ),
-                              child: Text(
-                                widget.badge!, 
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white, 
-                                  fontSize: 10, 
-                                  fontWeight: FontWeight.w800, 
-                                  letterSpacing: 0.5
-                                )
-                              ),
-                            ),
-                          ),
-                        if (widget.rating != null && widget.badge == null)
-                          Positioned(
-                            top: 8, right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.8), 
-                                borderRadius: BorderRadius.circular(4), 
-                                border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 0.8)
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.star, color: Color(0xFFFFC107), size: 10),
-                                  const SizedBox(width: 4),
-                                  Text(widget.rating!, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        // Senior Fix: Integrar Subtítulo como Badge en la parte inferior del póster
-                        if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
-                          Positioned(
-                            bottom: (widget.progress != null && widget.progress! > 0) ? 4 : 0, // Senior Fix: Subir badge si hay progreso
-                            left: 0,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: widget.subtitleColor ?? Colors.black.withOpacity(0.85),
-                                borderRadius: const BorderRadius.only(topRight: Radius.circular(8)),
-                                border: Border.all(color: Colors.white12, width: 0.5),
-                              ),
-                              child: Text(
-                                widget.subtitle!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ),
-                          ),
-                        // Senior Fix: Barra de progreso en la base del póster
-                        if (widget.progress != null && widget.progress! > 0)
-                          Positioned(
-                            bottom: 0, left: 0, right: 0,
-                            child: Container(
-                              height: 4,
-                              color: Colors.black45,
-                              child: FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor: widget.progress!.clamp(0.0, 1.0),
+
+                            // TOP-RIGHT: Category
+                            if (widget.badge != null)
+                              Positioned(
+                                top: -1, right: -1, // Senior Fix: Sangrado
                                 child: Container(
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFEF7A1E),
-                                    boxShadow: [
-                                      BoxShadow(color: Color(0xFFEF7A1E), blurRadius: 4)
-                                    ],
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: widget.badgeColor ?? const Color(0xFF1E1E26).withOpacity(0.9),
+                                    borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8)),
+                                    border: Border.all(color: Colors.white10, width: 0.5),
+                                  ),
+                                  child: Text(
+                                    widget.badge!,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5
+                                    )
                                   ),
                                 ),
                               ),
+
+                            // BOTTOM-RIGHT: Season
+                            if (widget.badgeOverlay != null)
+                              Positioned(
+                                bottom: (widget.progress != null && widget.progress! > 0) ? 3 : -1,
+                                right: -1, // Senior Fix: Sangrado
+                                child: widget.badgeOverlay!
+                              ),
+
+                            // BOTTOM-LEFT: Episode/Status
+                            if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
+                              Positioned(
+                                bottom: (widget.progress != null && widget.progress! > 0) ? 3 : -1,
+                                left: -1, // Senior Fix: Sangrado
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: widget.subtitleColor ?? const Color(0xFF1E1E26).withOpacity(0.95),
+                                    borderRadius: const BorderRadius.only(topRight: Radius.circular(8)),
+                                    border: Border.all(color: Colors.white10, width: 0.5),
+                                  ),
+                                  child: Text(
+                                    widget.subtitle!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // PROGRESS BAR
+                            if (widget.progress != null && widget.progress! > 0)
+                              Positioned(
+                                bottom: 0, left: 0, right: 0,
+                                child: Container(
+                                  height: 4,
+                                  color: Colors.black45,
+                                  child: FractionallySizedBox(
+                                    alignment: Alignment.centerLeft,
+                                    widthFactor: widget.progress!.clamp(0.0, 1.0),
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFEF7A1E),
+                                        boxShadow: [BoxShadow(color: Color(0xFFEF7A1E), blurRadius: 4)],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      // 3. EL BORDE (Capa Superior para sellar imperfecciones)
+                      IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _isActive ? Colors.white : Colors.white12,
+                              width: _isActive ? 3.0 : 1.0,
                             ),
                           ),
-                        if (_focused)
-                          Positioned.fill(
-                            child: Container(decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 4), borderRadius: BorderRadius.circular(8))),
-                          ),
-                      ],
-                    ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
