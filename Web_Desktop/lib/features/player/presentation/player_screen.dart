@@ -695,67 +695,62 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ));
     }
 
-    return ListView.builder(
+    return ListView.separated(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(horizontal: 16) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
       itemCount: servers.length,
+      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1, indent: 64),
       itemBuilder: (context, index) {
         final sName = servers[index];
         final isCurrent = sName == simplifySourceName(_currentSource);
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-          child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.12) : Colors.white.withOpacity(0.03),
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              onTap: () {
-                if (!isSidebar) Navigator.pop(context);
-                else setState(() => _activeOverlay = PlayerOverlay.none);
-                
-                if (!isCurrent) {
-                  _switchSource(_groupedSources[sName]!.first);
-                }
-              },
-              leading: Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: isCurrent ? Border.all(color: const Color(0xFFEF7A1E).withOpacity(0.5), width: 1.5) : null,
-                ),
-                child: Center(
-                  child: Icon(
-                    Symbols.dns,
-                    color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white60,
-                    size: 22,
-                    fill: isCurrent ? 1 : 0,
-                  ),
+        return Material(
+          color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.08) : Colors.transparent,
+          child: ListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            onTap: () {
+              if (!isSidebar) Navigator.pop(context);
+              else setState(() => _activeOverlay = PlayerOverlay.none);
+
+              if (!isCurrent) {
+                _switchSource(_groupedSources[sName]!.first);
+              }
+            },
+            leading: Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Center(
+                child: Icon(
+                  Symbols.dns,
+                  color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white54,
+                  size: 16,
+                  fill: isCurrent ? 1 : 0,
                 ),
               ),
-              title: Text(
-                sName,
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? Colors.white : Colors.white.withOpacity(0.85),
-                  fontSize: 16,
-                  fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-              subtitle: Text(
-                '${_groupedSources[sName]!.length} opciones disponibles',
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.8) : Colors.white30,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              trailing: isCurrent 
-                ? const Icon(Symbols.check_circle, color: Color(0xFFEF7A1E), size: 24, fill: 1)
-                : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.15), size: 20),
             ),
+            title: Text(
+              sName,
+              style: GoogleFonts.poppins(
+                color: isCurrent ? Colors.white : Colors.white.withOpacity(0.8),
+                fontSize: 14,
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+            subtitle: Text(
+              '${_groupedSources[sName]!.length} opciones',
+              style: GoogleFonts.poppins(
+                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.6) : Colors.white24,
+                fontSize: 11,
+              ),
+            ),
+            trailing: isCurrent
+              ? Icon(Symbols.check_circle, color: const Color(0xFFEF7A1E), size: 18, fill: 1)
+              : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.1), size: 16),
           ),
         );
       },
@@ -823,10 +818,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Widget _buildQualitySelectorContent({bool isSidebar = false}) {
     final List<Map<String, dynamic>> options = _qualityMenuOptions;
 
-    return ListView.builder(
+    return ListView.separated(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
       itemCount: options.length,
+      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1, indent: 64),
       itemBuilder: (context, index) {
         final option = options[index];
         final String key = option['key'] as String;
@@ -836,51 +832,47 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final bool isAvailable = url != null && url.isNotEmpty;
         final bool isCurrent = _selectedQuality == key;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-          child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.12) : Colors.white.withOpacity(0.03),
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              enabled: isAvailable,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              onTap: () {
-                if (!isSidebar) Navigator.pop(context);
-                else setState(() => _activeOverlay = PlayerOverlay.none);
-                
-                if (isAvailable && !isCurrent) {
-                  _changeQuality(key);
-                }
-              },
-              leading: Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  isCurrent ? Symbols.check_circle : Symbols.hd,
-                  color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white70 : Colors.white24),
-                  size: 24,
-                  fill: isCurrent ? 1 : 0,
-                ),
+        return Material(
+          color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.08) : Colors.transparent,
+          child: ListTile(
+            enabled: isAvailable,
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            onTap: () {
+              if (!isSidebar) Navigator.pop(context);
+              else setState(() => _activeOverlay = PlayerOverlay.none);
+
+              if (isAvailable && !isCurrent) {
+                _changeQuality(key);
+              }
+            },
+            leading: Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(6),
               ),
-              title: Text(
-                label,
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? Colors.white : (isAvailable ? Colors.white.withOpacity(0.85) : Colors.white24),
-                  fontSize: 16,
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                ),
+              child: Icon(
+                isCurrent ? Symbols.check_circle : Symbols.hd,
+                color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white54 : Colors.white12),
+                size: 16,
+                fill: isCurrent ? 1 : 0,
               ),
-              subtitle: Text(
-                isAvailable ? sub : 'No disponible para este tema',
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.7) : Colors.white30,
-                  fontSize: 12,
-                ),
+            ),
+            title: Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: isCurrent ? Colors.white : (isAvailable ? Colors.white.withOpacity(0.8) : Colors.white12),
+                fontSize: 14,
+                fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+            subtitle: Text(
+              isAvailable ? sub : 'No disponible para este tema',
+              style: GoogleFonts.poppins(
+                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.6) : Colors.white24,
+                fontSize: 11,
               ),
             ),
           ),
@@ -1077,7 +1069,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildLanguageSelectorContent({bool isSidebar = false}) {
-    final isMobile = ResponsiveUtils.isMobile(context);
     final sourceOptions = _getLanguageOptions();
     if (sourceOptions.isEmpty) {
       return const Center(child: Padding(
@@ -1086,135 +1077,78 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ));
     }
 
-    return ListView.builder(
+    return ListView.separated(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
       itemCount: sourceOptions.length,
+      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1, indent: 64),
       itemBuilder: (context, index) {
         final entry = sourceOptions[index];
         final s = entry.result;
-        final serverName = entry.server;
-        final quality = s.quality.toUpperCase();
         final type = trackQualityType(s.quality);
-        final isLatino = type != 'SUB';
-        final isCastellano = type == 'CAST';
+        final accentColor = type != 'SUB' ? Colors.greenAccent : Colors.blueAccent;
         
-
-        final accentColor = isLatino 
-            ? Colors.greenAccent 
-            : (isCastellano ? Colors.orangeAccent : Colors.blueAccent);
-        
-        // Senior Logic: Identificación precisa de la fuente actual
-        // Si es un track (sub-fuente), comparamos por índice.
-        // Si es una fuente base (servidor), comparamos por URL.
-        final bool isCurrent = entry.isTrack 
+        final bool isCurrent = entry.isTrack
             ? entry.trackIndex == _selectedTrackIndex
             : s.url == _currentSourceUrl;
 
-        final String? trackBadge = entry.isTrack
-            ? _allTracks[entry.trackIndex].label.toUpperCase()
-            : null;
+        return Material(
+          color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.08) : Colors.transparent,
+          child: ListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+            onTap: () {
+              if (!isSidebar) Navigator.pop(context);
+              else setState(() => _activeOverlay = PlayerOverlay.none);
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-          child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.12) : Colors.white.withOpacity(0.03),
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              onTap: () {
-                if (!isSidebar) Navigator.pop(context);
-                else setState(() => _activeOverlay = PlayerOverlay.none);
-
-                if (!isCurrent) {
-                  if (entry.isTrack) {
-                    _switchTrack(entry.trackIndex);
-                  } else {
-                    _switchSource(s);
-                  }
+              if (!isCurrent) {
+                if (entry.isTrack) {
+                  _switchTrack(entry.trackIndex);
+                } else {
+                  _switchSource(s);
                 }
-              },
-              leading: Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: isCurrent ? Border.all(color: accentColor, width: 2) : null,
-                ),
-                child: Center(
-                  child: Text(
-                    type,
-                    style: GoogleFonts.poppins(
-                      color: accentColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
+              }
+            },
+            leading: Container(
+              width: 36, height: 28,
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: accentColor.withOpacity(0.3), width: 1),
+              ),
+              child: Center(
+                child: Text(
+                  type,
+                  style: GoogleFonts.poppins(
+                    color: accentColor,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source}',
-                      style: GoogleFonts.poppins(
-                        color: isCurrent ? Colors.white : Colors.white.withOpacity(0.85),
-                        fontSize: 15,
-                        fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (trackBadge != null) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFC107).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 1),
-                      ),
-                      child: Text(
-                        trackBadge,
-                        style: const TextStyle(color: Color(0xFFFFC107), fontSize: 9, fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ],
-                  if (quality.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: (type == 'SUB' ? Colors.blueAccent : const Color(0xFFEF7A1E)).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        quality,
-                        style: TextStyle(
-                          color: (type == 'SUB' ? Colors.blueAccent : const Color(0xFFEF7A1E)),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              subtitle: Text(
-                entry.isTrack ? 'Pista de audio interna' : 'Fuente de servidor externo ($serverName)',
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.8) : Colors.white30,
-                  fontSize: 11,
-                ),
-              ),
-              trailing: isCurrent
-                ? const Icon(Symbols.check_circle, color: Color(0xFFEF7A1E), size: 24, fill: 1)
-                : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.15), size: 20),
             ),
+            title: Text(
+              '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source}',
+              style: GoogleFonts.poppins(
+                color: isCurrent ? Colors.white : Colors.white.withOpacity(0.8),
+                fontSize: 14,
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              entry.server,
+              style: GoogleFonts.poppins(
+                color: Colors.white24,
+                fontSize: 10,
+              ),
+              maxLines: 1,
+            ),
+            trailing: isCurrent
+              ? Icon(Symbols.check_circle, color: const Color(0xFFEF7A1E), size: 18, fill: 1)
+              : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.1), size: 16),
           ),
         );
       },
@@ -1236,10 +1170,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   @override
-  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _isMobileDevice = kIsWeb && ResponsiveUtils.isTactic(context);
+    final bool isTactic = kIsWeb && ResponsiveUtils.isTactic(context);
+    final double screenHeight = MediaQuery.of(context).size.height;
+    // Senior Fix: En Web Móvil Landscape (altura < 500), forzamos modo móvil
+    _isMobileDevice = isTactic || screenHeight < 500;
   }
 
   void _toggleFullscreen() {
@@ -3425,14 +3361,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildSkipVisual(bool isRight) {
     final bool isMobile = ResponsiveUtils.isMobile(context);
-    
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
     return Align(
       alignment: isRight ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         width: MediaQuery.sizeOf(context).width / 4,
         height: double.infinity,
         // Solo mostramos un fondo sutil en móvil para delimitar la zona táctil
-        decoration: isMobile ? BoxDecoration(
+        decoration: useMobileLayout ? BoxDecoration(
           color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.only(
             topLeft: isRight ? const Radius.circular(500) : Radius.zero,
@@ -3445,19 +3383,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!isRight) const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 36),
+              if (!isRight) Icon(Icons.chevron_left_rounded, color: Colors.white, size: useMobileLayout ? 28 : 36),
               const SizedBox(width: 4),
               Text(
                 '${isRight ? "+" : "-"}${_lastSkipValue}',
                 style: GoogleFonts.poppins(
                   color: Colors.white, 
                   fontWeight: FontWeight.w500, 
-                  fontSize: isMobile ? 22 : 32,
+                  fontSize: useMobileLayout ? 18 : 32,
                   shadows: const [Shadow(color: Colors.black45, blurRadius: 8)],
                 ),
               ),
               const SizedBox(width: 4),
-              if (isRight) const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 36),
+              if (isRight) Icon(Icons.chevron_right_rounded, color: Colors.white, size: useMobileLayout ? 28 : 36),
             ],
           ),
         ),
@@ -3469,7 +3407,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final bool isForward = _seekDiff.inMilliseconds >= 0;
     final String timeStr = _formatDuration(_seekTargetDuration);
     final String diffStr = "${isForward ? '+' : '-'}${_formatDuration(_seekDiff.abs())}";
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final bool isMobile = ResponsiveUtils.isMobile(context);
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
 
     return Container(
       color: Colors.black45,
@@ -3478,7 +3418,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(useMobileLayout ? 12 : 20),
               decoration: BoxDecoration(
                 color: Colors.black54,
                 shape: BoxShape.circle,
@@ -3487,21 +3427,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               child: Icon(
                 isForward ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
                 color: Colors.white,
-                size: isMobile ? 48 : 64,
+                size: useMobileLayout ? 32 : 64,
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: useMobileLayout ? 8 : 24),
             Text(
               timeStr,
               style: GoogleFonts.poppins(
                 color: Colors.white,
-                fontSize: isMobile ? 32 : 48,
+                fontSize: useMobileLayout ? 24 : 48,
                 fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 12 : 16, vertical: useMobileLayout ? 4 : 6),
               decoration: BoxDecoration(
                 color: const Color(0xFFEF7A1E),
                 borderRadius: BorderRadius.circular(20),
@@ -3510,7 +3450,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 diffStr,
                 style: GoogleFonts.poppins(
                   color: Colors.white,
-                  fontSize: isMobile ? 16 : 22,
+                  fontSize: useMobileLayout ? 13 : 22,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -4006,7 +3946,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildNextEpisodeOverlay() {
     if (_isTrailer) return const SizedBox.shrink();
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final bool isMobile = ResponsiveUtils.isMobile(context);
+    final double screenHeight = MediaQuery.of(context).size.height;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
     final bool isCountdown = _autoplayCountdown >= 0;
     final String label = _isAutoplayResume ? 'Reanudar' : 'Siguiente episodio';
 
@@ -4042,15 +3985,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final bool isVisible = (showNext || isCountdown) && (_isAutoplayResume || hasNext);
         
         return Positioned(
-          bottom: isMobile ? 120 : 160, 
-          right: isMobile ? 16 : 40, 
+          bottom: useMobileLayout ? 100 : 160,
+          right: useMobileLayout ? 16 : 40,
           child: IgnorePointer(
             ignoring: !isVisible,
             child: Opacity(
               opacity: isVisible ? 1.0 : 0.0, 
               child: Container(
-                height: 52,
-                constraints: BoxConstraints(minWidth: isMobile ? 120 : 180), 
+                height: useMobileLayout ? 44 : 52,
+                constraints: BoxConstraints(minWidth: useMobileLayout ? 120 : 180),
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: isCountdown ? const Color(0xFFB2B2B2) : Colors.white, 
@@ -4083,21 +4026,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             ? (_isAutoplayResume ? _handleResumeAction : () => _navigateToEpisode(true))
                             : () => _navigateToEpisode(true),
                         child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 24, vertical: 10),
+                          padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 14 : 24, vertical: useMobileLayout ? 6 : 10),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.play_arrow_rounded, color: Colors.black, size: isMobile ? 26 : 30),
-                              SizedBox(width: isMobile ? 8 : 12),
+                              Icon(Icons.play_arrow_rounded, color: Colors.black, size: useMobileLayout ? 24 : 30),
+                              SizedBox(width: useMobileLayout ? 8 : 12),
                               Text(
                                 label,
-                                style: const TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w700),
+                                style: TextStyle(color: Colors.black, fontSize: useMobileLayout ? 14 : 16, fontWeight: FontWeight.w700),
                               ),
                               if (isCountdown) ...[
-                                SizedBox(width: isMobile ? 10 : 18),
+                                SizedBox(width: useMobileLayout ? 10 : 18),
                                 Container(width: 1, height: 24, color: Colors.black12),
-                                SizedBox(width: isMobile ? 8 : 12),
+                                SizedBox(width: useMobileLayout ? 8 : 12),
                                 GestureDetector(
                                   onTap: _isAutoplayResume ? _handleRestartAction : () {
                                     _autoplayTimer?.cancel();
@@ -4406,10 +4349,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Widget _buildMobileCenterControls() {
     if (!_isMobileDevice) return const SizedBox.shrink();
     
-    final double iconSize = _isMobileDevice ? 44 : 56;
-    final double playSize = _isMobileDevice ? 64 : 90;
-    // Senior UI: Espaciado aumentado para evitar toques accidentales en el botón central en móviles
-    final double spacing = _isMobileDevice ? 56 : 40;
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final isTablet = ResponsiveUtils.isTablet(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
+    // Senior UI Adaptive logic:
+    final double iconSize = useMobileLayout ? (isLandscape ? 38 : 44) : (isTablet ? 48 : 56);
+    final double playSize = useMobileLayout ? (isLandscape ? 56 : 64) : (isTablet ? 72 : 90);
+    final double spacing = useMobileLayout ? (isLandscape ? 48 : 56) : (isTablet ? 64 : 80);
 
     return Center(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           _buildCircularCenterAction(icon: Symbols.replay_10, size: iconSize, onTap: _skipBackward),
@@ -4424,23 +4373,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return _buildCircularButton(
       icon: icon,
       onTap: onTap,
-      size: size + 20, // Ajuste para el padding del contenedor circular
+      size: size + 20,
       fill: true,
-      backgroundColor: _isMobileDevice ? Colors.black.withOpacity(0.15) : Colors.transparent,
+      backgroundColor: Colors.black.withOpacity(0.15),
       iconSize: size,
     );
   }
 
   Widget _buildMobileBottomBar() {
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
     final screenWidth = MediaQuery.sizeOf(context).width;
     final bool showLabels = screenWidth > 750;
 
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final double vPadding = _isMobileDevice && isLandscape ? 8 : 16;
-    
-    final double iconSize = _isMobileDevice ? 24 : 30;
-    final double spacing = _isMobileDevice ? 8 : 12;
-    final double playSize = _isMobileDevice ? 28 : 44; // Unificado a 44px
+    final double vPadding = useMobileLayout && isLandscape ? 10 : 16;
+    final double iconSize = useMobileLayout ? (isLandscape ? 24 : 24) : 30;
+    final double spacing = useMobileLayout ? (isLandscape ? 8 : 8) : 12;
+    final double playSize = useMobileLayout ? 28 : 44;
 
     // Senior Navigation Shield: Verificar si existen episodios anterior/siguiente
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
@@ -4469,12 +4421,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       left: 0,
       right: 0,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: vPadding),
+        padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 24 : 48, vertical: vPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildMobileTimeline(),
-            SizedBox(height: isLandscape ? 4 : 12),
+            SizedBox(height: isLandscape ? 2 : 12),
             // Senior: Usar SingleChildScrollView para evitar overflow en pantallas pequeñas/anchas
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -4485,31 +4437,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   children: [
                     Row(
                       children: [
-                        if (_isMobileDevice)
-                          IconButton(
-                            iconSize: iconSize,
-                            icon: Icon(
-                              _useVideoFitCycle 
-                                ? (_videoFit == BoxFit.contain ? Symbols.aspect_ratio : (_videoFit == BoxFit.fill ? Symbols.fit_screen : Symbols.fullscreen))
-                                : (_isFullscreen ? Symbols.close_fullscreen : Symbols.open_in_full),
-                              color: Colors.white,
-                              weight: 300,
-                            ),
-                            onPressed: _toggleFullscreen,
-                          )
-                        else
-                          _buildCircularButton(
-                            icon: _useVideoFitCycle 
-                                ? (_videoFit == BoxFit.contain ? Symbols.aspect_ratio : (_videoFit == BoxFit.fill ? Symbols.fit_screen : Symbols.fullscreen))
-                                : (_isFullscreen ? Symbols.close_fullscreen : Symbols.open_in_full),
-                            onTap: _toggleFullscreen,
-                            size: 44,
-                            iconSize: 30,
-                            padding: 4, // Senior Fix: Padding 4px para consistencia con la familia de cápsulas
+                        IconButton(
+                          iconSize: iconSize,
+                          icon: Icon(
+                            _useVideoFitCycle
+                              ? (_videoFit == BoxFit.contain ? Symbols.aspect_ratio : (_videoFit == BoxFit.fill ? Symbols.fit_screen : Symbols.fullscreen))
+                              : (_isFullscreen ? Symbols.close_fullscreen : Symbols.open_in_full),
+                            color: Colors.white,
+                            weight: 300,
                           ),
-                        // Controles desktop solo si no estamos en móvil (donde se usan gestos y centro)
+                          onPressed: _toggleFullscreen,
+                        ),
                         if (!_isMobileDevice) ...[
-                          const SizedBox(width: 12), // Espaciado de familia
+                          SizedBox(width: spacing),
                           _buildPlayPauseButton(size: playSize),
                           const SizedBox(width: 12),
                           _buildSeekCapsule(),
@@ -4520,7 +4460,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           const SizedBox(width: 12),
                           _buildDurationCapsule(),
                         ],
-                        // Rotación (Nativo y Web Móvil)
                         if (_isMobileDevice) ...[
                           SizedBox(width: spacing),
                           IconButton(
@@ -4549,7 +4488,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           icon: Symbols.skip_previous,
                           label: showLabels ? 'Anterior' : '',
                         ),
-                        if (hasPrevious && hasNext) const SizedBox(width: 12),
+                        if (hasPrevious && hasNext) const SizedBox(width: 8),
                         if (hasNext)
                         _PlayerTextButton(
                           onPressed: () => _navigateToEpisode(true),
@@ -4568,14 +4507,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             setState(() {
                               const speeds = [0.5, 0.7, 1.0, 1.2, 1.5, 1.7, 2.0];
                               int currentIndex = speeds.indexOf(_playbackSpeed);
-                              if (currentIndex == -1) currentIndex = 2; // Default a 1.0 si hay un valor intermedio
+                              if (currentIndex == -1) currentIndex = 2;
                               
                               _playbackSpeed = speeds[(currentIndex + 1) % speeds.length];
                               _player?.setRate(_playbackSpeed);
                             });
                           },
                         ),
-                        Text('${_playbackSpeed.toStringAsFixed(1)}x', style: TextStyle(color: Colors.white, fontSize: _isMobileDevice ? 13 : 14, fontWeight: FontWeight.w900)),
+                        Text('${_playbackSpeed.toStringAsFixed(1)}x', style: TextStyle(color: Colors.white, fontSize: useMobileLayout ? (isLandscape ? 11 : 13) : 14, fontWeight: FontWeight.w900)),
                         SizedBox(width: spacing),
                         if (!_isOpEd) ...[
                           IconButton(iconSize: iconSize, icon: const Icon(Symbols.dns, color: Colors.white), onPressed: _showServerSelector),
@@ -4782,7 +4721,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildLockToggle() {
-    return Positioned(top: 60, right: 16, child: IconButton(icon: Icon(_isLocked ? Icons.lock : Icons.lock_open, color: Colors.white), onPressed: () { setState(() { _isLocked = !_isLocked; if (_isLocked) _showControls = false; else { _showControls = true; _startHideTimer(); } }); }));
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    return Positioned(
+      top: isLandscape ? 45 : 60,
+      right: 16,
+      child: IconButton(
+        icon: Icon(_isLocked ? Icons.lock : Icons.lock_open, color: Colors.white),
+        onPressed: () {
+          setState(() {
+            _isLocked = !_isLocked;
+            if (_isLocked) _showControls = false;
+            else { _showControls = true; _startHideTimer(); }
+          });
+        }
+      )
+    );
   }
 }
 
@@ -4796,6 +4749,13 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
   bool _isHovered = false;
   @override Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
+    final double fontSize = useMobileLayout ? (isLandscape ? 12 : 12) : 16;
+    final double iconSize = useMobileLayout ? (isLandscape ? 20 : 20) : 30;
+
     return MouseRegion(
         onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
         onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
@@ -4806,15 +4766,18 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
                 onTap: widget.onPressed,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: isMobile ? (widget.label.isEmpty ? 6 : 10) : 24, vertical: isMobile ? 6 : 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: useMobileLayout ? (widget.label.isEmpty ? 6 : 10) : 24,
+                      vertical: useMobileLayout ? (isLandscape ? 6 : 6) : 12
+                    ),
                     decoration: BoxDecoration(
                         color: widget.useBackground ? (_isHovered ? Colors.white24 : Colors.white10) : (_isHovered ? Colors.white10 : Colors.transparent),
                         borderRadius: BorderRadius.circular(8)),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(widget.icon, color: Colors.white, size: isMobile ? 20 : 30),
+                      Icon(widget.icon, color: Colors.white, size: iconSize),
                       if (widget.label.isNotEmpty) ...[
-                        SizedBox(width: isMobile ? 6 : 8),
-                        Text(widget.label, style: TextStyle(color: Colors.white, fontSize: isMobile ? 12 : 16, fontWeight: widget.isBold ? FontWeight.w900 : FontWeight.bold)),
+                        SizedBox(width: useMobileLayout ? 4 : 8),
+                        Text(widget.label, style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: widget.isBold ? FontWeight.w900 : FontWeight.bold)),
                       ]
                     ])))));
   }
@@ -4888,8 +4851,12 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    
+
+    // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
@@ -4900,8 +4867,8 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
     return Container(
       width: double.infinity,
       padding: EdgeInsets.only(
-        bottom: isMobile ? 0 : 12, // Senior Fix: Eliminado padding inferior en móvil para máximo aprovechamiento
-        top: isMobile ? (isLandscape ? 5 : 60) : 40 
+        bottom: useMobileLayout ? 0 : 12,
+        top: useMobileLayout ? (isLandscape ? 5 : 60) : 40
       ), 
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -4921,7 +4888,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 48),
+            padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 24 : 48),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -4932,7 +4899,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                       'EPISODIOS',
                       style: TextStyle(
                         color: const Color(0xFFEF7A1E), 
-                        fontSize: isMobile ? (isLandscape ? 11 : 13) : 15, 
+                        fontSize: useMobileLayout ? (isLandscape ? 10 : 13) : 15,
                         fontWeight: FontWeight.w900, 
                         letterSpacing: 2
                       ),
@@ -4942,7 +4909,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                       'TEMPORADA ${widget.season}',
                       style: TextStyle(
                         color: Colors.white, 
-                        fontSize: isMobile ? (isLandscape ? 16 : 18) : 26, 
+                        fontSize: useMobileLayout ? (isLandscape ? 15 : 18) : 26,
                         fontWeight: FontWeight.w900
                       ),
                     ),
@@ -4951,19 +4918,19 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: Icon(Symbols.close, color: Colors.white, size: isMobile ? (isLandscape ? 28 : 36) : 48),
+                  icon: Icon(Symbols.close, color: Colors.white, size: useMobileLayout ? (isLandscape ? 28 : 36) : 48),
                   onPressed: widget.onClose,
                 ),
               ],
             ),
           ),
           
-          SizedBox(height: isMobile ? 2 : 16), // Senior Fix: Reducido al mínimo el espacio bajo el título
+          SizedBox(height: useMobileLayout ? 2 : 16),
           
           Stack(
             children: [
               SizedBox(
-                height: isMobile ? (isLandscape ? 250 : 280) : 440, // Senior Fix: Ajustado a 250px en landscape para eliminar aire inferior
+                height: useMobileLayout ? (isLandscape ? 230 : 280) : 440, // Senior Fix: Ajustado a 230px en landscape para 2 líneas de texto
                 child: episodesAsync.when(
                   data: (data) {
                     if (data == null || data.episodes.isEmpty) {
@@ -4974,9 +4941,9 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                       scrollDirection: Axis.horizontal,
                       clipBehavior: Clip.none,
                       padding: EdgeInsets.only(
-                        left: isMobile ? 24 : 48, 
-                        right: isMobile ? 24 : 48,
-                        top: isLandscape ? 5 : 10, // Senior Fix: Reducido espacio superior en horizontal
+                        left: useMobileLayout ? 24 : 48,
+                        right: useMobileLayout ? 24 : 48,
+                        top: isLandscape ? 5 : 10,
                         bottom: 0,
                       ),
                       itemCount: data.episodes.length,
@@ -5000,8 +4967,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                 ),
               ),
 
-              // Senior: Flechas de Navegación Proactivas
-              if (!isMobile) ...[
+              if (!useMobileLayout) ...[
                 Positioned(
                   left: 0, 
                   top: 0, 
@@ -5120,9 +5086,14 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
     // Senior UI Adaptive logic:
-    final double cardWidth = isMobile ? 240.0 : 440.0;
+    final double cardWidth = useMobileLayout ? (isLandscape ? 200.0 : 240.0) : 440.0;
     final bool isActive = _isHovered || _isFocused;
     
     return Focus(
@@ -5138,7 +5109,7 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
             curve: Curves.easeOut,
             child: Container(
               width: cardWidth,
-              margin: EdgeInsets.only(right: isMobile ? 20 : 32), 
+              margin: EdgeInsets.only(right: useMobileLayout ? 20 : 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -5147,21 +5118,21 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                     aspectRatio: 16 / 9,
                     child: Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(isMobile ? 10 : 16),
+                        borderRadius: BorderRadius.circular(useMobileLayout ? 10 : 16),
                         border: Border.all(
                           color: widget.isCurrent ? const Color(0xFFEF7A1E) : (isActive ? Colors.white : Colors.white.withOpacity(0.1)), 
-                          width: widget.isCurrent ? (isMobile ? 3 : 5) : (isActive ? 3 : 1)
+                          width: widget.isCurrent ? (useMobileLayout ? 3 : 5) : (isActive ? 3 : 1)
                         ),
                         boxShadow: (widget.isCurrent || isActive) ? [
                           BoxShadow(
                             color: (widget.isCurrent ? const Color(0xFFEF7A1E) : Colors.white).withOpacity(0.4), 
-                            blurRadius: isMobile ? 15 : 30, 
+                            blurRadius: useMobileLayout ? 15 : 30,
                             spreadRadius: 1
                           )
                         ] : [],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(isMobile ? 8 : 13),
+                        borderRadius: BorderRadius.circular(useMobileLayout ? 8 : 13),
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
@@ -5173,23 +5144,23 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                                 errorWidget: (context, url, error) => Container(color: Colors.black26),
                               )
                             else
-                              Container(color: Colors.white.withOpacity(0.05), child: Icon(Icons.movie_outlined, color: Colors.white10, size: isMobile ? 48 : 72)),
+                              Container(color: Colors.white.withOpacity(0.05), child: Icon(Icons.movie_outlined, color: Colors.white10, size: useMobileLayout ? 48 : 72)),
                             
                             if (widget.isCurrent)
                               Positioned.fill(
                                 child: Container(
-                                  color: const Color(0xFFEF7A1E).withOpacity(0.15), // Senior: Tinte sutil en lugar de icono play
+                                  color: const Color(0xFFEF7A1E).withOpacity(0.15),
                                 ),
                               ),
                             
                             // Badge de EP (Esquina inferior derecha)
                             Positioned(
-                              bottom: isMobile ? 8 : 12, 
-                              right: isMobile ? 8 : 12,
+                              bottom: useMobileLayout ? 8 : 12,
+                              right: useMobileLayout ? 8 : 12,
                               child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 12, vertical: isMobile ? 2 : 5),
-                                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(isMobile ? 4 : 8)),
-                                child: Text('EP ${widget.number}', style: TextStyle(color: Colors.white, fontSize: isMobile ? 10 : 14, fontWeight: FontWeight.w900)),
+                                padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 6 : 12, vertical: useMobileLayout ? 2 : 5),
+                                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(useMobileLayout ? 4 : 8)),
+                                child: Text('EP ${widget.number}', style: TextStyle(color: Colors.white, fontSize: useMobileLayout ? 10 : 14, fontWeight: FontWeight.w900)),
                               ),
                             ),
                           ],
@@ -5197,13 +5168,12 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12), // Senior Fix: Más compacto
+                  const SizedBox(height: 12),
                   // Información del episodio
                   Builder(
                     builder: (context) {
                       final String rawTitle = widget.title ?? "Episodio ${widget.number}";
-                      // Senior Clean Logic: Evitamos duplicados si el título ya trae el número o la palabra Episodio/EP
-                      final bool startsWithNumber = rawTitle.startsWith('${widget.number}') || 
+                      final bool startsWithNumber = rawTitle.startsWith('${widget.number}') ||
                                                   rawTitle.startsWith('0${widget.number}') ||
                                                   rawTitle.toLowerCase().startsWith('episodio') ||
                                                   rawTitle.toLowerCase().startsWith('ep ') ||
@@ -5217,7 +5187,7 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: widget.isCurrent || isActive ? Colors.white : Colors.white.withOpacity(0.9),
-                          fontSize: isMobile ? 14 : 22, 
+                          fontSize: useMobileLayout ? (isLandscape ? 12 : 14) : 22,
                           fontWeight: widget.isCurrent || isActive ? FontWeight.w900 : FontWeight.bold,
                         ),
                       );
@@ -5226,11 +5196,11 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                   const SizedBox(height: 6),
                   Text(
                     widget.description ?? 'Sin descripción disponible para este episodio.',
-                    maxLines: isMobile ? 2 : 3,
+                    maxLines: useMobileLayout ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.55), 
-                      fontSize: isMobile ? 11 : 17, 
+                      fontSize: useMobileLayout ? (isLandscape ? 10 : 11) : 17,
                       height: 1.4,
                       fontWeight: FontWeight.w500
                     ),
@@ -5261,28 +5231,31 @@ class _PlayerSidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
+    final screenHeight = MediaQuery.of(context).size.height;
     final bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    
+
+    // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
+    final bool useMobileLayout = isMobile || screenHeight < 500;
+
     // Senior UI Adaptive logic:
-    // En móvil landscape o tablet, el ancho es 380. En desktop 450.
-    final double panelWidth = isMobile ? (isLandscape ? 380 : MediaQuery.of(context).size.width * 0.85) : width;
-    final double padding = isMobile ? 12 : 24;
+    final double panelWidth = useMobileLayout ? (isLandscape ? 280.0 : MediaQuery.of(context).size.width * 0.85) : width;
+    final double padding = useMobileLayout ? (isLandscape ? 8.0 : 12.0) : 24.0;
 
     return Align(
       alignment: Alignment.centerRight,
       child: Padding(
         padding: EdgeInsets.all(padding),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(isMobile ? 24 : 32),
+          borderRadius: BorderRadius.circular(useMobileLayout ? 12 : 32),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: Material(
-              color: const Color(0xCC16161C), // Semi-transparente estilo YouTube
+              color: const Color(0xCC16161C),
               elevation: 0,
               child: Container(
                 width: panelWidth,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(isMobile ? 24 : 32),
+                  borderRadius: BorderRadius.circular(useMobileLayout ? 12 : 32),
                   border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -5298,7 +5271,12 @@ class _PlayerSidePanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: EdgeInsets.fromLTRB(isMobile ? 24 : 32, isMobile ? 24 : 32, 16, 12),
+                      padding: EdgeInsets.fromLTRB(
+                        useMobileLayout ? 16 : 32,
+                        useMobileLayout ? (isLandscape ? 12 : 24) : 32,
+                        12,
+                        useMobileLayout ? 4 : 12
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -5306,22 +5284,23 @@ class _PlayerSidePanel extends StatelessWidget {
                             title.toUpperCase(),
                             style: GoogleFonts.poppins(
                               color: Colors.white.withOpacity(0.9),
-                              fontSize: isMobile ? 13 : 15,
+                              fontSize: useMobileLayout ? (isLandscape ? 10 : 13) : 15,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: 1.5,
+                              letterSpacing: 1.2,
                             ),
                           ),
                           IconButton(
                             onPressed: onClose,
-                            icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.4), size: isMobile ? 22 : 26),
+                            icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.4), size: useMobileLayout ? 18 : 26),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
                           ),
                         ],
                       ),
                     ),
-                    const Divider(color: Colors.white10, height: 1, indent: 24, endIndent: 24),
-                    const SizedBox(height: 8),
+                    const Divider(color: Colors.white10, height: 1, indent: 16, endIndent: 16),
                     Flexible(child: child),
-                    const SizedBox(height: 12),
+                    SizedBox(height: useMobileLayout ? 4 : 12),
                   ],
                 ),
               ),
