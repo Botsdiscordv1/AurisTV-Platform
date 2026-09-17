@@ -23,6 +23,9 @@ Las aplicaciones finales consumen este Core y se encuentran en carpetas independ
 2.  **Web & Desktop (Windows)**: Ubicado en `E:\AurisTV_plataformas\Web_Desktop`.
     *   Diseño responsivo para navegadores.
     *   Contenedor de alto rendimiento para Windows.
+3.  **TV (Google TV / Android TV)**: Ubicado en `E:\AurisTV_plataformas\TV`.
+    *   Diseño optimizado para 10ft UI (visualización a 3 metros).
+    *   Navegación exclusiva mediante control remoto (D-pad Focus).
 
 ## Cómo trabajar en el Core
 

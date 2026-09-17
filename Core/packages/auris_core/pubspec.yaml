@@ -22,6 +22,7 @@ dependencies:
   youtube_explode_dart: ^2.2.0
   pointer_interceptor: ^0.10.1+1
   visibility_detector: ^0.4.0+2
+  google_fonts: ^6.2.1
 
   # Reproductor Nativo para Trailers (Mobile/TV)
   media_kit: ^1.1.11

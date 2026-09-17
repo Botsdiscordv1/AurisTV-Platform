@@ -38,7 +38,7 @@ class ContinueWatchingCard extends StatelessWidget {
     final remainingMin = (remainingMs / 60000).ceil();
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap != null ? () => SafeTap.run(onTap!) : null,
       child: Container(
         width: effectiveWidth,
         margin: const EdgeInsets.only(right: 16),

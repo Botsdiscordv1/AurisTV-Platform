@@ -11,7 +11,7 @@ final authProvider = StateNotifierProvider<AuthNotifier, UserAccount?>((ref) {
 });
 
 class AuthNotifier extends StateNotifier<UserAccount?> {
-  final Box _userBox = Hive.box('user_data');
+  Box get _userBox => Hive.box('user_data');
 
   // Senior Fix: Inicializar con una cuenta de invitado por defecto 
   // para estabilizar el profileId durante el arranque de la app.
@@ -25,24 +25,31 @@ class AuthNotifier extends StateNotifier<UserAccount?> {
   );
 
   AuthNotifier() : super(_defaultGuest) {
-    _init();
+    // Senior Fix: Diferir la inicialización para permitir overrides en tests
+    // y asegurar que Hive esté listo.
+    Future.microtask(() => _init());
   }
 
   void _init() {
-    final savedUserData = _userBox.get('profile');
-    if (savedUserData != null) {
-      try {
-        final map = savedUserData is String ? jsonDecode(savedUserData) : Map<String, dynamic>.from(savedUserData);
-        state = UserAccount.fromJson(map);
-      } catch (e) {
-        debugPrint('Error cargando perfil local: $e');
+    try {
+      final savedUserData = _userBox.get('profile');
+      if (savedUserData != null) {
+        try {
+          final map = savedUserData is String ? jsonDecode(savedUserData) : Map<String, dynamic>.from(savedUserData);
+          state = UserAccount.fromJson(map);
+        } catch (e) {
+          debugPrint('Error cargando perfil local: $e');
+        }
+      } else {
+        // Si no hay datos guardados, nos aseguramos de estar en modo invitado limpio
+        state = _defaultGuest;
       }
-    } else {
-      // Si no hay datos guardados, nos aseguramos de estar en modo invitado limpio
-      state = _defaultGuest;
+    } catch (e) {
+      debugPrint('[AuthNotifier] Hive box not ready yet: $e');
     }
 
-    Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+    try {
+      Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
       final user = data.session?.user;
       final bool shouldSyncFromCloud = 
           data.event == AuthChangeEvent.signedIn || 
@@ -91,6 +98,9 @@ class AuthNotifier extends StateNotifier<UserAccount?> {
         _userBox.delete('profile');
       }
     });
+    } catch (e) {
+      debugPrint('[AuthNotifier] Supabase not initialized: $e');
+    }
   }
 
   Future<void> _syncToCloud(UserAccount user) async {

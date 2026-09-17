@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
+import 'package:auris_core/auris_core.dart';
 
 class EpisodesDetailOverlay extends ConsumerStatefulWidget {
   final dynamic detailData;
@@ -113,7 +113,8 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
 
   Widget _buildHeaderInfo() {
     final d = widget.detailData;
-    final int? year = (d is AnimeDetail) ? d.year : (d is MovieDetail ? int.tryParse(d.releaseDate?.substring(0, 4) ?? '') : null);
+    final String? releaseDate = (d is MovieDetail) ? d.releaseDate : null;
+    final int? year = (d is AnimeDetail) ? d.year : (releaseDate != null ? int.tryParse(releaseDate.substring(0, 4)) : null);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,11 +130,23 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
             letterSpacing: 1.5,
           ),
         ),
+        if (d is MovieDetail && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            d.originalTitle!,
+            style: GoogleFonts.poppins(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         Row(
           children: [
-            if (year != null) ...[
-              Text('$year', style: const TextStyle(color: Colors.white60, fontSize: 18, fontWeight: FontWeight.bold)),
+            if (releaseDate != null || year != null) ...[
+              Text(releaseDate ?? '$year', style: const TextStyle(color: Colors.white60, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(width: 16),
             ],
             if (widget.totalSeasons > 0)
@@ -215,6 +228,7 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
     final d = widget.detailData;
     if (d == null) return const SizedBox.shrink();
     final String overview = (d is AnimeDetail) ? (d.overview ?? '') : (d is MovieDetail ? (d.overview ?? '') : '');
+    final List<String> languages = (d is MovieDetail) ? d.languages : [];
     
     return SingleChildScrollView(
       child: Column(
@@ -226,6 +240,29 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
             overview.isNotEmpty ? overview : 'No hay descripci\u00F3n disponible.',
             style: const TextStyle(color: Colors.white70, fontSize: 20, height: 1.6),
           ),
+          if (languages.isNotEmpty) ...[
+            const SizedBox(height: 40),
+            Text('Pa\u00EDs', style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text(() {
+              return languages.map((l) {
+                final country = l.toLowerCase();
+                String emoji = '';
+                if (country.contains('jap')) emoji = '🇯🇵';
+                else if (country.contains('cor')) emoji = '🇰🇷';
+                else if (country.contains('usa') || country.contains('estat') || country.contains('eeuu')) emoji = '🇺🇸';
+                else if (country.contains('esp') || country.contains('spain')) emoji = '🇪🇸';
+                else if (country.contains('mex')) emoji = '🇲🇽';
+                else if (country.contains('chi')) emoji = '🇨🇳';
+                else if (country.contains('fra')) emoji = '🇫🇷';
+                else if (country.contains('ing') || country.contains('uk')) emoji = '🇬🇧';
+                else if (country.contains('ale') || country.contains('ger')) emoji = '🇩🇪';
+                else if (country.contains('ita')) emoji = '🇮🇹';
+                
+                return emoji.isNotEmpty ? '$emoji $l' : l;
+              }).join('  ');
+            }(), style: const TextStyle(color: Colors.white60, fontSize: 18)),
+          ],
           if (d is MovieDetail && d.cast.isNotEmpty) ...[
             const SizedBox(height: 40),
             Text('Reparto', style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/utils/responsive_utils.dart';
+import 'package:auris_core/auris_core.dart';
 
 /// Un contenedor de seguridad senior que evita que el contenido se estire
 /// infinitamente en monitores ultra-anchos.

@@ -83,16 +83,17 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
           ],
         ),
         bottomNavigationBar: Container(
-          height: 60 + MediaQuery.of(context).padding.bottom,
+          height: 54 + MediaQuery.of(context).padding.bottom, // Senior: Altura más compacta estilo YouTube
           decoration: const BoxDecoration(
             color: Color(0xFF0B0B0D),
+            border: Border(top: BorderSide(color: Colors.white10, width: 0.5)), // Línea divisoria sutil
           ),
           child: Row(
             children: [
-              _buildNavItem(0, Icons.home_outlined, Icons.home),
-              _buildNavItem(1, Icons.search, Icons.search),
-              _buildNavItem(2, Icons.explore_outlined, Icons.explore),
-              _buildNavItem(3, null, null, isProfile: true),
+              _buildNavItem(0, Icons.home_outlined, Icons.home, 'Inicio'),
+              _buildNavItem(1, Icons.search_rounded, Icons.search_rounded, 'Buscar'),
+              _buildNavItem(2, Icons.explore_outlined, Icons.explore, 'Explorar'),
+              _buildNavItem(3, null, null, 'Perfil', isProfile: true),
             ],
           ),
         ),
@@ -104,10 +105,10 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     int index, 
     IconData? icon, 
     IconData? activeIcon, 
+    String label,
     {bool isProfile = false}
   ) {
     final bool isActive = widget.navigationShell.currentIndex == index;
-    const primaryColor = Color(0xFFEF7A1E);
 
     return Expanded(
       child: InkWell(
@@ -115,27 +116,26 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.start, // Senior: Alineación al inicio para dejar aire inferior
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutCubic,
-              width: isActive ? 32 : 0,
-              height: 3,
-              decoration: const BoxDecoration(
-                color: primaryColor,
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(3)),
-              ),
-            ),
-            const Spacer(),
+            const SizedBox(height: 8), // Senior: Aire superior respecto a la línea divisoria
             if (isProfile)
               _buildProfileIcon(isActive)
             else
               Icon(
                 isActive ? activeIcon : icon,
-                color: isActive ? Colors.white : Colors.white54,
-                size: 26,
+                color: isActive ? Colors.white : Colors.white70,
+                size: 24,
               ),
-            const Spacer(flex: 2),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? Colors.white : Colors.white70,
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),
@@ -149,18 +149,18 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     if (photoUrl == null) {
       return Icon(
         isActive ? Icons.person : Icons.person_outline,
-        color: isActive ? Colors.white : Colors.white54,
-        size: 26,
+        color: isActive ? Colors.white : Colors.white70,
+        size: 24,
       );
     }
 
     return Container(
-      width: 28,
-      height: 28,
+      width: 24,
+      height: 24,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: isActive ? Colors.white : Colors.white38,
+          color: isActive ? Colors.white : Colors.transparent,
           width: 1.5,
         ),
         image: DecorationImage(

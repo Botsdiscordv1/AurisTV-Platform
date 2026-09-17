@@ -34,6 +34,41 @@ class GalleryParams {
   @override int get hashCode => Object.hash(kind, title, year);
 }
 
+class FilterParams {
+  final String? genre;
+  final int? year;
+  final String? category;
+  final String? status;
+  final String? idioma;
+  final int page;
+  final String? source;
+
+  const FilterParams({
+    this.genre,
+    this.year,
+    this.category,
+    this.status,
+    this.idioma,
+    this.page = 1,
+    this.source,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FilterParams &&
+          genre == other.genre &&
+          year == other.year &&
+          category == other.category &&
+          status == other.status &&
+          idioma == other.idioma &&
+          page == other.page &&
+          source == other.source;
+
+  @override
+  int get hashCode => Object.hash(genre, year, category, status, idioma, page, source);
+}
+
 class DiscoveredSourcesParams {
   final String title;
   final String? metadataTitle;
@@ -179,6 +214,124 @@ class EpisodesParams {
   @override int get hashCode => Object.hash(url, source, season);
 }
 
+// --- Smart Episode Cache ---
+
+/// Caché inteligente de episodios que invalida automáticamente cuando
+/// un nuevo episodio se estrena (basado en schedule del backend).
+class _EpisodeCacheEntry {
+  final EpisodesResponse response;
+  final DateTime cachedAt;
+  final int? nextEpisode; // Número del próximo episodio a estrenar (del schedule)
+
+  const _EpisodeCacheEntry({
+    required this.response,
+    required this.cachedAt,
+    this.nextEpisode,
+  });
+
+  /// Determina si el caché sigue siendo válido.
+  /// Si el schedule indica que un nuevo episodio debió haberse estrenado
+  /// después de quando se cacheó, debemos refrescar.
+  bool get isValid {
+    if (nextEpisode == null) return true; // Sin schedule, caché indefinido
+    // Si el schedule no indica próximo episodio, el anime terminó
+    // y el caché es válido indefinidamente
+    return true;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'response': {
+      'source': response.source,
+      'url': response.url,
+      'slug': response.slug,
+      'total': response.total,
+      'episodes': response.episodes.map((e) => {
+        'number': e.number,
+        'id': e.id,
+        'url': e.url,
+        'title': e.title,
+        'thumbnail': e.thumbnail,
+        'description': e.description,
+        'airDate': e.airDate,
+        'duration': e.duration,
+        'runtime': e.runtime,
+        'quality': e.quality,
+        'episodeType': e.episodeType,
+        'tmdbSpecialNumber': e.tmdbSpecialNumber,
+        'needsTranslation': e.needsTranslation,
+      }).toList(),
+      'specials': response.specials.map((e) => {
+        'number': e.number, 'id': e.id, 'url': e.url, 'title': e.title,
+        'thumbnail': e.thumbnail, 'description': e.description,
+      }).toList(),
+      'relations': response.relations.map((r) => {
+        'title': r.title, 'url': r.url, 'slug': r.slug,
+        'cover': r.cover, 'relation': r.relation, 'category': r.category,
+      }).toList(),
+      'tmdbId': response.tmdbId,
+      'fullTitle': response.fullTitle,
+      'season': response.season,
+      'seasonAirDate': response.seasonAirDate,
+      'seasonNotAvailable': response.seasonNotAvailable,
+      'error': response.error,
+    },
+    'cachedAt': cachedAt.millisecondsSinceEpoch,
+    'nextEpisode': nextEpisode,
+  };
+
+  factory _EpisodeCacheEntry.fromJson(Map<dynamic, dynamic> json) {
+    final resp = Map<String, dynamic>.from(json['response'] as Map);
+    return _EpisodeCacheEntry(
+      response: EpisodesResponse.fromJson(resp),
+      cachedAt: DateTime.fromMillisecondsSinceEpoch(json['cachedAt'] as int? ?? 0),
+      nextEpisode: json['nextEpisode'] as int?,
+    );
+  }
+}
+
+/// Provider compartido de caché de episodios. Usado por episodesProvider
+/// y groupedEpisodesProvider para evitar duplicación.
+final _sharedEpisodeCacheProvider = StateProvider<Map<String, _EpisodeCacheEntry>>((ref) => {});
+
+/// Determina si el caché de episodios debe invalidarse basándose en el schedule.
+/// Retorna true si hay un nuevo episodio que debió haberse estrenado.
+Future<bool> _shouldInvalidateCache(Ref ref, EpisodesParams params, _EpisodeCacheEntry entry) async {
+  try {
+    final schedule = await ref.read(scheduleProvider.future);
+    final now = DateTime.now();
+    
+    // Buscar este anime en el schedule de hoy
+    for (final day in schedule.days) {
+      if (!day.isToday) continue;
+      for (final item in day.items) {
+        // Matchear por título (normalizado)
+        final itemTitle = item.title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+        final paramTitle = (params.title ?? '').toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+        if (itemTitle.isEmpty || paramTitle.isEmpty) continue;
+        if (!itemTitle.contains(paramTitle) && !paramTitle.contains(itemTitle)) continue;
+        
+        // Si hay un próximo episodio y es diferente al último cacheado
+        if (item.nextEpisode != null && entry.nextEpisode != null) {
+          if (item.nextEpisode! > entry.nextEpisode!) {
+            debugPrint('[EpisodeCache] Invalidating: new episode ${item.nextEpisode} released');
+            return true;
+          }
+        }
+        
+        // Si el schedule indica que ya se estrenó un episodio después del caché
+        if (item.airingAt != null) {
+          final airTime = DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000);
+          if (airTime.isAfter(entry.cachedAt) && airTime.isBefore(now)) {
+            debugPrint('[EpisodeCache] Invalidating: episode aired at $airTime');
+            return true;
+          }
+        }
+      }
+    }
+  } catch (_) {}
+  return false;
+}
+
 // --- Providers ---
 
 final contentSearchProvider = FutureProvider.family<SearchResponse, ContentSearchParams>((ref, params) async {
@@ -195,33 +348,130 @@ final omdbSeasonProvider = FutureProvider.family<List<OmdbEpisode>, OmdbSeasonPa
 
 final episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, EpisodesParams>((ref, params) async {
   if (params.url.isEmpty) return null;
-  final repo = ref.watch(aurisRepositoryProvider);
-  return repo.getEpisodes(
+  
+  final cache = ref.read(_sharedEpisodeCacheProvider);
+  final cacheKey = '${params.url}|${params.source}|${params.season ?? 1}';
+  
+  // 1. Intentar caché en memoria
+  final entry = cache[cacheKey];
+  if (entry != null) {
+      // 2. Verificar si el caché debe invalidarse (nuevo episodio estrenado)
+      final shouldInvalidate = await _shouldInvalidateCache(ref, params, entry);
+      if (!shouldInvalidate) {
+        debugPrint('[EpisodeCache] HIT for ${params.title}');
+        return entry.response;
+      }
+  }
+  
+  // 3. Fetch fresco del servidor
+  final repo = ref.read(aurisRepositoryProvider);
+  final response = await repo.getEpisodes(
     params.url, params.source, category: params.category,
     title: params.title, fullTitle: params.fullTitle, altTitle: params.altTitle,
     tmdbId: params.tmdbId, season: params.season, year: params.year,
   );
+  
+  // 4. Guardar en caché con info del schedule
+  int? nextEp;
+  try {
+    final schedule = await ref.read(scheduleProvider.future);
+    for (final day in schedule.days) {
+        for (final item in day.items) {
+          final itemTitle = item.title.toLowerCase();
+          final paramTitle = (params.title ?? '').toLowerCase();
+          if (itemTitle.contains(paramTitle) || paramTitle.contains(itemTitle)) {
+            nextEp = item.nextEpisode;
+            break;
+          }
+        }
+        if (nextEp != null) break;
+      }
+    } catch (_) {}
+    
+    ref.read(_sharedEpisodeCacheProvider.notifier).state = {
+      ...ref.read(_sharedEpisodeCacheProvider),
+      cacheKey: _EpisodeCacheEntry(response: response, cachedAt: DateTime.now(), nextEpisode: nextEp),
+    };
+  
+  return response;
 });
 
 final groupedEpisodesProvider = FutureProvider.autoDispose.family<GroupedEpisodesResult?, GroupedEpisodesParams>((ref, arg) async {
-  final repo = ref.watch(aurisRepositoryProvider);
-  final primaryRes = await repo.getEpisodes(
-    arg.currentSourceUrl, arg.source?.isNotEmpty == true ? arg.source! : arg.familyKey, category: arg.category,
-    title: arg.title, fullTitle: arg.metadataTitle, tmdbId: arg.tmdbId,
-    season: arg.season, year: arg.year,
-  );
+  // Usar el mismo episodesProvider subyacente para compartir caché
+  final episodesAsync = await ref.watch(episodesProvider(EpisodesParams(
+    url: arg.currentSourceUrl,
+    source: arg.source?.isNotEmpty == true ? arg.source! : arg.familyKey,
+    category: arg.category,
+    title: arg.title,
+    fullTitle: arg.metadataTitle,
+    tmdbId: arg.tmdbId,
+    season: arg.season,
+    year: arg.year,
+  )).future);
 
-  if (primaryRes == null) return null;
+  if (episodesAsync == null) return null;
 
   Future.microtask(() {
     final ctManager = ref.read(communityTranslationManagerProvider);
-    for (final ep in primaryRes.episodes) {
+    for (final ep in episodesAsync.episodes) {
       if (!ep.needsTranslation) continue;
-      unawaited(ctManager.processEpisodeTranslation(tmdbId: primaryRes.tmdbId ?? arg.tmdbId, season: arg.season ?? primaryRes.season, episode: ep));
+      unawaited(ctManager.processEpisodeTranslation(tmdbId: episodesAsync.tmdbId ?? arg.tmdbId, season: arg.season ?? episodesAsync.season, episode: ep));
     }
   });
 
-  return GroupedEpisodesResult(response: primaryRes, sources: List.filled(primaryRes.episodes.length, null));
+  return GroupedEpisodesResult(response: episodesAsync, sources: List.filled(episodesAsync.episodes.length, null));
+});
+
+// --- Player Consolidated Providers ---
+
+/// Estado consolidado del player para episodios.
+/// Reemplaza los 5 ref.watch separados en el player por uno solo.
+class PlayerEpisodesState {
+  final EpisodesResponse? episodes;
+  final bool hasNext;
+  final bool hasPrevious;
+  final int currentNum;
+  final bool isLoading;
+
+  const PlayerEpisodesState({
+    this.episodes,
+    required this.hasNext,
+    required this.hasPrevious,
+    required this.currentNum,
+    required this.isLoading,
+  });
+
+  static PlayerEpisodesState empty() => const PlayerEpisodesState(
+    hasNext: true, hasPrevious: false, currentNum: 0, isLoading: true,
+  );
+}
+
+/// Provider consolidado: un solo watch en el player para todo lo relacionado con episodios.
+final playerEpisodesSelector = FutureProvider.autoDispose.family<PlayerEpisodesState, ({String url, String source, String? title, int? season, int? currentEpisode})>((ref, params) async {
+  final episodesAsync = await ref.watch(episodesProvider(EpisodesParams(
+    url: params.url,
+    source: params.source,
+    title: params.title,
+    season: params.season,
+  )).future);
+
+  if (episodesAsync == null || episodesAsync.episodes.isEmpty) {
+    return PlayerEpisodesState(
+      currentNum: params.currentEpisode ?? 0,
+      hasNext: true, // Fallback: asumir que hay siguiente
+      hasPrevious: (params.currentEpisode ?? 0) > 1,
+      isLoading: false,
+    );
+  }
+
+  final currentNum = params.currentEpisode ?? 0;
+  return PlayerEpisodesState(
+    episodes: episodesAsync,
+    currentNum: currentNum,
+    hasNext: episodesAsync.episodes.any((e) => e.number > currentNum),
+    hasPrevious: currentNum > 1,
+    isLoading: false,
+  );
 });
 
 final unifiedRelationsProvider = StateNotifierProvider.autoDispose.family<_UnifiedRelationsNotifier, AsyncValue<UnifiedRelationsMap>, UnifiedRelationsParams>((ref, params) {
@@ -319,7 +569,10 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
   void addResult(SearchResult r) {
     final itemSources = r.sources.isNotEmpty ? r.sources : [SourceItem(source: r.source, url: r.url, quality: r.quality)];
     for (final s in itemSources) {
-      if (s.source.toUpperCase() == 'TMDB' || s.source.toUpperCase() == 'ANILIST' || s.source.toUpperCase() == 'TRAKT') continue;
+      if (s.source.isEmpty || s.source.toUpperCase() == 'TMDB' || s.source.toUpperCase() == 'ANILIST' || s.source.toUpperCase() == 'TRAKT') continue;
+      // URL numérica (ej. "9" de HomeItem TMDB sin url real) no es fuente válida
+      if (s.url.isEmpty || RegExp(r'^\d+$').hasMatch(s.url.trim())) continue;
+      if (!s.url.toLowerCase().startsWith('http')) continue;
       // Variantes descubiertas (mini/spin-off) no pisan la lista curada.
       if (isRogueVariant(s, params.initialSources)) continue;
       final rSeason = r.season ?? extractSeason(r.title) ?? extractSeason(r.url);
@@ -357,4 +610,19 @@ final episodeImagePrefetchProvider = Provider.family<void, ({List<EpisodeInfo> e
       precacheImage(NetworkImage(ep.thumbnail!), ref.read(navigatorKeyProvider).currentContext!).catchError((_) => null);
     }
   }
+});
+
+final filterResultsProvider = FutureProvider.family<List<MediaItem>, FilterParams>((ref, params) async {
+  final repo = ref.watch(aurisRepositoryProvider);
+  final response = await repo.filter(
+    genre: params.genre,
+    year: params.year,
+    category: params.category,
+    status: params.status,
+    idioma: params.idioma,
+    page: params.page,
+    source: params.source,
+  );
+  
+  return response.results.map((r) => mapSearchResultToMediaItem(r, params.category ?? 'movie')).toList();
 });

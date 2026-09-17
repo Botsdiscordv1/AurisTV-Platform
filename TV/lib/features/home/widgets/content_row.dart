@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 
 class ContentRow extends StatefulWidget {
   final String title;
+  final String? subtitle;
   final List<MediaItem> items;
   final double horizontalPadding;
   final void Function(MediaItem item) onItemTap;
@@ -15,6 +15,7 @@ class ContentRow extends StatefulWidget {
   const ContentRow({
     super.key,
     required this.title,
+    this.subtitle,
     required this.items,
     required this.onItemTap,
     this.horizontalPadding = 48.0,
@@ -91,44 +92,60 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     if (widget.items.isEmpty) return const SizedBox.shrink();
 
     final width = MediaQuery.of(context).size.width;
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final isCompactDesktop = width >= 800 && width < 1100;
+    final isMobile = false; // Forzado para TV
+    final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
     
-    final double cardWidth = ResponsiveUtils.posterWidth(context);
-    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false);
+    final double cardWidth = TVResponsiveUtils.posterWidth(context);
+    final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: false);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 12 : 16), // Senior Fix: Reducido drásticamente para TV
+      padding: const EdgeInsets.only(bottom: 12), // Senior Fix: Reducido para TV
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Senior Fix: Excluir todo el bloque de cabecera del foco para que el salto sea directo a los posters
           ExcludeFocus(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: Text(
-                widget.title,
-                style: GoogleFonts.poppins(
-                  fontSize: isMobile ? 18 : 20, // Reducido de 26
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: -0.4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: GoogleFonts.poppins(
+                          fontSize: TVResponsiveUtils.rowTitleFontSize(context),
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          widget.subtitle!,
+                          style: GoogleFonts.poppins(
+                            fontSize: TVResponsiveUtils.sp(context, 11),
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4), // Gap reducido
+              ],
             ),
-          ),
-          const SizedBox(height: 8), 
-          MouseRegion(
+          ),          MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
             child: Stack(
               children: [
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final double width = constraints.maxWidth;
-                    final double fadeOffset = horizontalPadding / width;
-                    final double fadeSize = 40 / width; // 40px de suavizado
-
                     return SizedBox(
                       height: rowHeight,
                       child: NotificationListener<ScrollNotification>(
@@ -136,40 +153,19 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                           _updateScrollIndicators();
                           return false;
                         },
-                        child: ShaderMask(
-                          shaderCallback: (Rect rect) {
-                            return LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                Colors.transparent,
-                                _canScrollLeft ? Colors.transparent : Colors.black,
-                                Colors.black,
-                                Colors.black,
-                                _canScrollRight ? Colors.transparent : Colors.black,
-                                Colors.transparent,
-                              ],
-                              stops: [
-                                0.0,
-                                fadeOffset,
-                                (fadeOffset + fadeSize).clamp(0.0, 1.0),
-                                (1.0 - fadeOffset - fadeSize).clamp(0.0, 1.0),
-                                1.0 - fadeOffset,
-                                1.0,
-                              ],
-                            ).createShader(rect);
-                          },
-                          blendMode: BlendMode.dstIn,
+                        child: Focus(
+                          canRequestFocus: false, // La lista no atrapa el foco
+                          // skipTraversal eliminado para permitir que el motor vea los posters internos
                           child: ListView.separated(
                             controller: _scrollController,
                             physics: const ClampingScrollPhysics(),
                             cacheExtent: 1000,
                             clipBehavior: Clip.none,
                             scrollDirection: Axis.horizontal,
-                            primary: false, // Senior Fix: Evita que el ScrollView intente capturar el foco
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Zero padding
+                            primary: false, 
+                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), 
                             itemCount: widget.items.length,
-                            separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 16),
+                            separatorBuilder: (_, __) => const SizedBox(width: 14),
                             itemBuilder: (context, index) {
                               final item = widget.items[index];
                               return SizedBox(

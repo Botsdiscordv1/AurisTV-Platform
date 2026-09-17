@@ -1,23 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/prime_expandable_card.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
+import '../../../shared/widgets/top_item.dart';
 
 class EditorialContentRow extends StatefulWidget {
   final String title;
+  final String? subtitle;
   final List<MediaItem> items;
   final EditorialBadge badge;
+  final bool forceTopDesign;
   final void Function(MediaItem item) onItemTap;
 
   const EditorialContentRow({
     super.key,
     required this.title,
+    this.subtitle,
     required this.items,
     required this.badge,
     required this.onItemTap,
+    this.forceTopDesign = false,
   });
 
   @override
@@ -80,47 +84,61 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     super.build(context);
     if (widget.items.isEmpty) return const SizedBox.shrink();
 
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final width = MediaQuery.of(context).size.width;
-    final isCompactDesktop = width >= 800 && width < 1100;
+    final isMobile = false;
+    final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
     
-    final double cardWidth = ResponsiveUtils.posterWidth(context);
-    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false);
+    final double cardWidth = TVResponsiveUtils.posterWidth(context);
+    final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: false);
 
-    final bool isMythical = widget.badge == EditorialBadge.mythical;
+    final bool isMythical = widget.badge == EditorialBadge.mythical || widget.forceTopDesign;
 
     if (isMythical) {
       return _buildMythicalTopRow(isMobile, horizontalPadding);
     }
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 12 : 16), // Senior Fix: Reducido drásticamente para TV
+      padding: const EdgeInsets.only(bottom: 12), // Senior Fix: Reducido drásticamente para TV
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ExcludeFocus(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: Text(
-                widget.title,
-                style: GoogleFonts.poppins(
-                  fontSize: isMobile ? 18 : (isCompactDesktop ? 20 : 22), // Reducido de 28
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: -0.4,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: GoogleFonts.poppins(
+                      fontSize: TVResponsiveUtils.rowTitleFontSize(context), 
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      widget.subtitle!,
+                      style: GoogleFonts.poppins(
+                        fontSize: TVResponsiveUtils.sp(context, 11),
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          _buildStandardRow(isMobile, horizontalPadding),
+          const SizedBox(height: 6),
+          _buildStandardRow(isMobile, horizontalPadding, cardWidth, rowHeight),
         ],
       ),
     );
   }
 
-  Widget _buildStandardRow(bool isMobile, double horizontalPadding) {
+  Widget _buildStandardRow(bool isMobile, double horizontalPadding, double cardWidth, double rowHeight) {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -130,29 +148,32 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
             height: rowHeight, // Usamos la altura calculada dinámicamente
             child: _buildFadedWrapper(
               horizontalPadding: horizontalPadding,
-              child: ListView.separated(
-                controller: _scrollController,
-                physics: const ClampingScrollPhysics(),
-                scrollDirection: Axis.horizontal,
-                primary: false, // Senior Fix: Evita que el ScrollView intente capturar el foco
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
-                itemCount: widget.items.length,
-                separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 16),
-                itemBuilder: (context, index) {
-                  final item = widget.items[index];
-                  return SizedBox(
-                    width: cardWidth,
-                    child: FocusablePosterCard(
-                      key: ValueKey(item.id),
-                      title: item.title,
-                      posterUrl: item.posterUrl,
-                      rating: formatRating(item.rating),
-                      subtitle: null, // Senior Fix: Ocultar año en editorial
-                      showInfo: false,
-                      onTap: () => widget.onItemTap(item),
-                    ),
-                  );
-                },
+              child: Focus(
+                canRequestFocus: false,
+                child: ListView.separated(
+                  controller: _scrollController,
+                  physics: const ClampingScrollPhysics(),
+                  scrollDirection: Axis.horizontal,
+                  primary: false, 
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
+                  itemCount: widget.items.length,
+                  separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 16),
+                  itemBuilder: (context, index) {
+                    final item = widget.items[index];
+                    return SizedBox(
+                      width: cardWidth,
+                      child: FocusablePosterCard(
+                        key: ValueKey(item.id),
+                        title: item.title,
+                        posterUrl: item.posterUrl,
+                        rating: formatRating(item.rating),
+                        subtitle: null, // Senior Fix: Ocultar año en editorial
+                        showInfo: false,
+                        onTap: () => widget.onItemTap(item),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -163,9 +184,9 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   Widget _buildMythicalTopRow(bool isMobile, double horizontalPadding) {
-    // Senior Fix: Sincronizamos con Core
-    final double posterHeight = ResponsiveUtils.posterHeight(context);
-    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false);
+    // Senior Fix: Sincronizamos con TV Utils
+    final double posterHeight = TVResponsiveUtils.posterHeight(context);
+    final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: false);
     final double titleAreaHeight = 0; // Senior Fix: Eliminado offset ya que no hay títulos debajo
     
     return Padding(
@@ -176,14 +197,30 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
           ExcludeFocus(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: Text(
-                widget.title,
-                style: GoogleFonts.poppins(
-                  fontSize: isMobile ? 20 : 24, // Reducido de 30
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: -0.8,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.title,
+                    style: GoogleFonts.poppins(
+                      fontSize: isMobile ? 20 : 24, // Reducido de 30
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: -0.8,
+                    ),
+                  ),
+                  if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      widget.subtitle!,
+                      style: GoogleFonts.poppins(
+                        fontSize: TVResponsiveUtils.sp(context, 11),
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -206,7 +243,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                       itemCount: widget.items.length.clamp(0, 10),
                       itemBuilder: (context, index) {
                         final item = widget.items[index];
-                        return _MythicTopItem(
+                        return TopItem(
                           index: index,
                           item: item,
                           height: posterHeight,
@@ -226,48 +263,14 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     );
   }
 
-  // WRAPPER DE DIFUMINADO (Efecto Banner Home)
+  // WRAPPER DE DIFUMINADO (Eliminado según requerimiento)
   Widget _buildFadedWrapper({required double horizontalPadding, required Widget child}) {
     return NotificationListener<ScrollNotification>(
       onNotification: (_) {
         _updateScrollIndicators();
         return false;
       },
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final double width = constraints.maxWidth;
-          // El difuminado se aplica sobre el margen lateral
-          final double fadeOffset = horizontalPadding / width;
-          final double fadeSize = 50 / width; // Grosor del difuminado
-
-          return ShaderMask(
-            shaderCallback: (Rect rect) {
-              return LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Colors.transparent,
-                  _canScrollLeft ? Colors.transparent : Colors.black,
-                  Colors.black,
-                  Colors.black,
-                  _canScrollRight ? Colors.transparent : Colors.black,
-                  Colors.transparent,
-                ],
-                stops: [
-                  0.0,
-                  fadeOffset,
-                  (fadeOffset + fadeSize).clamp(0.0, 1.0),
-                  (1.0 - fadeOffset - fadeSize).clamp(0.0, 1.0),
-                  1.0 - fadeOffset,
-                  1.0,
-                ],
-              ).createShader(rect);
-            },
-            blendMode: BlendMode.dstIn,
-            child: child,
-          );
-        },
-      ),
+      child: child,
     );
   }
 
@@ -310,135 +313,6 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
         ),
       ),
     ];
-  }
-}
-
-class _MythicTopItem extends StatelessWidget {
-  final int index;
-  final MediaItem item;
-  final double height;
-  final double textOffset;
-  final VoidCallback onTap;
-
-  const _MythicTopItem({
-    required this.index,
-    required this.item,
-    required this.height,
-    required this.textOffset,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isMobileDevice = ResponsiveUtils.isMobile(context);
-    final int number = index + 1;
-    final bool isDoubleDigit = number >= 10;
-    final bool isNumberOne = number == 1;
-
-    final double actualPosterHeight = height; 
-    // El número mide el 90% para que el póster sea más alto
-    final double dynamicNumberSize = isDoubleDigit ? actualPosterHeight * 0.8 : actualPosterHeight * 0.9;
-    final double posterWidth = actualPosterHeight * 0.68;
-    
-    // NETFLIX PERFECT OVERLAP (Ajuste Fino al 22%)
-    double numberVisiblePart;
-    if (isNumberOne) {
-      numberVisiblePart = posterWidth * 0.42; 
-    } else if (isDoubleDigit) {
-      // Senior Fix: Unificamos el solapamiento al 23% (factor 0.77) tanto en Web como en Móvil
-      numberVisiblePart = posterWidth * 0.77; 
-    } else {
-      numberVisiblePart = posterWidth * 0.62; 
-    }
-
-    // Senior Fix: Letter spacing dinámico para evitar que los números se junten en pantallas pequeñas
-    final double dynamicLetterSpacing = isDoubleDigit 
-        ? (isMobileDevice ? -12.0 : -22.0) 
-        : (isMobileDevice ? -8.0 : -15.0);
-
-    return Container(
-      width: numberVisiblePart + posterWidth,
-      margin: const EdgeInsets.only(right: 24), // Más aire entre tarjetas
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // 1. NÚMERO GIGANTE (Capa Inferior)
-          Positioned(
-            left: isDoubleDigit ? 4 : 0,
-            // BASE ALINEADA AL PÓSTER
-            bottom: textOffset, // Senior Fix: Pegado a la base
-            child: Stack(
-              children: [
-                // Borde gris vivo
-                Text(
-                  '$number',
-                  style: TextStyle(
-                    fontSize: dynamicNumberSize,
-                    fontWeight: FontWeight.w900,
-                    height: 1.0,
-                    letterSpacing: dynamicLetterSpacing,
-                    foreground: Paint()
-                      ..style = PaintingStyle.stroke
-                      ..strokeWidth = height * 0.045
-                      ..strokeJoin = StrokeJoin.round
-                      ..strokeCap = StrokeCap.round
-                      ..color = const Color(0xFF9E9E9E),
-                  ),
-                ),
-                // Triple capa de relleno
-                Stack(
-                  children: [
-                    Text(
-                      '$number',
-                      style: TextStyle(
-                        fontSize: dynamicNumberSize,
-                        fontWeight: FontWeight.w900,
-                        height: 1.0,
-                        letterSpacing: dynamicLetterSpacing,
-                        foreground: Paint()
-                          ..style = PaintingStyle.stroke
-                          ..strokeWidth = height * 0.02
-                          ..strokeJoin = StrokeJoin.round
-                          ..strokeCap = StrokeCap.round
-                          ..color = const Color(0xFF050505),
-                      ),
-                    ),
-                    Text(
-                      '$number',
-                      style: TextStyle(
-                        fontSize: dynamicNumberSize,
-                        fontWeight: FontWeight.w900,
-                        height: 1.0,
-                        letterSpacing: dynamicLetterSpacing,
-                        color: const Color(0xFF050505),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          // 2. PÓSTER NORMAL (Foreground)
-          Positioned(
-            left: numberVisiblePart,
-            top: 0,
-            child: SizedBox(
-              width: posterWidth,
-              child: FocusablePosterCard(
-                key: ValueKey(item.id),
-                title: item.title,
-                posterUrl: item.posterUrl,
-                rating: formatRating(item.rating),
-                subtitle: null, // Senior: Limpiamos overlay de año
-                showInfo: false, // Senior: Ocultar título debajo en fila mítica
-                onTap: onTap,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

@@ -123,10 +123,14 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
         title: h.title ?? '',
         url: h.url ?? h.contentId,
         source: h.source ?? '',
-        quality: 'Local',
+        quality: 'Historial', // Senior Fix: Identificador para el resolver de metadatos
         thumbnail: h.posterUrl ?? '',
         banner: h.bannerUrl ?? '',
         year: null,
+        kind: h.category, // Mapeo de metadatos para que el label sea correcto
+        type: h.category,
+        season: h.season,
+        progress: h.progress, // Inyectamos el progreso directamente
       );
       // Senior Fix: El historial tiene prioridad sobre la clave para mostrar progreso
       _accumulated[_fuseKey(res)] = res;

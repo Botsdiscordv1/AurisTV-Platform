@@ -11,6 +11,8 @@ import '../models/server/shared_models.dart';
 import '../models/unified_content_state.dart';
 import '../providers/content_providers.dart';
 import '../providers/player_provider.dart';
+import '../providers/auth_provider.dart';
+import '../../core/api/providers.dart';
 import '../../core/utils/content_logic.dart';
 import '../../core/utils/source_utils.dart';
 
@@ -121,11 +123,16 @@ final unifiedContentProvider = Provider.autoDispose
           ? r.sources
           : [SourceItem(source: r.source, url: r.url, quality: r.quality, slug: r.slug, type: r.type)];
       for (final s in items) {
+        if (s.source.isEmpty || s.source.toUpperCase() == 'TMDB' || s.source.toUpperCase() == 'ANILIST' || s.source.toUpperCase() == 'TRAKT') continue;
+        if (s.url.isEmpty || RegExp(r'^\d+$').hasMatch(s.url.trim()) || !s.url.toLowerCase().startsWith('http')) continue;
         add(r.copyWith(source: s.source, url: s.url, quality: s.quality, slug: s.slug, type: s.type));
       }
     }
   }
-  discovered.forEach(add);
+  for (final s in discovered) {
+    if (s.source.isEmpty || s.url.isEmpty || RegExp(r'^\d+$').hasMatch(s.url.trim()) || !s.url.toLowerCase().startsWith('http')) continue;
+    add(s);
+  }
   allSources.sort((a, b) => sourceDisplayRank(a.source).compareTo(sourceDisplayRank(b.source)));
 
   // 4. Bloqueo de Selección (Freeze)
@@ -187,9 +194,29 @@ final unifiedContentProvider = Provider.autoDispose
         : 1,
     episodes: episodesAsync,
     relations: relationsAsync,
-    isMovieish: detailData?.isMovieish ?? (params.category.contains('movie') || params.kind == 'movie'),
+    isMovieish: detailData?.isMovieish ?? (params.category.contains('movie') || 
+                 params.kind?.toLowerCase().contains('movie') == true || 
+                 params.kind?.toLowerCase().contains('pelicula') == true ||
+                 params.type?.toLowerCase().contains('movie') == true),
     seasonTitle: input.season > 1 ? seasonTitleFor(stripSeasonSuffix(params.title), input.season) : null,
   );
+});
+
+/// Tracker de personalización para la vista de detalle.
+/// Se dispara una única vez cuando el detalle de un anime es cargado y visualizado.
+final detailViewTrackerProvider = Provider.autoDispose.family<void, UnifiedDetailParams>((ref, params) {
+  ref.listen<UnifiedContentState>(unifiedContentProvider(params), (prev, next) {
+    final animeId = next.detail.valueOrNull?.anime?.id;
+    if (animeId != null) {
+      final auth = ref.read(authProvider);
+      ref.read(userEventTrackerProvider).record(
+        userId: auth?.activeProfileId ?? auth?.id,
+        animeId: animeId,
+        event: 'detail_view',
+        sectionId: params.sectionId,
+      );
+    }
+  }, fireImmediately: true);
 });
 
 extension UnifiedContentActions on WidgetRef {
@@ -207,7 +234,8 @@ extension UnifiedDetailParamsExt on UnifiedDetailParams {
     return UnifiedDetailParams(
       title: title, metadataTitle: metadataTitle, category: category,
       kind: kind, year: year, season: season ?? this.season,
-      source: source, url: url, type: type, initialSources: initialSources,
+      source: source, url: url, type: type, sectionId: sectionId,
+      initialSources: initialSources,
     );
   }
 }

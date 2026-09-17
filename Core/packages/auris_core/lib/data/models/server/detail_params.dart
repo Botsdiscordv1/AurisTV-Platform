@@ -11,6 +11,7 @@ class UnifiedDetailParams {
   final String source;
   final String? url;
   final String? type;
+  final String? sectionId;
   final List<SearchResult>? initialSources;
 
   const UnifiedDetailParams({
@@ -23,6 +24,7 @@ class UnifiedDetailParams {
     this.source = '',
     this.url,
     this.type,
+    this.sectionId,
     this.initialSources,
   });
 
@@ -39,6 +41,7 @@ class UnifiedDetailParams {
           source == other.source &&
           url == other.url &&
           type == other.type &&
+          sectionId == other.sectionId &&
           const ListEquality().equals(initialSources, other.initialSources);
 
   @override
@@ -52,6 +55,7 @@ class UnifiedDetailParams {
       source,
       url,
       type,
+      sectionId,
       const ListEquality().hash(initialSources));
 }
 

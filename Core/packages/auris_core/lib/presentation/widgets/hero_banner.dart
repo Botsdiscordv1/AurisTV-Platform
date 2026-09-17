@@ -65,6 +65,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   Timer? _fadeTimer;
   Timer? _delayTimer;
   bool _isTrailerLoading = false;
+  bool _isDisposing = false;
 
   @override
   void initState() {
@@ -106,6 +107,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
   @override
   void dispose() {
+    _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
     _stopAutoPlay();
     _stopCycle();
@@ -188,7 +190,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   void _stopCycle() {
     _delayTimer?.cancel();
     _disposeController();
-    // Senior Fix: Evitar setState si el widget ya está siendo desmontado (dispose)
+    // Senior Fix: Evitar setState durante dispose/finalizeTree (lifecycle defunct)
+    if (_isDisposing) {
+      _showTrailerLayer = false;
+      _videoReady = false;
+      return;
+    }
     if (mounted) {
       setState(() { _showTrailerLayer = false; _videoReady = false; });
     }
@@ -360,7 +367,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       onVisibilityChanged: (info) {
         if (!mounted) return;
         final visible = info.visibleFraction > 0.1; // Senior Fix: 10% de visibilidad para considerar activo
-        if (visible != _isVisible) {
+        if (visible != _isVisible && mounted) {
           setState(() => _isVisible = visible);
           if (!_isVisible) {
             _stopAutoPlay();
@@ -396,7 +403,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             },
             onTap: () {
               final item = _currentContentItem;
-              if (item != null) widget.onDetails(item);
+              if (item != null) {
+                SafeTap.run(() => widget.onDetails(item));
+              }
             },
             child: _buildAdaptiveLayout(layout, screenWidth),
           ),
@@ -441,12 +450,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   }
 
   Widget _buildCinematicLayout(double screenWidth) {
-    final double horizontalPadding = context.breakpoint < Breakpoint.xl ? 40.0 : 60.0;
+    final double horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final bgItem = _currentBackgroundItem;
     final contentItem = _currentContentItem;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(horizontalPadding, 24, horizontalPadding, 48),
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 16),
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF0B0B0D),
@@ -467,12 +476,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                   _buildTrailerLayer(screenWidth),
                 // Gradient Scrim
                 _buildCinematicGradients(),
-                // Content Overlay
                 Positioned(
                   left: 0, bottom: 0, top: 0, // Senior Fix: Anclamos el Positioned a los bordes izquierdos
                   child: Container(
                     width: screenWidth * 0.6,
-                    padding: const EdgeInsets.only(left: 80, bottom: 45),
+                    padding: EdgeInsets.only(
+                      left: context.breakpoint <= Breakpoint.xl ? 30 : 40, 
+                      bottom: context.breakpoint <= Breakpoint.xl ? 25 : 45
+                    ),
                     alignment: Alignment.bottomLeft,
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 400),
@@ -830,24 +841,34 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           children: [
             // Estado dinámico (Alineado a la izquierda)
             if (!item.available)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)),
-                child: Text('PRÓXIMAMENTE', style: TextStyle(color: Colors.white60, fontSize: ResponsiveUtils.sp(context, 10), fontWeight: FontWeight.w900, letterSpacing: 1)),
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)),
+                  child: Text('PRÓXIMAMENTE', style: TextStyle(color: Colors.white60, fontSize: ResponsiveUtils.sp(context, 10), fontWeight: FontWeight.w900, letterSpacing: 1)),
+                ),
               )
             else if (item.episode != null)
-              Text(
-                'NUEVO EPISODIO ${item.episode}', 
-                style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w900, letterSpacing: 0.5)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Text(
+                  'NUEVO EPISODIO ${item.episode}', 
+                  style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w900, letterSpacing: 0.5)
+                ),
               )
             else
               const SizedBox.shrink(),
 
-            // Géneros en MAYÚSCULAS (Alineados a la derecha, misma altura que el estado)
+            // Géneros en MAYÚSCULAS (Lista completa alineada al estado)
             if (item.genres.isNotEmpty)
-              Text(
-                item.genres.take(2).join(' • ').toUpperCase(), 
-                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w500)
+              Flexible(
+                child: Text(
+                  item.genres.join(' • ').toUpperCase(), 
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w500)
+                ),
               ),
           ],
         ),
@@ -857,7 +878,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           Row(
             children: [
               _BannerButton(
-                onPressed: () => widget.onPlay(item),
+                onPressed: () => SafeTap.run(() => widget.onPlay(item)),
                 icon: Icons.play_arrow,
                 label: 'Reproducir',
                 isPrimary: true,
@@ -867,7 +888,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               _BannerIconButton(
                 icon: Icons.info_outline,
                 label: 'Info',
-                onPressed: () => widget.onDetails(item),
+                onPressed: () => SafeTap.run(() => widget.onDetails(item)),
                 isCompact: true,
               ),
               if (item.trailerKey != null) ...[
@@ -899,6 +920,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
 
   Widget _buildCinematicContent(MediaItem item, double screenWidth) {
+    final b = context.breakpoint;
+    final bool isIntermediate = b <= Breakpoint.xl; // iPad Pro (V/H) y Laptops
     final titleFontSize = ResponsiveUtils.heroTitleFontSize(context);
     
     return Column(
@@ -906,43 +929,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 1. EL LOGO / TÍTULO (Protagonista)
-        if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
-          CachedNetworkImage(
-            key: ValueKey('logo_${item.id}'),
-            imageUrl: item.logoUrl!, 
-            height: ResponsiveUtils.heroLogoHeight(context),
-            fit: BoxFit.contain, 
-            alignment: Alignment.bottomLeft,
-            fadeInDuration: const Duration(milliseconds: 100),
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              item.title.toUpperCase(), 
-              style: TextStyle(
-                fontSize: titleFontSize, 
-                fontWeight: FontWeight.w900, 
-                color: Colors.white, 
-                height: 0.9,
-                letterSpacing: -1,
-                shadows: [
-                  Shadow(color: Colors.black.withOpacity(0.5), offset: const Offset(0, 4), blurRadius: 10)
-                ]
-              )
-            ),
-          ),
-        
-        const SizedBox(height: 12),
-
-        // 2. METADATA (Diseño Completo Restaurado)
+        // 1. ICONO + CATEGORÍA
         Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SvgPicture.asset(
               'assets/icons/auris-tv-icon.svg', 
-              height: 20, 
+              height: isIntermediate ? 16 : 18, 
               colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn)
             ),
             const SizedBox(width: 10),
@@ -950,110 +942,158 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               item.type.name.toUpperCase(), 
               style: TextStyle(
                 color: Colors.white, 
-                fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.xl ? 12 : 13), 
+                fontSize: ResponsiveUtils.sp(context, isIntermediate ? 11 : 13), 
                 fontWeight: FontWeight.w900, 
                 letterSpacing: 1.5
               )
             ),
+          ],
+        ),
+        SizedBox(height: isIntermediate ? 10 : 16),
 
-            // Senior Fix: Mostrar "NUEVO EPISODIO N" en Cinematic (Web/TV) para Animes
+        // 2. EL LOGO / TÍTULO
+        if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
+          CachedNetworkImage(
+            key: ValueKey('logo_${item.id}'),
+            imageUrl: item.logoUrl!, 
+            height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.1 : 1.35), 
+            fit: BoxFit.contain, 
+            alignment: Alignment.bottomLeft,
+            fadeInDuration: const Duration(milliseconds: 100),
+          )
+        else
+          Text(
+            item.title.toUpperCase(), 
+            style: TextStyle(
+              fontSize: titleFontSize * (isIntermediate ? 1.0 : 1.2), 
+              fontWeight: FontWeight.w900, 
+              color: Colors.white, 
+              height: 0.9,
+              letterSpacing: -1,
+              shadows: [
+                Shadow(color: Colors.black.withOpacity(0.5), offset: const Offset(0, 4), blurRadius: 10)
+              ]
+            )
+          ),
+        
+        SizedBox(height: isIntermediate ? 10 : 16),
+
+        // 3. METADATA
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
             if (item.type == MediaType.anime && item.episode != null) ...[
-              const SizedBox(width: 12),
-              Container(width: 1.2, height: 12, color: Colors.white30),
-              const SizedBox(width: 12),
               Text(
                 'NUEVO EPISODIO ${item.episode}', 
                 style: TextStyle(
                   color: const Color(0xFFEF7A1E), 
-                  fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.xl ? 12 : 13), 
+                  fontSize: ResponsiveUtils.sp(context, isIntermediate ? 11 : 13), 
                   fontWeight: FontWeight.w900, 
                   letterSpacing: 0.5
                 )
               ),
-            ],
-            
-            // Separador 1 (Rating)
-            if (item.rating != null && item.rating! > 0) ...[
               const SizedBox(width: 12),
               Container(width: 1.2, height: 12, color: Colors.white30),
               const SizedBox(width: 12),
-              Icon(Icons.star_rounded, color: const Color(0xFFEF7A1E), size: context.breakpoint < Breakpoint.xl ? 16 : 18),
+            ],
+            
+            if (item.rating != null && item.rating! > 0) ...[
+              Icon(Icons.star_rounded, color: const Color(0xFFEF7A1E), size: isIntermediate ? 14 : 18),
               const SizedBox(width: 4),
               Text(
                 item.rating!.toStringAsFixed(1), 
                 style: TextStyle(
                   color: Colors.white, 
-                  fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.xl ? 13 : 14), 
+                  fontSize: ResponsiveUtils.sp(context, isIntermediate ? 12 : 14), 
                   fontWeight: FontWeight.w900
                 )
               ),
-            ],
-
-            // Separador 3 (Certificación)
-            if (item.certification != null) ...[
               const SizedBox(width: 12),
               Container(width: 1.2, height: 12, color: Colors.white30),
               const SizedBox(width: 12),
+            ],
+
+            if (item.certification != null) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 decoration: BoxDecoration(border: Border.all(color: Colors.white38), borderRadius: BorderRadius.circular(2)),
                 child: Text(
                   item.certification!, 
-                  style: TextStyle(color: Colors.white70, fontSize: ResponsiveUtils.sp(context, 10), fontWeight: FontWeight.bold)
+                  style: TextStyle(color: Colors.white70, fontSize: ResponsiveUtils.sp(context, 9), fontWeight: FontWeight.bold)
                 ),
               ),
-            ],
-
-            // Separador 4 (Géneros)
-            if (item.genres.isNotEmpty) ...[
               const SizedBox(width: 12),
               Container(width: 1.2, height: 12, color: Colors.white30),
               const SizedBox(width: 12),
-              Text(
-                item.genres.take(3).join('  •  '), 
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6), 
-                  fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.xl ? 12 : 13), 
-                  fontWeight: FontWeight.w600
-                )
+            ],
+
+            if (item.genres.isNotEmpty) ...[
+              Flexible(
+                child: Text(
+                  item.genres.join('  •  '), 
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6), 
+                    fontSize: ResponsiveUtils.sp(context, isIntermediate ? 11 : 13), 
+                    fontWeight: FontWeight.w600
+                  )
+                ),
               ),
             ],
           ],
         ),
         
-        const SizedBox(height: 20),
+        SizedBox(height: isIntermediate ? 16 : 20),
 
-        // 3. SINOPSIS
+        // 4. SINOPSIS
         SizedBox(
-          width: screenWidth * 0.44,
+          width: screenWidth * (isIntermediate ? 0.55 : 0.44),
           child: Text(
             item.synopsis ?? '', 
-            maxLines: 3, 
+            maxLines: isIntermediate ? 2 : 3, 
             overflow: TextOverflow.ellipsis, 
             style: TextStyle(
               color: Colors.white, 
               fontSize: ResponsiveUtils.heroSynopsisFontSize(context), 
-              height: 1.5, 
+              height: 1.4, 
               fontWeight: FontWeight.w400
             )
           ),
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: isIntermediate ? 18 : 32),
         
-        // 4. ACCIONES
+        // 5. ACCIONES
         Row(
           children: [
-            _BannerButton(onPressed: () => widget.onPlay(item), icon: Icons.play_arrow, label: 'Reproducir', isPrimary: true),
+            _BannerButton(
+              onPressed: () => SafeTap.run(() => widget.onPlay(item)), 
+              icon: Icons.play_arrow, 
+              label: 'Reproducir', 
+              isPrimary: true,
+              isCompact: isIntermediate,
+            ),
             const SizedBox(width: 12),
-            _BannerIconButton(icon: Icons.add, label: 'Mi lista', onPressed: () {}),
+            _BannerIconButton(
+              icon: Icons.add, 
+              label: 'Mi lista', 
+              onPressed: () {},
+              isCompact: isIntermediate,
+            ),
             const SizedBox(width: 12),
-            _BannerIconButton(icon: Icons.info_outline, label: 'Detalles', onPressed: () => widget.onDetails(item)),
+            _BannerIconButton(
+              icon: Icons.info_outline, 
+              label: 'Detalles', 
+              onPressed: () => SafeTap.run(() => widget.onDetails(item)),
+              isCompact: isIntermediate,
+            ),
             if (item.trailerKey != null) ...[
               const SizedBox(width: 12),
               _BannerIconButton(
                 icon: (kIsWeb && _showTrailerLayer) ? Icons.videocam_off_outlined : Icons.movie_outlined,
                 label: 'Tráiler',
                 isLoading: _isTrailerLoading,
+                isCompact: isIntermediate,
                 onPressed: () async {
                   if (_isTrailerLoading) return;
                   if (kIsWeb && _showTrailerLayer) {
@@ -1082,6 +1122,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                 return _BannerIconButton(
                   icon: isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
                   label: isMuted ? 'Activar audio' : 'Silenciar',
+                  isCompact: isIntermediate,
                   onPressed: () => ref.read(heroBannerMutedProvider.notifier).state = !isMuted,
                 );
               }),
@@ -1137,18 +1178,27 @@ class _BannerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double height = isCompact ? 44 : 54;
     return ElevatedButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, size: isCompact ? 20 : 28),
-      label: Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: isCompact ? 14 : 16)),
+      icon: Icon(icon, size: isCompact ? 24 : 32, color: isPrimary ? Colors.black : Colors.white),
+      label: Text(
+        label, 
+        style: TextStyle(
+          fontWeight: FontWeight.w800, 
+          fontSize: isCompact ? 16 : 20,
+          letterSpacing: -0.5,
+        )
+      ),
       style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? Colors.white : Colors.white10,
+        backgroundColor: isPrimary ? Colors.white : Colors.white.withValues(alpha: 0.1),
         foregroundColor: isPrimary ? Colors.black : Colors.white,
+        elevation: 0,
+        fixedSize: Size.fromHeight(height), 
         padding: EdgeInsets.symmetric(
-          horizontal: isCompact ? 16 : 24, 
-          vertical: isCompact ? 8 : 16
+          horizontal: isCompact ? 20 : 28, 
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(height)),
       ),
     );
   }
@@ -1170,21 +1220,27 @@ class _BannerIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double size = isCompact ? 44 : 54;
     return Tooltip(
       message: label,
-      child: IconButton.filledTonal(
-        onPressed: isLoading ? null : onPressed,
-        icon: isLoading 
-          ? SizedBox(
-              width: isCompact ? 18 : 22, 
-              height: isCompact ? 18 : 22, 
-              child: const CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white)
-            )
-          : Icon(icon, size: isCompact ? 20 : 24),
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.white10, 
-          foregroundColor: Colors.white, 
-          padding: EdgeInsets.all(isCompact ? 8 : 12)
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.15),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: isLoading ? null : onPressed,
+          child: Container(
+            width: size,
+            height: size,
+            alignment: Alignment.center,
+            child: isLoading 
+              ? SizedBox(
+                  width: isCompact ? 20 : 24, 
+                  height: isCompact ? 20 : 24, 
+                  child: const CircularProgressIndicator(strokeWidth: 3, color: Colors.white)
+                )
+              : Icon(icon, size: isCompact ? 22 : 26, color: Colors.white),
+          ),
         ),
       ),
     );

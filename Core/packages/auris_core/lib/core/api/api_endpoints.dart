@@ -140,12 +140,15 @@ class ApiEndpoints {
   /// [width] y [height] - Dimensiones deseadas para optimizar RAM y red.
   /// [highQuality] - Si es true, usa parámetros de máxima fidelidad (ideal para 4K/Backdrops).
   /// [policy] - Política de redimensionamiento predefinida (opcional).
+  /// [category] / [source] - Hint para elegir el VPS correcto en fallback (evita que películas usen 3000).
   static String proxyImage(String? url, {
     int? width, 
     int? height, 
     bool highQuality = false, 
     String? fallbackUrl,
     ImageSize? policy,
+    String? category,
+    String? source,
   }) {
     if (url == null || url.isEmpty) return '';
 
@@ -198,9 +201,23 @@ class ApiEndpoints {
       return fixUrl(workingUrl);
     }
 
+    // Resolver VPS correcto para fallback (category/source aware)
+    String _fallbackBase() {
+      if (category != null && category.isNotEmpty) return baseUrlForCategory(category);
+      if (source != null && source.isNotEmpty) return baseUrlForSource(source, category);
+      // Auto-inferir desde la URL si no se pasó hint (gnulahd/onlypelis -> 3001, anime hosts -> 3000, doramas -> 3002)
+      if (lowerUrl.contains('gnulahd') || lowerUrl.contains('onlypelis') || lowerUrl.contains('pelispedia') || lowerUrl.contains('nu/') ) {
+        // wp.com/nu es ambiguo, pero si la URL original es gnulahd, ya se detectó vía source; fallback conservador a movies
+        if (lowerUrl.contains('gnulahd') || lowerUrl.contains('onlypelis')) return moviesSeriesBaseUrl;
+      }
+      if (lowerUrl.contains('jkanime') || lowerUrl.contains('animeav1') || lowerUrl.contains('animed23') || lowerUrl.contains('animejara')) return animeBaseUrl;
+      if (lowerUrl.contains('tudorama') || lowerUrl.contains('doramas')) return kdramasBaseUrl;
+      return baseUrl;
+    }
+
     const sensitiveCDNs = ['anilist.co', 'wp.com', 'animed23.com'];
     if (sensitiveCDNs.any((k) => lowerUrl.contains(k))) {
-      if (kIsWeb) return '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+      if (kIsWeb) return '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
       return workingUrl;
     }
 
@@ -210,7 +227,7 @@ class ApiEndpoints {
       // igual carga. Un fallbackUrl explícito (otra imagen) tiene prioridad.
       final String effectiveFallback = (fallbackUrl != null && fallbackUrl.isNotEmpty)
           ? fallbackUrl
-          : '$baseUrl/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+          : '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
       final String fallbackParam = '&errorredirect=${Uri.encodeComponent(effectiveFallback)}';
       
       String params = '&output=webp&q=$targetQuality';
@@ -239,6 +256,7 @@ class ApiEndpoints {
   static const String searchAnimeVariants = '/api/search/anime/variants';
   static const String detailAnime = '/api/detail/anime';
   static const String detailMovie = '/api/detail/movie';
+  static const String filter = '/api/filter';
   static const String homeHero = '/api/home/hero'; // Senior Fix: Nuevo endpoint dedicado para HeroBanner
   static const String homeEditorial = '/api/home/editorial';
   static String homeRecent(int limit) => '/api/home/recent?limit=$limit';

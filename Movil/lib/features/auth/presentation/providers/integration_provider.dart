@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:auris_core/auris_core.dart';
 import 'auth_web_helper.dart';
@@ -26,21 +27,18 @@ class IntegrationNotifier extends StateNotifier<void> {
     const String clientId = '47461';
 
     if (kIsWeb) {
-      // Senior Web: Usar un flujo más limpio para navegadores
       final authUrl = 'https://anilist.co/api/v2/oauth/authorize'
           '?client_id=$clientId'
-          '&redirect_uri=${Uri.encodeComponent(redirectUrl)}'
+          '&redirect_uri=https://anilist.co/api/v2/oauth/pin'
           '&response_type=code';
       
-      debugPrint('Lanzando Auth Web: $authUrl');
+      debugPrint('Lanzando Auth Web con PIN oficial (Seguro contra Captchas): $authUrl');
       _webHelper.launchWebAuth(
         url: authUrl,
         type: ConnectionType.anilist,
-        redirectUrl: redirectUrl,
+        redirectUrl: 'https://anilist.co/api/v2/oauth/pin',
         onCodeReceived: (code) async {
-          debugPrint('Código recibido para AniList en Web: $code');
-          await _exchangeCodeAndSave(ConnectionType.anilist, code, redirectUrl);
-          _ref.invalidate(authProvider);
+          await _exchangeCodeAndSave(ConnectionType.anilist, code, 'https://anilist.co/api/v2/oauth/pin');
         },
       );
       return;
@@ -88,7 +86,7 @@ class IntegrationNotifier extends StateNotifier<void> {
         onCodeReceived: (code) async {
           debugPrint('Código recibido para Simkl en Web: $code');
           await _exchangeCodeAndSave(ConnectionType.simkl, code, redirectUrl);
-          _ref.invalidate(authProvider);
+          // Senior Fix: No invalidamos authProvider aquí
         },
       );
       return;
@@ -138,20 +136,34 @@ class IntegrationNotifier extends StateNotifier<void> {
         clientSecret = 'daf68331ba4eee2b5d7b1df9a68e544ba4544f649fd3601c4eecaf97fa9101b3';
       }
 
-      final response = await _dio.post(
-        tokenEndpoint, 
-        data: {
-          'grant_type': 'authorization_code',
-          'client_id': clientId,
-          'client_secret': clientSecret,
-          'redirect_uri': redirectUrl,
-          'code': code,
-        },
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-          headers: {'Accept': 'application/json'},
-        ),
-      );
+      Response response;
+      
+      if (kIsWeb && type == ConnectionType.anilist) {
+        final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent('$tokenEndpoint?grant_type=authorization_code&client_id=$clientId&client_secret=$clientSecret&redirect_uri=$redirectUrl&code=$code')}';
+        
+        final proxyResponse = await _dio.get(proxyUrl);
+        final Map<String, dynamic> contents = jsonDecode(proxyResponse.data['contents']);
+        
+        response = Response(
+          data: contents,
+          requestOptions: RequestOptions(path: tokenEndpoint),
+        );
+      } else {
+        response = await _dio.post(
+          tokenEndpoint, 
+          data: {
+            'grant_type': 'authorization_code',
+            'client_id': clientId,
+            'client_secret': clientSecret,
+            'redirect_uri': redirectUrl,
+            'code': code,
+          },
+          options: Options(
+            contentType: Headers.formUrlEncodedContentType,
+            headers: {'Accept': 'application/json'},
+          ),
+        );
+      }
 
       final accessToken = response.data['access_token'];
       final refreshToken = response.data['refresh_token'];

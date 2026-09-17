@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -60,18 +61,6 @@ class AurisApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Si estamos en Windows (y no es Web), usamos el Wrapper de Alto Rendimiento
-    /*
-    if (!kIsWeb && Platform.isWindows) {
-      return MaterialApp(
-        title: 'AurisTV Desktop',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
-        home: const WindowsWebWrapper(),
-      );
-    }
-    */
-
     return MaterialApp.router(
       title: 'AurisTV',
       debugShowCheckedModeBanner: false,
@@ -83,11 +72,47 @@ class AurisApp extends StatelessWidget {
         return NotificationInitializer(
           child: RemoteCommandListener(
             child: MinWidthWrapper(
-              minWidth: 1024,
-              child: child,
+              minWidth: 360, // Sincronizado con Web para evitar inconsistencias en tablets
+              child: Stack(
+                fit: StackFit.expand, // Senior Fix: Garantiza que el contenido principal llene la pantalla
+                children: [
+                  child,
+                  // Senior: Floating MiniPlayer (Global y Persistente)
+                  const GlobalMiniPlayerOverlay(),
+                ],
+              ),
             ),
           ),
         );
+      },
+    );
+  }
+}
+
+class GlobalMiniPlayerOverlay extends ConsumerWidget {
+  const GlobalMiniPlayerOverlay({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return MiniPlayerBar(
+      onExpand: () {
+        final state = ref.read(activePlayerProvider);
+        if (state.currentItem != null) {
+          // Senior: Sincroniza uiState antes del push para que PlayerScreen vea isFull=true y no oculte extract
+          ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
+          final posterParam = '&posterUrl=${Uri.encodeComponent(state.currentItem!.posterUrl)}&bannerUrl=${Uri.encodeComponent(state.currentItem!.bannerUrl ?? '')}';
+          final langParam = state.language != null ? '&language=${Uri.encodeComponent(state.language!)}' : '';
+          final serverParam = state.source != null ? '&serverName=${Uri.encodeComponent(simplifySourceName(state.source!))}' : '';
+          final uri = '/player/${Uri.encodeComponent(state.currentItem!.title)}'
+              '?source=${Uri.encodeComponent(state.source ?? '')}'
+              '&url=${Uri.encodeComponent(state.url ?? '')}'
+              '&episode=${Uri.encodeComponent(state.episode ?? '')}'
+              '&season=${state.season ?? ''}'
+              '&category=${state.currentItem!.type.name}'
+              '$posterParam$langParam$serverParam';
+          
+          appRouter.push(uri);
+        }
       },
     );
   }

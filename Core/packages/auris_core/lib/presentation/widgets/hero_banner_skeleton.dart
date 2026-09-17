@@ -20,6 +20,9 @@ class HeroBannerSkeleton extends StatelessWidget {
     final double hPadding = horizontalPadding ?? ResponsiveUtils.horizontalPadding(context);
     final double ratio = aspectRatio ?? ResponsiveUtils.heroAspectRatio(context);
 
+    final bool isIntermediate = context.breakpoint <= Breakpoint.xl;
+    final double logoScale = isIntermediate ? 1.1 : 1.35;
+
     final Widget skeletonContent = AspectRatio(
       aspectRatio: ratio,
       child: Stack(
@@ -58,30 +61,44 @@ class HeroBannerSkeleton extends StatelessWidget {
               ),
             )
           else
-            // Cinematic: Layout tradicional de texto y botones a la izquierda
+            // Cinematic: Layout sincronizado con Hero real
             Positioned(
-              left: 80,
-              bottom: 45,
+              left: isIntermediate ? 30 : 40,
+              bottom: isIntermediate ? 25 : 45,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // 1. Icono + Categoría
+                  const SkeletonContainer(width: 120, height: 16),
+                  SizedBox(height: isIntermediate ? 10 : 16),
+
+                  // 2. Logo imponente (escalado)
                   SkeletonContainer(
-                    width: 400,
-                    height: ResponsiveUtils.heroLogoHeight(context)
-                  ), // Logo imponente
-                  const SizedBox(height: 24),
-                  const SkeletonContainer(width: 500, height: 20), // Metadata row
-                  const SizedBox(height: 24),
-                  const SkeletonContainer(width: 450, height: 60), // Sinopsis
-                  const SizedBox(height: 32),
+                    width: isIntermediate ? 300 : 400,
+                    height: ResponsiveUtils.heroLogoHeight(context) * logoScale,
+                  ),
+                  SizedBox(height: isIntermediate ? 10 : 16),
+
+                  // 3. Metadata row
+                  const SkeletonContainer(width: 450, height: 18),
+                  SizedBox(height: isIntermediate ? 16 : 20),
+
+                  // 4. Sinopsis
+                  SkeletonContainer(
+                    width: MediaQuery.of(context).size.width * (isIntermediate ? 0.35 : 0.28),
+                    height: isIntermediate ? 45 : 60,
+                  ),
+                  SizedBox(height: isIntermediate ? 18 : 32),
+
+                  // 5. Botones
                   Row(
                     children: [
-                      const SkeletonContainer(width: 160, height: 50, borderRadius: 25),
+                      SkeletonContainer(width: isIntermediate ? 140 : 180, height: isIntermediate ? 44 : 54, borderRadius: 54),
                       const SizedBox(width: 12),
-                      const SkeletonContainer(width: 50, height: 50, borderRadius: 25),
+                      SkeletonContainer(width: isIntermediate ? 44 : 54, height: isIntermediate ? 44 : 54, borderRadius: 54),
                       const SizedBox(width: 12),
-                      const SkeletonContainer(width: 50, height: 50, borderRadius: 25),
+                      SkeletonContainer(width: isIntermediate ? 44 : 54, height: isIntermediate ? 44 : 54, borderRadius: 54),
                     ],
                   ),
                 ],
@@ -107,9 +124,9 @@ class HeroBannerSkeleton extends StatelessWidget {
 
     if (useMobileLayout) return skeletonContent;
 
-    // Senior Fix: Aplicar el mismo Padding que el HeroBanner real para evitar Layout Shifts
+    // Senior Fix: Aplicar los mismos Padds que el Hero real
     return Padding(
-      padding: EdgeInsets.fromLTRB(hPadding, 24, hPadding, 48),
+      padding: EdgeInsets.fromLTRB(hPadding, 8, hPadding, 16),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),

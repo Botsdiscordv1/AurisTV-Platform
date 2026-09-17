@@ -32,9 +32,9 @@ class RowSkeleton extends StatelessWidget {
         ? ResponsiveUtils.bannerHeight(context)
         : ResponsiveUtils.posterHeight(context);
     
-    final double totalHeight = isWide 
+    final double totalHeight = (isWide 
         ? ResponsiveUtils.bannerRowHeight(context)
-        : ResponsiveUtils.rowHeight(context, hasInfo: isWide); // Si no es Wide, asumimos Home (no info)
+        : ResponsiveUtils.rowHeight(context, hasInfo: isWide)) + 4.0; // Senior Fix: Buffer de seguridad de 4px
 
     final double spacing = isMobile ? 12.0 : 18.0;
 
@@ -42,22 +42,22 @@ class RowSkeleton extends StatelessWidget {
     final int effectiveItemCount = itemCount ?? ((screenWidth - hPadding) / (cardWidth + spacing)).ceil() + 1;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 32 : 48),
+      padding: EdgeInsets.only(bottom: context.useMobileLayout ? 18 : 32), // Senior: Adaptativo 18px (Mob/Tab) / 32px (Desktop)
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: hPadding),
             child: SkeletonContainer(
-              width: 180,
-              height: ResponsiveUtils.rowTitleFontSize(context)
+              width: 140,
+              height: ResponsiveUtils.rowTitleFontSize(context) * 0.8,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8), // Senior: Unificado a 8px
           SizedBox(
             height: totalHeight,
             child: ListView.separated(
-              padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 5),
+              padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 0), // Senior: Zero padding vertical
               scrollDirection: Axis.horizontal,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: effectiveItemCount,
@@ -65,6 +65,7 @@ class RowSkeleton extends StatelessWidget {
               itemBuilder: (_, __) => SizedBox(
                 width: cardWidth,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min, // Senior Fix: Evitar expansión vertical innecesaria
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // El póster / banner

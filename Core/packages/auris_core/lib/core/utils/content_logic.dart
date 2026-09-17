@@ -1,6 +1,53 @@
-import 'package:collection/collection.dart';
+import '../../data/models/media_item.dart';
+import '../../core/api/api_endpoints.dart';
+import '../../core/api/image_policy.dart';
 import '../../data/models/server/search_result.dart';
 import 'source_utils.dart';
+
+MediaItem mapSearchResultToMediaItem(SearchResult result, String category) {
+  MediaType type = MediaType.series;
+  final c = category.toLowerCase();
+  
+  if (c.contains('anime')) type = MediaType.anime;
+  else if (c.contains('movie') || c.contains('pelicula')) type = MediaType.movie;
+  else if (c.contains('drama')) type = MediaType.kdrama;
+  else if (c.contains('series')) type = MediaType.series;
+
+  // Inferencia por Kind si el category es genérico
+  final k = result.kind?.toLowerCase() ?? '';
+  if (k == 'movie') type = MediaType.movie;
+  else if (k == 'series') type = MediaType.series;
+  else if (k == 'anime') type = MediaType.anime;
+  else if (k == 'kdrama') type = MediaType.kdrama;
+
+  // Senior Fix: Asegurar que el source sea un nombre de servidor válido
+  String effectiveSource = result.source;
+  if (effectiveSource.isEmpty) {
+    if (result.url.contains('jkanime.net')) effectiveSource = 'JKAnime';
+    else if (result.url.contains('animejara.com')) effectiveSource = 'AnimeJara';
+    else if (result.url.contains('tudorama.net')) effectiveSource = 'TuDorama';
+  }
+
+  return MediaItem(
+    id: result.url,
+    title: result.title,
+    romaji: result.romaji,
+    english: result.english,
+    posterUrl: ApiEndpoints.proxyImage(result.thumbnail, policy: ImageSize.poster, fallbackUrl: result.tmdbThumbnail),
+    bannerUrl: ApiEndpoints.proxyImage(result.banner, policy: ImageSize.banner, fallbackUrl: result.tmdbBanner),
+    logoUrl: ApiEndpoints.proxyImage(result.logo),
+    type: type,
+    synopsis: result.synopsis,
+    rating: result.score,
+    year: result.year,
+    source: effectiveSource,
+    available: true,
+    detailUrl: result.url,
+    trailerKey: result.trailerKey,
+    genres: result.genres ?? const [],
+    card: result,
+  );
+}
 
 int? extractSeason(String? s) {
   if (s == null || s.isEmpty) return null;

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../core/utils/responsive_utils.dart';
 import 'marquee_text.dart';
 
 class FocusableWideCard extends StatefulWidget {
   final String title;
   final String imageUrl;
+  final String? logoUrl; // Senior Fix: Soporte para logo oficial del contenido
   final double? progress;
   final String? subtitle;
   final String? rating;
@@ -21,6 +23,7 @@ class FocusableWideCard extends StatefulWidget {
     required this.title,
     required this.imageUrl,
     required this.onTap,
+    this.logoUrl,
     this.onDelete,
     this.progress,
     this.subtitle,
@@ -50,7 +53,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
         onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
         onExit: (_) { if (mounted) setState(() => _isHovered = false); },
         child: GestureDetector(
-          onTap: widget.onTap,
+          onTap: () => SafeTap.run(widget.onTap),
           child: SizedBox(
             width: widget.width,
             child: Column(
@@ -93,6 +96,26 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                               ),
                             ),
                           ),
+                          if (widget.logoUrl != null && widget.logoUrl!.isNotEmpty)
+                            Positioned(
+                              bottom: 12,
+                              left: 12,
+                              right: 12,
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: widget.width * 0.6,
+                                    maxHeight: widget.height * 0.4,
+                                  ),
+                                  child: CachedNetworkImage(
+                                    imageUrl: widget.logoUrl!,
+                                    fit: BoxFit.contain,
+                                    filterQuality: FilterQuality.medium,
+                                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                                  ),
+                                ),
+                              ),
+                            ),
                           if (widget.onDelete != null && (isSelected || isMobile))
                             Positioned(
                               top: 8, left: 8,

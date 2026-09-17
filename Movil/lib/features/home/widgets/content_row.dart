@@ -7,6 +7,7 @@ import '../../../shared/widgets/focusable_poster_card.dart';
 
 class ContentRow extends StatefulWidget {
   final String title;
+  final String? subtitle;
   final List<MediaItem> items;
   final double horizontalPadding;
   final void Function(MediaItem item) onItemTap;
@@ -14,6 +15,7 @@ class ContentRow extends StatefulWidget {
   const ContentRow({
     super.key,
     required this.title,
+    this.subtitle,
     required this.items,
     required this.onItemTap,
     this.horizontalPadding = 48.0,
@@ -96,23 +98,39 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     
     final double posterHeight = ResponsiveUtils.posterHeight(context);
     final double cardWidth = ResponsiveUtils.posterWidth(context);
-    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: true);
+    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false); // Senior Fix: showInfo is false
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 12 : 24), // Senior Fix: Reducido de 32/48 para compactar secciones
+      padding: EdgeInsets.only(bottom: context.useMobileLayout ? 18 : 32), // Senior Fix: Adaptativo 18px / 32px
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Text(
-              widget.title,
-              style: GoogleFonts.poppins(
-                fontSize: ResponsiveUtils.rowTitleFontSize(context),
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: -0.4,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.title,
+                  style: GoogleFonts.poppins(
+                    fontSize: ResponsiveUtils.rowTitleFontSize(context),
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.subtitle!,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(height: 8), 

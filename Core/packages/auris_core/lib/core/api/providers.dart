@@ -5,6 +5,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import '../../data/models/playback_history.dart';
 import '../../data/repositories/auris_repository.dart';
 import '../../data/repositories/impl/auris_repository_impl.dart';
+import '../utils/user_event_tracker.dart';
 import 'api_client.dart';
 
 /// Senior Fix: Provider global para el navigator key, permitiendo acceder al 
@@ -20,6 +21,11 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 final aurisRepositoryProvider = Provider<AurisRepository>((ref) {
   final client = ref.watch(apiClientProvider);
   return AurisRepositoryImpl(client);
+});
+
+final userEventTrackerProvider = Provider<UserEventTracker>((ref) {
+  final repo = ref.watch(aurisRepositoryProvider);
+  return UserEventTracker(repo);
 });
 
 final playbackHistoryProvider = Provider((ref) {

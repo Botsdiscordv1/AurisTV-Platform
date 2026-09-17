@@ -7,14 +7,15 @@ final favoritesProvider = StateNotifierProvider<FavoritesNotifier, List<Favorite
   final box = Hive.box('favorites');
   final user = ref.watch(authProvider);
   final profileId = user?.activeProfileId ?? 'guest_profile';
-  return FavoritesNotifier(box, profileId);
+  return FavoritesNotifier(box, profileId, ref);
 });
 
 class FavoritesNotifier extends StateNotifier<List<FavoriteItem>> {
   final Box _box;
   final String _profileId;
+  final Ref ref;
 
-  FavoritesNotifier(this._box, this._profileId) : super([]) {
+  FavoritesNotifier(this._box, this._profileId, this.ref) : super([]) {
     _loadFavorites();
   }
 
@@ -38,6 +39,16 @@ class FavoritesNotifier extends StateNotifier<List<FavoriteItem>> {
     } else {
       await _box.put(key, item.toJson());
       state = [item, ...state];
+
+      // [Intelligence] Reportar favorito al motor de personalización
+      final user = ref.read(authProvider);
+      final String? animeId = item.id.contains('/') ? null : item.id; // Heurística: si es URL no es animeId canónico
+      
+      ref.read(userEventTrackerProvider).record(
+        userId: user?.activeProfileId ?? user?.id,
+        animeId: animeId, // Solo si es canónico
+        event: 'favorite',
+      );
     }
   }
 }

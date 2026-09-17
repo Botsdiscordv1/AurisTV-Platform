@@ -73,7 +73,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
         '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
         '&year=${item.year ?? ''}'
-        '${kind != null ? '&type=${Uri.encodeComponent(kind)}' : ''}';
+        '${kind != null ? '&type=${Uri.encodeComponent(kind)}' : ''}'
+        '&sectionId=${Uri.encodeComponent(item.sectionId ?? '')}';
         
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.mounted) context.push(uri, extra: item.toContentSeed());
@@ -98,11 +99,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           // para que el ruteo sea 100% dinámico por MediaItem.
           final targetCat = (category == 'inicio') ? 'inicio' : (row.isMovie ? movieCategory : category);
 
-          if (row.format == RowFormat.horizontal) {
+          if (row.format == SectionPresentation.wide) {
             list.add(SliverToBoxAdapter(
               child: RepaintBoundary(
                 child: WideContentRow(
                   title: row.title,
+                  subtitle: row.subtitle,
                   items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
                   onItemTap: (wideItem) => onTap(context, wideItem.originalItem as MediaItem, targetCat),
                 ),
@@ -113,6 +115,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: RepaintBoundary(
                 child: EditorialContentRow(
                   title: row.title,
+                  subtitle: row.subtitle,
                   items: row.items,
                   badge: row.badge,
                   onItemTap: (item) => onTap(context, item, targetCat),
@@ -132,78 +135,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildSection(HomeLayoutSection section, double horizontalPadding) {
+  Widget _buildSection(ComposedHomeSection section, double horizontalPadding) {
     switch (section.type) {
       case HomeSectionType.continueWatching:
-        final continueWatchingAsync = ref.watch(continueWatchingProvider);
-        
-        return continueWatchingAsync.when(
-          data: (items) {
-            if (items.isEmpty) return const SizedBox.shrink();
-
-            return WideContentRow(
-              title: 'Continuar Viendo',
-              items: items.map((h) {
-                final bool useEpisodeThumb = _isHighQualityThumbnail(h.posterUrl);
-                final String finalImageUrl = useEpisodeThumb ? (h.posterUrl ?? '') : (h.bannerUrl ?? h.posterUrl ?? '');
-
-                String displayTitle = h.title ?? 'Contenido';
-                final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
-                if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
-                  displayTitle = 'Ep ${h.episode} • $displayTitle';
-                }
-
-                String remainingText = '';
-                final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
-                if (remainingMs > 0) {
-                  final minutes = (remainingMs / 60000).ceil();
-                  remainingText = 'Quedan $minutes min';
-                }
-
-                return WideContentItem(
-                  id: h.contentId,
-                  title: displayTitle,
-                  imageUrl: finalImageUrl,
-                  progress: h.progress,
-                  subtitle: remainingText,
-                  onDelete: () {
-                    ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
-                  },
-                  originalItem: h,
-                );
-              }).toList(),
-              onItemTap: (wideItem) {
-                final item = wideItem.originalItem as PlaybackHistory;
-                final uri = '/player/${Uri.encodeComponent(item.contentId)}'
-                    '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
-                    '&source=${Uri.encodeComponent(item.source ?? "")}'
-                    '&episode=${item.episode ?? ""}'
-                    '&season=${item.season ?? ""}'
-                    '&startPosition=${item.positionInMilliseconds}'
-                    '&category=${Uri.encodeComponent(item.category ?? "anime")}'
-                    '&title=${Uri.encodeComponent(item.title ?? "")}'
-                    '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-                    '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
-                    '&language=${Uri.encodeComponent(item.language ?? "")}';
-                context.push(uri);
-              },
-            );
-          },
-          loading: () => RowSkeleton(isWide: true),
-          error: (_, __) => const SizedBox.shrink(),
-        );
+        return _ContinueWatchingSection(horizontalPadding: horizontalPadding);
 
       case HomeSectionType.editorial:
+      case HomeSectionType.discovery:
         final row = section.data as EditorialRow;
-        if (row.format == RowFormat.horizontal) {
+        if (row.format == SectionPresentation.top10) {
+          return EditorialContentRow(
+            title: row.title,
+            subtitle: row.subtitle,
+            items: row.items,
+            badge: row.badge,
+            forceTopDesign: true,
+            onItemTap: (item) => _openDetails(context, item, 'inicio'),
+          );
+        } else if (row.format == SectionPresentation.wide) {
           return WideContentRow(
             title: row.title,
+            subtitle: row.subtitle,
             items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
             onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
           );
         } else {
           return EditorialContentRow(
             title: row.title,
+            subtitle: row.subtitle,
             items: row.items,
             badge: row.badge,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
@@ -215,8 +174,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return top10Async.when(
           data: (items) => EditorialContentRow(
             title: section.title ?? 'Top 10 de hoy',
+            subtitle: null,
             items: items,
             badge: EditorialBadge.mythical,
+            forceTopDesign: true,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           ),
           loading: () => RowSkeleton(),
@@ -228,6 +189,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return recentAddedAsync.when(
           data: (items) => ContentRow(
             title: section.title ?? 'Recién añadido a AurisTV',
+            subtitle: null,
             items: items,
             horizontalPadding: horizontalPadding,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
@@ -241,6 +203,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return trendingAsync.when(
           data: (items) => ContentRow(
             title: section.title ?? 'Animes en tendencia',
+            subtitle: null,
             items: items,
             horizontalPadding: horizontalPadding,
             onItemTap: (item) => _openDetails(context, item, 'animes'),
@@ -254,6 +217,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return movieTrendingAsync.when(
           data: (items) => WideContentRow(
             title: section.title ?? 'Películas destacadas',
+            subtitle: null,
             items: items.map((m) => _wideItemFromMedia(m)).toList(),
             onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'películas'),
           ),
@@ -266,6 +230,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return recentAsync.when(
           data: (items) => WideContentRow(
             title: section.title ?? 'Estrenos (Hoy)',
+            subtitle: null,
             items: items.map((m) => _wideItemFromMedia(
               m,
               badgeOverlay: m.airingAt != null ? AiringCountdownBadge(airingAt: m.airingAt!, aired: m.aired) : null,
@@ -275,6 +240,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           loading: () => RowSkeleton(isWide: true),
           error: (err, _) => const SizedBox.shrink(),
         );
+
+      case HomeSectionType.recommendation:
+        final row = section.data as EditorialRow;
+        if (row.format == SectionPresentation.top10) {
+          return EditorialContentRow(
+            title: row.title,
+            subtitle: row.subtitle,
+            items: row.items,
+            badge: row.badge,
+            forceTopDesign: true,
+            onItemTap: (item) => _openDetails(context, item, 'inicio'),
+          );
+        } else if (row.format == SectionPresentation.wide) {
+          return WideContentRow(
+            title: row.title,
+            subtitle: row.subtitle,
+            items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
+            onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
+          );
+        } else {
+          return ContentRow(
+            title: row.title,
+            subtitle: row.subtitle,
+            items: row.items,
+            horizontalPadding: horizontalPadding,
+            onItemTap: (item) => _openDetails(context, item, 'inicio'),
+          );
+        }
     }
   }
 
@@ -290,9 +283,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final url = seed?.url ?? item.id;
     final quality = seed?.quality ?? '';
     final type = seed?.type ?? '';
+    final kind = seed?.kind ?? (item.type == MediaType.movie ? 'movie_anime' : 'anime');
+    final effectiveCat = (kind == 'movie_anime' || item.type == MediaType.movie) ? 'movie_anime' : 'anime';
 
     final uri =
-        '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(source)}&category=anime&url=${Uri.encodeComponent(url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=&year=${itemYear ?? ''}&quality=${Uri.encodeComponent(quality)}&type=${Uri.encodeComponent(type)}';
+        '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(source)}&category=${Uri.encodeComponent(effectiveCat)}&url=${Uri.encodeComponent(url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=&year=${itemYear ?? ''}&quality=${Uri.encodeComponent(quality)}&type=${Uri.encodeComponent(type)}&kind=${Uri.encodeComponent(kind)}';
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.mounted) context.push(uri, extra: item.toContentSeed());
@@ -303,6 +298,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         id: m.id,
         title: m.title,
         imageUrl: m.bannerUrl ?? m.posterUrl,
+        logoUrl: m.logoUrl,
         subtitle: m.subtitle,
         rating: formatRating(m.rating),
         badgeOverlay: badgeOverlay,
@@ -320,6 +316,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final currentCategory = ref.watch(homeCategoryProvider);
+    ref.listen(homeCategoryProvider, (prev, next) {
+      if (prev != next && prev != null && _scrollController.hasClients) {
+        _scrollController.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+      }
+    });
     final isMobile = ResponsiveUtils.isMobile(context);
     final width = MediaQuery.of(context).size.width;
 
@@ -343,7 +344,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final recentAsync = ref.watch(recentEpisodesProvider);
     final movieTrendingAsync = ref.watch(trendingListProvider('películas'));
     final animeMoviesAsync = ref.watch(animeMoviesProvider);
-    final editorialRowsAsync = ref.watch(editorialRowsProvider);
+    final editorialRowsAsync = ref.watch(editorialRowsProvider(currentCategory));
 
     // Senior Logic: Una vez que el provider deja de estar en carga (ya sea éxito o error),
     // mandamos la señal al index.html para desvanecer y eliminar el Splash Screen.
@@ -414,7 +415,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)), // Senior: Reducido para inmediatez visual en tablets
 
               // 2. Contenido dinámico con Server-Driven UI Lite
               if (currentCategory == 'inicio') 
@@ -438,75 +439,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
                 )
-              else if (currentCategory == 'animes') ...[
-                  recentAsync.when(
-                  data: (items) => SliverToBoxAdapter(
-                    child: WideContentRow(
-                      key: const ValueKey('recent_animes'),
-                      title: 'Estrenos (Hoy)',
-                      items: items.map((m) => _wideItemFromMedia(
-                        m,
-                        badgeOverlay: m.airingAt != null
-                            ? AiringCountdownBadge(airingAt: m.airingAt!, aired: m.aired)
-                            : null,
-                      )).toList(),
-                      onItemTap: (wideItem) => _openScheduleItem(context, wideItem.originalItem as MediaItem),
+              else
+                layoutAsync.when(
+                  data: (sections) => SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _buildSection(sections[index], horizontalPadding),
+                      childCount: sections.length,
                     ),
                   ),
-                  loading: () => SliverToBoxAdapter(child: RowSkeleton(isWide: true)),
-                  error: (err, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-                ),
-                
-                trendingAsync.when(
-                  data: (items) => SliverToBoxAdapter(
-                    child: ContentRow(
-                      key: const ValueKey('trending_seasonal'),
-                      title: 'Populares esta temporada',
-                      items: items,
-                      horizontalPadding: horizontalPadding,
-                      onItemTap: (item) => _openDetails(context, item, 'animes'),
+                  loading: () => SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 12),
+                        ...List.generate(3, (index) => const RowSkeleton()),
+                      ],
                     ),
                   ),
-                  loading: () => SliverToBoxAdapter(child: RowSkeleton()),
-                  error: (err, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                  error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
                 ),
-
-                ..._buildEditorialRows(editorialRowsAsync, _openDetails,
-                    'animes', includeMovies: true,
-                    movieCategory: 'anime_movies'),
-              ]
-else if (currentCategory == 'películas') ...[
-                SliverToBoxAdapter(
-                  child: WideContentRow(
-                    key: const ValueKey('trending_movies'),
-                    title: 'Cine Recomendado',
-                    items: trendingItems.map((m) => _wideItemFromMedia(m)).toList(),
-                    onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'películas'),
-                  ),
-                ),
-              ] else if (currentCategory == 'series') ...[
-                SliverToBoxAdapter(
-                  child: ContentRow(
-                    key: const ValueKey('trending'),
-                    title: 'Series y Dramas Populares',
-                    items: trendingItems,
-                    horizontalPadding: horizontalPadding,
-                    onItemTap: (item) => _openDetails(context, item, 'series'),
-                  ),
-                ),
-              ] else if (currentCategory == 'kdrama') ...[
-                SliverToBoxAdapter(
-                  child: ContentRow(
-                    key: const ValueKey('trending_kdrama'),
-                    title: 'Doramas Populares',
-                    items: trendingItems,
-                    horizontalPadding: horizontalPadding,
-                    onItemTap: (item) => _openDetails(context, item, 'kdrama'),
-                  ),
-                ),
-              ],
               
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              SliverToBoxAdapter(child: SizedBox(height: context.useMobileLayout ? 18 : 32)), // Senior: Espaciado final adaptativo (18/32)
             ],
           ),
           
@@ -1315,3 +1267,80 @@ class _LanguageItemState extends State<_LanguageItem> {
     );
   }
 }
+
+class _ContinueWatchingSection extends ConsumerWidget {
+  final double horizontalPadding;
+  final String? categoryFilter;
+  const _ContinueWatchingSection({required this.horizontalPadding, this.categoryFilter});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final continueWatchingAsync = ref.watch(continueWatchingProvider);
+
+    return continueWatchingAsync.when(
+      data: (items) {
+        // Senior Logic: Aplicar filtro de categoría si se solicita (ej: 'anime')
+        final filteredItems = categoryFilter == null
+            ? items
+            : items.where((h) => h.category?.toLowerCase() == categoryFilter!.toLowerCase()).toList();
+
+        if (filteredItems.isEmpty) return const SizedBox.shrink();
+
+        return RepaintBoundary(
+          child: WideContentRow(
+            title: 'Continuar Viendo',
+            items: filteredItems.map((h) => _mapHistoryToWide(ref, h)).toList(),
+            onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
+          ),
+        );
+      },
+      // Mientras carga (Hot Restart), mostramos el esqueleto para evitar saltos visuales
+      loading: () => const RowSkeleton(isWide: true),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
+    String displayTitle = h.title ?? 'Contenido';
+    final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
+    if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+      displayTitle = 'Ep ${h.episode} • $displayTitle';
+    }
+
+    String remainingText = '';
+    final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
+    if (remainingMs > 0) {
+      final minutes = (remainingMs / 60000).ceil();
+      remainingText = 'Quedan $minutes min';
+    }
+
+    return WideContentItem(
+      id: h.contentId,
+      title: displayTitle,
+      imageUrl: h.bannerUrl ?? h.posterUrl ?? '',
+      progress: h.progress,
+      subtitle: remainingText,
+      onDelete: () {
+        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+      },
+      originalItem: h,
+    );
+  }
+
+  void _onTap(BuildContext context, PlaybackHistory item) {
+    final uri = '/player/${Uri.encodeComponent(item.contentId)}'
+        '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
+        '&source=${Uri.encodeComponent(item.source ?? "")}'
+        '&episode=${item.episode ?? ""}'
+        '&season=${item.season ?? ""}'
+        '&startPosition=${item.positionInMilliseconds}'
+        '&category=${Uri.encodeComponent(item.category ?? "anime")}'
+        '&title=${Uri.encodeComponent(item.title ?? "")}'
+        '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
+        '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
+        '&language=${Uri.encodeComponent(item.language ?? "")}';
+    context.push(uri);
+  }
+}
+
+

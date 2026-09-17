@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../home/presentation/providers/home_provider.dart';
 import '../../schedule/presentation/schedule_screen.dart';
 
 final _exploreFilterProvider = StateProvider<String>((ref) => 'En Emisión');
@@ -266,7 +264,7 @@ class ExploreScreen extends ConsumerWidget {
                             context.push(
                               '/content/${Uri.encodeComponent(item.title)}'
                               '?source=${Uri.encodeComponent(item.source)}'
-                              '&category=${item.type.name}'
+                              '&category=${(item.card?.kind == "movie_anime") ? "movie_anime" : item.type.name}'
                               '&url=${Uri.encodeComponent(item.id)}'
                               '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
                               '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'

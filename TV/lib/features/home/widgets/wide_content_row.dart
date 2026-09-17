@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/utils/responsive_utils.dart';
+import 'package:auris_core/auris_core.dart';
+import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/focusable_wide_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 
 class WideContentItem {
   final String id;
   final String title;
   final String imageUrl;
+  final String? logoUrl; // Senior Fix: Soporte para logo en WideCard
   final String? subtitle;
   final String? rating;
   final double? progress;
@@ -19,6 +20,7 @@ class WideContentItem {
     required this.id,
     required this.title,
     required this.imageUrl,
+    this.logoUrl,
     this.subtitle,
     this.rating,
     this.progress,
@@ -30,12 +32,14 @@ class WideContentItem {
 
 class WideContentRow extends StatefulWidget {
   final String title;
+  final String? subtitle;
   final List<WideContentItem> items;
   final void Function(WideContentItem item) onItemTap;
 
   const WideContentRow({
     super.key,
     required this.title,
+    this.subtitle,
     required this.items,
     required this.onItemTap,
   });
@@ -79,31 +83,52 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
     super.build(context);
     if (widget.items.isEmpty) return const SizedBox.shrink();
 
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final cardWidth = isMobile ? ResponsiveUtils.sp(context, 280.0) : 320.0; // Reducido de 420 (sp ya escala)
-    final cardHeight = isMobile ? ResponsiveUtils.sp(context, 160.0) : 180.0; // Reducido de 240
+    const isMobile = false;
+    final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
+    final cardWidth = TVResponsiveUtils.bannerWidth(context); 
+    final cardHeight = TVResponsiveUtils.bannerHeight(context);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 12 : 16), // Senior Fix: Reducido para TV
+      padding: const EdgeInsets.only(bottom: 12), // Senior Fix: Reducido para TV
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ExcludeFocus(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: Text(
-                widget.title,
-                style: GoogleFonts.poppins(
-                  fontSize: isMobile ? 18 : 20, // Reducido de 26
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: -0.4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: GoogleFonts.poppins(
+                          fontSize: TVResponsiveUtils.rowTitleFontSize(context),
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          widget.subtitle!,
+                          style: GoogleFonts.poppins(
+                            fontSize: TVResponsiveUtils.sp(context, 11),
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 6),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
           MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
@@ -111,56 +136,31 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
               children: [
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final double width = constraints.maxWidth;
-                    final double fadeOffset = horizontalPadding / width;
-                    final double fadeSize = 40 / width;
-
                     return SizedBox(
-                      height: isMobile ? ResponsiveUtils.sp(context, 225) : 260, // Reducido de 355
+                      height: TVResponsiveUtils.bannerRowHeight(context) - 10, // Ajustado para TV
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           _updateScrollIndicators();
                           return false;
                         },
-                        child: ShaderMask(
-                          shaderCallback: (Rect rect) {
-                            return LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                Colors.transparent,
-                                _canScrollLeft ? Colors.transparent : Colors.black,
-                                Colors.black,
-                                Colors.black,
-                                _canScrollRight ? Colors.transparent : Colors.black,
-                                Colors.transparent,
-                              ],
-                              stops: [
-                                0.0,
-                                fadeOffset,
-                                (fadeOffset + fadeSize).clamp(0.0, 1.0),
-                                (1.0 - fadeOffset - fadeSize).clamp(0.0, 1.0),
-                                1.0 - fadeOffset,
-                                1.0,
-                              ],
-                            ).createShader(rect);
-                          },
-                          blendMode: BlendMode.dstIn,
+                        child: Focus(
+                          canRequestFocus: false,
                           child: ListView.separated(
                             controller: _scrollController,
                             physics: const ClampingScrollPhysics(),
                             clipBehavior: Clip.none, 
                             scrollDirection: Axis.horizontal,
-                            primary: false, // Senior Fix: Evita que el ScrollView intente capturar el foco
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5), // Senior: Ajuste de padding vertical
+                            primary: false, 
+                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5), 
                             itemCount: widget.items.length,
-                            separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
+                            separatorBuilder: (_, __) => const SizedBox(width: 16),
                             itemBuilder: (context, index) {
                               final item = widget.items[index];
                               
                               return FocusableWideCard(
                                 title: item.title,
                                 imageUrl: item.imageUrl,
+                                logoUrl: item.logoUrl,
                                 progress: item.progress,
                                 subtitle: item.subtitle,
                                 rating: item.rating,

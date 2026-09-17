@@ -8,6 +8,7 @@ class WideContentItem {
   final String id;
   final String title;
   final String imageUrl;
+  final String? logoUrl; // Senior Fix: Soporte para logo en WideCard
   final String? subtitle;
   final String? rating;
   final double? progress;
@@ -19,6 +20,7 @@ class WideContentItem {
     required this.id,
     required this.title,
     required this.imageUrl,
+    this.logoUrl,
     this.subtitle,
     this.rating,
     this.progress,
@@ -30,12 +32,14 @@ class WideContentItem {
 
 class WideContentRow extends StatefulWidget {
   final String title;
+  final String? subtitle;
   final List<WideContentItem> items;
   final void Function(WideContentItem item) onItemTap;
 
   const WideContentRow({
     super.key,
     required this.title,
+    this.subtitle,
     required this.items,
     required this.onItemTap,
   });
@@ -108,23 +112,39 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
     final rowHeight = ResponsiveUtils.bannerRowHeight(context);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 12 : 24), // Senior Fix: Reducido de 32/48 para compactar secciones
+      padding: EdgeInsets.only(bottom: context.useMobileLayout ? 18 : 32), // Senior Fix: Adaptativo 18px / 32px
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Text(
-              widget.title,
-              style: GoogleFonts.poppins(
-                fontSize: ResponsiveUtils.rowTitleFontSize(context),
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: -0.4,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.title,
+                  style: GoogleFonts.poppins(
+                    fontSize: ResponsiveUtils.rowTitleFontSize(context),
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.subtitle!,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8), // Senior: Unificado a 8px
           MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
@@ -148,7 +168,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                           physics: const ClampingScrollPhysics(),
                           clipBehavior: Clip.none, 
                           scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5), // Senior: Ajuste de padding vertical
+                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px vertical
                           itemCount: widget.items.length,
                           separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
                           itemBuilder: (context, index) {
@@ -157,6 +177,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                             return FocusableWideCard(
                               title: item.title,
                               imageUrl: item.imageUrl,
+                              logoUrl: item.logoUrl,
                               progress: item.progress,
                               subtitle: item.subtitle,
                               rating: item.rating,

@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
 import 'providers/search_provider.dart';
 import 'widgets/search_widgets.dart';
@@ -345,7 +345,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         key: const ValueKey('pre_search_desktop'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // COLUMNA IZQUIERDA (GÉNEROS + TRENDING)
+          // COLUMNA IZQUIERDA (GÉNEROS + DISCOVERY FEED)
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 40, right: 24),
@@ -353,8 +353,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SearchGenresGrid(onGenreTap: _performSearch),
-                  const SizedBox(height: 32),
-                  SearchTrendingSection(onTrendingTap: _onContentTap),
+                  const SizedBox(height: 8),
+                  SearchDiscoveryFeed(
+                    category: _selectedCategory,
+                    onContentTap: _onContentTap,
+                  ),
                 ],
               ),
             ),
@@ -382,8 +385,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         children: [
           SearchHistorySection(onQueryTap: _performSearch),
           SearchGenresGrid(onGenreTap: _performSearch),
-          const SizedBox(height: 16),
-          SearchTrendingSection(onTrendingTap: _onContentTap),
+          const SizedBox(height: 8),
+          SearchDiscoveryFeed(
+            category: _selectedCategory,
+            onContentTap: _onContentTap,
+          ),
         ],
       ),
     );
@@ -538,8 +544,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           
           const SizedBox(height: 60),
           
-          // RECOMENDACIONES (EL TOP 10 RECIÉN CREADO)
-          SearchTrendingSection(onTrendingTap: _onContentTap),
+          // RECOMENDACIONES (EL NUEVO FEED DE DESCUBRIMIENTO)
+          SearchDiscoveryFeed(
+            category: _selectedCategory,
+            onContentTap: _onContentTap,
+          ),
           
           const SizedBox(height: 40),
           

@@ -1129,8 +1129,8 @@ class _ActionSquareButton extends StatelessWidget {
 }
 
 class _ThemeCard extends StatefulWidget {
-  final AnimeThemeInfo theme; final bool isOP; final String? fallbackImage;
-  const _ThemeCard({required this.theme, required this.isOP, this.fallbackImage});
+  final AnimeThemeInfo theme; final bool isOP; final String? fallbackImage; final String animeTitle;
+  const _ThemeCard({required this.theme, required this.isOP, this.fallbackImage, required this.animeTitle});
   @override State<_ThemeCard> createState() => _ThemeCardState();
 }
 
@@ -1153,7 +1153,8 @@ class _ThemeCardState extends State<_ThemeCard> {
           String url = widget.theme.videoUrl; final typeLabel = widget.isOP ? 'OP' : 'ED';
           if (!url.startsWith('http')) { 
             url = 'https://www.youtube.com/watch?v=$url'; 
-            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube&language=SUB'); 
+            final extraTitleParam = '&title=${Uri.encodeComponent(widget.animeTitle)}&episodeTitle=${Uri.encodeComponent(widget.theme.title)}';
+            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube&language=SUB$extraTitleParam'); 
           }
           else { 
             String url720 = widget.theme.video720 ?? '';
@@ -1165,7 +1166,8 @@ class _ThemeCardState extends State<_ThemeCard> {
             }
             final v720Param = url720.isNotEmpty ? '&video720=${Uri.encodeComponent(url720)}' : '';
             final v1080Param = url1080.isNotEmpty ? '&video1080=${Uri.encodeComponent(url1080)}' : '';
-            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes&language=SUB$v720Param$v1080Param'); 
+            final extraTitleParam = '&title=${Uri.encodeComponent(widget.animeTitle)}&episodeTitle=${Uri.encodeComponent(widget.theme.title)}';
+            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes&language=SUB$v720Param$v1080Param$extraTitleParam'); 
           }
         }, 
         child: AnimatedContainer(
@@ -1440,6 +1442,7 @@ class ContentScreen extends ConsumerStatefulWidget {
   final String category;
   final int? year;
   final int? totalSeasons;
+  final String? sectionId;
 
   /// Card abierta (con sus fuentes/servidores). Se usa para sembrar al instante la
   /// lista de servidores sin re-raspear en vivo. Para deep-links (sin card) es null
@@ -1458,6 +1461,7 @@ class ContentScreen extends ConsumerStatefulWidget {
     this.category = 'all',
     this.year,
     this.totalSeasons,
+    this.sectionId,
     this.result,
   });
 
@@ -1534,10 +1538,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       source: widget.source,
       url: widget.url,
       type: widget.type,
+      sectionId: widget.sectionId,
       initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
     );
 
     final detailState = ref.watch(unifiedContentProvider(detailParams));
+    
+    // [Intelligence] Tracking de personalización al entrar a la pantalla
+    ref.watch(detailViewTrackerProvider(detailParams));
 
     // Senior Sync Fix: Sincronizar fuentes con el player de forma segura (sin microtasks)
     ref.listen<UnifiedContentState>(unifiedContentProvider(detailParams), (prev, next) {
@@ -1577,7 +1585,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     int _ti = 0;
     final episodesTabIndex = hasEpisodesTab ? _ti++ : -1;
     final relatedTabIndex = _ti++;
-    final extrasTabIndex = (detailData is AnimeDetail && (detailData.openings.isNotEmpty || detailData.endings.isNotEmpty)) ? _ti++ : -1;
+    
+    final currentOpenings = detailData is AnimeDetail 
+        ? detailData.openings 
+        : (detailData is MovieDetail ? (detailData as MovieDetail).openings : const []);
+    final currentEndings = detailData is AnimeDetail 
+        ? detailData.endings 
+        : (detailData is MovieDetail ? (detailData as MovieDetail).endings : const []);
+    final extrasTabIndex = (currentOpenings.isNotEmpty || currentEndings.isNotEmpty) ? _ti++ : -1;
+    
     final detailsTabIndex = _ti++;
     final galleryTabIndex = _ti++;
 
@@ -1782,7 +1798,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 unifiedRelations: unifiedRelationsAsync.valueOrNull,
                 currentSource: currentSource,
               ),
-              if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(detailAsync.valueOrNull?.anime, hPadding),
+              if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(detailData, hPadding),
               if (selectedTabIndex == detailsTabIndex) ..._buildDetailsTab(detailData, hPadding, inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, sourceRating: currentSource?.score, showRatingSkeleton: currentSource?.score == null && detailLoading),
               if (selectedTabIndex == galleryTabIndex) ..._buildGalleryTab(
                 hPadding,
@@ -2101,13 +2117,25 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     ];
   }
 
-  List<Widget> _buildExtrasTab(AnimeDetail? detail, double hPadding) {
+  List<Widget> _buildExtrasTab(dynamic detail, double hPadding) {
     if (detail == null) return [const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 40), child: Center(child: CircularProgressIndicator(color: Colors.white24))))];
-    final isMobile = ResponsiveUtils.isMobile(context); final ops = detail.openings; final eds = detail.endings;
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final List<AnimeThemeInfo> ops = detail is AnimeDetail 
+        ? detail.openings 
+        : (detail is MovieDetail ? (detail as MovieDetail).openings : const []);
+    final List<AnimeThemeInfo> eds = detail is AnimeDetail 
+        ? detail.endings 
+        : (detail is MovieDetail ? (detail as MovieDetail).endings : const []);
+    final String? fallbackImg = detail is AnimeDetail 
+        ? (detail.banner ?? detail.backdrop) 
+        : (detail is MovieDetail ? ((detail as MovieDetail).backdrop ?? (detail as MovieDetail).poster) : null);
+
+    final String animeTitle = detail is AnimeDetail ? (detail as AnimeDetail).title : (detail is MovieDetail ? (detail as MovieDetail).title : '');
+
     if (ops.isEmpty && eds.isEmpty) return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay temas musicales disponibles', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
     return [
-      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: detail.banner ?? detail.backdrop), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
-      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: detail.banner ?? detail.backdrop), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: fallbackImg, animeTitle: animeTitle), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: fallbackImg, animeTitle: animeTitle), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
     ];
   }
 
@@ -2127,8 +2155,20 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     if (isMobile) return [ 
       SliverPadding(padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 0, bottom: 10), sliver: SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ 
-        const Text('M\u00E1s informaci\u00F3n', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), 
-        const SizedBox(height: 20), 
+        Text(detail.title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+        if (detail is MovieDetail && detail.originalTitle != null && detail.originalTitle!.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            detail.originalTitle!,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
         if (detail.genres is List) Wrap(spacing: 8, runSpacing: 8, children: (detail.genres as List).map<Widget>((g) => _buildBadge(context, g.toString().toUpperCase())).toList()), 
         const SizedBox(height: 20), 
         _ExpandableText(
@@ -2148,7 +2188,28 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         Text(_getWarningText(cert), style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 14)), 
         const SizedBox(height: 24), 
         if (status != null) ...[const Text('Estado', style: TextStyle(color: Colors.white, fontSize: 16)), Text(status, style: const TextStyle(color: const Color(0xFFA5A5AA))), const SizedBox(height: 24)],
-        if (languages.isNotEmpty) ...[const Text('Idiomas', style: TextStyle(color: Colors.white, fontSize: 16)), Text(languages.join(', '), style: const TextStyle(color: const Color(0xFFA5A5AA))), const SizedBox(height: 24)],
+        if (languages.isNotEmpty) ...[
+          const Text('Pa\u00EDs', style: TextStyle(color: Colors.white, fontSize: 16)),
+          Text(() {
+              return languages.map((l) {
+                final country = l.toLowerCase();
+                String emoji = '';
+                if (country.contains('jap')) emoji = '🇯🇵';
+                else if (country.contains('cor')) emoji = '🇰🇷';
+                else if (country.contains('usa') || country.contains('estat') || country.contains('eeuu')) emoji = '🇺🇸';
+                else if (country.contains('esp') || country.contains('spain')) emoji = '🇪🇸';
+                else if (country.contains('mex')) emoji = '🇲🇽';
+                else if (country.contains('chi')) emoji = '🇨🇳';
+                else if (country.contains('fra')) emoji = '🇫🇷';
+                else if (country.contains('ing') || country.contains('uk')) emoji = '🇬🇧';
+                else if (country.contains('ale') || country.contains('ger')) emoji = '🇩🇪';
+                else if (country.contains('ita')) emoji = '🇮🇹';
+
+                return emoji.isNotEmpty ? '$emoji $l' : l;
+              }).join('  ');
+          }(), style: const TextStyle(color: const Color(0xFFA5A5AA))),
+          const SizedBox(height: 24)
+        ],
         if (dir.isNotEmpty) ...[const Text('Direcci\u00F3n', style: TextStyle(color: Colors.white, fontSize: 16)), Text(dir.join(', '), style: const TextStyle(color: Color(0xFFA5A5AA)))], 
         if (cast.isNotEmpty && detail is! MovieDetail) ...[const SizedBox(height: 24), const Text('Elenco', style: TextStyle(color: Colors.white, fontSize: 16)), Text(cast.join(', '), style: const TextStyle(color: const Color(0xFFA5A5AA)))], 
         if (std.isNotEmpty) ...[const SizedBox(height: 24), const Text('Estudio', style: TextStyle(color: Colors.white, fontSize: 16)), Text(std.join(', '), style: const TextStyle(color: const Color(0xFFA5A5AA)))] 
@@ -2161,14 +2222,44 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       SliverPadding(padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 8, bottom: 20), sliver: SliverToBoxAdapter(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(flex: 15, child: Column(children: [
           _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(detail.title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)), const SizedBox(height: 10),
+            Text(detail.title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
+            if (detail is MovieDetail && detail.originalTitle != null && detail.originalTitle!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                detail.originalTitle!,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
             Wrap(spacing: 8, children: [ Text(detail is AnimeDetail ? 'Jap\u00F3n' : 'Internacional', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 17)), const Text('•', style: TextStyle(color: Colors.white24)), Text(detail is AnimeDetail ? 'Anime' : 'Pel\u00EDcula', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 17)) ]), const SizedBox(height: 10),
-            Row(children: [ const Text('IMDb ', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17, fontWeight: FontWeight.w900)), if (showRatingSkeleton && rating == null) const _RatingSkeleton(width: 36, height: 18) else Text(rating ?? 'N/A', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17)), const Text('/10', style: TextStyle(color: const Color(0xFFA5A5AA))), const SizedBox(width: 16), Text(year, style: const TextStyle(color: const Color(0xFFA5A5AA))), if (sInfo.isNotEmpty) ...[const SizedBox(width: 16), Text(sInfo, style: const TextStyle(color: const Color(0xFFA5A5AA)))] ]), const SizedBox(height: 16),
+            Row(children: [ const Text('IMDb ', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17, fontWeight: FontWeight.w900)), if (showRatingSkeleton && rating == null) const _RatingSkeleton(width: 36, height: 18) else Text(rating ?? 'N/A', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17)), const Text('/10', style: TextStyle(color: const Color(0xFFA5A5AA))), const SizedBox(width: 16), Text((detail is MovieDetail && detail.releaseDate != null && detail.releaseDate!.isNotEmpty) ? detail.releaseDate! : year, style: const TextStyle(color: const Color(0xFFA5A5AA))), if (sInfo.isNotEmpty) ...[const SizedBox(width: 16), Text(sInfo, style: const TextStyle(color: const Color(0xFFA5A5AA)))] ]), const SizedBox(height: 16),
             _ExpandableText(text: detail.overview ?? '', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 20), maxLines: 4)
           ])),
           const SizedBox(height: 24), if (dir.isNotEmpty || cast.isNotEmpty || std.isNotEmpty || status != null || languages.isNotEmpty) _DetailInfoCard(child: Column(children: [ 
             if (status != null) _buildPrimeRow('Estado', status),
-            if (languages.isNotEmpty) _buildPrimeRow('Idioma', languages.join(', ')),
+            if (languages.isNotEmpty) _buildPrimeRow('Pa\u00EDs', () {
+              return languages.map((l) {
+                final country = l.toLowerCase();
+                String emoji = '';
+                if (country.contains('jap')) emoji = '🇯🇵';
+                else if (country.contains('cor')) emoji = '🇰🇷';
+                else if (country.contains('usa') || country.contains('estat') || country.contains('eeuu')) emoji = '🇺🇸';
+                else if (country.contains('esp') || country.contains('spain')) emoji = '🇪🇸';
+                else if (country.contains('mex')) emoji = '🇲🇽';
+                else if (country.contains('chi')) emoji = '🇨🇳';
+                else if (country.contains('fra')) emoji = '🇫🇷';
+                else if (country.contains('ing') || country.contains('uk')) emoji = '🇬🇧';
+                else if (country.contains('ale') || country.contains('ger')) emoji = '🇩🇪';
+                else if (country.contains('ita')) emoji = '🇮🇹';
+
+                return emoji.isNotEmpty ? '$emoji $l' : l;
+              }).join('  ');
+            }()),
             if (dir.isNotEmpty) _buildPrimeRow('Direcci\u00F3n', dir.join(', ')), 
             if (cast.isNotEmpty && detail is! MovieDetail) _buildPrimeRow('Elenco', cast.join(', ')), 
             if (std.isNotEmpty) _buildPrimeRow('Estudio', std.join(', ')) 

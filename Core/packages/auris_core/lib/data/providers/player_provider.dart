@@ -39,6 +39,7 @@ final movieDetailProvider =
 /// o el de Películas/Series basándose en metadatos y categorías.
 final unifiedContentDetailProvider =
     FutureProvider.family<ContentDetailResponse?, UnifiedDetailParams>((ref, params) async {
+  ref.keepAlive();
   final repo = ref.watch(aurisRepositoryProvider);
 
   // 1. Identificar el servidor de origen real basándose en la fuente (source)
@@ -59,39 +60,54 @@ final unifiedContentDetailProvider =
   AnimeDetail? anime;
   MovieDetail? movie;
 
-  // Senior Priority Logic: Si el contenido se identifica como Anime (por categoría, kind o tipo),
-  // forzamos la consulta al servidor de Anime para obtener la mejor metadata (AniList/MAL).
-  final bool isStrictAnime = params.category.toLowerCase() == 'anime' || 
-                             rawKind == 'anime' || 
-                             params.type?.toLowerCase() == 'anime';
+  // Senior Priority Logic: Priorizar estrictamente 'kind' o 'type' sobre 'category'
+  // ya que la categoría de la sección/UI puede ser ambigua (ej: 'inicio').
+  final String? rawType = params.type?.toLowerCase();
+  final bool isStrictAnime = rawKind == 'anime' || 
+                             rawType == 'anime' ||
+                             rawKind == 'tv_anime' ||
+                             rawKind == 'movie_anime' ||
+                             rawType == 'movie_anime' ||
+                             params.category.toLowerCase() == 'anime';
 
-  if (isStrictAnime || isFromAnimeServer) {
-    // Consulta al servidor de anime
-    anime = await repo.getAnimeDetail(
-      title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
-      metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle!)) : null,
-      year: params.year,
-      season: rawKind == 'movie' ? null : params.season,
-      kind: params.kind,
-      url: params.url,
-      type: params.type,
-      imgSize: 'original',
-    );
-  } else if (isFromMovieServer) {
-    // Si viene del servidor movie y no es anime, pedimos a ese servidor.
+  final bool isMovieFormat = rawKind == 'movie' || 
+                             rawKind == 'pelicula' || 
+                             rawKind == 'movie_anime' ||
+                             rawType == 'movie_anime' ||
+                             params.type?.toLowerCase() == 'movie';
+
+  // Senior Decision: Si el formato es una película (incluyendo movie_anime), 
+  // debemos usar obligatoriamente getMovieDetail para mapear la estructura cinematográfica 
+  // (runtime, cast, plataformas) en lugar de la estructura capitulada de series de anime.
+  if (isMovieFormat) {
+    // movie_anime SIEMPRE pertenece al backend de anime, sin importar el source
+    final String? targetServer = (rawKind == 'movie_anime' || rawType == 'movie_anime')
+        ? ApiEndpoints.animeBaseUrl
+        : sourceServer;
     movie = await repo.getMovieDetail(
       title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
       year: params.year,
       metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle!)) : null,
       url: params.url,
       type: params.type,
-      category: params.category,
-      server: sourceServer,
+      category: (rawKind == 'movie_anime' || rawType == 'movie_anime') ? 'movie_anime' : params.category,
+      server: targetServer,
       kind: params.kind,
       imgSize: 'original',
     );
+  } else if (isStrictAnime || isFromAnimeServer) {
+    // Consulta al servidor de anime para series de TV
+    anime = await repo.getAnimeDetail(
+      title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
+      metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle!)) : null,
+      year: params.year,
+      season: params.season,
+      kind: params.kind,
+      url: params.url,
+      type: params.type,
+      imgSize: 'original',
+    );
   } else {
-    // Fallback para búsquedas globales sin origen claro
     movie = await repo.getMovieDetail(
       title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
       year: params.year,
@@ -104,9 +120,14 @@ final unifiedContentDetailProvider =
     );
   }
 
-  // Definición clara de la categoría efectiva
+  // Definición clara de la categoría efectiva y formato cinematográfico
+  final bool isEffectiveMovie = isMovieFormat || 
+                               (movie?.isMovie ?? false) || 
+                               anime?.format?.toLowerCase() == 'movie' ||
+                               anime?.kind?.toLowerCase() == 'movie';
+
   final String trueCategory = anime != null
-      ? 'anime'
+      ? (isEffectiveMovie ? 'movie' : 'anime')
       : (movie != null
           ? (movie.isMovie ? 'movie' : 'series')
           : params.category);
@@ -114,7 +135,7 @@ final unifiedContentDetailProvider =
   return ContentDetailResponse(
     anime: anime,
     movie: movie,
-    isMovieish: rawKind == 'movie' || rawKind == 'pelicula' || (movie?.isMovie ?? false),
+    isMovieish: isEffectiveMovie,
     effectiveCategory: trueCategory,
   );
 });
@@ -154,7 +175,7 @@ class ExtractParams {
 }
 
 final extractProvider =
-    FutureProvider.family<ExtractResult, ExtractParams>((ref, params) async {
+    FutureProvider.autoDispose.family<ExtractResult, ExtractParams>((ref, params) async {
   final repo = ref.watch(aurisRepositoryProvider);
   return repo.extractVideo(params.url, params.source, category: params.category, direct: !kIsWeb);
 });
@@ -194,6 +215,12 @@ class PlayerPreloadController {
     if (baseSource != null) {
       final nextUrl = buildEpisodeUrl(baseSource.url, baseSource.source, nextNum);
       if (nextUrl == _lastPreloadedUrl) return;
+
+      // Senior Fix (Issue #8): Validar URL antes de intentar extract
+      if (nextUrl.isEmpty || !nextUrl.startsWith('http')) {
+        debugPrint('[PlayerPreload] Invalid URL for next episode: $nextUrl');
+        return;
+      }
 
       _isPreloading = true;
       try {

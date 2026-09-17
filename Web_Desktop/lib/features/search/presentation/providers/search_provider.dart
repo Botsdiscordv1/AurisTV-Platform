@@ -27,6 +27,59 @@ final searchTrendingProvider = FutureProvider<List<SearchResult>>((ref) async {
   return response.results.take(10).toList();
 });
 
+class SearchChart {
+  final String title;
+  final List<SearchResult> items;
+  final bool isTop10;
+
+  SearchChart({required this.title, required this.items, this.isTop10 = false});
+}
+
+final searchDiscoveryProvider = FutureProvider.family<List<SearchChart>, String>((ref, category) async {
+  final repo = ref.watch(searchRepositoryProvider);
+
+  final String? apiCategory = category == 'all' ? null : category;
+  final bool isAnime = apiCategory == 'anime';
+
+  final results = await Future.wait([
+    repo.filter(category: apiCategory, page: 1).timeout(const Duration(seconds: 12)),
+
+    isAnime
+      ? repo.filter(category: 'anime', status: 'releasing').timeout(const Duration(seconds: 12))
+      : repo.filter(category: apiCategory, year: DateTime.now().year).timeout(const Duration(seconds: 12)),
+
+    isAnime
+      ? repo.filter(category: 'movie_anime').timeout(const Duration(seconds: 12))
+      : Future.value(const SearchResponse(query: '', category: '', count: 0, results: [])),
+  ]);
+
+  final List<SearchChart> charts = [];
+
+  if (results[0].results.isNotEmpty) {
+    charts.add(SearchChart(
+      title: isAnime ? 'Tendencias de Temporada' : 'Tendencias Globales',
+      items: results[0].results.take(12).toList(),
+      isTop10: true
+    ));
+  }
+
+  if (results[1].results.isNotEmpty) {
+    charts.add(SearchChart(
+      title: isAnime ? 'En Emisión (Simulcast)' : 'Lanzamientos 2025',
+      items: results[1].results.take(12).toList()
+    ));
+  }
+
+  if (isAnime && results[2].results.isNotEmpty) {
+    charts.add(SearchChart(
+      title: 'Películas Destacadas',
+      items: results[2].results.take(12).toList()
+    ));
+  }
+
+  return charts;
+});
+
 final searchHistoryProvider =
     StateNotifierProvider<SearchHistoryNotifier, List<SearchHistoryItem>>((ref) {
   final box = Hive.box('search_history');

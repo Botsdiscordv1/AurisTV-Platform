@@ -9,7 +9,7 @@ import '../../../core/utils/url_utils.dart';
 import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auristv_web/features/player/presentation/player_screen.dart';
-import '../../home/widgets/wide_content_row.dart';
+import '../../home/widgets/unified_section.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -38,24 +38,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     super.dispose();
   }
 
-  void _onHistoryTap(BuildContext context, PlaybackHistory item) {
+  void _onHistoryTap(BuildContext context, MediaItem item) {
+    final history = item.playbackHistory;
+    if (history == null) return;
+
     final player = PlayerScreen(
-      contentId: item.contentId,
-      sourceUrl: item.url ?? item.contentId,
-      source: item.source ?? "",
-      episode: item.episode ?? "1",
-      season: item.season,
-      startPosition: item.positionInMilliseconds,
-      category: item.category,
-      title: item.title,
-      posterUrl: item.posterUrl,
-      bannerUrl: item.bannerUrl,
-      language: item.language,
+      contentId: history.contentId,
+      sourceUrl: history.url ?? history.contentId,
+      source: history.source ?? "",
+      episode: history.episode ?? "1",
+      season: history.season,
+      startPosition: history.positionInMilliseconds,
+      category: history.category,
+      title: history.title,
+      posterUrl: history.posterUrl,
+      bannerUrl: history.bannerUrl,
+      language: history.language,
     );
     UrlUtils.openPlayer(context, player);
   }
 
-  WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
+  MediaItem _historyToMediaItem(PlaybackHistory h) {
     String displayTitle = h.title ?? 'Contenido';
     final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
     if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
@@ -69,16 +72,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       remainingText = 'Quedan $minutes min';
     }
 
-    return WideContentItem(
+    return MediaItem(
       id: h.contentId,
       title: displayTitle,
-      imageUrl: h.posterUrl ?? h.bannerUrl ?? '',
-      progress: h.progress,
+      posterUrl: h.posterUrl ?? '',
+      bannerUrl: h.bannerUrl,
+      type: isMovie ? MediaType.movie : MediaType.anime,
       subtitle: remainingText,
-      onDelete: () {
-        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
-      },
-      originalItem: h,
+      playbackHistory: h,
     );
   }
 
@@ -154,12 +155,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               return SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 40),
-                  child: RepaintBoundary(
-                    child: WideContentRow(
-                      title: 'Continuar Viendo',
-                      items: items.map((h) => _mapHistoryToWide(ref, h)).toList(),
-                      onItemTap: (wideItem) => _onHistoryTap(context, wideItem.originalItem as PlaybackHistory),
-                    ),
+                  child: UnifiedSection(
+                    presentation: SectionPresentation.wide,
+                    title: 'Continuar Viendo',
+                    items: items.map((h) => _historyToMediaItem(h)).toList(),
+                    onItemTap: (item) => _onHistoryTap(context, item),
+                    onItemDelete: (item) {
+                      final h = item.playbackHistory;
+                      if (h != null) {
+                        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+                      }
+                    },
                   ),
                 ),
               );

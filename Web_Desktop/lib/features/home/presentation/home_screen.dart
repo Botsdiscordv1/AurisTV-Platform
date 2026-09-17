@@ -14,6 +14,7 @@ import '../../../core/utils/url_utils.dart';
 import '../widgets/content_row.dart';
 import '../widgets/editorial_content_row.dart';
 import '../widgets/wide_content_row.dart';
+import '../widgets/unified_section.dart';
 import 'package:auristv_web/features/player/presentation/player_screen.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 
@@ -21,11 +22,13 @@ import '../../../shared/widgets/airing_countdown_badge.dart';
 /// sin depender de la instancia privada de _HomeScreenState.
 void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
   final category = switch (uiCategory) {
-    'inicio' => switch (item.type) {
-      MediaType.movie => 'movie',
-      MediaType.kdrama => 'kdrama',
-      _ => 'anime',
-    },
+    'inicio' => (item.card?.kind == 'movie_anime') 
+        ? 'movie_anime' 
+        : switch (item.type) {
+            MediaType.movie => 'movie',
+            MediaType.kdrama => 'kdrama',
+            _ => 'anime',
+          },
     'animes' => 'anime',
     'anime_movies' => 'movie_anime',
     'películas' => 'movie',
@@ -42,6 +45,7 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
     category: category,
     year: item.year,
     type: item.card?.kind,
+    sectionId: item.sectionId,
     from: '/inicio',
   );
       
@@ -148,28 +152,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           
           final targetCat = (category == 'inicio') ? 'inicio' : (row.isMovie ? movieCategory : category);
 
-          if (row.format == RowFormat.horizontal) {
-            list.add(SliverToBoxAdapter(
-              child: RepaintBoundary(
-                child: WideContentRow(
-                  title: row.title,
-                  items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
-                  onItemTap: (wideItem) => openHomeDetails(context, wideItem.originalItem as MediaItem, targetCat),
-                ),
-              ),
-            ));
-          } else {
-            list.add(SliverToBoxAdapter(
-              child: RepaintBoundary(
-                child: EditorialContentRow(
-                  title: row.title,
-                  items: row.items,
-                  badge: row.badge,
-                  onItemTap: (item) => openHomeDetails(context, item, targetCat),
-                ),
-              ),
-            ));
-          }
+          list.add(SliverToBoxAdapter(
+            child: UnifiedSection(
+              presentation: row.format,
+              title: row.title,
+              subtitle: row.subtitle,
+              items: row.items,
+              badge: row.badge,
+              onItemTap: (item) => openHomeDetails(context, item, targetCat),
+            ),
+          ));
         }
         return list;
       },
@@ -182,47 +174,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildSection(HomeLayoutSection section, double horizontalPadding) {
-    switch (section.type) {
-      case HomeSectionType.continueWatching:
-        return _ContinueWatchingSection(horizontalPadding: horizontalPadding);
-
-      case HomeSectionType.editorial:
-        final row = section.data as EditorialRow;
-        if (row.format == RowFormat.horizontal) {
-          return RepaintBoundary(
-            child: WideContentRow(
-              title: row.title,
-              items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
-              onItemTap: (wideItem) => openHomeDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
-            ),
-          );
-        } else {
-          return RepaintBoundary(
-            child: EditorialContentRow(
-              title: row.title,
-              items: row.items,
-              badge: row.badge,
-              onItemTap: (item) => openHomeDetails(context, item, 'inicio'),
-            ),
-          );
-        }
-
-      case HomeSectionType.top10Global:
-        return _Top10Section(title: section.title ?? 'Top 10 de hoy', horizontalPadding: horizontalPadding);
-
-      case HomeSectionType.recentlyAdded:
-        return _RecentlyAddedSection(title: section.title ?? 'Recién añadido', horizontalPadding: horizontalPadding);
-
-      case HomeSectionType.trendingAnime:
-        return _TrendingSection(category: 'animes', title: section.title ?? 'En tendencia', horizontalPadding: horizontalPadding);
-
-      case HomeSectionType.trendingMovies:
-        return _TrendingSection(category: 'películas', title: section.title ?? 'Cine', horizontalPadding: horizontalPadding, isWide: true);
-
-      case HomeSectionType.recentEpisodes:
-        return _RecentEpisodesSection(title: section.title ?? 'Estrenos', horizontalPadding: horizontalPadding);
+  Widget _buildSection(ComposedHomeSection section, double horizontalPadding) {
+    if (section.type == HomeSectionType.continueWatching) {
+      // Pass category filter if provided in data hint from provider
+      final String? categoryFilter = section.data is String ? section.data as String : null;
+      return _ContinueWatchingSection(
+        horizontalPadding: horizontalPadding,
+        categoryFilter: categoryFilter
+      );
     }
+
+    return UnifiedSection(
+      presentation: section.presentation,
+      title: section.title,
+      subtitle: section.subtitle,
+      items: section.items,
+      badge: section.badge,
+      onItemTap: (item) => openHomeDetails(context, item, ref.read(homeCategoryProvider)),
+    );
   }
 
   WideContentItem _wideItemFromMedia(MediaItem m, {Widget? badgeOverlay}) => WideContentItem(
@@ -238,12 +207,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final currentCategory = ref.watch(homeCategoryProvider);
+    // Senior Fix: Al cambiar categoría siempre volver arriba
+    ref.listen(homeCategoryProvider, (prev, next) {
+      if (prev != next && prev != null && _scrollController.hasClients) {
+        _scrollController.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+      }
+    });
     final useMobileLayout = context.useMobileLayout;
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     
     final layoutAsync = ref.watch(homeLayoutProvider);
     final heroBannerItemsAsync = ref.watch(heroBannerItemsProvider(currentCategory));
-    final editorialRowsAsync = ref.watch(editorialRowsProvider);
+    final editorialRowsAsync = ref.watch(editorialRowsProvider(currentCategory));
 
     if (!editorialRowsAsync.isLoading && !_splashRemoved) {
       _splashRemoved = true;
@@ -260,7 +235,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             controller: _scrollController,
             slivers: [
               SliverToBoxAdapter(
-                child: SizedBox(height: useMobileLayout ? (MediaQuery.of(context).padding.top + 60) : 80),
+                child: SizedBox(height: useMobileLayout ? (MediaQuery.of(context).padding.top + 58) : 78),
               ),
 
               // 1. Banner Principal (Conectado al Sistema Editorial del Servidor)
@@ -317,44 +292,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              const SliverToBoxAdapter(child: SizedBox(height: 6)), // Senior: Espaciado refinado para equilibrio visual
               
               // 2. Contenido dinámico
-              if (currentCategory == 'inicio') 
-                layoutAsync.when(
-                  data: (sections) => SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        return RepaintBoundary(
-                          child: _buildSection(sections[index], horizontalPadding),
-                        );
-                      },
-                      childCount: sections.length,
-                    ),
+              layoutAsync.when(
+                data: (sections) => SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      return RepaintBoundary(
+                        child: _buildSection(sections[index], horizontalPadding),
+                      );
+                    },
+                    childCount: sections.length,
                   ),
-                  loading: () => SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 12), // Senior Fix: Separador de seguridad para el primer skeleton
-                        ...List.generate(3, (index) => const RowSkeleton()),
-                      ],
-                    ),
+                ),
+                loading: () => SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      ...List.generate(3, (index) => const RowSkeleton()),
+                    ],
                   ),
-                  error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
-                )
-              else if (currentCategory == 'animes') ...[
-                SliverToBoxAdapter(child: _RecentEpisodesSection(title: 'Estrenos (Hoy)', horizontalPadding: horizontalPadding)),
-                SliverToBoxAdapter(child: _TrendingSection(category: 'animes', title: 'Populares esta temporada', horizontalPadding: horizontalPadding)),
-                ..._buildEditorialRows(editorialRowsAsync, 'animes', includeMovies: true, movieCategory: 'anime_movies'),
-              ] else if (currentCategory == 'películas') ...[
-                SliverToBoxAdapter(child: _TrendingSection(category: 'películas', title: 'Cine Recomendado', horizontalPadding: horizontalPadding, isWide: true)),
-              ] else if (currentCategory == 'series') ...[
-                SliverToBoxAdapter(child: _TrendingSection(category: 'series', title: 'Series y Dramas Populares', horizontalPadding: horizontalPadding)),
-              ] else if (currentCategory == 'kdrama') ...[
-                SliverToBoxAdapter(child: _TrendingSection(category: 'kdrama', title: 'Doramas Populares', horizontalPadding: horizontalPadding)),
-              ],
+                ),
+                error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
+              ),
               
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              SliverToBoxAdapter(child: SizedBox(height: context.useMobileLayout ? 18 : 32)), // Senior: Espaciado final adaptativo (18/32)
             ],
           ),
           
@@ -543,8 +506,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(width: 12),
                 ],
                 _buildUserAvatar(context, isUltraCompact ? true : isCompactDesktop),
-                const SizedBox(width: 20),
-                _AuthButton(isCompactDesktop: isCompactDesktop),
+                SizedBox(width: isCompactDesktop ? 0 : 4), // Senior Fix: Eliminamos espacio extra a la derecha del perfil
               ],
             ),
           ),
@@ -931,7 +893,8 @@ class _LanguageButtonState extends State<_LanguageButton> {
 
 class _ContinueWatchingSection extends ConsumerWidget {
   final double horizontalPadding;
-  const _ContinueWatchingSection({required this.horizontalPadding});
+  final String? categoryFilter;
+  const _ContinueWatchingSection({required this.horizontalPadding, this.categoryFilter});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -939,25 +902,23 @@ class _ContinueWatchingSection extends ConsumerWidget {
 
     return continueWatchingAsync.when(
       data: (items) {
-        // Senior UX: Solo ocultamos con SizedBox.shrink si estamos SEGUROS de que no hay datos.
-        if (items.isEmpty) return const SizedBox.shrink();
+        // Senior Logic: Aplicar filtro de categoría si se solicita (ej: 'anime')
+        final filteredItems = categoryFilter == null
+            ? items
+            : items.where((h) => h.category?.toLowerCase() == categoryFilter!.toLowerCase()).toList();
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 24),
-          child: RepaintBoundary(
-            child: WideContentRow(
-              title: 'Continuar Viendo',
-              items: items.map((h) => _mapHistoryToWide(ref, h)).toList(),
-              onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
-            ),
+        if (filteredItems.isEmpty) return const SizedBox.shrink();
+
+        return RepaintBoundary(
+          child: WideContentRow(
+            title: 'Continuar Viendo',
+            items: filteredItems.map((h) => _mapHistoryToWide(ref, h)).toList(),
+            onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
           ),
         );
       },
       // Mientras carga (Hot Restart), mostramos el esqueleto para evitar saltos visuales
-      loading: () => Padding(
-        padding: const EdgeInsets.only(bottom: 24),
-        child: RowSkeleton(isWide: true),
-      ),
+      loading: () => const RowSkeleton(isWide: true),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
@@ -979,7 +940,8 @@ class _ContinueWatchingSection extends ConsumerWidget {
     return WideContentItem(
       id: h.contentId,
       title: displayTitle,
-      imageUrl: h.posterUrl ?? h.bannerUrl ?? '',
+      imageUrl: h.bannerUrl ?? h.posterUrl ?? '',
+      logoUrl: null, // Historial normalmente no tiene logo independiente guardado aún
       progress: h.progress,
       subtitle: remainingText,
       onDelete: () {
@@ -1012,19 +974,19 @@ class _ContinueWatchingSection extends ConsumerWidget {
 class _Top10Section extends ConsumerWidget {
   final String title;
   final double horizontalPadding;
-  const _Top10Section({required this.title, required this.horizontalPadding});
+  final SectionPresentation presentation;
+  const _Top10Section({required this.title, required this.horizontalPadding, this.presentation = SectionPresentation.top10});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncData = ref.watch(top10GlobalProvider);
     return asyncData.when(
-      data: (items) => RepaintBoundary(
-        child: EditorialContentRow(
-          title: title,
-          items: items,
-          badge: EditorialBadge.mythical,
-          onItemTap: (item) => openHomeDetails(context, item, 'inicio'),
-        ),
+      data: (items) => UnifiedSection(
+        presentation: presentation,
+        title: title,
+        items: items,
+        badge: EditorialBadge.mythical,
+        onItemTap: (item) => openHomeDetails(context, item, 'inicio'),
       ),
       loading: () => const RowSkeleton(),
       error: (_, __) => const SizedBox.shrink(),
@@ -1035,19 +997,18 @@ class _Top10Section extends ConsumerWidget {
 class _RecentlyAddedSection extends ConsumerWidget {
   final String title;
   final double horizontalPadding;
-  const _RecentlyAddedSection({required this.title, required this.horizontalPadding});
+  final SectionPresentation presentation;
+  const _RecentlyAddedSection({required this.title, required this.horizontalPadding, this.presentation = SectionPresentation.poster});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncData = ref.watch(recentlyAddedProvider);
     return asyncData.when(
-      data: (items) => RepaintBoundary(
-        child: ContentRow(
-          title: title,
-          items: items,
-          horizontalPadding: horizontalPadding,
-          onItemTap: (item) => openHomeDetails(context, item, 'inicio'),
-        ),
+      data: (items) => UnifiedSection(
+        presentation: presentation,
+        title: title,
+        items: items,
+        onItemTap: (item) => openHomeDetails(context, item, 'inicio'),
       ),
       loading: () => const RowSkeleton(),
       error: (_, __) => const SizedBox.shrink(),
@@ -1059,36 +1020,20 @@ class _TrendingSection extends ConsumerWidget {
   final String category;
   final String title;
   final double horizontalPadding;
-  final bool isWide;
-  const _TrendingSection({required this.category, required this.title, required this.horizontalPadding, this.isWide = false});
+  final SectionPresentation presentation;
+  const _TrendingSection({required this.category, required this.title, required this.horizontalPadding, this.presentation = SectionPresentation.poster});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncData = ref.watch(trendingListProvider(category));
     return asyncData.when(
-      data: (items) {
-        if (isWide) {
-          return RepaintBoundary(
-            child: WideContentRow(
-              title: title,
-              items: items.map((m) => WideContentItem(
-                id: m.id, title: m.title, imageUrl: m.bannerUrl ?? m.posterUrl,
-                subtitle: m.subtitle, rating: formatRating(m.rating), originalItem: m,
-              )).toList(),
-              onItemTap: (wide) => openHomeDetails(context, wide.originalItem as MediaItem, category),
-            ),
-          );
-        }
-        return RepaintBoundary(
-          child: ContentRow(
-            title: title,
-            items: items,
-            horizontalPadding: horizontalPadding,
-            onItemTap: (item) => openHomeDetails(context, item, category),
-          ),
-        );
-      },
-      loading: () => RowSkeleton(isWide: isWide),
+      data: (items) => UnifiedSection(
+        presentation: presentation,
+        title: title,
+        items: items,
+        onItemTap: (item) => openHomeDetails(context, item, category),
+      ),
+      loading: () => RowSkeleton(isWide: presentation == SectionPresentation.wide),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
@@ -1097,25 +1042,20 @@ class _TrendingSection extends ConsumerWidget {
 class _RecentEpisodesSection extends ConsumerWidget {
   final String title;
   final double horizontalPadding;
-  const _RecentEpisodesSection({required this.title, required this.horizontalPadding});
+  final SectionPresentation presentation;
+  const _RecentEpisodesSection({required this.title, required this.horizontalPadding, this.presentation = SectionPresentation.wide});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncData = ref.watch(recentEpisodesProvider);
     return asyncData.when(
-      data: (items) => RepaintBoundary(
-        child: WideContentRow(
-          title: title,
-          items: items.map((m) => WideContentItem(
-            id: m.id, title: m.title, imageUrl: m.bannerUrl ?? m.posterUrl,
-            subtitle: m.subtitle, rating: formatRating(m.rating),
-            badgeOverlay: m.airingAt != null ? AiringCountdownBadge(airingAt: m.airingAt!, aired: m.aired) : null,
-            originalItem: m,
-          )).toList(),
-          onItemTap: (wide) => openHomeScheduleItem(context, wide.originalItem as MediaItem),
-        ),
+      data: (items) => UnifiedSection(
+        presentation: presentation,
+        title: title,
+        items: items,
+        onItemTap: (item) => openHomeScheduleItem(context, item),
       ),
-      loading: () => const RowSkeleton(isWide: true),
+      loading: () => RowSkeleton(isWide: presentation == SectionPresentation.wide),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
@@ -1123,23 +1063,20 @@ class _RecentEpisodesSection extends ConsumerWidget {
 
 class _AnimeMoviesSection extends ConsumerWidget {
   final double horizontalPadding;
-  const _AnimeMoviesSection({required this.horizontalPadding});
+  final SectionPresentation presentation;
+  const _AnimeMoviesSection({required this.horizontalPadding, this.presentation = SectionPresentation.wide});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncData = ref.watch(animeMoviesProvider);
     return asyncData.when(
-      data: (items) => RepaintBoundary(
-        child: WideContentRow(
-          title: 'Películas de Anime',
-          items: items.map((m) => WideContentItem(
-            id: m.id, title: m.title, imageUrl: m.bannerUrl ?? m.posterUrl,
-            subtitle: m.subtitle, rating: formatRating(m.rating), originalItem: m,
-          )).toList(),
-          onItemTap: (wide) => openHomeDetails(context, wide.originalItem as MediaItem, 'anime_movies'),
-        ),
+      data: (items) => UnifiedSection(
+        presentation: presentation,
+        title: 'Películas de Anime',
+        items: items,
+        onItemTap: (item) => openHomeDetails(context, item, 'anime_movies'),
       ),
-      loading: () => const RowSkeleton(isWide: true),
+      loading: () => RowSkeleton(isWide: presentation == SectionPresentation.wide),
       error: (_, __) => const SizedBox.shrink(),
     );
   }

@@ -23,7 +23,6 @@ import 'package:material_symbols_icons/material_symbols_icons.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
-import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/screen_brightness.dart';
 import '../../../core/utils/web_utils.dart';
 
@@ -3361,32 +3360,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _playerView({List<VideoTrackOption> tracks = const [], required UserSettings settings}) {
-    if (_ytController != null) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          Container(color: Colors.black),
-          Center(
-            child: YoutubePlayer(
-              controller: _ytController!,
-              aspectRatio: 16 / 9,
-            ),
-          ),
-          Positioned(
-            top: 16,
-            left: 16,
-            child: SafeArea(
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 30),
-                onPressed: _exitPlayer,
-                style: IconButton.styleFrom(backgroundColor: Colors.black45),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
     final playableTracks = tracks.where((t) => !t.isDownload).toList();
     if (!_isCurrentTrackEmbed(playableTracks)) return _buildMobilePlayer(playableTracks, settings);
 

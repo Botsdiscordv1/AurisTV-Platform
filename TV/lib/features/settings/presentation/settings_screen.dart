@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import 'providers/settings_provider.dart';
 

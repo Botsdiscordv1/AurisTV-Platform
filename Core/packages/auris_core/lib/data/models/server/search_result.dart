@@ -30,6 +30,8 @@ class SearchResult {
   final int? season;
   final int? totalSeasons;
   final List<String>? genres;
+  final double? progress;
+  final String? sectionId;
 
   final List<SourceItem> sources;
 
@@ -61,6 +63,8 @@ class SearchResult {
     this.season,
     this.totalSeasons,
     this.genres,
+    this.progress,
+    this.sectionId,
     this.sources = const [],
   });
 
@@ -107,6 +111,8 @@ class SearchResult {
     int? season,
     int? totalSeasons,
     List<String>? genres,
+    double? progress,
+    String? sectionId,
     List<SourceItem>? sources,
   }) {
     return SearchResult(
@@ -137,54 +143,58 @@ class SearchResult {
       season: season ?? this.season,
       totalSeasons: totalSeasons ?? this.totalSeasons,
       genres: genres ?? this.genres,
+      progress: progress ?? this.progress,
+      sectionId: sectionId ?? this.sectionId,
       sources: sources ?? this.sources,
     );
   }
 
-  factory SearchResult.fromJson(Map<String, dynamic> json) {
+  factory SearchResult.fromJson(Map<dynamic, dynamic> json) {
     return SearchResult(
-      title: json['title'] as String? ?? '',
-      url: json['url'] as String? ?? '',
-      quality: json['quality'] as String? ?? '',
+      title: json['title']?.toString() ?? '',
+      url: json['url']?.toString() ?? '',
+      quality: json['quality']?.toString() ?? '',
       thumbnail: ApiEndpoints.proxyImage(
-        json['thumbnail'] as String? ?? 
-        json['poster'] as String? ?? 
-        json['posterUrl'] as String? ?? 
-        json['cover'] as String? ?? 
-        json['coverImage'] as String? ?? 
-        json['image'] as String?,
+        json['thumbnail']?.toString() ?? 
+        json['poster']?.toString() ?? 
+        json['posterUrl']?.toString() ?? 
+        json['cover']?.toString() ?? 
+        json['coverImage']?.toString() ?? 
+        json['image']?.toString(),
         policy: ImageSize.poster,
-        fallbackUrl: json['tmdbThumbnail'] as String?,
+        fallbackUrl: json['tmdbThumbnail']?.toString(),
       ),
-      tmdbThumbnail: json['tmdbThumbnail'] as String?,
+      tmdbThumbnail: json['tmdbThumbnail']?.toString(),
       banner: ApiEndpoints.proxyImage(
-        json['banner'] as String? ?? json['backdrop'] as String?, 
+        json['banner']?.toString() ?? json['backdrop']?.toString(), 
         policy: ImageSize.banner,
-        fallbackUrl: json['tmdbBanner'] as String? ?? json['tmdbBackdrop'] as String?,
+        fallbackUrl: json['tmdbBanner']?.toString() ?? json['tmdbBackdrop']?.toString(),
       ),
-      tmdbBanner: json['tmdbBanner'] as String? ?? json['tmdbBackdrop'] as String?,
-      logo: ApiEndpoints.proxyImage(json['logo'] as String?),
-      source: json['source'] as String? ?? '',
-      romaji: json['romaji'] as String?,
-      english: json['english'] as String?,
+      tmdbBanner: json['tmdbBanner']?.toString() ?? json['tmdbBackdrop']?.toString(),
+      logo: ApiEndpoints.proxyImage(json['logo']?.toString()),
+      source: json['source']?.toString() ?? '',
+      romaji: json['romaji']?.toString(),
+      english: json['english']?.toString(),
       year: _parseInt(json['year']),
-      slug: json['slug'] as String?,
-      scrapedTitle: json['scrapedTitle'] as String?,
-      metadataTitle: json['metadataTitle'] as String?,
+      slug: json['slug']?.toString(),
+      scrapedTitle: json['scrapedTitle']?.toString(),
+      metadataTitle: json['metadataTitle']?.toString(),
       forcedTitle: json['forcedTitle'] as bool?,
       fromDiscovery: json['fromDiscovery'] as bool?,
       score: _parseDouble(json['score']),
-      fullDate: json['fullDate'] as String?,
-      trailerKey: json['trailerKey'] as String?,
-      synopsis: json['synopsis'] as String?,
-      status: json['status'] as String?,
-      kind: json['kind'] as String?,
-      type: json['type'] as String?,
+      fullDate: json['fullDate']?.toString(),
+      trailerKey: json['trailerKey']?.toString(),
+      synopsis: json['synopsis']?.toString(),
+      status: json['status']?.toString(),
+      kind: json['kind']?.toString(),
+      type: json['type']?.toString(),
       season: _parseInt(json['season']),
       totalSeasons: _parseInt(json['totalSeasons']),
       genres: (json['genres'] as List?)?.map((e) => e.toString()).toList(),
+      progress: _parseDouble(json['progress']),
+      sectionId: json['sectionId']?.toString(),
       sources: (json['sources'] as List<dynamic>?)
-              ?.map((e) => SourceItem.fromJson(e as Map<String, dynamic>))
+              ?.map((e) => SourceItem.fromJson(e as Map))
               .toList() ??
           [],
     );
@@ -233,6 +243,8 @@ class SearchResult {
     'season': season,
     'totalSeasons': totalSeasons,
     'genres': genres,
+    'progress': progress,
+    'sectionId': sectionId,
     'sources': sources.map((e) => e.toJson()).toList(),
   };
 }
@@ -263,13 +275,13 @@ class SourceItem {
   @override
   int get hashCode => Object.hash(url, source, quality);
 
-  factory SourceItem.fromJson(Map<String, dynamic> json) {
+  factory SourceItem.fromJson(Map<dynamic, dynamic> json) {
     return SourceItem(
-      source: json['source'] as String? ?? '',
-      url: json['url'] as String? ?? '',
-      quality: json['quality'] as String? ?? '',
-      slug: json['slug'] as String?,
-      type: json['type'] as String?,
+      source: json['source']?.toString() ?? '',
+      url: json['url']?.toString() ?? '',
+      quality: json['quality']?.toString() ?? '',
+      slug: json['slug']?.toString(),
+      type: json['type']?.toString(),
     );
   }
 
@@ -295,13 +307,13 @@ class SearchResponse {
     required this.results,
   });
 
-  factory SearchResponse.fromJson(Map<String, dynamic> json) {
+  factory SearchResponse.fromJson(Map<dynamic, dynamic> json) {
     return SearchResponse(
-      query: json['query'] as String? ?? '',
-      category: json['category'] as String? ?? '',
+      query: json['query']?.toString() ?? '',
+      category: json['category']?.toString() ?? '',
       count: json['count'] as int? ?? 0,
       results: (json['results'] as List<dynamic>?)
-              ?.map((e) => SearchResult.fromJson(e as Map<String, dynamic>))
+              ?.map((e) => SearchResult.fromJson(e as Map))
               .toList() ??
           [],
     );

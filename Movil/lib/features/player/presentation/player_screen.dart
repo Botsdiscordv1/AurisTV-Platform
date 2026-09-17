@@ -138,6 +138,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   double _lastAppliedBrightness = 0.5; // Senior Fix: Inicializar a 0.5 para coincidir con el default de _brightness
   double _lastAppliedVolume = -1.0;
   bool _showSeekIndicator = false;
+  bool _isLongPressSpeedActive = false;
+  bool _wasPlayingBeforeSeek = false;
   Duration _seekTargetDuration = Duration.zero;
   Duration _seekDiff = Duration.zero;
   Timer? _historySaveTimer;
@@ -187,6 +189,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   bool get _isSpecial => widget.season == 0;
   String get _displayTitle {
+    if (_isOpEd && widget.title != null) return widget.title!;
     if (_isTrailer) return 'Tráiler: ${widget.title ?? widget.contentId}';
     if (_isSpecial && widget.episodeTitle?.isNotEmpty == true) return widget.episodeTitle!;
     return widget.title ?? widget.contentId;
@@ -387,7 +390,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _updateHistory({required int positionMs, required int durationMs, bool force = false}) {
     if (widget.contentId.isEmpty || _historyNotifier == null || _isOpEd || _isTrailer) return;
-    
+
     // Senior Performance Fix: Throttling de guardado en base de datos.
     // Solo guardamos si es 'force' o si han pasado 1s desde el último movimiento.
     if (!force) {
@@ -398,7 +401,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       });
       return;
     }
-    
+
     _performHistoryUpdate(positionMs, durationMs, force: true);
   }
 
@@ -434,7 +437,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   int _lastUiPersistenceMs = 0;
   int _lastRemoteUpdateMs = 0;
   Timer? _bufferingDebounceTimer;
-  final GlobalKey _videoKey = GlobalKey();
+  // Senior Continuity Shield: Usar la llave global del provider para evitar reconstrucciones del hardware
+  late final GlobalKey _videoKey;
   
   // Senior Recovery State
   int _resetRetryCount = 0;
@@ -453,10 +457,61 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   @override
   void initState() {
     super.initState();
+    _videoKey = ref.read(activePlayerProvider).videoKey;
     _screenInitTime = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
     
     _isMobileDevice = true;
+
+    final activePlayer = ref.read(activePlayerProvider);
+    final bool isSameEpisode = activePlayer.currentItem?.id == widget.contentId && activePlayer.episode == widget.episode;
+    final bool isResumingSession = activePlayer.player != null && activePlayer.uiState != PlayerUIState.none && (isSameEpisode || activePlayer.url == widget.sourceUrl);
+    final currentSources = ref.read(activeContentSourcesProvider);
+
+    // Senior Fix: uiState full sincrónico para que primer build ya sea isFull y dispare extract
+    if (!isResumingSession) {
+      try { ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full); } catch (_) {}
+    } else {
+      try { ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full); } catch (_) {}
+    }
+
+    // Senior Restoration Logic: Sincronizar con el Player Global de forma segura (Post Frame)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (isResumingSession) {
+        // Sincronizar el idioma y calidades finales para la UI
+        if (_allTracks.isNotEmpty) {
+          final track = _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0];
+          setState(() {
+             _currentLanguage = trackQualityType(track.quality) == 'SUB' ? 'SUB' : 'LAT';
+             _qualityOptions = track.qualities;
+          });
+        }
+
+        // Sincronizar el provider de fuentes para que otras pantallas lo vean si es necesario
+        if (activePlayer.availableSources.isNotEmpty) {
+           ref.read(activeContentSourcesProvider.notifier).state = activePlayer.availableSources;
+        }
+
+        ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
+      } else {
+        // Solo inicialización directa para fuentes directas (YouTube/Themes) o sin source
+        // Para fuentes normales (JKAnime etc) el extract en _buildMainContent se encarga
+        final bool isDirect = widget.source.isEmpty && widget.sourceUrl.isNotEmpty;
+        if (isDirect) {
+          ref.read(activePlayerProvider.notifier).initPlayerIfNeeded();
+          final newState = ref.read(activePlayerProvider);
+          if (mounted) {
+            setState(() {
+              _player = newState.player;
+              _controller = newState.controller;
+            });
+            _initPlayer(widget.sourceUrl);
+          }
+        }
+      }
+    });
 
     _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
 
@@ -536,16 +591,56 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       else if (call.method == 'volumeDown') _handleVolumeStep(-0.05);
     });
 
+    // Senior Restoration: Si ya venimos de una sesión activa, marcamos inicialización
+    // síncronamente para bloquear extracciones redundantes en el primer build.
+    // Clave del miniplayer continuo: reusa player/tracks/episodios/servidores sin pausa.
+    if (isResumingSession) {
+      _hasInitialized = true;
+      _isLoading = false;
+      _player = activePlayer.player;
+      _controller = activePlayer.controller;
+      _allTracks = activePlayer.availableTracks;
+      _selectedTrackIndex = activePlayer.selectedTrackIndex;
+      _extractTracks = _allTracks.where((t) => !t.isEmbed).toList();
+      _currentLanguage = activePlayer.language;
+      if (_currentLanguage == null && _allTracks.isNotEmpty) {
+        final t = _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0];
+        _currentLanguage = trackQualityType(t.quality) == 'SUB' ? 'SUB' : 'LAT';
+        if (trackQualityType(t.quality) == 'CAST') _currentLanguage = 'CAST';
+      }
+      final Map<String, List<SearchResult>> grouped = {};
+      for (final r in activePlayer.availableSources) {
+        final sName = simplifySourceName(r.source);
+        grouped.putIfAbsent(sName, () => []).add(r);
+      }
+      _groupedSources = grouped;
+      if (_allTracks.isNotEmpty) {
+        final cur = _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0];
+        _qualityOptions = cur.qualities;
+        _currentStreamUrl = cur.url;
+        _currentStreamHeaders = cur.headers;
+        if (_qualityOptions.length <= 1) _selectedQuality = 'auto';
+      }
+      if (activePlayer.source != null && activePlayer.source!.isNotEmpty) {
+        _currentSource = activePlayer.source!;
+        _currentServerName = simplifySourceName(activePlayer.source!);
+      }
+      if (activePlayer.url != null && activePlayer.url!.isNotEmpty) {
+        _currentSourceUrl = activePlayer.url!;
+      }
+      if (activePlayer.language != null) {
+        _currentLanguage = activePlayer.language;
+      }
+    }
+
     // Senior Restoration: Si el provider de fuentes está vacío (viniendo de "Continuar Viendo"),
     // intentamos restaurarlo desde el historial persistido para permitir cambio de servidor.
     // [Trailer Fix] Los tráilers no necesitan buscar alternativas ni restaurar fuentes.
-    final currentSources = ref.read(activeContentSourcesProvider);
-    if (currentSources.isEmpty && !_isTrailer) {
+    if (!isResumingSession && currentSources.isEmpty && !_isTrailer) {
       final history = _historyNotifier?.getProgress(widget.contentId, widget.season, _activeEpisode);
       if (history?.alternativeSources != null && history!.alternativeSources!.isNotEmpty) {
-        // Senior Fix: Diferimos la actualización al siguiente microtask para evitar el error
-        // "Tried to modify a provider while the widget tree was building"
-        Future.microtask(() {
+        // Senior Fix: Usar addPostFrameCallback para evitar errores de modificación durante build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             ref.read(activeContentSourcesProvider.notifier).state = history.alternativeSources!;
             // Senior Fix: Regenerar la lista de servidores una vez restaurados del historial
@@ -555,12 +650,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     }
 
-    if (widget.sourceUrl.isNotEmpty && widget.source.isEmpty) {
-      _hasInitialized = true;
-      _initPlayer(widget.sourceUrl);
-      if (!_isTrailer) _findAlternatives();
-    } else {
-      if (!_isTrailer) _findAlternatives();
+    if (!isResumingSession) {
+      if (widget.sourceUrl.isNotEmpty && widget.source.isEmpty) {
+        _hasInitialized = true;
+        _initPlayer(widget.sourceUrl);
+        if (!_isTrailer) _findAlternatives();
+      } else {
+        if (!_isTrailer) _findAlternatives();
+      }
     }
     
     _startHideTimer();
@@ -596,6 +693,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     setState(() {
       _groupedSources = grouped;
     });
+
+    // Senior Session Sync: Persistir fuentes en el provider global
+    ref.read(activePlayerProvider.notifier).updateSession(sources: effective);
   }
 
   @override
@@ -624,14 +724,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     final int durationMs = (_player?.state.duration.inMilliseconds ?? 0);
 
-    if (currentPosMs > 3000) {
-      _updateHistory(
-        positionMs: currentPosMs,
-        durationMs: durationMs,
-        force: true,
-      );
-    }
-
     // Senior Stability Fix: Parar el reproductor INMEDIATAMENTE
     _player?.stop();
 
@@ -649,6 +741,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (_qualityOptions.length <= 1) _selectedQuality = 'auto';
     });
 
+    final newLang = trackQualityType(track.quality) == 'SUB' ? 'SUB' : trackQualityType(track.quality) == 'CAST' ? 'CAST' : 'LAT';
+    ref.read(activePlayerProvider.notifier).updateSession(selectedIndex: index, language: newLang);
+
     _initPlayer(track.url, track.headers);
     _startHideTimer();
   }
@@ -662,14 +757,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final qualityLower = newSource.quality.toLowerCase();
     final epNum = _activeEpisode != null ? int.tryParse(_activeEpisode!) ?? 1 : 1;
     
-    if (currentPosMs > 3000) {
-      _updateHistory(
-        positionMs: currentPosMs,
-        durationMs: durationMs,
-        force: true,
-      );
-    }
-
     // Senior Stability Fix: Parar el reproductor INMEDIATAMENTE
     _player?.stop();
 
@@ -710,7 +797,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _qualityOptions = const [];
       _selectedQuality = 'auto';
     });
-    
+    ref.read(activePlayerProvider.notifier).updateSession(
+      sources: _groupedSources.values.expand((e) => e).toList(),
+    );
+    final curItem2 = ref.read(activePlayerProvider).currentItem;
+    if (curItem2 != null) {
+      ref.read(activePlayerProvider.notifier).play(
+        item: curItem2,
+        url: resolvedUrl,
+        episode: _activeEpisode,
+        season: widget.season,
+        source: newSource.source,
+        language: _currentLanguage,
+        triggerOpen: false,
+      );
+    }
     _startHideTimer();
   }
 
@@ -930,7 +1031,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   BoxDecoration get _controlCapsuleDecoration => BoxDecoration(
-    color: Colors.black.withValues(alpha: 0.45),
+    color: Colors.black.withValues(alpha: 0.20),
     borderRadius: BorderRadius.circular(22), // Unificado radio para alto 44
   );
 
@@ -1608,6 +1709,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           if (mounted) setState(() => _showVolumeIndicator = false);
         });
         return KeyEventResult.handled;
+      } else if (key == LogicalKeyboardKey.keyI) {
+        _minimizePlayer();
+        return KeyEventResult.handled;
       } else if (key == LogicalKeyboardKey.escape) {
         _handleBackNavigation();
         return KeyEventResult.handled;
@@ -1869,9 +1973,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       });
     }
 
+    // Senior: Registrar el contenido en el Provider global para que el MiniPlayer tenga data.
+    // [Continuity Fix] Pasamos triggerOpen: false porque esta pantalla asume el control
+    // total del comando open() (headers, posiciones, etc) para evitar audio doble.
+    ref.read(activePlayerProvider.notifier).play(
+      item: MediaItem(
+        id: widget.contentId,
+        title: widget.title ?? _displayTitle,
+        posterUrl: widget.posterUrl ?? '',
+        bannerUrl: widget.bannerUrl,
+        type: widget.category == 'movie' ? MediaType.movie : MediaType.anime,
+      ),
+      url: videoUrl,
+      episode: _activeEpisode,
+      season: widget.season,
+      source: _currentSource,
+      triggerOpen: false,
+    );
+
     if (_player == null) {
-      _player = Player(configuration: const PlayerConfiguration(bufferSize: 32 * 1024 * 1024));
+      final active = ref.read(activePlayerProvider);
+      if (mounted) {
+        setState(() {
+          _player = active.player;
+          _controller = active.controller;
+        });
+      }
     }
+
+    if (_player == null) return; // Fail safe
     final player = _player!;
 
     _posSubscription?.cancel();
@@ -2522,11 +2652,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     WidgetsBinding.instance.removeObserver(this);
 
     if (_player != null) {
-      // Senior Fix: Red de seguridad final por si _exitPlayer no fue invocado
-      final p = _player;
+      // Senior Fix: Ya no matamos al player aquí, lo gestiona el Global Provider
       _player = null;
-      p?.stop();
-      p?.dispose();
     }
 
     if (kIsWeb) {
@@ -2571,20 +2698,34 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _exitPlayer();
   }
 
-  void _exitPlayer() async {
+  void _minimizePlayer() {
     if (!mounted || _isExiting) return;
 
-    // Senior Safety Flush: Guardar historial ANTES de matar el hardware
+    if (_allTracks.isNotEmpty) {
+      ref.read(activePlayerProvider.notifier).updateSession(
+        tracks: _allTracks,
+        selectedIndex: _selectedTrackIndex,
+        language: _currentLanguage,
+      );
+    }
+    if (_groupedSources.isNotEmpty) {
+      ref.read(activePlayerProvider.notifier).updateSession(
+        sources: _groupedSources.values.expand((e) => e).toList(),
+      );
+    }
+    ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
+    _exitPlayer(minimizing: true);
+  }
+
+  void _exitPlayer({bool minimizing = false}) async {
+    if (!mounted || _isExiting) return;
+
+    // Senior Safety Flush: Guardar historial ANTES de cualquier cambio de estado
     try {
       final ms = _player?.state.position.inMilliseconds ?? 0;
       final duration = _player?.state.duration.inMilliseconds ?? 0;
       
       if (_hasResetPosition && ms > 3000 && duration > 0) {
-        _updateHistory(
-          positionMs: ms,
-          durationMs: duration,
-          force: true,
-        );
         _historyNotifier?.flush();
       }
     } catch (e) {
@@ -2594,15 +2735,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Fix: Marcar como saliendo ANTES de cualquier otra acción
     setState(() => _isExiting = true);
     
-    // 1. Silencio absoluto y detención radical del motor nativo
-    final p = _player;
-    _player = null; 
-    try {
-      p?.setVolume(0);
-      await p?.stop(); // Esperamos a que el buffer se vacíe educadamente
-      p?.dispose();
-    } catch (e) {
-      debugPrint('[player] Error killing native instance: $e');
+    if (!minimizing) {
+      // Si cerramos de verdad, detenemos todo
+      final p = _player;
+      _player = null;
+      try {
+        p?.setVolume(0);
+        await p?.stop();
+      } catch (e) {
+        debugPrint('[player] Error killing native instance: $e');
+      }
+      ref.read(activePlayerProvider.notifier).stop();
     }
     
     // 2. Forzar restauración del sistema (Orientación + UI)
@@ -2669,9 +2812,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final remoteState = ref.watch(remoteControlProvider);
     final targetId = remoteState.activeTargetDeviceId;
     
-    if (targetId != null) {
-      final target = remoteState.availableDevices.firstWhereOrNull((d) => d.id == targetId);
-      if (target != null) return _buildRemoteModeView(target);
+    final activeState = ref.watch(activePlayerProvider);
+    final bool isFull = activeState.uiState == PlayerUIState.full;
+
+    // Senior Restoration: Si ya estamos inicializados (viniendo de MiniPlayer),
+    // devolvemos la vista directamente sin disparar nuevas extracciones.
+    if (_hasInitialized && _player != null) {
+      return Material(
+        color: Colors.black, 
+        child: isFull 
+            ? _playerView(tracks: _allTracks, settings: settings)
+            : const SizedBox.shrink(), // Soltamos la GlobalKey para que el MiniPlayer la tome
+      );
     }
 
     // Senior Direct Flow: Fuentes que ya entregan el stream directo o proxied
@@ -2693,9 +2845,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       category: widget.category,
     )));
 
+    // Senior Session Sync: Sincronizar lista de episodios con el provider global
+    final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
+      url: widget.sourceUrl,
+      source: widget.source,
+      title: widget.title,
+      season: widget.season,
+    )));
+
+    episodesAsync.whenData((data) {
+      if (data != null && data.episodes.isNotEmpty) {
+        Future.microtask(() {
+          if (mounted) {
+             ref.read(activePlayerProvider.notifier).updateSession(episodes: data.episodes);
+          }
+        });
+      }
+    });
+
     return Material(
       color: Colors.black,
-      child: extractAsync.when(
+      child: isFull 
+          ? extractAsync.when(
         data: (result) {
           final tracks = result.tracks;
           final playableTracks = tracks.where((t) => !t.isDownload).toList();
@@ -2714,6 +2885,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               if (mounted) {
               _allTracks = playableTracks;
               setState(() => _extractTracks = playableTracks.where((t) => !t.isEmbed).toList());
+
+              // Senior Session Sync: Persistir tracks en el provider global
+              ref.read(activePlayerProvider.notifier).updateSession(
+                tracks: playableTracks,
+                selectedIndex: _selectedTrackIndex,
+              );
             }
             });
           }
@@ -2765,7 +2942,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
             Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), onPressed: _exitPlayer))),
           ]),
-      ),
+      ) : const SizedBox.shrink(),
     );
   }
 
@@ -3451,6 +3628,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
+  Widget _buildSpeedIndicator() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "2x",
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.fast_forward_rounded, color: Colors.white, size: 20),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSeekIndicator() {
     final bool isForward = _seekDiff.inMilliseconds >= 0;
     final String timeStr = _formatDuration(_seekTargetDuration);
@@ -3508,7 +3710,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildMobilePlayer(List<VideoTrackOption> playableTracks, UserSettings settings) {
-    final bool isAnyGestureActive = _isBrightnessGesture != null || _showSeekIndicator;
+    final bool isAnyGestureActive = _isBrightnessGesture != null || _showSeekIndicator || _isLongPressSpeedActive;
     final bool showAnyway = (_showControls || _isLocked || (_autoplayCountdown >= 0 && _isAutoplayResume) || _showEpisodesOverlay || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
 
     return Focus(
@@ -3585,6 +3787,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           }
                         },
                         behavior: HitTestBehavior.opaque, 
+                        onLongPressStart: (_) {
+                          if (_isLocked || !(_player?.state.playing ?? false)) return;
+                          
+                          _player?.setRate(2.0);
+                          setState(() {
+                            _isLongPressSpeedActive = true;
+                            _showControls = false;
+                          });
+                          HapticFeedback.heavyImpact();
+                        },
+                        onLongPressEnd: (_) {
+                          if (!_isLongPressSpeedActive) return;
+                          
+                          _player?.setRate(_playbackSpeed);
+                          setState(() {
+                            _isLongPressSpeedActive = false;
+                          });
+                        },
+                        onLongPressCancel: () {
+                          if (!_isLongPressSpeedActive) return;
+                          
+                          _player?.setRate(_playbackSpeed);
+                          setState(() {
+                            _isLongPressSpeedActive = false;
+                          });
+                        },
                         onDoubleTapDown: (details) { 
                           if (_isLocked) return; 
                           final width = MediaQuery.sizeOf(context).width; 
@@ -3596,6 +3824,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           final duration = _player?.state.duration ?? Duration.zero;
                           if (duration.inMilliseconds <= 0) return;
                           
+                          _wasPlayingBeforeSeek = _player?.state.playing ?? false;
+                          if (_wasPlayingBeforeSeek) {
+                            _player?.pause();
+                          }
+
                           setState(() {
                             _showSeekIndicator = true;
                             _seekTargetDuration = _player?.state.position ?? Duration.zero;
@@ -3625,11 +3858,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           _player?.seek(_seekTargetDuration);
                           _updateHistory(positionMs: _seekTargetDuration.inMilliseconds, durationMs: _player?.state.duration.inMilliseconds ?? 0, force: true);
                           
+                          if (_wasPlayingBeforeSeek) {
+                            _player?.play();
+                          }
+
                           setState(() {
                             _showSeekIndicator = false;
-                            _showControls = true;
+                            _showControls = false;
                           });
-                          _startHideTimer();
                           HapticFeedback.mediumImpact();
                         },
                         onVerticalDragStart: (details) {
@@ -3713,8 +3949,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                              _lastAppliedVolume = _volume;
                            }
                            _isBrightnessGesture = null;
-                           setState(() => _showControls = true);
-                           _startHideTimer();
+                           setState(() => _showControls = false);
                          },
                          child: Container(color: Colors.transparent),
                        ),
@@ -3824,6 +4059,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                  ),
                ),
              ),
+           
+           if (_isLongPressSpeedActive)
+             Positioned(
+               top: 32,
+               left: 0,
+               right: 0,
+               child: Center(
+                 child: IgnorePointer(
+                   child: _buildSpeedIndicator(),
+                 ),
+               ),
+             ),
+
            if (_showSeekIndicator) Positioned.fill(child: IgnorePointer(child: _buildSeekIndicator())),
            
            if (_showLeftSkip) _buildSkipVisual(false),
@@ -4144,10 +4392,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center, 
           children: [
-            if (!hideBack) ...[
-              IconButton(iconSize: iconSize, icon: const Icon(Symbols.arrow_back, color: Colors.white), onPressed: _handleBackNavigation),
-              SizedBox(width: spacing),
-            ],
+            IconButton(
+              iconSize: iconSize,
+              icon: const Icon(Symbols.arrow_back, color: Colors.white),
+              onPressed: _exitPlayer, // Senior Fix: Volver a cerrar player por defecto
+            ),
+            SizedBox(width: spacing),
+            IconButton(
+              iconSize: iconSize,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 32),
+              onPressed: _minimizePlayer, // Botón dedicado para minimizar
+            ),
+            SizedBox(width: spacing),
             Expanded(
               child: Consumer(
                 builder: (context, ref, _) {
@@ -4178,6 +4434,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                               style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ],
+                        )
+                      else if (_isOpEd)
+                        Text(
+                          '${widget.episode}: ${widget.episodeTitle ?? ""}',
+                          style: TextStyle(
+                            color: Colors.white70, 
+                            fontSize: useMobileLayout ? (isLandscape ? 12 : 14) : 14, 
+                            fontWeight: FontWeight.bold
+                          ),
                         )
                       else if (_activeEpisode != null && !_isMovie)
                         Text(
@@ -4313,6 +4578,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     double size = 24, 
     bool fill = false,
     double minWidth = 48,
+    double weight = 300.0, // Peso por defecto consistente
   }) {
     return Container(
       width: minWidth, height: 44, // Unificado a 44px
@@ -4325,9 +4591,129 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           hoverColor: Colors.white.withValues(alpha: 0.12),
           splashColor: Colors.white.withValues(alpha: 0.08),
           child: Center(
-            child: Icon(icon, color: Colors.white, size: size, fill: fill ? 1.0 : 0.0),
+            child: Icon(icon, color: Colors.white, size: size, fill: fill ? 1.0 : 0.0, weight: weight),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildUnifiedControlsCapsule(bool hasPrevious, bool hasNext) {
+    final useMobileLayout = ResponsiveUtils.isMobile(context);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    
+    // Senior Visual Normalization: Ajustamos tamaños base y pesos para armonía visual
+    final double baseIconSize = useMobileLayout ? 22 : 28;
+    const double iconWeight = 300.0; // Más fino para matchear con el timeline de 2px
+
+    return Container(
+      height: 44,
+      decoration: _controlCapsuleDecoration,
+      clipBehavior: Clip.antiAlias,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(width: 6),
+          // Rotar (Visualmente tiende a verse grande, bajamos un poco)
+          _buildCapsuleIconButton(
+            icon: Symbols.screen_rotation,
+            onTap: () {
+              setState(() {
+                _isLandscapeOnly = !_isLandscapeOnly;
+                if (_isLandscapeOnly) lockAppOrientation();
+                else unlockAppOrientation();
+              });
+            },
+            size: baseIconSize - 2,
+            minWidth: 40,
+          ),
+          
+          Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
+          
+          // Anterior (Sólido suele verse pequeño, subimos un poco)
+          if (hasPrevious)
+            _buildCapsuleIconButton(
+              icon: Symbols.skip_previous,
+              onTap: () => _navigateToEpisode(false),
+              size: baseIconSize + 2,
+              fill: true,
+              minWidth: 40,
+            ),
+          
+          // Siguiente (Sólido suele verse pequeño, subimos un poco)
+          if (hasNext)
+            _buildCapsuleIconButton(
+              icon: Symbols.skip_next,
+              onTap: () => _navigateToEpisode(true),
+              size: baseIconSize + 2,
+              fill: true,
+              minWidth: 40,
+            ),
+          
+          Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
+
+          // Velocidad (Icono + Texto)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  const speeds = [0.5, 0.7, 1.0, 1.2, 1.5, 1.7, 2.0];
+                  int currentIndex = speeds.indexOf(_playbackSpeed);
+                  if (currentIndex == -1) currentIndex = 2; 
+                  _playbackSpeed = speeds[(currentIndex + 1) % speeds.length];
+                  _player?.setRate(_playbackSpeed);
+                });
+              },
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Symbols.speed, color: Colors.white, size: baseIconSize - 1, weight: iconWeight),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_playbackSpeed.toStringAsFixed(1)}x', 
+                      style: TextStyle(
+                        color: Colors.white, 
+                        fontSize: useMobileLayout ? 12 : 14, 
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.5
+                      )
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
+
+          // Servidor
+          if (!_isOpEd)
+            _buildCapsuleIconButton(
+              icon: Symbols.dns,
+              onTap: _showServerSelector,
+              size: baseIconSize - 2,
+              minWidth: 40,
+            ),
+
+          // Audio / Subtítulos
+          if (!_isOpEd && !_isTrailer) ...[
+            if (!_isOpEd) Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
+            _buildCapsuleIconButton(
+              icon: Symbols.subtitles,
+              onTap: _showLanguageSelector,
+              size: baseIconSize - 2,
+              minWidth: 40,
+            ),
+          ],
+          
+          const SizedBox(width: 6),
+        ],
       ),
     );
   }
@@ -4361,7 +4747,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildNavigationCapsule(bool hasPrevious, bool hasNext) {
-    if (_isTrailer || (!hasPrevious && !hasNext)) return const SizedBox.shrink();
+    if (_isOpEd || _isTrailer || (!hasPrevious && !hasNext)) return const SizedBox.shrink();
     return Container(
       height: 44, // Unificado a 44px
       decoration: _controlCapsuleDecoration,
@@ -4425,7 +4811,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildMobileCenterControls() {
     final bool isTablet = ResponsiveUtils.isTablet(context);
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     if (!_isMobileDevice) return const SizedBox.shrink();
     
@@ -4506,7 +4891,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           children: [
             _buildMobileTimeline(),
             SizedBox(height: isLandscape ? 2 : 12),
-            // Senior: Usar SingleChildScrollView para evitar overflow en pantallas pequeñas/anchas
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
@@ -4540,65 +4924,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           _buildDurationCapsule(),
                         ],
                         if (_isMobileDevice) ...[
-                          SizedBox(width: spacing),
-                          IconButton(
-                            iconSize: iconSize,
-                            icon: const Icon(Symbols.screen_rotation, color: Colors.white),
-                            onPressed: () {
-                              setState(() {
-                                _isLandscapeOnly = !_isLandscapeOnly;
-                                if (_isLandscapeOnly) {
-                                  lockAppOrientation();
-                                } else {
-                                  unlockAppOrientation();
-                                }
-                              });
-                            },
-                          ),
+                          const SizedBox(width: 8),
+                          _buildUnifiedControlsCapsule(hasPrevious, hasNext),
                         ],
                       ],
                     ),
-                    if (!_isOpEd && _isMobileDevice && !_isTrailer)
+                    
                     Row(
                       children: [
-                        if (hasPrevious)
-                        _PlayerTextButton(
-                          onPressed: () => _navigateToEpisode(false),
-                          icon: Symbols.skip_previous,
-                          label: showLabels ? 'Anterior' : '',
-                        ),
-                        if (hasPrevious && hasNext) const SizedBox(width: 8),
-                        if (hasNext)
-                        _PlayerTextButton(
-                          onPressed: () => _navigateToEpisode(true),
-                          icon: Symbols.skip_next,
-                          label: showLabels ? 'Siguiente' : '',
-                          isBold: true,
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          iconSize: iconSize,
-                          icon: const Icon(Symbols.speed, color: Colors.white),
-                          onPressed: () {
-                            setState(() {
-                              const speeds = [0.5, 0.7, 1.0, 1.2, 1.5, 1.7, 2.0];
-                              int currentIndex = speeds.indexOf(_playbackSpeed);
-                              if (currentIndex == -1) currentIndex = 2; 
-                              
-                              _playbackSpeed = speeds[(currentIndex + 1) % speeds.length];
-                              _player?.setRate(_playbackSpeed);
-                            });
-                          },
-                        ),
-                        Text('${_playbackSpeed.toStringAsFixed(1)}x', style: TextStyle(color: Colors.white, fontSize: useMobileLayout ? (isLandscape ? 11 : 13) : 14, fontWeight: FontWeight.w900)),
-                        SizedBox(width: spacing),
-                        if (!_isOpEd) ...[
-                          IconButton(iconSize: iconSize, icon: const Icon(Symbols.dns, color: Colors.white), onPressed: _showServerSelector),
-                          SizedBox(width: spacing),
-                        ],
                         if (_hasQualityOptions) ...[
                           _PlayerTextButton(
                             onPressed: _showQualitySelector,
@@ -4608,10 +4941,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                                 : (_qualityMenuOptions.firstWhereOrNull((o) => o['key'] == _selectedQuality)?['label'] as String? ?? 'Calidad'),
                             useBackground: true,
                           ),
-                          SizedBox(width: spacing),
-                        ],
-                        if (!_isOpEd && !_isTrailer) ...[
-                          IconButton(iconSize: iconSize, icon: const Icon(Symbols.subtitles, color: Colors.white), onPressed: _showLanguageSelector),
                           SizedBox(width: spacing),
                         ],
                         if (!_isOpEd && !_isMovie && !_isTrailer)
@@ -4709,11 +5038,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     ),
                     SliderTheme(
                       data: SliderTheme.of(context).copyWith(
-                        trackHeight: 4,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                        trackHeight: 2,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                         activeTrackColor: const Color(0xFFEF7A1E),
-                        inactiveTrackColor: Colors.white10,
-                        thumbColor: Colors.white,
+                        inactiveTrackColor: Colors.white24,
+                        thumbColor: const Color(0xFFEF7A1E),
                         overlayColor: const Color(0xFFEF7A1E).withOpacity(0.2),
                       ),
                       child: Slider(

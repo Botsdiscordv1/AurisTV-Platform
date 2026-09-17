@@ -104,6 +104,7 @@ final GoRouter appRouter = GoRouter(
           year: int.tryParse(params['year'] ?? ''),
           quality: params['quality'],
           type: params['type'],
+          sectionId: params['sectionId'],
           result: extraResult,
           from: params['from'],
         );

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../models/server/anilist_media.dart';
 import '../models/server/editorial_section.dart';
+import '../models/server/personalized_home.dart';
 import '../models/server/episodes_response.dart';
 import '../models/server/extract_result.dart';
 import '../models/server/omdb_episode.dart';
@@ -22,6 +23,16 @@ abstract class AurisRepository {
     String? phase,
     String? imgSize,
     CancelToken? cancelToken,
+  });
+
+  Future<SearchResponse> filter({
+    String? genre,
+    int? year,
+    String? category,
+    String? status,
+    String? idioma,
+    int page = 1,
+    String? source,
   });
 
   /// Realiza una búsqueda en tiempo real que emite resultados parciales conforme llegan (Streaming).
@@ -67,10 +78,12 @@ abstract class AurisRepository {
   });
 
   Future<List<MediaItem>> getHomeHero({String category = 'anime', String? imgSize});
+  Future<HomeResponse> getUserHome({required String userId, String? category});
+  Future<void> sendUserEvent({required String userId, required String animeId, required String event, String? sectionId});
 
   Future<ScheduleResponse> getSchedule();
   Future<List<SourceInfo>> getSources();
-  Future<EditorialResponse> getEditorial({String? imgSize});
+  Future<EditorialResponse> getEditorial({String? imgSize, String? category});
   Future<AnimeTitleInfo> getAnimeTitles(String query);
   Future<MovieTitleInfo> getMovieTitles(String query);
   Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false});

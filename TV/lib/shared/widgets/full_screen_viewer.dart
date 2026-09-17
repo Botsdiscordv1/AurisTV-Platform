@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../core/utils/responsive_utils.dart';
 
 class FullScreenViewer extends StatefulWidget {
   final List<GalleryImage> images;

@@ -32,9 +32,14 @@ extension SearchResultMetadataExtension on SearchResult {
     final cleanType = (typeUp == 'ALL' || typeUp.isEmpty) ? null : type;
     final cleanKind = (kindUp == 'ALL' || kindUp.isEmpty) ? null : kind;
 
+    // Prioridad 0: Historial (Visto recientemente)
+    if (quality.toLowerCase() == 'historial') {
+      typeLabel = 'VISTO';
+    }
+
     // Prioridad 1: Tipo específico (OVA, Especial, ONA, Película...) 
     // pero evitamos etiquetas redundantes como "TV" o "ANIME" crudo.
-    if (cleanType != null && 
+    else if (cleanType != null && 
         !typeUp.contains('ANIME') && 
         !typeUp.contains('TV') && 
         !typeUp.contains('SERIE')) {
@@ -49,7 +54,8 @@ extension SearchResultMetadataExtension on SearchResult {
     // Prioridad 3: Metadata en la calidad (p.ej. "Serie", "Película")
     else if (quality.isNotEmpty && 
              quality.toLowerCase() != 'all' && 
-             quality.toLowerCase() != 'hd') {
+             quality.toLowerCase() != 'hd' &&
+             quality.toLowerCase() != 'historial') {
       typeLabel = _categoryFromQuality(quality);
     }
 
@@ -72,7 +78,9 @@ extension SearchResultMetadataExtension on SearchResult {
 
     return ContentMetadata(
       label: typeLabel,
-      labelColor: const Color(0xFF1976D2), // Azul AurisTV
+      labelColor: quality.toLowerCase() == 'historial' 
+          ? const Color(0xFF2A2A2A) // Gris neutro para historial
+          : const Color(0xFF1976D2), // Azul AurisTV
       status: statusLabel,
       statusColor: statusColor,
     );

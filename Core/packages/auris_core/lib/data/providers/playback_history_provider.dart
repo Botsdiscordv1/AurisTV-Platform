@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -51,13 +52,17 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     
     final profileId = user?.activeProfileId ?? 'guest_profile';
     
+    if (kDebugMode) {
+      print('[PlaybackHistoryNotifier] Build iniciado para profileId: $profileId (User: ${user?.id ?? 'null'})');
+    }
+
     // Senior Fix: Ya no bloqueamos con Completer si el auth es null. 
     // Cargamos lo que tengamos en local (Hive) de inmediato para que la app sea funcional.
     final history = await repository.getHistory(profileId);
     _memoryCache = history;
 
     // Si hay usuario real, disparamos la sincronización en segundo plano
-    if (user != null && user.email != null) {
+    if (user != null && user.email != null && user.id != 'guest_user') {
       _triggerSync(repository, profileId, user.id).ignore();
     }
 
@@ -87,6 +92,9 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     List<SearchResult>? alternativeSources,
     bool force = false,
   }) {
+    // [PlaybackHistory] Red de seguridad definitiva contra OP/ED en el historial
+    if (episode == 'OP' || episode == 'ED') return;
+
     final user = ref.read(authProvider);
     final profileId = user?.activeProfileId ?? 'guest_profile';
 

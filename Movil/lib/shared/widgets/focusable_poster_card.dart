@@ -103,14 +103,14 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
             if (event.logicalKey == LogicalKeyboardKey.enter || 
                 event.logicalKey == LogicalKeyboardKey.select ||
                 event.logicalKey == LogicalKeyboardKey.space) {
-              widget.onTap();
+              SafeTap.run(widget.onTap);
               return KeyEventResult.handled;
             }
           }
           return KeyEventResult.ignored;
         },
         child: GestureDetector(
-          onTap: widget.onTap,
+          onTap: () => SafeTap.run(widget.onTap),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,

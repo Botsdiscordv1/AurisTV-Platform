@@ -8,6 +8,7 @@ class WideContentItem {
   final String id;
   final String title;
   final String imageUrl;
+  final String? logoUrl; // Senior Fix: Soporte para logo en WideCard
   final String? subtitle;
   final String? rating;
   final double? progress;
@@ -19,6 +20,7 @@ class WideContentItem {
     required this.id,
     required this.title,
     required this.imageUrl,
+    this.logoUrl,
     this.subtitle,
     this.rating,
     this.progress,
@@ -30,12 +32,14 @@ class WideContentItem {
 
 class WideContentRow extends StatefulWidget {
   final String title;
+  final String? subtitle;
   final List<WideContentItem> items;
   final void Function(WideContentItem item) onItemTap;
 
   const WideContentRow({
     super.key,
     required this.title,
+    this.subtitle,
     required this.items,
     required this.onItemTap,
   });
@@ -92,23 +96,39 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
     final rowHeight = ResponsiveUtils.bannerRowHeight(context);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 12 : 24), // Senior Fix: Reducido de 32/48 para compactar secciones
+      padding: EdgeInsets.only(bottom: context.useMobileLayout ? 18 : 32), // Senior Fix: Adaptativo 18px / 32px
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Text(
-              widget.title,
-              style: GoogleFonts.poppins(
-                fontSize: ResponsiveUtils.rowTitleFontSize(context),
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: -0.4,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.title,
+                  style: GoogleFonts.poppins(
+                    fontSize: ResponsiveUtils.rowTitleFontSize(context),
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.subtitle!,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8), // Senior: Unificado a 8px
           MouseRegion(
             onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
             onExit: (_) { if (mounted) setState(() => _isHovered = false); },
@@ -126,7 +146,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                       cacheExtent: 600,
                       clipBehavior: Clip.none, 
                       scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px vertical
                       itemCount: widget.items.length,
                       separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
                       itemBuilder: (context, index) {
@@ -135,6 +155,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                           key: ValueKey('wide_${item.id}_${item.title}'),
                           title: item.title,
                           imageUrl: item.imageUrl,
+                          logoUrl: item.logoUrl,
                           progress: item.progress,
                           subtitle: item.subtitle,
                           rating: item.rating,
@@ -161,32 +182,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                           _updateScrollIndicators();
                           return false;
                         },
-                        child: ShaderMask(
-                          shaderCallback: (Rect rect) {
-                            return LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                Colors.transparent,
-                                _canScrollLeft ? Colors.transparent : Colors.black,
-                                Colors.black,
-                                Colors.black,
-                                _canScrollRight ? Colors.transparent : Colors.black,
-                                Colors.transparent,
-                              ],
-                              stops: [
-                                0.0,
-                                fadeOffset,
-                                (fadeOffset + fadeSize).clamp(0.0, 1.0),
-                                (1.0 - fadeOffset - fadeSize).clamp(0.0, 1.0),
-                                1.0 - fadeOffset,
-                                1.0,
-                              ],
-                            ).createShader(rect);
-                          },
-                          blendMode: BlendMode.dstIn,
-                          child: content,
-                        ),
+                        child: content,
                       ),
                     );
                   }

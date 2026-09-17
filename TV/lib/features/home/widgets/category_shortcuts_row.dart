@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/utils/responsive_utils.dart';
+import 'package:auris_core/auris_core.dart';
 
 class CategoryShortcutsRow extends StatelessWidget {
   final ValueChanged<String> onCategoryTap;

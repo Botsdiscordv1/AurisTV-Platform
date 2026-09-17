@@ -12,7 +12,7 @@ import 'package:auristv_web/core/utils/url_utils.dart';
 import 'package:auristv_web/shared/widgets/focusable_poster_card.dart';
 import 'package:auristv_web/features/search/presentation/providers/search_provider.dart';
 import 'package:auristv_web/features/search/presentation/widgets/search_widgets.dart';
-import 'package:auristv_web/features/home/widgets/wide_content_row.dart';
+import 'package:auristv_web/features/home/widgets/unified_section.dart';
 import 'package:auristv_web/features/player/presentation/player_screen.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -337,8 +337,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
                 children: [
                   const _ContinueWatchingSection(),
                   RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
-                  const SizedBox(height: 32),
-                  RepaintBoundary(child: SearchTrendingSection(onTrendingTap: _onContentTap)),
+                  const SizedBox(height: 8),
+                  RepaintBoundary(
+                    child: SearchDiscoveryFeed(
+                      category: _selectedCategory,
+                      onContentTap: _onContentTap,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -362,8 +367,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
           const _ContinueWatchingSection(),
           RepaintBoundary(child: SearchHistorySection(onQueryTap: _performSearch)),
           RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
-          const SizedBox(height: 16),
-          RepaintBoundary(child: SearchTrendingSection(onTrendingTap: _onContentTap)),
+          const SizedBox(height: 8),
+          RepaintBoundary(
+            child: SearchDiscoveryFeed(
+              category: _selectedCategory,
+              onContentTap: _onContentTap,
+            ),
+          ),
         ],
       ),
     );
@@ -383,12 +393,17 @@ class _ContinueWatchingSection extends ConsumerWidget {
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 24, top: 12),
-          child: RepaintBoundary(
-            child: WideContentRow(
-              title: 'Continuar Viendo',
-              items: items.map((h) => _mapHistoryToWide(ref, h)).toList(),
-              onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
-            ),
+          child: UnifiedSection(
+            presentation: SectionPresentation.wide,
+            title: 'Continuar Viendo',
+            items: items.map((h) => _mapHistoryToMediaItem(h)).toList(),
+            onItemTap: (item) => _onTap(context, item.playbackHistory!),
+            onItemDelete: (item) {
+              final h = item.playbackHistory;
+              if (h != null) {
+                ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+              }
+            },
           ),
         );
       },
@@ -400,7 +415,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
     );
   }
 
-  WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
+  MediaItem _mapHistoryToMediaItem(PlaybackHistory h) {
     String displayTitle = h.title ?? 'Contenido';
     final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
     if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
@@ -414,16 +429,14 @@ class _ContinueWatchingSection extends ConsumerWidget {
       remainingText = 'Quedan $minutes min';
     }
 
-    return WideContentItem(
+    return MediaItem(
       id: h.contentId,
       title: displayTitle,
-      imageUrl: h.posterUrl ?? h.bannerUrl ?? '',
-      progress: h.progress,
+      posterUrl: h.posterUrl ?? '',
+      bannerUrl: h.bannerUrl,
+      type: isMovie ? MediaType.movie : MediaType.anime,
       subtitle: remainingText,
-      onDelete: () {
-        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
-      },
-      originalItem: h,
+      playbackHistory: h,
     );
   }
 
@@ -498,14 +511,6 @@ class _SearchResultsGrid extends ConsumerWidget {
               final result = results[index];
               final meta = result.resolveMetadata(category);
 
-              // Senior Fix: Obtener el progreso del historial si existe
-              final historyAsync = ref.watch(playbackHistoryStateProvider);
-              double? progress;
-              historyAsync.whenData((items) {
-                final match = items.firstWhereOrNull((h) => h.contentId == result.url);
-                if (match != null) progress = match.progress;
-              });
-
               final card = FocusablePosterCard(
                 key: ValueKey('search_${result.url}_${result.source}'),
                 title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
@@ -518,7 +523,7 @@ class _SearchResultsGrid extends ConsumerWidget {
                 subtitle: meta.status,
                 subtitleColor: meta.statusColor,
                 showInfo: true,
-                progress: progress,
+                progress: result.progress, // Senior Fix: Usamos el progreso inyectado
                 onTap: () => onContentTap(result),
               );
 
@@ -561,7 +566,10 @@ class _SearchResultsGrid extends ConsumerWidget {
           const SizedBox(height: 12),
           const Text('Prueba con otros términos o explora lo más visto hoy', style: TextStyle(color: Colors.white30, fontSize: 14)),
           const SizedBox(height: 60),
-          SearchTrendingSection(onTrendingTap: (res) => onContentTap(res)),
+          SearchDiscoveryFeed(
+            category: category,
+            onContentTap: onContentTap,
+          ),
           const SizedBox(height: 40),
           SearchGenresGrid(onGenreTap: (q) {
           }),

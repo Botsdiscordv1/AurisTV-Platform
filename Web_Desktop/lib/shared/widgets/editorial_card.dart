@@ -62,7 +62,7 @@ class _EditorialCardState extends State<EditorialCard> {
       onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
       onExit: (_) { if (mounted) setState(() => _isHovered = false); },
       child: GestureDetector(
-        onTap: widget.onTap,
+        onTap: () => SafeTap.run(widget.onTap),
         child: AnimatedScale(
           scale: _isHovered ? 1.05 : 1.0,
           duration: const Duration(milliseconds: 200),

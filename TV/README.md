@@ -1,17 +1,22 @@
-# auris_tv_google
+# AurisTV — Google TV & Android TV
 
-A new Flutter project.
+Este proyecto contiene la aplicación de **AurisTV** optimizada para televisores y dispositivos de streaming.
 
-## Getting Started
+## Características Principales
 
-This project is a starting point for a Flutter application.
+- **10ft UI**: Interfaz diseñada para ser vista a 3 metros de distancia, con fuentes y elementos escalados.
+- **Navegación D-pad**: Optimizada para ser controlada exclusivamente con el mando a distancia del televisor.
+- **Reproducción Nativa**: Integración directa con `media_kit` para el máximo rendimiento en hardware de TV.
+- **Sincronización Global**: Comparte historial, favoritos y perfiles con las versiones de Móvil y Web.
 
-A few resources to get you started if this is your first Flutter project:
+## Desarrollo
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+La aplicación consume el core compartido en `packages/auris_core`. 
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Para ejecutar en un emulador o dispositivo real:
+```bash
+flutter run -d android
+```
+
+Asegúrate de que el dispositivo esté en modo "Android TV" para activar las optimizaciones específicas de escalado.
+

@@ -86,11 +86,52 @@ class AurisApp extends StatelessWidget {
         return NotificationInitializer(
           child: RemoteCommandListener(
             child: MinWidthWrapper(
-              minWidth: 360, // Bajado de 1024 para permitir que la adaptabilidad (480/768/1024) sea visible
-              child: child,
+              minWidth: 360, 
+              child: Stack(
+                fit: StackFit.expand, // Senior Fix: Garantiza que el contenido principal llene la pantalla
+                children: [
+                  child,
+                  // Senior: Floating MiniPlayer (Global y Persistente)
+                  const GlobalMiniPlayerOverlay(),
+                ],
+              ),
             ),
           ),
         );
+      },
+    );
+  }
+}
+
+class GlobalMiniPlayerOverlay extends ConsumerWidget {
+  const GlobalMiniPlayerOverlay({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return MiniPlayerBar(
+      onExpand: () {
+        final state = ref.read(activePlayerProvider);
+        if (state.currentItem != null) {
+          final player = PlayerScreen(
+            contentId: state.currentItem!.id,
+            sourceUrl: state.url ?? '',
+            source: state.source ?? '',
+            episode: state.episode,
+            season: state.season,
+            title: state.currentItem!.title,
+            posterUrl: state.currentItem!.posterUrl,
+            bannerUrl: state.currentItem!.bannerUrl,
+            category: state.currentItem!.type.name,
+            language: state.language,
+            serverName: state.source != null ? simplifySourceName(state.source!) : null,
+            totalEpisodes: state.availableEpisodes.isNotEmpty ? state.availableEpisodes.length : null,
+          );
+          
+          final navContext = rootNavigatorKey.currentContext;
+          if (navContext != null) {
+            UrlUtils.openPlayer(navContext, player);
+          }
+        }
       },
     );
   }

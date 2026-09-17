@@ -136,11 +136,11 @@ class ResponsiveUtils {
     final b = getBreakpoint(context);
     final double posterH = posterHeight(context);
     if (!hasInfo) {
-      // Senior Tuning: Reducido al mínimo matemático para el zoom 1.12x (H * 0.06) + sombra
-      return posterH + (b < Breakpoint.md ? 15.0 : 25.0);
+      // Senior Tuning: Altura exacta del póster + margen para sombra/zoom
+      return posterH + (b < Breakpoint.md ? 8.0 : 12.0);
     }
-    // Espacio para póster + Gap (8) + Texto (22-28) + Margen foco
-    return posterH + (b < Breakpoint.md ? 55.0 : 75.0);
+    // Espacio para póster + Gap (8) + Texto (22-28) + Margen sombra
+    return posterH + (b < Breakpoint.md ? 42.0 : 55.0);
   }
 
   /// Senior UI Strategy: Ancho de banners (Wide Cards) adaptativo.
@@ -161,7 +161,8 @@ class ResponsiveUtils {
   /// Altura del contenedor de la fila Wide.
   static double bannerRowHeight(BuildContext context) {
     final b = getBreakpoint(context);
-    return bannerHeight(context) + (b < Breakpoint.md ? 60.0 : 85.0);
+    // bannerHeight + cardGap (12) + textArea (42) + shadowMargin (8)
+    return bannerHeight(context) + sp(context, 42) + (b < Breakpoint.md ? 20.0 : 28.0);
   }
 
   /// Senior UI Strategy: Tamaños de fuente adaptativos para títulos de filas.
@@ -202,7 +203,7 @@ class ResponsiveUtils {
     if (b == Breakpoint.sm) return 16 / 10;
     if (b == Breakpoint.md) return 2.0; // Tablets: Más inmersivo pero menos ancho que desktop
     if (b == Breakpoint.lg) return 2.4;
-    return 2.8; // Desktop standard
+    return 2.8; // Restaurado a 2.8 para no afectar a Desktop Web
   }
 
   /// Senior UI Strategy: Tamaños de fuente para el HeroBanner (Cinematic).

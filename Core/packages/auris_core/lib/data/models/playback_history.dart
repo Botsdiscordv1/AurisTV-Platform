@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+
 import './server/search_result.dart';
 
 class PlaybackHistory {
@@ -96,7 +96,7 @@ class PlaybackHistory {
       language: json['language'] as String?,
       alternativeSources: json['alternativeSources'] != null 
           ? (json['alternativeSources'] as List<dynamic>)
-              .map((e) => SearchResult.fromJson(Map<String, dynamic>.from(e as Map)))
+              .map((e) => SearchResult.fromJson(e as Map))
               .toList() 
           : null,
       progress: json['progress'] != null ? double.tryParse(json['progress'].toString()) : calcProgress,

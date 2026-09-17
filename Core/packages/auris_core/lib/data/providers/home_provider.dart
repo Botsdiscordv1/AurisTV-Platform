@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
@@ -33,24 +34,51 @@ final heroBannerItemsProvider = FutureProvider.family<List<MediaItem>, String>((
       final movies = results[1];
       final series = results[2];
 
-      // Senior Adaptive Mixing: Barajamos el orden de las categorías para que el inicio sea dinámico
-      final categories = [animes, movies, series]..shuffle();
+      // Senior Strategy: Intercalado para ritmo + shuffle con semilla horaria (cada 8h hero distinto, tolera 1-2 repetidos)
+      // Tomamos los 30+ items, intercalamos a 25, luego shuffle con seed temporal y limitamos a 10
+      final categories = [animes, movies, series];
 
       final List<MediaItem> mixedHero = [];
       int maxLen = categories.map((l) => l.length).fold(0, (prev, curr) => curr > prev ? curr : prev);
 
-      // Algoritmo de Intercalado Dinámico (Interleaving)
+      // Algoritmo de Intercalado Dinámico (Interleaving) - preserva variedad por categoría
+      // Barajamos el orden de categorías con seed horario para que cada 8h el interleaving sea distinto
+      final bucket = DateTime.now().millisecondsSinceEpoch ~/ const Duration(hours: 8).inMilliseconds;
+      final rndCategory = Random(bucket);
+      categories.shuffle(rndCategory);
       for (int i = 0; i < maxLen; i++) {
         for (final list in categories) {
           if (i < list.length) {
             mixedHero.add(list[i]);
-            if (mixedHero.length >= 25) break;
+            if (mixedHero.length >= 30) break;
           }
         }
-        if (mixedHero.length >= 25) break;
+        if (mixedHero.length >= 30) break;
       }
 
-      if (mixedHero.isNotEmpty) return mixedHero;
+      if (mixedHero.isNotEmpty) {
+        // Shuffle final con la misma semilla horaria y limitar a 10 para hero rotativo diario
+        final rndHero = Random(bucket);
+        mixedHero.shuffle(rndHero);
+        // Senior: Que los primeros 2 no sean anime (anime luego en 3º+)
+        if (mixedHero.isNotEmpty && mixedHero[0].type == MediaType.anime) {
+          final idx = mixedHero.indexWhere((m) => m.type != MediaType.anime, 1);
+          if (idx != -1) {
+            final first = mixedHero.removeAt(0);
+            mixedHero.insert(idx.clamp(2, mixedHero.length), first);
+          }
+        }
+        if (mixedHero.length > 1 && mixedHero[1].type == MediaType.anime) {
+          final idx = mixedHero.indexWhere((m) => m.type != MediaType.anime, 2);
+          if (idx != -1) {
+            final second = mixedHero.removeAt(1);
+            mixedHero.insert(idx.clamp(2, mixedHero.length), second);
+          }
+        }
+        final limited = mixedHero.take(10).toList();
+        debugPrint('[heroBannerItemsProvider] Inicio hero ${limited.length}/${mixedHero.length} bucket:$bucket first:${limited.first.type}');
+        return limited;
+      }
     } catch (e) {
       debugPrint('[heroBannerItemsProvider] Inicio fusion error: $e');
     }
@@ -179,37 +207,37 @@ final top10GlobalProvider = FutureProvider<List<MediaItem>>((ref) async {
   return merged.take(20).toList();
 });
 
-final editorialSectionsProvider = AsyncNotifierProvider<EditorialSectionsNotifier, List<EditorialSection>>(() {
+final editorialSectionsProvider = AsyncNotifierProvider.family<EditorialSectionsNotifier, List<EditorialSection>, String>(() {
   return EditorialSectionsNotifier();
 });
 
-class EditorialSectionsNotifier extends AsyncNotifier<List<EditorialSection>> {
+class EditorialSectionsNotifier extends FamilyAsyncNotifier<List<EditorialSection>, String> {
   @override
-  FutureOr<List<EditorialSection>> build() async {
+  FutureOr<List<EditorialSection>> build(String arg) async {
     ref.keepAlive();
     final box = Hive.box('home_cache');
-    final cachedData = box.get('editorial_sections');
+    final cachedData = box.get('editorial_sections_$arg');
     
     if (cachedData != null) {
       try {
         final List<dynamic> list = cachedData as List<dynamic>;
         final sections = list.map((e) => EditorialSection.fromJson(Map<String, dynamic>.from(e as Map))).toList();
-        _refreshFromNetwork();
+        _refreshFromNetwork(arg);
         return sections;
       } catch (e) {
         debugPrint('[HomeCache] Error: $e');
       }
     }
-    return _refreshFromNetwork();
+    return _refreshFromNetwork(arg);
   }
 
-  Future<List<EditorialSection>> _refreshFromNetwork() async {
+  Future<List<EditorialSection>> _refreshFromNetwork(String category) async {
     try {
       final repo = ref.read(aurisRepositoryProvider);
-      // Senior Fix: Solicitamos calidad w780 para secciones editoriales para optimizar carga.
-      final response = await repo.getEditorial(imgSize: 'w780');
+      // Senior Fix: Solicitamos calidad w780 para secciones editoriales para optimizar carga con soporte de categoría.
+      final response = await repo.getEditorial(imgSize: 'w780', category: category);
       final box = Hive.box('home_cache');
-      await box.put('editorial_sections', response.sections.map((e) => e.toJson()).toList());
+      await box.put('editorial_sections_$category', response.sections.map((e) => e.toJson()).toList());
       state = AsyncData(response.sections);
       return response.sections;
     } catch (e) {
@@ -219,15 +247,13 @@ class EditorialSectionsNotifier extends AsyncNotifier<List<EditorialSection>> {
   }
 }
 
-enum RowFormat { vertical, horizontal }
-
 class EditorialRow {
   final EditorialBadge badge;
   final String title;
   final String? subtitle;
   final List<MediaItem> items;
   final bool isMovie;
-  final RowFormat format;
+  final SectionPresentation format;
   
   const EditorialRow({
     required this.badge, 
@@ -235,7 +261,7 @@ class EditorialRow {
     required this.items, 
     this.subtitle, 
     this.isMovie = false,
-    this.format = RowFormat.vertical,
+    this.format = SectionPresentation.poster,
   });
 }
 
@@ -246,65 +272,508 @@ enum HomeSectionType {
   recentEpisodes,
   recentlyAdded,
   continueWatching,
-  top10Global
+  top10Global,
+  recommendation,
+  discovery // Senior Fix: Soporte para charts y exploraciones dinámicas vía /api/filter
 }
 
 class HomeLayoutSection {
   final HomeSectionType type;
   final String? title;
   final dynamic data;
+  final SectionPresentation presentation;
+  final String? serverFormat; // Cache del formato original del server
 
-  const HomeLayoutSection({required this.type, this.title, this.data});
+  const HomeLayoutSection({
+    required this.type, 
+    this.title, 
+    this.data, 
+    this.presentation = SectionPresentation.poster,
+    this.serverFormat,
+  });
 }
 
 /// Senior: Orchestrator for the Home Screen layout.
-final homeLayoutProvider = FutureProvider<List<HomeLayoutSection>>((ref) async {
-  final List<HomeLayoutSection> layout = [];
-  layout.add(const HomeLayoutSection(type: HomeSectionType.continueWatching));
-  layout.add(const HomeLayoutSection(type: HomeSectionType.top10Global, title: 'Top 10 de hoy'));
-  layout.add(const HomeLayoutSection(type: HomeSectionType.recentlyAdded, title: 'Recién añadido a AurisTV'));
+/// Unificado para manejar personalización por categorías desde el servidor.
+final homeLayoutProvider = FutureProvider<List<ComposedHomeSection>>((ref) async {
+  final currentCategory = ref.watch(homeCategoryProvider);
+  return _getHomeLayout(ref, currentCategory);
+});
+
+Future<List<ComposedHomeSection>> _getHomeLayout(Ref ref, String category) async {
+  final repo = ref.watch(aurisRepositoryProvider);
+  final authState = ref.watch(authProvider);
+  final String userId = authState?.activeProfileId ?? authState?.id ?? 'guest_profile';
+  final box = Hive.box('home_cache');
+  
+  // Senior Fix: Caché aislada por usuario Y categoría para evitar colisiones visuales
+  final cacheKey = 'personalized_home_${userId}_$category';
 
   try {
-    final editorials = await ref.watch(editorialRowsProvider.future);
+    // 1. Intentar cargar desde caché para velocidad instantánea (Optimistic UI)
+    final cachedData = box.get(cacheKey);
+    if (cachedData != null) {
+      try {
+        final homeResponse = HomeResponse.fromJson(Map<String, dynamic>.from(cachedData as Map));
+        PersonalizationMonitor.instance.logMetric('home_cache_hit', true, tags: {'userId': userId, 'category': category});
+        _processPersonalizedHome(homeResponse, ref); // Disparar refresco en segundo plano
+        
+        final rawSections = _mapResponseToLayout(homeResponse, category);
+        // Senior Fix: Fusionar editorial también en hit de caché
+        if (category == 'inicio') {
+          // Inicio: 2 random por categoría (películas/series/animes) para scroll infinito sin reciclar top
+          final rnd = Random();
+          for (final cat in ['películas', 'series', 'animes']) {
+            try {
+              final edCache = box.get('editorial_sections_$cat');
+              List<EditorialSection> pool = [];
+              if (edCache is List && edCache.isNotEmpty) {
+                try {
+                  pool = edCache.map((e) => EditorialSection.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+                } catch (e) {
+                  debugPrint('[homeLayoutProvider] edCache parse fail $cat: $e');
+                }
+              }
+              if (pool.isEmpty) {
+                final repoCached = ref.read(aurisRepositoryProvider);
+                final edNet = await repoCached.getEditorial(imgSize: 'w780', category: cat)
+                    .timeout(const Duration(seconds: 4))
+                    .catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []));
+                if (edNet.sections.isNotEmpty) {
+                  try { await box.put('editorial_sections_$cat', edNet.sections.map((e) => e.toJson()).toList()); } catch (_) {}
+                  pool = edNet.sections;
+                }
+              }
+              if (pool.isEmpty) continue;
+              pool.shuffle(rnd);
+              final picks = pool.take(2);
+              for (final s in picks) {
+                final mapped = _mapEditorialResponseToLayout(EditorialResponse(generatedAt: '', locale: 'es-MX', sections: [s]), cat).first;
+                if (!rawSections.any((x) => x.title == mapped.title)) rawSections.add(mapped);
+              }
+              debugPrint('[homeLayoutProvider] inicio cache hit editorial $cat: 2/${pool.length}');
+            } catch (e) {
+              debugPrint('[homeLayoutProvider] inicio cache editorial $cat error: $e');
+            }
+          }
+        } else if (category != 'inicio') {
+          try {
+            final edCache = box.get('editorial_sections_$category');
+            bool mergedFromCache = false;
+            if (edCache is List && edCache.isNotEmpty) {
+              try {
+                final edSections = edCache
+                    .map((e) => EditorialSection.fromJson(Map<String, dynamic>.from(e as Map)))
+                    .toList();
+                if (edSections.isNotEmpty) {
+                  final edResponse = EditorialResponse(generatedAt: '', locale: 'es-MX', sections: edSections);
+                  final edMapped = _mapEditorialResponseToLayout(edResponse, category);
+                  for (final ed in edMapped) {
+                    if (!rawSections.any((s) => s.title == ed.title)) rawSections.add(ed);
+                  }
+                  mergedFromCache = edMapped.isNotEmpty;
+                  debugPrint('[homeLayoutProvider] cache hit editorial merged from Hive $category: ${edMapped.length}');
+                }
+              } catch (e) {
+                debugPrint('[homeLayoutProvider] edCache parse fail $category: $e');
+              }
+            }
+            if (!mergedFromCache) {
+              final repoCached = ref.read(aurisRepositoryProvider);
+              final edNet = await repoCached.getEditorial(imgSize: 'w780', category: category)
+                  .timeout(const Duration(seconds: 5))
+                  .catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []));
+              if (edNet.sections.isNotEmpty) {
+                try { await box.put('editorial_sections_$category', edNet.sections.map((e) => e.toJson()).toList()); } catch (_) {}
+                final edMapped = _mapEditorialResponseToLayout(edNet, category);
+                int added = 0;
+                for (final ed in edMapped) {
+                  if (!rawSections.any((s) => s.title == ed.title)) { rawSections.add(ed); added++; }
+                }
+                debugPrint('[homeLayoutProvider] cache hit editorial merged from network $category: $added/${edMapped.length}');
+              } else {
+                debugPrint('[homeLayoutProvider] editorial network empty for $category');
+              }
+            }
+          } catch (e) {
+            debugPrint('[homeLayoutProvider] editorial merge error $category: $e');
+          }
+        }
+        return SectionComposer.compose(rawSections);
+      } catch (e) {
+        debugPrint('[homeLayoutProvider] Cache parsing error for $category: $e');
+      }
+    }
+
+    // 2. Carga real desde el servidor (Redirigido al puerto específico por el Repositorio)
+    final stopwatch = Stopwatch()..start();
+    
+    // Senior Strategy: Inicio trae 2 random por categoría, otras categorías 1 editorial completa
+    final futures = [
+      repo.getUserHome(userId: userId, category: category).timeout(const Duration(seconds: 10)),
+      if (category == 'inicio') ...[
+        repo.getEditorial(imgSize: 'w780', category: 'películas').timeout(const Duration(seconds: 8)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+        repo.getEditorial(imgSize: 'w780', category: 'series').timeout(const Duration(seconds: 8)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+        repo.getEditorial(imgSize: 'w780', category: 'animes').timeout(const Duration(seconds: 8)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+      ] else
+        repo.getEditorial(imgSize: 'w780', category: category).timeout(const Duration(seconds: 8)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []))
+    ];
+
+    final results = await Future.wait(futures);
+    final homeResponse = results[0] as HomeResponse;
+    final List<EditorialResponse> editorialResponses = results.length > 1 ? results.sublist(1).cast<EditorialResponse>() : [];
+    
+    stopwatch.stop();
+
+    PersonalizationMonitor.instance.logMetric('home_fetch_latency_ms', stopwatch.elapsedMilliseconds, tags: {'userId': userId, 'category': category});
+    
+    try {
+      PersonalizationMonitor.instance.auditHomeResponse(homeResponse);
+    } catch (e) {
+      debugPrint('[HomeProvider] Audit error (ignored): $e');
+    }
+    
+    // Guardar en caché el home personalizado principal
+    await box.put(cacheKey, homeResponse.toJson());
+
+    // 3. Mapear y Fusionar
+    final rawSections = _mapResponseToLayout(homeResponse, category);
+    
+    if (category == 'inicio' && editorialResponses.isNotEmpty) {
+      final rnd = Random();
+      final catNames = ['películas', 'series', 'animes'];
+      for (int i = 0; i < editorialResponses.length; i++) {
+        final ed = editorialResponses[i];
+        final cat = i < catNames.length ? catNames[i] : category;
+        if (ed.sections.isEmpty) continue;
+        try { await box.put('editorial_sections_$cat', ed.sections.map((e) => e.toJson()).toList()); } catch (_) {}
+        final pool = List<EditorialSection>.from(ed.sections)..shuffle(rnd);
+        final picks = pool.take(2);
+        for (final s in picks) {
+          final mapped = _mapEditorialResponseToLayout(EditorialResponse(generatedAt: ed.generatedAt, locale: ed.locale, sections: [s]), cat).first;
+          if (!rawSections.any((x) => x.title == mapped.title)) rawSections.add(mapped);
+        }
+      }
+    } else if (editorialResponses.isNotEmpty) {
+      final ed = editorialResponses.first;
+      if (ed.sections.isNotEmpty) {
+        try { await box.put('editorial_sections_$category', ed.sections.map((e) => e.toJson()).toList()); } catch (_) {}
+        final edSections = _mapEditorialResponseToLayout(ed, category);
+        for (final sec in edSections) {
+          if (!rawSections.any((s) => s.title == sec.title)) rawSections.add(sec);
+        }
+      }
+    }
+
+    try {
+      return SectionComposer.compose(rawSections);
+    } catch (e) {
+      debugPrint('[HomeProvider] Composer error: $e');
+      return SectionComposer.compose([]); 
+    }
+  } catch (e, stack) {
+    PersonalizationMonitor.instance.logMetric('home_error', e.toString(), tags: {'userId': userId, 'category': category});
+    debugPrint('[homeLayoutProvider] Personalized Home failed for $category: $e');
+    debugPrint(stack.toString());
+  }
+
+  // --- FALLBACK AL HOME EDITORIAL ACTUAL (Categorizado) ---
+  final rawSections = await _getEditorialFallback(ref, category);
+  return SectionComposer.compose(rawSections);
+}
+
+List<HomeLayoutSection> _mapEditorialResponseToLayout(EditorialResponse response, String category) {
+  final List<HomeLayoutSection> layout = [];
+  for (final section in response.sections) {
+    if (section.items.isEmpty) continue;
+
+    final presentation = SectionPresentationResolver.resolve(
+      section.badge, 
+      id: section.title, 
+      serverFormat: section.format,
+    );
+    final isMovie = section.badge.toLowerCase().contains('movie') || category == 'películas';
+
+    final row = EditorialRow(
+      badge: editorialBadgeFromString(section.badge) ?? EditorialBadge.essential,
+      title: section.title,
+      subtitle: section.subtitle,
+      items: section.items.map((e) => _mapEditorialItemToMediaItem(e, sectionId: section.id)).toList(),
+      isMovie: isMovie,
+      format: presentation,
+    );
+
+    layout.add(HomeLayoutSection(
+      type: HomeSectionType.editorial,
+      title: section.title,
+      data: row,
+      presentation: presentation,
+      serverFormat: section.format,
+    ));
+  }
+  return layout;
+}
+
+// El método _getCategoryLayout ha sido deprecated en favor de la personalización completa por categoría desde el servidor.
+// Se mantiene como referencia interna o fallback si fuera necesario.
+
+List<HomeLayoutSection> _mapResponseToLayout(HomeResponse response, String category) {
+  final List<HomeLayoutSection> layout = [];
+
+  // [Senior UX Fix] Forzar "Continuar Viendo" siempre al inicio de la pestaña
+  // El widget de UI se encargará de ocultarse si el historial está vacío (SizedBox.shrink).
+  layout.add(HomeLayoutSection(
+    type: HomeSectionType.continueWatching,
+    presentation: SectionPresentation.wide,
+    data: category == 'animes' ? 'anime' : null,
+  ));
+
+  SectionPresentation? lastPresentation;
+
+  for (final section in response.sections) {
+    try {
+      if (section.items.isEmpty) continue; // Omitir secciones vacías de forma segura
+      
+      // Evitar duplicar la sección de continuar viendo si el backend la envía
+      if (section.type.toLowerCase().contains('watching') || section.type.toLowerCase().contains('continue')) {
+        continue;
+      }
+
+      final sectionType = _mapApiSectionType(section.type);
+      final List<MediaItem> mediaItems = section.items.map((item) => _mapHomeItemToMediaItem(item, section.id)).toList();
+
+      final String? contextualSubtitle = section.subtitle ?? PersonalizedHomeHelper.getContextSubtitle(section.reasonKeys);
+
+      final apiType = section.type.toLowerCase();
+      EditorialBadge badge = EditorialBadge.essential;
+
+      // 1. [Senior UX Rhythm] Asignación de formato ideal según el tipo de sección
+      if (apiType == 'editorial_for_you') {
+        badge = EditorialBadge.mythical;
+      }
+
+      // 2. [Senior UX Resolver] Determinar presentación visual mediante el Resolver Global
+      final presentation = SectionPresentationResolver.resolve(
+        section.type, 
+        id: section.title,
+        serverFormat: section.format,
+      );
+
+      final row = EditorialRow(
+        badge: badge,
+        title: section.title,
+        subtitle: contextualSubtitle,
+        items: mediaItems,
+        isMovie: mediaItems.any((item) => item.type == MediaType.movie),
+        format: presentation,
+      );
+
+      layout.add(HomeLayoutSection(
+        type: sectionType,
+        title: section.title,
+        data: row,
+        presentation: presentation,
+        serverFormat: section.format,
+      ));
+    } catch (e) {
+      debugPrint('[HomeProvider] Error mapping section ${section.title}: $e');
+    }
+  }
+  return layout;
+}
+
+Future<void> _processPersonalizedHome(HomeResponse response, Ref ref) async {
+  // Aquí se podrían disparar tareas de segundo plano o prefetch si fuera necesario.
+}
+
+Future<List<HomeLayoutSection>> _getEditorialFallback(Ref ref, String category) async {
+  final List<HomeLayoutSection> layout = [];
+  layout.add(HomeLayoutSection(
+    type: HomeSectionType.continueWatching,
+    presentation: SectionPresentation.wide,
+    data: category == 'animes' ? 'anime' : null,
+  ));
+  layout.add(const HomeLayoutSection(
+    type: HomeSectionType.top10Global, 
+    title: 'Top 10 de hoy',
+    presentation: SectionPresentation.top10,
+  ));
+  layout.add(const HomeLayoutSection(
+    type: HomeSectionType.recentlyAdded, 
+    title: 'Recién añadido a AurisTV',
+    presentation: SectionPresentation.poster,
+  ));
+
+  try {
+    final editorials = await ref.watch(editorialRowsProvider(category).future);
     for (final row in editorials) {
-      layout.add(HomeLayoutSection(type: HomeSectionType.editorial, data: row));
+      layout.add(HomeLayoutSection(
+        type: HomeSectionType.editorial, 
+        data: row,
+        presentation: row.format,
+      ));
     }
   } catch (e) {}
 
-  layout.add(const HomeLayoutSection(type: HomeSectionType.recentEpisodes, title: 'Estrenos (Hoy)'));
-  layout.add(const HomeLayoutSection(type: HomeSectionType.trendingAnime, title: 'Animes en tendencia'));
-  layout.add(const HomeLayoutSection(type: HomeSectionType.trendingMovies, title: 'Películas destacadas'));
+  layout.add(const HomeLayoutSection(
+    type: HomeSectionType.recentEpisodes, 
+    title: 'Estrenos (Hoy)',
+    presentation: SectionPresentation.wide,
+  ));
+  layout.add(const HomeLayoutSection(
+    type: HomeSectionType.trendingAnime, 
+    title: 'Animes en tendencia',
+    presentation: SectionPresentation.poster,
+  ));
+  layout.add(const HomeLayoutSection(
+    type: HomeSectionType.trendingMovies, 
+    title: 'Películas destacadas',
+    presentation: SectionPresentation.wide,
+  ));
 
   return layout;
-});
+}
 
-final editorialRowsProvider = FutureProvider<List<EditorialRow>>((ref) async {
-  final sections = await ref.watch(editorialSectionsProvider.future);
-  return sections.map((section) {
+HomeSectionType _mapApiSectionType(String apiType) {
+  switch (apiType.toLowerCase()) {
+    case 'editorial':
+    case 'editorial_for_you':
+      return HomeSectionType.editorial;
+    case 'recommendation':
+    case 'for_you':
+    case 'more_of_genre':
+    case 'because_you_watched':
+      return HomeSectionType.recommendation;
+    case 'continue_watching':
+      return HomeSectionType.continueWatching;
+    default:
+      return HomeSectionType.editorial;
+  }
+}
+
+MediaItem _mapHomeItemToMediaItem(HomeItem item, String sectionId) {
+  final String rawKind = item.kind?.toLowerCase() ?? '';
+  MediaType mediaType = MediaType.series;
+  if (rawKind == 'anime' || rawKind == 'tv_anime' || rawKind == 'movie_anime') mediaType = MediaType.anime;
+  else if (rawKind == 'movie' || rawKind == 'pelicula') mediaType = MediaType.movie;
+  else if (rawKind == 'kdrama') mediaType = MediaType.kdrama;
+  else if (rawKind == 'series') mediaType = MediaType.series;
+
+  final String? resolvedSubtitle = PersonalizedHomeHelper.getContextSubtitle(item.reasonKeys);
+
+  // Senior Fix: Fallback de imagen horizontal si no viene del servidor
+  final String effectiveBanner = (item.backdropUrl != null && item.backdropUrl!.isNotEmpty)
+      ? item.backdropUrl!
+      : (item.posterUrl ?? '');
+
+  // Senior Fix: Preservar source/sources reales del servidor (OnlyPelis/GnulaHD) si vienen
+  final String effectiveSource = (item.source != null && item.source!.isNotEmpty)
+      ? item.source!
+      : (item.sources.isNotEmpty ? item.sources.first.source : '');
+  final String effectiveUrl = item.url ?? item.detailUrl ?? item.id;
+  final List<SourceItem> effectiveSources = item.sources.isNotEmpty
+      ? item.sources
+      : (effectiveSource.isNotEmpty ? [SourceItem(source: effectiveSource, url: effectiveUrl, quality: 'HD')] : const []);
+  final card = SearchResult(
+    title: item.title,
+    url: effectiveUrl,
+    source: effectiveSource,
+    quality: 'HD',
+    thumbnail: item.posterUrl ?? '',
+    banner: effectiveBanner,
+    logo: item.logoUrl,
+    score: item.score ?? item.rating,
+    year: item.year,
+    kind: item.kind,
+    type: item.type,
+    sources: effectiveSources,
+  );
+
+  PlaybackHistory? progressHistory;
+  if (item.progress != null && item.progress is Map) {
+    try {
+      final map = Map<String, dynamic>.from(item.progress as Map);
+      // Casting ultra-resiliente
+      final pos = map['positionInMilliseconds'] ?? map['position'] ?? 0;
+      final dur = map['durationInMilliseconds'] ?? map['duration'] ?? 0;
+      
+      progressHistory = PlaybackHistory(
+        contentId: item.id,
+        positionInMilliseconds: pos is num ? pos.toInt() : 0,
+        durationInMilliseconds: dur is num ? dur.toInt() : 0,
+        updatedAt: DateTime.now(),
+        title: item.title,
+        posterUrl: ApiEndpoints.proxyImage(item.posterUrl, category: rawKind, source: item.detailUrl),
+        bannerUrl: ApiEndpoints.proxyImage(effectiveBanner, highQuality: true, category: rawKind, source: item.detailUrl),
+      );
+    } catch (_) {}
+  }
+
+  return MediaItem(
+    id: item.id,
+    title: item.title,
+    posterUrl: ApiEndpoints.proxyImage(item.posterUrl, category: rawKind, source: effectiveSource),
+    bannerUrl: ApiEndpoints.proxyImage(effectiveBanner, highQuality: true, category: rawKind, source: effectiveSource),
+    logoUrl: item.logoUrl,
+    type: mediaType,
+    rating: item.rating ?? item.score,
+    subtitle: resolvedSubtitle,
+    year: item.year,
+    detailUrl: item.detailUrl,
+    animeId: item.animeId,
+    score: item.score,
+    reasonKeys: item.reasonKeys,
+    playbackHistory: progressHistory,
+    sectionId: sectionId,
+    source: effectiveSource,
+    card: card.copyWith(sectionId: sectionId),
+  );
+}
+
+final editorialRowsProvider = FutureProvider.family<List<EditorialRow>, String>((ref, category) async {
+  final sections = await ref.watch(editorialSectionsProvider(category).future);
+  
+  final List<EditorialRow> rows = sections.map((section) {
     final badge = editorialBadgeFromString(section.badge);
     final isMovie = section.badge.toLowerCase().contains('movie');
     
-    RowFormat format = RowFormat.vertical;
-    final titleLower = section.title.toLowerCase();
-    if (badge == EditorialBadge.hiddenGem || 
-        badge == EditorialBadge.movieEssential || 
-        titleLower.contains('película') ||
-        titleLower.contains('pelicula')) {
-      format = RowFormat.horizontal;
-    }
+    // Usamos el resolver para determinar la presentación editorial
+    final presentation = SectionPresentationResolver.resolve(
+      section.badge, 
+      id: section.title,
+      serverFormat: section.format,
+    );
 
     return EditorialRow(
       badge: badge ?? EditorialBadge.essential,
       title: section.title,
       subtitle: section.subtitle,
       isMovie: isMovie,
-      format: format,
-      items: section.items.map(_mapEditorialItemToMediaItem).toList(),
+      format: presentation,
+      items: section.items.map((e) => _mapEditorialItemToMediaItem(e, sectionId: section.id)).toList(),
     );
   }).toList();
+
+  // Senior Logic: Ordenar secciones por jerarquía de prestigio editorial
+  int getPriority(EditorialBadge badge) {
+    switch (badge) {
+      case EditorialBadge.mythical: return 0;
+      case EditorialBadge.masterpiece: return 1;
+      case EditorialBadge.movieEssential: return 2;
+      case EditorialBadge.essential: return 3;
+      case EditorialBadge.starter: return 4;
+      case EditorialBadge.favorite: return 5;
+      case EditorialBadge.awardWinner: return 6;
+      case EditorialBadge.classic: return 7;
+      case EditorialBadge.hiddenGem: return 8;
+    }
+  }
+
+  rows.sort((a, b) => getPriority(a.badge).compareTo(getPriority(b.badge)));
+  return rows;
 });
 
-MediaItem _mapEditorialItemToMediaItem(EditorialItem result) {
+MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}) {
   MediaType type = MediaType.series;
   final s = result.source.toLowerCase();
   final t = result.title.toLowerCase();
@@ -340,21 +809,53 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result) {
     else if (result.id.contains('tudorama.net')) effectiveSource = 'TuDorama';
   }
 
+  // Senior Fix: Fallback de imagen horizontal para secciones WIDE editoriales
+  final String effectiveBanner = (result.bannerUrl != null && result.bannerUrl!.isNotEmpty)
+      ? result.bannerUrl!
+      : result.posterUrl;
+
   return MediaItem(
     id: result.id,
     title: result.title,
     romaji: result.romaji,
     english: result.english,
-    posterUrl: ApiEndpoints.proxyImage(result.posterUrl),
-    bannerUrl: ApiEndpoints.proxyImage(result.bannerUrl),
+    posterUrl: ApiEndpoints.proxyImage(result.posterUrl, source: effectiveSource, category: result.kind),
+    bannerUrl: ApiEndpoints.proxyImage(effectiveBanner, source: effectiveSource, category: result.kind),
+    logoUrl: result.logoUrl,
     type: type,
     rating: result.rating,
     source: effectiveSource,
     year: int.tryParse(result.year ?? ''),
+    episode: result.episode,
+    airingAt: result.airingAt,
     trailerKey: result.trailerKey,
     synopsis: result.synopsis,
     subtitle: displaySubtitle,
-    aired: type == MediaType.movie || (result.subtitle?.toLowerCase().contains('finalizado') ?? false),
+    aired: type == MediaType.movie || (result.subtitle?.toLowerCase().contains('finalizado') ?? false) || (result.status?.toLowerCase().contains('finalizado') ?? false),
+    genres: result.genres,
+    certification: result.certification,
+    available: sectionId == 'genreUpcoming' ? false : result.available,
+    detailUrl: sectionId == 'genreUpcoming' ? '' : (result.detailUrl ?? result.url),
+    tmdbId: result.tmdbId,
+    sectionId: sectionId,
+    card: SearchResult(
+      title: result.title,
+      url: sectionId == 'genreUpcoming' ? '' : (result.url ?? result.detailUrl ?? result.id),
+      quality: result.type ?? 'TV',
+      thumbnail: result.posterUrl,
+      banner: result.bannerUrl,
+      source: effectiveSource,
+      romaji: result.romaji,
+      english: result.english,
+      year: int.tryParse(result.year ?? ''),
+      score: result.rating,
+      synopsis: result.synopsis,
+      kind: result.kind,
+      type: result.type,
+      genres: result.genres,
+      sources: result.sources,
+      sectionId: sectionId,
+    ),
   );
 }
 
@@ -501,7 +1002,11 @@ class TrendingListNotifier extends FamilyAsyncNotifier<List<MediaItem>, String> 
 
 final homePrefetchProvider = FutureProvider<void>((ref) async {
   try {
-    ref.watch(editorialRowsProvider.future).ignore();
+    ref.watch(editorialRowsProvider('inicio').future).ignore();
+    ref.watch(editorialRowsProvider('animes').future).ignore();
+    ref.watch(editorialRowsProvider('películas').future).ignore();
+    ref.watch(editorialRowsProvider('series').future).ignore();
+    ref.watch(editorialRowsProvider('kdrama').future).ignore();
     ref.watch(trendingListProvider('animes').future).ignore();
     ref.watch(trendingListProvider('películas').future).ignore();
     ref.watch(trendingListProvider('series').future).ignore();

@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 
 final _scheduleProvider = FutureProvider<ScheduleResponse>((ref) async {
   final repo = ref.watch(aurisRepositoryProvider);

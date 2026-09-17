@@ -192,6 +192,270 @@ class _GenreCardState extends State<_GenreCard> {
   }
 }
 
+class SearchDiscoveryFeed extends ConsumerWidget {
+  final String category;
+  final Function(SearchResult) onContentTap;
+
+  const SearchDiscoveryFeed({
+    super.key,
+    required this.category,
+    required this.onContentTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final discoveryAsync = ref.watch(searchDiscoveryProvider(category));
+
+    return discoveryAsync.when(
+      data: (charts) {
+        if (charts.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          children: charts.map((chart) => _ChartRow(
+            chart: chart,
+            onTap: onContentTap,
+          )).toList(),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 60),
+        child: Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _ChartRow extends StatefulWidget {
+  final SearchChart chart;
+  final Function(SearchResult) onTap;
+
+  const _ChartRow({required this.chart, required this.onTap});
+
+  @override
+  State<_ChartRow> createState() => _ChartRowState();
+}
+
+class _ChartRowState extends State<_ChartRow> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isHovered = false;
+  bool _showLeft = false;
+  bool _showRight = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_updateArrows);
+  }
+
+  void _updateArrows() {
+    if (!mounted || !_scrollController.hasClients) return;
+    final left = _scrollController.offset > 20;
+    final right = _scrollController.offset < _scrollController.position.maxScrollExtent - 20;
+    if (left != _showLeft || right != _showRight) {
+      setState(() { _showLeft = left; _showRight = right; });
+    }
+  }
+
+  void _scroll(bool right) {
+    final offset = right ? 800.0 : -800.0;
+    _scrollController.animateTo(
+      (_scrollController.offset + offset).clamp(0, _scrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeOutQuart,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final double posterHeight = isMobile ? 180 : 220;
+    final double itemWidth = widget.chart.isTop10 ? posterHeight * 1.1 : posterHeight * 0.7;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(isMobile ? 16 : 32, 40, 16, 16),
+            child: Text(
+              widget.chart.title,
+              style: TextStyle(
+                fontSize: isMobile ? 22 : 26,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: -0.6,
+              ),
+            ),
+          ),
+          SizedBox(
+            height: posterHeight + 30,
+            child: Stack(
+              children: [
+                ListView.builder(
+                  controller: _scrollController,
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32),
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: widget.chart.items.length,
+                  itemBuilder: (context, index) {
+                    final item = widget.chart.items[index];
+
+                    if (widget.chart.isTop10) {
+                      return _TrendingPosterCard(
+                        index: index,
+                        item: item,
+                        height: posterHeight,
+                        width: itemWidth,
+                        onTap: () => widget.onTap(item),
+                      );
+                    }
+
+                    return _StandardDiscoveryCard(
+                      item: item,
+                      width: itemWidth,
+                      height: posterHeight,
+                      onTap: () => widget.onTap(item),
+                    );
+                  },
+                ),
+                if (!isMobile) ...[
+                  _buildArrow(false),
+                  _buildArrow(true),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArrow(bool isRight) {
+    final bool isVisible = isRight ? _showRight : _showLeft;
+    return Positioned(
+      left: isRight ? null : 0,
+      right: isRight ? 0 : null,
+      top: 0, bottom: 30,
+      child: AnimatedOpacity(
+        opacity: (_isHovered && isVisible) ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 300),
+        child: IgnorePointer(
+          ignoring: !(_isHovered && isVisible),
+          child: Container(
+            width: 80,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: isRight ? Alignment.centerLeft : Alignment.centerRight,
+                end: isRight ? Alignment.centerRight : Alignment.centerLeft,
+                colors: [Colors.black.withOpacity(0), Colors.black.withOpacity(0.8)],
+              ),
+            ),
+            child: Center(
+              child: NavArrow(
+                icon: isRight ? Icons.arrow_forward_ios_rounded : Icons.arrow_back_ios_new_rounded,
+                useBackground: true,
+                onTap: () => _scroll(isRight),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StandardDiscoveryCard extends StatefulWidget {
+  final SearchResult item;
+  final double width;
+  final double height;
+  final VoidCallback onTap;
+
+  const _StandardDiscoveryCard({
+    required this.item,
+    required this.width,
+    required this.height,
+    required this.onTap,
+  });
+
+  @override
+  State<_StandardDiscoveryCard> createState() => _StandardDiscoveryCardState();
+}
+
+class _StandardDiscoveryCardState extends State<_StandardDiscoveryCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _isHovered ? 1.05 : 1.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            width: widget.width,
+            margin: const EdgeInsets.only(right: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _isHovered ? Colors.white70 : Colors.white10,
+                        width: _isHovered ? 2.0 : 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(_isHovered ? 0.6 : 0.4),
+                          blurRadius: _isHovered ? 20 : 10,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: ApiEndpoints.proxyImage(widget.item.thumbnail, fallbackUrl: widget.item.tmdbThumbnail),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        filterQuality: FilterQuality.medium,
+                        placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.white10,
+                          child: const Icon(Icons.movie_outlined, color: Colors.white24),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  cleanTitleForDisplay(widget.item.title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _isHovered ? Colors.white : Colors.white70,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class SearchTrendingSection extends ConsumerStatefulWidget {
   final Function(SearchResult) onTrendingTap;
   const SearchTrendingSection({super.key, required this.onTrendingTap});

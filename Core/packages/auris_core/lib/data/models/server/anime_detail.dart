@@ -75,28 +75,30 @@ class AnimeDetail {
   String? get trailerKey => trailer?.videoId;
   String? get firstAirDate => year?.toString();
 
-  factory AnimeDetail.fromJson(Map<String, dynamic> json) {
+  factory AnimeDetail.fromJson(Map<dynamic, dynamic> json) {
     final root = (json.containsKey('data') && json['data'] is Map)
-        ? json['data'] as Map<String, dynamic>
-        : json;
+        ? Map<String, dynamic>.from(json['data'] as Map)
+        : Map<String, dynamic>.from(json);
 
-    final anime = (root['anime'] as Map<String, dynamic>?) ?? root;
-    final visuals = (root['visuals'] as Map<String, dynamic>?) ?? root;
+    final anime = (root['anime'] is Map) ? Map<String, dynamic>.from(root['anime'] as Map) : root;
+    final visuals = (root['visuals'] is Map) ? Map<String, dynamic>.from(root['visuals'] as Map) : root;
     final themes = (root['themes'] as List<dynamic>?) ?? [];
 
     final trailerData =
-        anime['trailer'] is Map<String, dynamic>
-            ? TrailerInfo.fromJson(anime['trailer'] as Map<String, dynamic>)
+        anime['trailer'] is Map
+            ? TrailerInfo.fromJson(Map<String, dynamic>.from(anime['trailer'] as Map))
             : null;
 
     final openings = <AnimeThemeInfo>[];
     final endings = <AnimeThemeInfo>[];
     for (final t in themes) {
-      final theme = AnimeThemeInfo.fromJson(t as Map<String, dynamic>);
-      if (theme.type == 'OPENING') {
-        openings.add(theme);
-      } else if (theme.type == 'ENDING') {
-        endings.add(theme);
+      if (t is Map) {
+        final theme = AnimeThemeInfo.fromJson(Map<String, dynamic>.from(t as Map));
+        if (theme.type == 'OPENING') {
+          openings.add(theme);
+        } else if (theme.type == 'ENDING') {
+          endings.add(theme);
+        }
       }
     }
 
@@ -147,10 +149,30 @@ class AnimeDetail {
       logo: ApiEndpoints.proxyImage(visuals?['logo'] as String? ?? root['logo'] as String?, policy: ImageSize.tiny),
       rating: (anime['score'] as num?)?.toDouble(),
       episodes: anime['episodes'] as int?,
-      genres: (anime['genres'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
+      genres: () {
+        // genresTranslated vive en anime, debajo de genres (como movies).
+        final inAnime = anime['genresTranslated'];
+        if (inAnime is List && inAnime.isNotEmpty) {
+          return inAnime.map((e) => e.toString()).toList();
+        }
+        // Compat: respuestas con el campo a nivel root.
+        final translated = root['genresTranslated'];
+        if (translated is List && translated.isNotEmpty) {
+          return translated.map((e) => e.toString()).toList();
+        }
+        // Combinar o priorizar la lista del root level (enriquecida por TMDB/servidor) 
+        // con la del nodo anime para asegurar paridad total (Móvil vs Web).
+        final Set<String> uniqueGenres = {};
+        final rootGenres = root['genres'] ?? root['genre'];
+        if (rootGenres is List) {
+          uniqueGenres.addAll(rootGenres.map((e) => e.toString()));
+        }
+        final animeGenres = anime['genres'] ?? anime['genre'];
+        if (animeGenres is List) {
+          uniqueGenres.addAll(animeGenres.map((e) => e.toString()));
+        }
+        return uniqueGenres.toList();
+      }(),
       format: anime['type'] as String?,
       status: anime['status'] as String?,
       season: anime['season']?.toString(),
@@ -275,9 +297,10 @@ class RelationInfo {
   final String? id;
   final String title;
   final String relation;
+  final String? category;
   final String? poster;
 
-  const RelationInfo({this.id, required this.title, required this.relation, this.poster});
+  const RelationInfo({this.id, required this.title, required this.relation, this.category, this.poster});
 
   factory RelationInfo.fromJson(Map<String, dynamic> json) {
     final v = (json['visuals'] as Map<String, dynamic>?) ?? json;
@@ -285,6 +308,7 @@ class RelationInfo {
       id: json['id']?.toString(),
       title: json['title'] as String? ?? '',
       relation: json['relation'] as String? ?? 'UNKNOWN',
+      category: json['category'] as String?,
       poster: ApiEndpoints.proxyImage(
         v['poster'] as String? ??
         v['posterUrl'] as String? ??

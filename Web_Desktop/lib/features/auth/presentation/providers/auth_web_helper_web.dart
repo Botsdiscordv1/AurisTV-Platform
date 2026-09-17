@@ -1,7 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:js_interop';
 import 'package:web/web.dart' as web;
 import 'auth_web_helper.dart';
 import 'package:auris_core/auris_core.dart';
+
+@JS('JSON.stringify')
+external String _jsStringify(JSAny obj);
 
 class AuthWebHelperWeb implements AuthWebHelper {
   @override
@@ -20,16 +25,36 @@ class AuthWebHelperWeb implements AuthWebHelper {
 
     StreamSubscription? sub;
     sub = web.window.onMessage.listen((event) {
-      final dynamic rawData = event.data;
-      if (rawData is! Map) return;
-      
-      final Map data = rawData;
-      if (data['type'] == 'authorization_response') {
+      final JSAny? rawData = event.data;
+      if (rawData == null) return;
+
+      Map? data;
+      if (rawData.isA<JSString>()) {
+        try {
+          final String str = (rawData as JSString).toDart;
+          data = jsonDecode(str) as Map;
+        } catch (_) {}
+      } else if (rawData.isA<JSObject>()) {
+        try {
+          final String jsonStr = _jsStringify(rawData);
+          data = jsonDecode(jsonStr) as Map;
+        } catch (_) {}
+      }
+
+      if (data != null && data['type'] == 'authorization_response') {
         final responseUrl = data['response'] as String;
-        final uri = Uri.parse(responseUrl);
+
+        // El flujo nativo del PIN redirige a una URL interna de AniList que contiene el token en el fragmento o query
+        // Reemplazamos los hashes para un análisis uniforme
+        final normalizedUrl = responseUrl.replaceFirst('#', '?');
+        final uri = Uri.parse(normalizedUrl);
+
+        final accessToken = uri.queryParameters['access_token'];
         final code = uri.queryParameters['code'];
         
-        if (code != null) {
+        if (accessToken != null) {
+          onCodeReceived('token:$accessToken');
+        } else if (code != null) {
           onCodeReceived(code);
         }
         sub?.cancel();
@@ -39,3 +64,4 @@ class AuthWebHelperWeb implements AuthWebHelper {
 }
 
 AuthWebHelper getAuthWebHelperImpl() => AuthWebHelperWeb();
+

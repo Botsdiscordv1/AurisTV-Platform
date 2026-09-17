@@ -197,6 +197,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   // del anime/temporada. Para eso content_screen envía `episodeTitle`.
   bool get _isSpecial => widget.season == 0;
   String get _displayTitle {
+    if (_isOpEd && widget.title != null) return widget.title!;
     if (_isTrailer) return 'Tráiler: ${widget.title ?? widget.contentId}';
     if (_isSpecial && widget.episodeTitle?.isNotEmpty == true) return widget.episodeTitle!;
     if (_isSpecial) return widget.title ?? widget.contentId;
@@ -386,7 +387,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _updateHistory({required int positionMs, required int durationMs, bool force = false}) {
     if (widget.contentId.isEmpty || _historyNotifier == null || _isOpEd || _isTrailer) return;
-    
+
     // Senior Performance Fix: Throttling de guardado en base de datos.
     // Solo guardamos si es 'force' o si han pasado 1s desde el último movimiento.
     if (!force) {
@@ -397,7 +398,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       });
       return;
     }
-    
+
     _performHistoryUpdate(positionMs, durationMs, force: true);
   }
 
@@ -432,7 +433,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   int _lastUiPersistenceMs = 0;
   int _lastRemoteUpdateMs = 0;
   Timer? _bufferingDebounceTimer;
-  final GlobalKey _videoKey = GlobalKey();
+  // Senior Continuity Shield: Usar la llave global del provider para evitar reconstrucciones del hardware
+  late final GlobalKey _videoKey;
   
   // Senior Recovery State
   int _resetRetryCount = 0;
@@ -451,9 +453,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   @override
   void initState() {
     super.initState();
+    _videoKey = ref.read(activePlayerProvider).videoKey;
     WidgetsBinding.instance.addObserver(this);
     
     _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
+
+    // Senior Normalization: Aseguramos que la URL del widget sea comparable con la del motor
+    final String normalizedWidgetUrl = ApiEndpoints.fixUrl(widget.sourceUrl);
 
     if (kIsWeb) {
       _fullscreenSubscription = onFullscreenChanged()?.listen((_) {
@@ -477,22 +483,74 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     _initRemoteControl();
 
-    // Senior Bridge Listener: Escuchar señales de botones físicos desde Android
-    _volumeControlChannel.setMethodCallHandler((call) async {
-      if (call.method == 'volumeUp') _handleVolumeStep(0.05);
-      else if (call.method == 'volumeDown') _handleVolumeStep(-0.05);
-    });
+    // Senior Bridge Listener: Escuchar señales de botones físicos desde Android (solo móvil)
+    if (!kIsWeb) {
+      _volumeControlChannel.setMethodCallHandler((call) async {
+        if (call.method == 'volumeUp') _handleVolumeStep(0.05);
+        else if (call.method == 'volumeDown') _handleVolumeStep(-0.05);
+      });
+    }
+
+    final activePlayer = ref.read(activePlayerProvider);
+    final bool isSameEpisode = activePlayer.currentItem?.id == widget.contentId && activePlayer.episode == widget.episode;
+    final bool isResumingSession = activePlayer.player != null && activePlayer.uiState != PlayerUIState.none && (isSameEpisode || activePlayer.url == widget.sourceUrl || activePlayer.url == normalizedWidgetUrl);
+    final currentSources = ref.read(activeContentSourcesProvider);
+
+    // Senior Restoration: Si ya venimos de una sesión activa, marcamos inicialización
+    // síncronamente para bloquear extracciones redundantes en el primer build.
+    // Esta es la clave del miniplayer continuo: reusa player, tracks, episodios y servidores.
+    if (isResumingSession) {
+      _hasInitialized = true;
+      _isLoading = false;
+      _player = activePlayer.player;
+      _controller = activePlayer.controller;
+      _allTracks = activePlayer.availableTracks;
+      _selectedTrackIndex = activePlayer.selectedTrackIndex;
+      _extractTracks = _allTracks.where((t) => !t.isEmbed).toList();
+      _currentLanguage = activePlayer.language;
+      // Si no hay language guardado, derivarlo del track actual
+      if (_currentLanguage == null && _allTracks.isNotEmpty) {
+        final t = _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0];
+        _currentLanguage = trackQualityType(t.quality) == 'SUB' ? 'SUB' : 'LAT';
+        if (trackQualityType(t.quality) == 'CAST') _currentLanguage = 'CAST';
+      }
+
+      // Re-agrupar fuentes síncronamente
+      final Map<String, List<SearchResult>> grouped = {};
+      for (final r in activePlayer.availableSources) {
+        final sName = simplifySourceName(r.source);
+        grouped.putIfAbsent(sName, () => []).add(r);
+      }
+      _groupedSources = grouped;
+      // Restaurar calidades de la pista actual sin re-extraer
+      if (_allTracks.isNotEmpty) {
+        final cur = _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0];
+        _qualityOptions = cur.qualities;
+        _currentStreamUrl = cur.url;
+        _currentStreamHeaders = cur.headers;
+        if (_qualityOptions.length <= 1) _selectedQuality = 'auto';
+      }
+      // Restaurar servidor/track para el badge superior esquina derecha
+      if (activePlayer.source != null && activePlayer.source!.isNotEmpty) {
+        _currentSource = activePlayer.source!;
+        _currentServerName = simplifySourceName(activePlayer.source!);
+      }
+      if (activePlayer.url != null && activePlayer.url!.isNotEmpty) {
+        _currentSourceUrl = activePlayer.url!;
+      }
+      if (activePlayer.language != null) {
+        _currentLanguage = activePlayer.language;
+      }
+    }
 
     // Senior Restoration: Si el provider de fuentes está vacío (viniendo de "Continuar Viendo"),
     // intentamos restaurarlo desde el historial persistido para permitir cambio de servidor.
     // [Trailer Fix] Los tráilers no necesitan buscar alternativas ni restaurar fuentes.
-    final currentSources = ref.read(activeContentSourcesProvider);
-    if (currentSources.isEmpty && !_isTrailer) {
+    if (!isResumingSession && currentSources.isEmpty && !_isTrailer) {
       final history = _historyNotifier?.getProgress(widget.contentId, widget.season, _activeEpisode);
       if (history?.alternativeSources != null && history!.alternativeSources!.isNotEmpty) {
-        // Senior Fix: Diferimos la actualización al siguiente microtask para evitar el error
-        // "Tried to modify a provider while the widget tree was building"
-        Future.microtask(() {
+        // Senior Fix: Usar addPostFrameCallback para evitar errores de modificación durante build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             ref.read(activeContentSourcesProvider.notifier).state = history.alternativeSources!;
             // Senior Fix: Regenerar la lista de servidores una vez restaurados del historial
@@ -502,14 +560,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     }
 
-    if (widget.sourceUrl.isNotEmpty && widget.source.isEmpty) {
-      _hasInitialized = true;
-      _initPlayer(widget.sourceUrl);
-      if (!_isTrailer) _findAlternatives();
+    if (!isResumingSession) {
+      try { ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full); } catch (_) {}
     } else {
-      if (!_isTrailer) _findAlternatives();
+      try { ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full); } catch (_) {}
     }
-    
+
+    // Senior Restoration Logic: Sincronizar con el Player Global de forma segura (Post Frame)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (isResumingSession) {
+        // Sincronizar el idioma y calidades finales para la UI
+        if (_allTracks.isNotEmpty) {
+          final track = _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0];
+          setState(() {
+             _currentLanguage = trackQualityType(track.quality) == 'SUB' ? 'SUB' : 'LAT';
+             _qualityOptions = track.qualities;
+          });
+        }
+
+        // Sincronizar el provider de fuentes para que otras pantallas lo vean si es necesario
+        if (activePlayer.availableSources.isNotEmpty) {
+           ref.read(activeContentSourcesProvider.notifier).state = activePlayer.availableSources;
+        }
+
+        ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
+      } else {
+        if (widget.sourceUrl.isNotEmpty && widget.source.isEmpty) {
+          _hasInitialized = true;
+          _initPlayer(widget.sourceUrl);
+        }
+      }
+    });
+
+    if (!isResumingSession && !_isTrailer) _findAlternatives();
     _startHideTimer();
   }
 
@@ -543,6 +628,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     setState(() {
       _groupedSources = grouped;
     });
+
+    // Senior Session Sync: Persistir fuentes en el provider global
+    ref.read(activePlayerProvider.notifier).updateSession(sources: effective);
   }
 
   @override
@@ -565,11 +653,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       // Senior Shield: Si el usuario minimiza la app o apaga la pantalla, 
       // restauramos la UI del sistema para no "secuestrar" los botones de volumen fuera del player.
       VolumeController().showSystemUI = true;
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      if (!kIsWeb) {
+        try { _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false}); } catch (_) {}
+      }
     } else if (state == AppLifecycleState.resumed) {
       // Al volver al player, retomamos el control total de la interfaz de volumen.
       VolumeController().showSystemUI = false;
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true});
+      if (!kIsWeb) {
+        try { _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true}); } catch (_) {}
+      }
     }
   }
 
@@ -580,14 +672,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final int currentPosMs = (_player?.state.position.inMilliseconds ?? 0);
     
     final int durationMs = (_player?.state.duration.inMilliseconds ?? 0);
-
-    if (currentPosMs > 3000) {
-      _updateHistory(
-        positionMs: currentPosMs,
-        durationMs: durationMs,
-        force: true,
-      );
-    }
 
     // Senior Stability Fix: Parar el reproductor INMEDIATAMENTE
     _player?.stop();
@@ -606,6 +690,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (_qualityOptions.length <= 1) _selectedQuality = 'auto';
     });
 
+    // Senior Session Sync: Sincronizar selección de track + idioma para miniplayer
+    final newLang = trackQualityType(track.quality) == 'SUB' ? 'SUB' : trackQualityType(track.quality) == 'CAST' ? 'CAST' : 'LAT';
+    ref.read(activePlayerProvider.notifier).updateSession(selectedIndex: index, language: newLang);
+
     _initPlayer(track.url, track.headers);
     _startHideTimer();
   }
@@ -619,14 +707,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final qualityLower = newSource.quality.toLowerCase();
     final epNum = _activeEpisode != null ? int.tryParse(_activeEpisode!) ?? 1 : 1;
     
-    if (currentPosMs > 3000) {
-      _updateHistory(
-        positionMs: currentPosMs,
-        durationMs: durationMs,
-        force: true,
-      );
-    }
-
     // Senior Stability Fix: Parar el reproductor INMEDIATAMENTE
     _player?.stop();
 
@@ -667,6 +747,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _qualityOptions = const [];
       _selectedQuality = 'auto';
     });
+    // Sincroniza estado global para que miniplayer conserve servidor/episodio sin perder datos
+    ref.read(activePlayerProvider.notifier).updateSession(
+      sources: _groupedSources.values.expand((e) => e).toList(),
+    );
+    // Mantiene url/episode coherentes para reanudación desde mini
+    ref.read(activePlayerProvider.notifier).play(
+      item: ref.read(activePlayerProvider).currentItem ?? MediaItem(id: widget.contentId, title: widget.title ?? '', posterUrl: widget.posterUrl ?? '', bannerUrl: widget.bannerUrl, type: widget.category == 'movie' ? MediaType.movie : MediaType.anime),
+      url: resolvedUrl,
+      episode: _activeEpisode,
+      season: widget.season,
+      source: newSource.source,
+      language: _currentLanguage,
+      triggerOpen: false,
+    );
     
     _startHideTimer();
   }
@@ -1558,6 +1652,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           if (mounted) setState(() => _showVolumeIndicator = false);
         });
         return KeyEventResult.handled;
+      } else if (key == LogicalKeyboardKey.keyI) {
+        _minimizePlayer();
+        return KeyEventResult.handled;
       } else if (key == LogicalKeyboardKey.escape) {
         _handleBackNavigation();
         return KeyEventResult.handled;
@@ -1819,8 +1916,48 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       });
     }
 
+    // Senior: Registrar el contenido en el Provider global para que el MiniPlayer tenga data.
+    // [Continuity Fix] Pasamos triggerOpen: false porque esta pantalla asume el control
+    // total del comando open() (headers, posiciones, etc) para evitar audio doble.
+    ref.read(activePlayerProvider.notifier).play(
+      item: MediaItem(
+        id: widget.contentId,
+        title: widget.title ?? _displayTitle,
+        posterUrl: widget.posterUrl ?? '',
+        bannerUrl: widget.bannerUrl,
+        type: widget.category == 'movie' ? MediaType.movie : MediaType.anime,
+      ),
+      url: videoUrl,
+      episode: _activeEpisode,
+      season: widget.season,
+      source: _currentSource.isNotEmpty ? _currentSource : widget.source,
+      triggerOpen: false,
+    );
+
     if (_player == null) {
-      _player = Player(configuration: const PlayerConfiguration(bufferSize: 32 * 1024 * 1024));
+      var active = ref.read(activePlayerProvider);
+      if (active.player == null) {
+        // Senior Web Race Condition Fix: Si el player aún se está inicializando asíncronamente
+        // en el provider global, esperamos un par de ciclos de eventos.
+        int retries = 0;
+        while (active.player == null && retries < 10) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          active = ref.read(activePlayerProvider);
+          retries++;
+        }
+      }
+
+      if (active.player == null) {
+        debugPrint('[player] CRITICAL ERROR: Could not retrieve player from provider.');
+        setState(() {
+          _isLoading = false;
+          _playbackError = 'Error al inicializar el motor de video';
+        });
+        return;
+      }
+
+      _player = active.player;
+      _controller = active.controller;
     }
     final player = _player!;
 
@@ -1836,12 +1973,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // fatal en una pista de audio), retiramos cualquier cartel de error.
     _playingSubscription = player.stream.playing.listen((playing) {
       if (mounted && playing) {
-        setState(() {
-          _playbackError = null;
-          _isLoading = false; 
-          _webNeedsInteraction = false; // Si empieza a sonar, ya no necesitamos interaction
-        });
-        _applyVolume();
+        // Diferir un frame o aplicar de inmediato si es un clip directo corto (OP/ED)
+        void clearLoad() {
+          if (mounted) {
+            setState(() {
+              _playbackError = null;
+              _isLoading = false;
+              _webNeedsInteraction = false;
+            });
+            _applyVolume();
+          }
+        }
+        if (_isOpEd) {
+          clearLoad();
+          Future.delayed(const Duration(milliseconds: 300), clearLoad);
+        } else {
+          clearLoad();
+        }
       }
     });
 
@@ -1909,7 +2057,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
       // Senior UI Fix: la carga termina cuando la posición avanza de verdad
       // (no al llamar a play()); así el spinner cubre el tiempo de buffering.
-      if (ms > 1000 && mounted && _isLoading) {
+      // Para clips cortos como OP/ED, quitamos el spinner de inmediato si avanza > 0ms.
+      final int threshold = _isOpEd ? 0 : 1000;
+      if (ms > threshold && mounted && _isLoading) {
         setState(() => _isLoading = false);
       }
 
@@ -2212,8 +2362,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _ensureAutoplay(player);
         } else {
           _hasResetPosition = true;
+          // Senior Fix: Si es un OP/ED, quitamos el loading de inmediato en el hilo de UI
           setState(() => _isLoading = false);
           player.play();
+
+          // Senior Watchdog Web Shield: Para la primera reproducción en web, si tras 1.5s
+          // el audio ya suena de fondo, forzamos la caída del spinner por seguridad.
+          if (kIsWeb && _isOpEd) {
+            Future.delayed(const Duration(milliseconds: 1500), () {
+              if (mounted && _isLoading && !player.state.buffering) {
+                setState(() => _isLoading = false);
+              }
+            });
+          }
+
           // Senior Autoplay Fix: En web el elemento <video> puede quedar pausado
           // si play() se emite antes de que esté listo (HLS). Reintentamos.
           _ensureAutoplay(player);
@@ -2425,11 +2587,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _historySaveTimer?.cancel();
     _bufferingDebounceTimer?.cancel();
     _volumeSubscription?.cancel();
-    _volumeControlChannel.setMethodCallHandler(null);
+    if (!kIsWeb) {
+      _volumeControlChannel.setMethodCallHandler(null);
+    }
     
-    if (_isMobileDevice && _isExiting) {
+    if (!kIsWeb && _isMobileDevice && _isExiting) {
       VolumeController().showSystemUI = true;
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      try { _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false}); } catch (_) {}
     }
     _posSubscription?.cancel();
     _bufferingSubscription?.cancel();
@@ -2465,11 +2629,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _volumeExitTimer?.cancel();
 
     if (_player != null) {
-      // Senior Fix: Red de seguridad final por si _exitPlayer no fue invocado
-      final p = _player;
+      // Senior Fix: Ya no matamos al player aquí, lo gestiona el Global Provider
       _player = null;
-      p?.stop();
-      p?.dispose();
     }
 
     if (kIsWeb) {
@@ -2514,20 +2675,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _exitPlayer();
   }
 
-  void _exitPlayer() async {
+  void _minimizePlayer() {
     if (!mounted || _isExiting) return;
 
-    // Senior Safety Flush: Guardar historial ANTES de matar el hardware
+    // Senior: Sincronizar estado completo antes de minimizar para que el badge
+    // superior (servidor/track) no se pierda al volver del miniplayer.
+    // Sincronización síncrona crítica: tracks, servidor, idioma y url actual.
+    if (_allTracks.isNotEmpty) {
+      ref.read(activePlayerProvider.notifier).updateSession(
+        tracks: _allTracks,
+        selectedIndex: _selectedTrackIndex,
+        language: _currentLanguage,
+      );
+    }
+    if (_groupedSources.isNotEmpty) {
+      ref.read(activePlayerProvider.notifier).updateSession(
+        sources: _groupedSources.values.expand((e) => e).toList(),
+      );
+    }
+
+    // Senior: Cambiar a modo Mini en el Provider global sin pausar el motor
+    // No sobrescribir url con pageUrl para que isResuming no sea true al reabrir mismo episodio tras X
+    ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
+
+    // Salir de la pantalla pero mantener el hardware vivo
+    _exitPlayer(minimizing: true);
+  }
+
+  void _exitPlayer({bool minimizing = false}) async {
+    if (!mounted || _isExiting) return;
+
+    // Senior Safety Flush: Guardar historial ANTES de cualquier cambio de estado
     try {
       final ms = _player?.state.position.inMilliseconds ?? 0;
       final duration = _player?.state.duration.inMilliseconds ?? 0;
       
       if (_hasResetPosition && ms > 3000 && duration > 0) {
-        _updateHistory(
-          positionMs: ms,
-          durationMs: duration,
-          force: true,
-        );
         _historyNotifier?.flush();
       }
     } catch (e) {
@@ -2537,26 +2720,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Fix: Marcar como saliendo ANTES de cualquier otra acción
     setState(() => _isExiting = true);
     
-    // 1. Silencio absoluto y detención radical del motor nativo
-    final p = _player;
-    _player = null; 
-    try {
-      p?.setVolume(0);
-      await p?.stop(); // Esperamos a que el buffer se vacíe educadamente
-      p?.dispose();
-    } catch (e) {
-      debugPrint('[player] Error killing native instance: $e');
+    if (!minimizing) {
+      // Si cerramos de verdad, detenemos todo
+      final p = _player;
+      _player = null;
+      try {
+        p?.setVolume(0);
+        await p?.stop();
+        // p?.dispose(); // No lo matamos nosotros, lo gestiona el Provider global si es necesario
+      } catch (e) {
+        debugPrint('[player] Error killing native instance: $e');
+      }
+      ref.read(activePlayerProvider.notifier).stop();
     }
     
     // 2. Forzar restauración del sistema (Orientación + UI)
-    if (_isMobileDevice) {
-      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+    if (!kIsWeb && _isMobileDevice) {
+      try { _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false}); } catch (_) {}
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      VolumeController().showSystemUI = true;
+    } else if (_isMobileDevice) {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       VolumeController().showSystemUI = true;
     }
 
-    // 3. Salida limpia usando GoRouter para asegurar consistencia
+    // 3. Salida limpia usando GoRouter
     if (mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
@@ -2615,9 +2805,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final remoteState = ref.watch(remoteControlProvider);
     final targetId = remoteState.activeTargetDeviceId;
     
-    if (targetId != null) {
-      final target = remoteState.availableDevices.firstWhereOrNull((d) => d.id == targetId);
-      if (target != null) return _buildRemoteModeView(target);
+    final activeState = ref.watch(activePlayerProvider);
+    final bool isFull = activeState.uiState == PlayerUIState.full;
+
+    // Senior Restoration: Si ya estamos inicializados (viniendo de MiniPlayer),
+    // devolvemos la vista directamente sin disparar nuevas extracciones.
+    if (_hasInitialized && _player != null) {
+      return Material(
+        color: Colors.black,
+        child: isFull
+            ? _playerView(tracks: _allTracks, settings: settings)
+            : const SizedBox.shrink(), // Soltamos la GlobalKey para que el MiniPlayer la tome
+      );
     }
 
     // Senior Direct Flow: Fuentes que ya entregan el stream directo o proxied
@@ -2639,9 +2838,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       category: widget.category,
     )));
 
+    // Senior Fix (Issue #6): ref.listen para sync de session sin mutar build.
+    // NO usar ref.watch(episodesProvider) aquí: causaría rebuild antes de
+    // _initPlayer (async en postFrameCallback), bloqueando la inicialización.
+    ref.listen(episodesProvider(EpisodesParams(
+      url: widget.sourceUrl,
+      source: widget.source,
+      title: widget.title,
+      season: widget.season,
+    )), (prev, next) {
+      next.whenData((data) {
+        if (data != null && data.episodes.isNotEmpty && mounted) {
+          ref.read(activePlayerProvider.notifier).updateSession(episodes: data.episodes);
+        }
+      });
+    });
+
+    debugPrint('[player build] extractAsync is ${extractAsync.runtimeType} hasValue=${extractAsync.hasValue} isLoading=${extractAsync.isLoading} hasError=${extractAsync.hasError}');
     return Material(
       color: Colors.black,
-      child: extractAsync.when(
+      child: isFull
+          ? extractAsync.when(
         data: (result) {
           final tracks = result.tracks;
           final playableTracks = tracks.where((t) => !t.isDownload).toList();
@@ -2660,6 +2877,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               if (mounted) {
               _allTracks = playableTracks;
               setState(() => _extractTracks = playableTracks.where((t) => !t.isEmbed).toList());
+
+              // Senior Session Sync: Persistir tracks en el provider global para miniplayer
+              final derivedLang = playableTracks.isNotEmpty ? trackQualityType(playableTracks[_selectedTrackIndex < playableTracks.length ? _selectedTrackIndex : 0].quality) : null;
+              final langToSave = derivedLang == 'SUB' ? 'SUB' : derivedLang == 'CAST' ? 'CAST' : 'LAT';
+              ref.read(activePlayerProvider.notifier).updateSession(
+                tracks: playableTracks,
+                selectedIndex: _selectedTrackIndex,
+                language: langToSave,
+              );
             }
             });
           }
@@ -2711,7 +2937,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
             Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), onPressed: _exitPlayer))),
           ]),
-      ),
+      ) : const SizedBox.shrink(),
     );
   }
 
@@ -3048,34 +3274,37 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) {
-        final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
-          url: widget.sourceUrl,
-          source: _currentSource,
-          title: widget.title ?? '',
-          season: widget.season ?? 1,
-        )));
+      builder: (sheetContext) {
+        // Senior Fix (Issue #9): Usar Consumer para evitar stale ref
+        return Consumer(
+          builder: (context, ref, _) {
+            final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
+              url: widget.sourceUrl,
+              source: _currentSource,
+              title: widget.title ?? '',
+              season: widget.season ?? 1,
+            )));
 
-        return DraggableScrollableSheet(
-          initialChildSize: 0.6,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          expand: false,
-          builder: (context, scrollController) {
-            return Column(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text('EXPLORADOR DE EPISODIOS (REMOTO)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-                ),
-                const Divider(color: Colors.white10, height: 1),
-                Expanded(
-                  child: episodesAsync.when(
-                    data: (data) {
-                      if (data == null || data.episodes.isEmpty) {
-                        return const Center(child: Text('No hay episodios disponibles', style: TextStyle(color: Colors.white54)));
-                      }
-                      return ListView.builder(
+            return DraggableScrollableSheet(
+              initialChildSize: 0.6,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text('EXPLORADOR DE EPISODIOS (REMOTO)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                    ),
+                    const Divider(color: Colors.white10, height: 1),
+                    Expanded(
+                      child: episodesAsync.when(
+                        data: (data) {
+                          if (data == null || data.episodes.isEmpty) {
+                            return const Center(child: Text('No hay episodios disponibles', style: TextStyle(color: Colors.white54)));
+                          }
+                          return ListView.builder(
                         controller: scrollController,
                         itemCount: data.episodes.length,
                         itemBuilder: (context, index) {
@@ -3111,6 +3340,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ],
             );
           },
+        );
+          }, // Consumer
         );
       },
     );
@@ -3953,7 +4184,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final bool isCountdown = _autoplayCountdown >= 0;
     final String label = _isAutoplayResume ? 'Reanudar' : 'Siguiente episodio';
 
-    // Senior Autoplay Shield: Verificar si existe un siguiente episodio para evitar el popup en el final
+    // Senior Autoplay Shield: Verificar si existe un siguiente episodio
+    // Senior Fix (Issue #4): Usar consolidated provider
+    final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
@@ -3965,12 +4198,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       data: (data) {
         if (data == null || data.episodes.isEmpty) {
           if (widget.totalEpisodes != null) {
-            final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
             return currentNum < widget.totalEpisodes!;
           }
           return true; 
         }
-        final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
         return data.episodes.any((e) => e.number > currentNum);
       },
       loading: () => true,
@@ -4074,10 +4305,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final double spacing = _isMobileDevice ? 8 : 12;
 
     return Positioned(top: 0, left: 0, right: 0, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            if (!hideBack) ...[
-              IconButton(iconSize: iconSize, icon: const Icon(Symbols.arrow_back, color: Colors.white), onPressed: _handleBackNavigation),
-              SizedBox(width: spacing),
-            ],
+            IconButton(
+              iconSize: iconSize,
+              icon: const Icon(Symbols.arrow_back, color: Colors.white),
+              onPressed: _exitPlayer, // Senior Fix: Volver a cerrar player por defecto
+            ),
+            SizedBox(width: spacing),
+            IconButton(
+              iconSize: iconSize,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 32),
+              onPressed: _minimizePlayer, // Botón dedicado para minimizar
+            ),
+            SizedBox(width: spacing),
             Expanded(
               child: Consumer(
                 builder: (context, ref, _) {
@@ -4104,6 +4343,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                               style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 12, fontWeight: FontWeight.bold),
                             ),
                           ],
+                        )
+                      else if (_isOpEd)
+                        Text(
+                          '${widget.episode}: ${widget.episodeTitle ?? ""}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
                         )
                       else if (_activeEpisode != null && !_isMovie)
                         Text(
@@ -4284,7 +4528,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildNavigationCapsule(bool hasPrevious, bool hasNext) {
-    if (_isTrailer || (!hasPrevious && !hasNext)) return const SizedBox.shrink();
+    if (_isOpEd || _isTrailer || (!hasPrevious && !hasNext)) return const SizedBox.shrink();
     return Container(
       height: 44, // Unificado a 44px
       decoration: _controlCapsuleDecoration,
@@ -4395,6 +4639,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final double playSize = useMobileLayout ? 28 : 44;
 
     // Senior Navigation Shield: Verificar si existen episodios anterior/siguiente
+    // Senior Fix (Issue #4): Usar consolidated provider
+    final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
+    final bool hasPrevious = currentNum > 1;
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
@@ -4402,8 +4649,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       season: widget.season,
     )));
 
-    final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
-    final bool hasPrevious = currentNum > 1;
     final bool hasNext = episodesAsync.when(
       data: (data) {
         if (data == null || data.episodes.isEmpty) {
@@ -4536,11 +4781,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           SizedBox(width: spacing),
                         ],
                         if (!_isOpEd && !_isMovie && !_isTrailer)
-                        IconButton(
-                          iconSize: iconSize, 
-                          icon: const Icon(Symbols.video_library, color: Colors.white), 
-                          onPressed: _showEpisodesCarousel
-                        ),
+                          IconButton(
+                            iconSize: iconSize,
+                            icon: const Icon(Symbols.video_library, color: Colors.white),
+                            onPressed: _showEpisodesCarousel
+                          ),
+                        if (kIsWeb) ...[
+                          SizedBox(width: spacing),
+                          IconButton(
+                            iconSize: iconSize,
+                            icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white),
+                            onPressed: () {
+                              // Senior: Activar PiP Nativo del Navegador
+                              try {
+                                final dynamic platform = _player?.platform;
+                                // En Web, media_kit-dart expone el video element a través de JS
+                                // Si no hay API directa, intentamos minimizar a MiniPlayer interno
+                                // o guiar al usuario al botón del browser.
+                                // Por ahora, minimizamos al MiniPlayer de la App.
+                                ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
+                                _exitPlayer();
+                              } catch (e) {
+                                debugPrint('[PiP] Error: $e');
+                              }
+                            },
+                          ),
+                        ],
                         SizedBox(width: spacing),
                         _buildCastIcon(iconSize),
                         if (!_isOpEd && !_isMovie && !_isTrailer) ...[
@@ -4818,6 +5084,33 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
     super.initState();
     _scrollController.addListener(_updateArrows);
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateArrows());
+    
+    // Senior Fix (Issue #6): Prefetch de thumbnails del carrusel
+    _prefetchThumbnails();
+  }
+
+  void _prefetchThumbnails() {
+    final episodesAsync = ref.read(episodesProvider(EpisodesParams(
+      url: widget.sourceUrl,
+      source: widget.source,
+      title: widget.title,
+      season: widget.season,
+    )));
+    episodesAsync.whenData((data) {
+      if (data == null || data.episodes.isEmpty) return;
+      // Prefetch las primeras 12 imágenes
+      final thumbnails = data.episodes
+          .take(12)
+          .map((e) => e.thumbnail)
+          .where((t) => t != null && t.isNotEmpty)
+          .cast<String>()
+          .toList();
+      if (thumbnails.isNotEmpty) {
+        for (final url in thumbnails) {
+          precacheImage(CachedNetworkImageProvider(url), context).catchError((_) {});
+        }
+      }
+    });
   }
 
   @override

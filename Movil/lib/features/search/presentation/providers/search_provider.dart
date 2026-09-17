@@ -17,6 +17,66 @@ final searchTrendingProvider = FutureProvider<List<SearchResult>>((ref) async {
   return response.results.take(10).toList();
 });
 
+class SearchChart {
+  final String title;
+  final List<SearchResult> items;
+  final bool isTop10;
+
+  SearchChart({required this.title, required this.items, this.isTop10 = false});
+}
+
+final searchDiscoveryProvider = FutureProvider.family<List<SearchChart>, String>((ref, category) async {
+  final repo = ref.watch(searchRepositoryProvider);
+
+  final String? apiCategory = category == 'all' ? null : category;
+  final bool isAnime = apiCategory == 'anime';
+
+  // Ejecutamos las peticiones de descubrimiento en paralelo con filtros semánticos
+  final results = await Future.wait([
+    // 0. Ranking de Popularidad (Siempre presente)
+    repo.filter(category: apiCategory, page: 1).timeout(const Duration(seconds: 8)),
+
+    // 1. Lógica condicionada por tipo de contenido
+    isAnime
+      ? repo.filter(category: 'anime', status: 'releasing').timeout(const Duration(seconds: 8)) // Simulcast
+      : repo.filter(category: apiCategory, year: DateTime.now().year).timeout(const Duration(seconds: 8)), // Recientes
+
+    // 2. Películas de Anime (Contenido disponible)
+    isAnime
+      ? repo.filter(category: 'movie_anime').timeout(const Duration(seconds: 8))
+      : Future.value(const SearchResponse(query: '', category: '', count: 0, results: [])),
+  ]);
+
+  final List<SearchChart> charts = [];
+
+  // Bloque 1: El TOP (Con diseño numerado)
+  if (results[0].results.isNotEmpty) {
+    charts.add(SearchChart(
+      title: isAnime ? 'Favoritos de la Comunidad' : 'Top 10 Global',
+      items: results[0].results.take(10).toList(),
+      isTop10: true
+    ));
+  }
+
+  // Bloque 2: Actualidad o Simulcast
+  if (results[1].results.isNotEmpty) {
+    charts.add(SearchChart(
+      title: isAnime ? 'Simulcast de Temporada' : 'Novedades del Año',
+      items: results[1].results.take(10).toList()
+    ));
+  }
+
+  // Bloque 3: Películas de Anime
+  if (isAnime && results[2].results.isNotEmpty) {
+    charts.add(SearchChart(
+      title: 'Películas de Anime',
+      items: results[2].results.take(10).toList()
+    ));
+  }
+
+  return charts;
+});
+
 final searchHistoryProvider =
     StateNotifierProvider<SearchHistoryNotifier, List<SearchHistoryItem>>((ref) {
   final box = Hive.box('search_history');

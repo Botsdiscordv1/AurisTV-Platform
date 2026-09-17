@@ -121,7 +121,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         backgroundColor: const Color(0xFF0B0B0D),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        toolbarHeight: isMobile ? 108 : 124,
+        toolbarHeight: isMobile ? 116 : 132,
         title: Column(
           children: [
             // BARRA DE BÚSQUEDA (ANCHO COMPLETO)
@@ -167,7 +167,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 onSubmitted: _onSearchSubmitted,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             
             // SELECTOR DE CATEGORÍAS (PILL STYLE)
             Align(
@@ -196,7 +196,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         children: [
           SearchHistorySection(onQueryTap: _performSearch),
           SearchGenresGrid(onGenreTap: _performSearch),
-          SearchTrendingSection(onTrendingTap: _onContentTap),
+          const SizedBox(height: 8),
+          SearchDiscoveryFeed(
+            category: _selectedCategory,
+            onContentTap: _onContentTap,
+          ),
         ],
       ),
     );
@@ -302,7 +306,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             style: TextStyle(color: Colors.white30, fontSize: 14),
           ),
           const SizedBox(height: 60),
-          SearchTrendingSection(onTrendingTap: _onContentTap),
+          SearchDiscoveryFeed(
+            category: _selectedCategory,
+            onContentTap: _onContentTap,
+          ),
           const SizedBox(height: 40),
           SearchGenresGrid(onGenreTap: _performSearch),
         ],

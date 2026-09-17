@@ -265,6 +265,134 @@ class SearchGenresGrid extends StatelessWidget {
   }
 }
 
+class SearchDiscoveryFeed extends ConsumerWidget {
+  final String category;
+  final Function(SearchResult) onContentTap;
+
+  const SearchDiscoveryFeed({
+    super.key,
+    required this.category,
+    required this.onContentTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final discoveryAsync = ref.watch(searchDiscoveryProvider(category));
+
+    return discoveryAsync.when(
+      data: (charts) {
+        if (charts.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          children: charts.map((chart) => _ChartRow(
+            chart: chart,
+            onTap: onContentTap,
+          )).toList(),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _ChartRow extends StatelessWidget {
+  final SearchChart chart;
+  final Function(SearchResult) onTap;
+
+  const _ChartRow({required this.chart, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = ResponsiveUtils.isMobile(context);
+    final double posterHeight = isMobile ? (chart.isTop10 ? 160 : 180) : 220;
+    final double itemWidth = chart.isTop10 ? posterHeight * 1.1 : posterHeight * 0.7;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+          child: Text(
+            chart.title,
+            style: TextStyle(
+              fontSize: isMobile ? 20 : 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: posterHeight + (chart.isTop10 ? 20 : 10),
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: chart.items.length,
+            itemBuilder: (context, index) {
+              final item = chart.items[index];
+
+              if (chart.isTop10) {
+                return _TrendingPosterCard(
+                  index: index,
+                  item: item,
+                  height: posterHeight,
+                  width: itemWidth,
+                  onTap: () => onTap(item),
+                );
+              }
+
+              return GestureDetector(
+                onTap: () => onTap(item),
+                child: Container(
+                  width: itemWidth,
+                  margin: const EdgeInsets.only(right: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: CachedNetworkImage(
+                              imageUrl: ApiEndpoints.proxyImage(item.thumbnail, fallbackUrl: item.tmdbThumbnail),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.white10,
+                                child: const Icon(Icons.movie_outlined, color: Colors.white24),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class SearchTrendingSection extends ConsumerStatefulWidget {
   final Function(SearchResult) onTrendingTap;
   const SearchTrendingSection({super.key, required this.onTrendingTap});

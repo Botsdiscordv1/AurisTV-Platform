@@ -2,6 +2,25 @@ import '../../../core/utils/synopsis_cleaner.dart';
 import '../../../core/api/api_endpoints.dart';
 import '../../../core/api/image_policy.dart';
 import 'shared_models.dart';
+import 'anime_detail.dart';
+
+bool _inferIsMovie(Map<String, dynamic> root) {
+  final mediaType = root['mediaType']?.toString().toLowerCase();
+  final kind = root['kind']?.toString().toLowerCase();
+  final type = root['type']?.toString().toLowerCase();
+  final seasons = root['seasons'] as List?;
+  final totalSeasons = root['totalSeasons'] as int?;
+  final totalEpisodes = root['totalEpisodes'] as int?;
+  // Series inequívocas
+  if (mediaType == 'tv' || kind == 'series' || type == 'tv' || type == 'series') return false;
+  if (seasons != null && seasons.isNotEmpty) return false;
+  if (totalSeasons != null && totalSeasons > 1) return false;
+  if (totalEpisodes != null && totalEpisodes > 1 && mediaType == 'tv') return false;
+  // Película inequívoca
+  if (mediaType == 'movie' || kind == 'movie' || type == 'movie') return true;
+  // Fallback: si tiene seasons es serie
+  return true;
+}
 
 class MovieDetail {
   final String tmdbId;
@@ -33,6 +52,8 @@ class MovieDetail {
   final String? homepage;
   final bool isMovie;
   final String? kind;
+  final List<AnimeThemeInfo> openings;
+  final List<AnimeThemeInfo> endings;
 
   const MovieDetail({
     required this.tmdbId,
@@ -64,60 +85,84 @@ class MovieDetail {
     this.homepage,
     this.isMovie = true,
     this.kind,
+    this.openings = const [],
+    this.endings = const [],
   });
 
   factory MovieDetail.fromJson(Map<String, dynamic> json) {
+    final root = (json.containsKey('data') && json['data'] is Map)
+        ? Map<String, dynamic>.from(json['data'] as Map)
+        : json;
+
+    final openingsData = (root['openings'] as List<dynamic>?) ?? [];
+    final endingsData = (root['endings'] as List<dynamic>?) ?? [];
+    
+    final openings = openingsData
+        .whereType<Map>()
+        .map((e) => AnimeThemeInfo.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+        
+    final endings = endingsData
+        .whereType<Map>()
+        .map((e) => AnimeThemeInfo.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+
     return MovieDetail(
-      tmdbId: (json['tmdbId'] ?? '').toString(),
-      mediaType: json['mediaType'] as String?,
-      title: json['title'] as String? ?? '',
-      originalTitle: json['originalTitle'] as String?,
-      overview: SynopsisCleaner.clean(json['overview'] as String?),
-      poster: ApiEndpoints.proxyImage(json['poster'] as String?, policy: ImageSize.poster),
+      tmdbId: (root['tmdbId'] ?? '').toString(),
+      mediaType: root['mediaType'] as String?,
+      title: root['title'] as String? ?? '',
+      originalTitle: root['originalTitle'] as String?,
+      overview: SynopsisCleaner.clean(root['overview'] as String?),
+      poster: ApiEndpoints.proxyImage(root['poster'] as String?, policy: ImageSize.poster),
       backdrop: ApiEndpoints.proxyImage(json['backdrop'] as String?, policy: ImageSize.full),
       logo: ApiEndpoints.proxyImage(json['logo'] as String?, policy: ImageSize.tiny),
       rating: (json['rating'] as num?)?.toDouble(),
       voteCount: json['voteCount'] as int?,
-      releaseDate: json['releaseDate'] as String?,
-      runtime: json['runtime'] as int?,
-      episodeRuntime: json['episodeRuntime'] as int?,
-      genres: (json['genres'] as List<dynamic>?)
+      releaseDate: root['releaseDate'] as String?,
+      runtime: root['runtime'] as int?,
+      episodeRuntime: root['episodeRuntime'] as int?,
+      genres: (root['genresTranslated'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          (root['genres'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      productionCompanies: (json['productionCompanies'] as List<dynamic>?)
+      productionCompanies: (root['productionCompanies'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      directors: (json['directors'] as List<dynamic>?)
+      directors: (root['directors'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      cast: (json['cast'] as List<dynamic>?)
+      cast: (root['cast'] as List<dynamic>?)
               ?.map((e) => CastMember.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      status: json['status'] as String?,
-      languages: (json['languages'] as List<dynamic>?)
+      status: root['status'] as String?,
+      languages: (root['languages'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
-      seasons: (json['seasons'] as List<dynamic>?)
+      seasons: (root['seasons'] as List<dynamic>?)
               ?.map((e) => SeasonInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      totalSeasons: json['totalSeasons'] as int?,
-      totalEpisodes: json['totalEpisodes'] as int?,
-      certification: json['certification'] as String?,
-      platforms: (json['platforms'] as List<dynamic>?)
+      totalSeasons: root['totalSeasons'] as int?,
+      totalEpisodes: root['totalEpisodes'] as int?,
+      certification: root['certification'] as String?,
+      platforms: (root['platforms'] as List<dynamic>?)
               ?.map((e) => PlatformInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      trailerKey: json['trailerKey'] as String?,
-      trailerType: json['trailerType'] as String?,
-      homepage: json['homepage'] as String?,
-      isMovie: json['isMovie'] as bool? ?? true,
-      kind: json['kind'] as String?,
+      trailerKey: root['trailerKey'] as String?,
+      trailerType: root['trailerType'] as String?,
+      homepage: root['homepage'] as String?,
+      isMovie: root['isMovie'] as bool? ?? _inferIsMovie(root),
+      kind: root['kind'] as String?,
+      openings: openings,
+      endings: endings,
     );
   }
 }

@@ -5,7 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../core/theme/app_theme.dart';
 
 enum LoginMode { phone, remote }

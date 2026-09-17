@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'package:hive_ce_flutter/hive_ce_flutter.dart';
-
 import 'package:flutter/material.dart';
 import '../../features/player/presentation/player_screen.dart';
 
@@ -54,6 +51,7 @@ class UrlUtils {
     int? year,
     String? quality,
     String? type,
+    String? sectionId,
     String? from,
   }) {
     final queryParams = {
@@ -64,6 +62,7 @@ class UrlUtils {
       if (year != null) 'year': year.toString(),
       if (quality != null) 'quality': quality,
       if (type != null) 'type': type,
+      if (sectionId != null) 'sectionId': sectionId,
       if (from != null) 'from': from,
     };
 

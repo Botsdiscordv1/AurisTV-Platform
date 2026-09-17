@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
+import 'package:auris_core/auris_core.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});

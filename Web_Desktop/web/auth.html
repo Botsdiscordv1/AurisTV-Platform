@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Autenticando con AniList...</title>
+</head>
+<body>
+  <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
+    <h2>Autenticación completada</h2>
+    <p>Cerrando ventana y regresando a la aplicación...</p>
+  </div>
+  <script>
+    if (window.opener) {
+      // Enviamos toda la URL actual de vuelta a la ventana principal de Flutter
+      window.opener.postMessage({
+        type: 'authorization_response',
+        response: window.location.href
+      }, window.location.origin);
+    }
+    window.close();
+  </script>
+</body>
+</html>

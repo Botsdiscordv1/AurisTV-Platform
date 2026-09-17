@@ -21,6 +21,7 @@ String inferOpenCategory(SearchResult result, [String fallback = 'all']) {
   final url = (result.url ?? '').toLowerCase();
 
   // 1. Prioridad: Metadatos explícitos del servidor (kind)
+  if (kind == 'movie_anime' || kind == 'anime-movies' || kind == 'anime_movie') return 'movie_anime';
   if (kind == 'movie' || kind == 'pelicula') return 'movie';
   if (kind == 'series' || kind == 'serie' || kind == 'tv') return 'series';
   if (kind == 'anime') return 'anime';

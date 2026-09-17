@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/utils/responsive_utils.dart';
+import 'package:auris_core/auris_core.dart';
 
 class SkeletonContainer extends StatefulWidget {
   final double width;

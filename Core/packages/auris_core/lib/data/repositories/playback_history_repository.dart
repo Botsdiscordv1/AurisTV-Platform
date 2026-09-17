@@ -20,9 +20,15 @@ class HivePlaybackHistoryRepository implements PlaybackHistoryRepository {
   Future<List<PlaybackHistory>> getHistory(String profileId) async {
     final List<PlaybackHistory> history = [];
     
+    // Senior Debug: Log del estado de la caja de Hive tras reinicio
+    if (kDebugMode) {
+      print('[HiveHistory] Leyendo entradas para profileId: $profileId (Total en box: ${_box.length})');
+    }
+
     for (var value in _box.values) {
       try {
         if (value is Map) {
+          // Senior Fix: Usar Map.from para asegurar compatibilidad con tipos de Hive
           final item = PlaybackHistory.fromJson(value);
           // Senior Fix: Si el item no tiene profileId (legacy), lo asignamos al invitado
           // para no perder el historial al actualizar la app.
@@ -37,14 +43,22 @@ class HivePlaybackHistoryRepository implements PlaybackHistoryRepository {
       }
     }
     
+    if (kDebugMode) {
+      print('[HiveHistory] Recuperadas ${history.length} entradas válidas.');
+    }
+
     return history..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
   @override
   Future<void> saveHistory(PlaybackHistory history) async {
     await _box.put(history.key, history.toJson());
-    // Senior Fix: Forzar persistencia física en disco inmediatamente
+    // Senior Fix: Forzar persistencia física en disco inmediatamente (Crucial para Hot Restart)
     await _box.flush();
+    
+    if (kDebugMode) {
+      print('[HiveHistory] Guardado exitoso: ${history.contentId} (Pos: ${history.positionInMilliseconds}ms)');
+    }
   }
 
   @override

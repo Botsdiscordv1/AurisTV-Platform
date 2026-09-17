@@ -15,9 +15,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
-import '../../../shared/widgets/nav_arrow.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
 import 'episodes_detail_overlay.dart';
 
@@ -431,20 +429,37 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           duration: const Duration(milliseconds: 1200), 
           curve: Curves.easeInOut, 
           opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, 
-          child: HeroTitle(
-            title: heroTitle,
-            logo: d?.logo,
-            logoReady: logoReady,
-            maxWidth: width < 1050 ? width * 0.45 : 500.0,
-            maxHeight: titleSize * 2.2,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: titleSize * 1.5,
-              fontWeight: FontWeight.w900,
-              height: 1.0,
-              letterSpacing: 1.5,
-              shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              HeroTitle(
+                title: heroTitle,
+                logo: d?.logo,
+                logoReady: logoReady,
+                maxWidth: width < 1050 ? width * 0.45 : 500.0,
+                maxHeight: titleSize * 2.2,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: titleSize * 1.5,
+                  fontWeight: FontWeight.w900,
+                  height: 1.0,
+                  letterSpacing: 1.5,
+                  shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
+                ),
+              ),
+              if (d is MovieDetail && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  d.originalTitle!,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: titleSize * 0.65,
+                    fontWeight: FontWeight.w500,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ],
           )
         ),
         SizedBox(height: contentSpacing * 1.5),
@@ -542,7 +557,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 _SkeletonBox(width: ResponsiveUtils.sp(context, 50), height: ResponsiveUtils.sp(context, 20)),
                 _SkeletonBox(width: ResponsiveUtils.sp(context, 80), height: ResponsiveUtils.sp(context, 20)),
               ] else ...[
-                if (d != null && d.length >= 4) Text(d.substring(0, 4)),
+                if (d != null && d.length >= 4) Text(isMovie && d.length > 4 ? d : d.substring(0, 4)),
                 if (isMovie) ...[ if (runtime != null) Text(_formatRuntime(runtime)) ] 
                 else if (widget.totalSeasons > 1) ...[ Text('${widget.totalSeasons} Temporadas') ] 
                 else if (detail?.episodes != null) ...[ Text('${detail.episodes} Episodios') ],
@@ -711,8 +726,8 @@ class _NetflixListButtonState extends State<_NetflixListButton> {
 }
 
 class ContentScreen extends ConsumerStatefulWidget {
-  final String title; final String source; final String url; final String? quality; final String? type; final String? metadataTitle; final String? banner; final String category; final int? year; final int? totalSeasons; final SearchResult? result;
-  const ContentScreen({super.key, required this.title, required this.source, required this.url, this.quality, this.type, this.metadataTitle, this.banner, this.category = 'all', this.year, this.totalSeasons, this.result});
+  final String title; final String source; final String url; final String? quality; final String? type; final String? metadataTitle; final String? banner; final String category; final int? year; final int? totalSeasons; final String? sectionId; final SearchResult? result;
+  const ContentScreen({super.key, required this.title, required this.source, required this.url, this.quality, this.type, this.metadataTitle, this.banner, this.category = 'all', this.year, this.totalSeasons, this.sectionId, this.result});
   @override ConsumerState<ContentScreen> createState() => _ContentScreenState();
 }
 
@@ -733,9 +748,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       source: widget.source,
       url: widget.url,
       type: widget.type,
+      sectionId: widget.sectionId,
       initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
     );
     final detailState = ref.watch(unifiedContentProvider(detailParams));
+    
+    // [Intelligence] Tracking de personalización al entrar a la pantalla
+    ref.watch(detailViewTrackerProvider(detailParams));
 
     // Senior Sync Fix: Sincronizar fuentes con el player de forma segura (sin microtasks)
     ref.listen<UnifiedContentState>(unifiedContentProvider(detailParams), (prev, next) {
