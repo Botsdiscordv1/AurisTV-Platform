@@ -30,25 +30,22 @@ class IntegrationNotifier extends StateNotifier<void> {
     const String clientId = '47461';
 
     if (kIsWeb) {
-      // Senior Solution Indestructible: Usamos el flujo de PIN oficial de AniList.
-      // Al redirigir a 'https://anilist.co/api/v2/oauth/pin', Cloudflare no genera captchas porque es un dominio interno nativo de AniList.
-      // El usuario se logea como humano normal en Chrome y AniList le entrega un código PIN en pantalla.
+      // Senior Production Fix: Restauramos la redirect_uri oficial dinámica ($baseUrl/auth.html)
+      // Ahora que estamos en producción (https://auristv.dpdns.org), el dominio coincide perfectamente
+      // con la configuración de AniList, eliminando los errores de invalid_client y captchas de desarrollo.
       final authUrl = 'https://anilist.co/api/v2/oauth/authorize'
           '?client_id=$clientId'
-          '&redirect_uri=https://anilist.co/api/v2/oauth/pin'
+          '&redirect_uri=${Uri.encodeComponent(redirectUrl)}'
           '&response_type=code';
       
-      debugPrint('Lanzando Auth Web con PIN oficial (Seguro contra Captchas): $authUrl');
+      debugPrint('Lanzando Auth Web Producción: $authUrl');
       _webHelper.launchWebAuth(
         url: authUrl,
         type: ConnectionType.anilist,
-        redirectUrl: 'https://anilist.co/api/v2/oauth/pin',
+        redirectUrl: redirectUrl,
         onCodeReceived: (code) async {
-          // El helper web interceptará si la URL cambia, pero como AniList se queda en su propio dominio,
-          // el usuario simplemente visualizará el código en esa subventana o lo ingresará.
-          // Para máxima comodidad, el código quedará listo para ser procesado si el popup redirige.
-          debugPrint('Código detectado automáticamente: $code');
-          await _exchangeCodeAndSave(ConnectionType.anilist, code, 'https://anilist.co/api/v2/oauth/pin');
+          debugPrint('Código recibido para AniList en Web de Producción: $code');
+          await _exchangeCodeAndSave(ConnectionType.anilist, code, redirectUrl);
         },
       );
       return;
@@ -149,9 +146,10 @@ class IntegrationNotifier extends StateNotifier<void> {
       Response response;
 
       if (kIsWeb && type == ConnectionType.anilist) {
-        // Al usar el flujo PIN de AniList, el navegador no tira error CORS al consultar mediante GraphQL o proxies
-        // de datos puros. Usamos un proxy de datos libre de Cloudflare para enviar el payload de intercambio del PIN.
-        final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent('$tokenEndpoint?grant_type=authorization_code&client_id=$clientId&client_secret=$clientSecret&redirect_uri=$redirectUrl&code=$code')}';
+        // En producción web utilizamos AllOrigins mediante paso estructurado GET parametrizado.
+        // Esto previene bloqueos de CORS del navegador y es compatible con el WAF de Cloudflare de AniList.
+        final targetUrl = '$tokenEndpoint?grant_type=authorization_code&client_id=$clientId&client_secret=$clientSecret&redirect_uri=${Uri.encodeComponent(redirectUrl)}&code=$code';
+        final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent(targetUrl)}';
 
         final proxyResponse = await _dio.get(proxyUrl);
         final Map<String, dynamic> contents = jsonDecode(proxyResponse.data['contents']);

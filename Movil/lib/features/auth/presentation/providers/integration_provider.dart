@@ -29,16 +29,16 @@ class IntegrationNotifier extends StateNotifier<void> {
     if (kIsWeb) {
       final authUrl = 'https://anilist.co/api/v2/oauth/authorize'
           '?client_id=$clientId'
-          '&redirect_uri=https://anilist.co/api/v2/oauth/pin'
+          '&redirect_uri=${Uri.encodeComponent(redirectUrl)}'
           '&response_type=code';
       
-      debugPrint('Lanzando Auth Web con PIN oficial (Seguro contra Captchas): $authUrl');
+      debugPrint('Lanzando Auth Web Producción: $authUrl');
       _webHelper.launchWebAuth(
         url: authUrl,
         type: ConnectionType.anilist,
-        redirectUrl: 'https://anilist.co/api/v2/oauth/pin',
+        redirectUrl: redirectUrl,
         onCodeReceived: (code) async {
-          await _exchangeCodeAndSave(ConnectionType.anilist, code, 'https://anilist.co/api/v2/oauth/pin');
+          await _exchangeCodeAndSave(ConnectionType.anilist, code, redirectUrl);
         },
       );
       return;
@@ -137,13 +137,14 @@ class IntegrationNotifier extends StateNotifier<void> {
       }
 
       Response response;
-      
+
       if (kIsWeb && type == ConnectionType.anilist) {
-        final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent('$tokenEndpoint?grant_type=authorization_code&client_id=$clientId&client_secret=$clientSecret&redirect_uri=$redirectUrl&code=$code')}';
-        
+        final targetUrl = '$tokenEndpoint?grant_type=authorization_code&client_id=$clientId&client_secret=$clientSecret&redirect_uri=${Uri.encodeComponent(redirectUrl)}&code=$code';
+        final String proxyUrl = 'https://api.allorigins.win/get?url=${Uri.encodeComponent(targetUrl)}';
+
         final proxyResponse = await _dio.get(proxyUrl);
         final Map<String, dynamic> contents = jsonDecode(proxyResponse.data['contents']);
-        
+
         response = Response(
           data: contents,
           requestOptions: RequestOptions(path: tokenEndpoint),
