@@ -63,6 +63,7 @@ abstract class AurisRepository {
     String? kind,
     String? url,
     String? type,
+    String? server,
     String? imgSize,
   });
   Future<MovieDetail?> getMovieDetail({
@@ -79,6 +80,8 @@ abstract class AurisRepository {
 
   Future<List<MediaItem>> getHomeHero({String category = 'anime', String? imgSize});
   Future<HomeResponse> getUserHome({required String userId, String? category});
+  /// Senior: Obtiene la versión actual del Home para sincronización ligera.
+  Future<int> getHomeVersion({String? category});
   Future<void> sendUserEvent({required String userId, required String animeId, required String event, String? sectionId});
 
   Future<ScheduleResponse> getSchedule();
@@ -86,7 +89,7 @@ abstract class AurisRepository {
   Future<EditorialResponse> getEditorial({String? imgSize, String? category});
   Future<AnimeTitleInfo> getAnimeTitles(String query);
   Future<MovieTitleInfo> getMovieTitles(String query);
-  Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false});
+  Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken});
   Future<String> resolveEpisodeUrl(String url, String source, int episode, {String? category});
   Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year});
   Future<List<OmdbEpisode>> getOmdbSeason({required String title, int season = 1, bool enrich = true});

@@ -11,6 +11,7 @@ class UnifiedSection extends StatelessWidget {
   final String? subtitle;
   final List<MediaItem> items;
   final EditorialBadge? badge;
+  final SectionSeeMore? verMas;
   final void Function(MediaItem item) onItemTap;
   final void Function(MediaItem item)? onItemDelete;
 
@@ -21,6 +22,7 @@ class UnifiedSection extends StatelessWidget {
     this.subtitle,
     required this.items,
     this.badge,
+    this.verMas,
     required this.onItemTap,
     this.onItemDelete,
   });
@@ -36,6 +38,7 @@ class UnifiedSection extends StatelessWidget {
             title: title,
             subtitle: subtitle,
             items: items.map((m) => _mapMediaToWide(m)).toList(),
+            verMas: verMas,
             onItemTap: (wideItem) => onItemTap(wideItem.originalItem as MediaItem),
           ),
         );
@@ -47,6 +50,7 @@ class UnifiedSection extends StatelessWidget {
             items: items,
             badge: badge ?? EditorialBadge.mythical,
             forceTopDesign: true,
+            verMas: verMas,
             onItemTap: onItemTap,
           ),
         );
@@ -57,6 +61,7 @@ class UnifiedSection extends StatelessWidget {
             title: title,
             subtitle: subtitle,
             items: items,
+            verMas: verMas,
             onItemTap: onItemTap,
           ),
         );
@@ -73,10 +78,23 @@ class UnifiedSection extends StatelessWidget {
       );
     }
 
+    final bool isMovieish = isMovieLike(m.type.name, m.title, m.playbackHistory?.durationInMilliseconds);
+
+    String displayTitle = m.title;
+    if (isMovieish) {
+      displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '').trim();
+    } else if (m.playbackHistory?.episode != null && m.playbackHistory!.episode!.isNotEmpty) {
+      displayTitle = 'Ep ${m.playbackHistory!.episode} • $displayTitle';
+    }
+
     return WideContentItem(
       id: m.id,
-      title: m.title,
-      imageUrl: m.bannerUrl ?? m.posterUrl,
+      title: displayTitle,
+      imageUrl: ApiEndpoints.proxyImage(
+        m.bannerUrl ?? m.posterUrl,
+        // Senior Optimization: 1280px para películas/movie_anime para nitidez en Wide Cards
+        width: isMovieish ? 1280 : 800,
+      ),
       logoUrl: m.logoUrl,
       subtitle: m.subtitle,
       rating: _formatRating(m.rating),

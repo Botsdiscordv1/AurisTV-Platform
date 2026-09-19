@@ -1,5 +1,6 @@
 import '../editorial_badge.dart';
 import 'search_result.dart';
+import 'section_see_more.dart';
 import '../../../core/api/api_endpoints.dart';
 
 class EditorialSection {
@@ -9,6 +10,8 @@ class EditorialSection {
   final String badge;
   final List<EditorialItem> items;
   final String? format; // Senior Fix: Soporte para Server-Driven UI (poster, wide, top10)
+  final SectionFilters? filters;
+  final SectionSeeMore? verMas;
 
   const EditorialSection({
     required this.id,
@@ -17,6 +20,8 @@ class EditorialSection {
     required this.items,
     this.subtitle,
     this.format,
+    this.filters,
+    this.verMas,
   });
 
   factory EditorialSection.fromJson(Map<String, dynamic> json) {
@@ -35,6 +40,12 @@ class EditorialSection {
               ?.map((e) => EditorialItem.fromJson(Map<String, dynamic>.from(e as Map)))
               .toList() ??
           [],
+      filters: json['filters'] != null
+          ? SectionFilters.fromJson(Map<String, dynamic>.from(json['filters'] as Map))
+          : null,
+      verMas: json['verMas'] != null
+          ? SectionSeeMore.fromJson(Map<String, dynamic>.from(json['verMas'] as Map))
+          : null,
     );
   }
 
@@ -45,6 +56,8 @@ class EditorialSection {
     'badge': badge,
     'format': format,
     'items': items.map((e) => e.toJson()).toList(),
+    if (filters != null) 'filters': filters!.toJson(),
+    if (verMas != null) 'verMas': verMas!.toJson(),
   };
 }
 

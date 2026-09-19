@@ -20,6 +20,10 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => context.pop(),
+        ),
         title: const Text('Ajustes'),
         backgroundColor: const Color(0xFF0B0B0D),
         surfaceTintColor: Colors.transparent,

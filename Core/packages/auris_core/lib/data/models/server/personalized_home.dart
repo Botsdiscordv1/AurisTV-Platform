@@ -1,4 +1,5 @@
 import 'search_result.dart';
+import 'section_see_more.dart';
 
 class HomeResponse {
   final String userId;
@@ -46,6 +47,8 @@ class HomeSection {
   final String? format; // Senior Fix: Soporte para Server-Driven UI (poster, wide, top10)
   final List<HomeItem> items;
   final List<String> reasonKeys;
+  final SectionFilters? filters;
+  final SectionSeeMore? verMas;
 
   const HomeSection({
     required this.id,
@@ -57,6 +60,8 @@ class HomeSection {
     this.format,
     required this.items,
     this.reasonKeys = const [],
+    this.filters,
+    this.verMas,
   });
 
   factory HomeSection.fromJson(Map<String, dynamic> json) {
@@ -81,6 +86,12 @@ class HomeSection {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      filters: json['filters'] != null
+          ? SectionFilters.fromJson(Map<String, dynamic>.from(json['filters'] as Map))
+          : null,
+      verMas: json['verMas'] != null
+          ? SectionSeeMore.fromJson(Map<String, dynamic>.from(json['verMas'] as Map))
+          : null,
     );
   }
 
@@ -94,6 +105,8 @@ class HomeSection {
         'format': format,
         'items': items.map((e) => e.toJson()).toList(),
         'reasonKeys': reasonKeys,
+        if (filters != null) 'filters': filters!.toJson(),
+        if (verMas != null) 'verMas': verMas!.toJson(),
       };
 }
 

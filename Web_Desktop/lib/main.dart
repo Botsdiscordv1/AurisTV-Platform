@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; 
 import 'package:flutter/foundation.dart'; // Para kIsWeb
 import 'package:flutter/services.dart'; // Para SystemChrome
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -121,8 +121,8 @@ class GlobalMiniPlayerOverlay extends ConsumerWidget {
             title: state.currentItem!.title,
             posterUrl: state.currentItem!.posterUrl,
             bannerUrl: state.currentItem!.bannerUrl,
+            logoUrl: state.currentItem!.logoUrl,
             category: state.currentItem!.type.name,
-            language: state.language,
             serverName: state.source != null ? simplifySourceName(state.source!) : null,
             totalEpisodes: state.availableEpisodes.isNotEmpty ? state.availableEpisodes.length : null,
           );

@@ -12,7 +12,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
-import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
 
 // --- Galería Local Helpers ---
@@ -575,7 +574,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 final directUrl = await YoutubeResolver.getDirectStreamUrl(_lastTrailerKey!);
                 if (directUrl != null && context.mounted) {
                   final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(widget.poster ?? '')}&bannerUrl=${Uri.encodeComponent(widget.banner ?? '')}';
-                  context.push('/player/${Uri.encodeComponent(widget.title)}?source=YouTube&url=${Uri.encodeComponent(directUrl)}&episode=Trailer&serverName=YouTube&language=Trailer&totalEpisodes=1$posterParam');
+                  context.push('/player/${Uri.encodeComponent(widget.title)}?source=YouTube&url=${Uri.encodeComponent(directUrl)}&episode=Trailer&serverName=YouTube&totalEpisodes=1$posterParam');
                 }
               } finally {
                 if (mounted) setState(() => _isTrailerLoading = false);
@@ -747,7 +746,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   Widget _buildUpperButtons(BuildContext context) {
     return Stack(children: [
-      Positioned(top: 45, left: 15, child: PointerInterceptor(child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), onPressed: () => Navigator.of(context).pop()))),
+      Positioned(top: 45, left: 15, child: PointerInterceptor(child: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28), onPressed: () => Navigator.of(context).pop()))),
       Positioned(top: 45, right: 15, child: PointerInterceptor(child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {}))),
     ]);
   }
@@ -1129,8 +1128,8 @@ class _ActionSquareButton extends StatelessWidget {
 }
 
 class _ThemeCard extends StatefulWidget {
-  final AnimeThemeInfo theme; final bool isOP; final String? fallbackImage; final String animeTitle;
-  const _ThemeCard({required this.theme, required this.isOP, this.fallbackImage, required this.animeTitle});
+  final AnimeThemeInfo theme; final bool isOP; final String? fallbackImage; final String animeTitle; final String? logoUrl;
+  const _ThemeCard({required this.theme, required this.isOP, this.fallbackImage, required this.animeTitle, this.logoUrl});
   @override State<_ThemeCard> createState() => _ThemeCardState();
 }
 
@@ -1153,8 +1152,8 @@ class _ThemeCardState extends State<_ThemeCard> {
           String url = widget.theme.videoUrl; final typeLabel = widget.isOP ? 'OP' : 'ED';
           if (!url.startsWith('http')) { 
             url = 'https://www.youtube.com/watch?v=$url'; 
-            final extraTitleParam = '&title=${Uri.encodeComponent(widget.animeTitle)}&episodeTitle=${Uri.encodeComponent(widget.theme.title)}';
-            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube&language=SUB$extraTitleParam'); 
+            final extraTitleParam = '&title=${Uri.encodeComponent(widget.animeTitle)}&episodeTitle=${Uri.encodeComponent(widget.theme.title)}&logoUrl=${Uri.encodeComponent(widget.logoUrl ?? '')}';
+            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube$extraTitleParam');
           }
           else { 
             String url720 = widget.theme.video720 ?? '';
@@ -1166,8 +1165,8 @@ class _ThemeCardState extends State<_ThemeCard> {
             }
             final v720Param = url720.isNotEmpty ? '&video720=${Uri.encodeComponent(url720)}' : '';
             final v1080Param = url1080.isNotEmpty ? '&video1080=${Uri.encodeComponent(url1080)}' : '';
-            final extraTitleParam = '&title=${Uri.encodeComponent(widget.animeTitle)}&episodeTitle=${Uri.encodeComponent(widget.theme.title)}';
-            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes&language=SUB$v720Param$v1080Param$extraTitleParam'); 
+            final extraTitleParam = '&title=${Uri.encodeComponent(widget.animeTitle)}&episodeTitle=${Uri.encodeComponent(widget.theme.title)}&logoUrl=${Uri.encodeComponent(widget.logoUrl ?? '')}';
+            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes$v720Param$v1080Param$extraTitleParam');
           }
         }, 
         child: AnimatedContainer(
@@ -1624,6 +1623,32 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final history = historyAsync.valueOrNull ?? [];
     final detailLoading = detailAsync.isLoading && detailAsync.valueOrNull == null;
 
+    // Senior Pre-fetch Strategy:
+    // Al abrir detalles, disparamos la extracción de la fuente seleccionada en segundo plano
+    // (ya sea película o el episodio a reanudar). Así, al pulsar "Reproducir", 
+    // el stream ya estará caliente en el caché de Riverpod.
+    if (currentSource != null && _showContent) {
+      String? prefetchUrl;
+      if (isMovieCategory) {
+        prefetchUrl = currentSource.url;
+      } else {
+        final latest = history.where((h) => h.contentId == widget.title).firstOrNull;
+        int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
+        final epData = episodesAsync.valueOrNull?.response;
+        final epSource = episodesAsync.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
+        final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
+        prefetchUrl = _episodeUrlFor(ep, epSource.url, epSource.source, epNum);
+      }
+
+      if (prefetchUrl.isNotEmpty) {
+        ref.watch(extractProvider(ExtractParams(
+          url: prefetchUrl,
+          source: currentSource.source,
+          category: widget.category,
+        )));
+      }
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D), 
       body: AnimatedOpacity(
@@ -1662,8 +1687,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
                 if (isMovieCategory) {
                   final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Película', thumbnail: ApiEndpoints.proxyImage(playSource?.thumbnail));
-                  final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                  context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1)}&episode=1&serverName=${simplifySourceName(effectiveSrc)}&language=${((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&totalEpisodes=1$posterParam');
+                  final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                  context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1)}&episode=1&serverName=${simplifySourceName(effectiveSrc)}&startPosition=&category=${widget.category}&totalEpisodes=1$posterParam');
                   return;
                 }
                 final latest = history.where((h) => h.contentId == widget.title).firstOrNull;
@@ -1673,8 +1698,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
                 
                 final episodeThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
-                final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(episodeThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&language=${(epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB'}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}$posterParam');
+                final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(episodeThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}$posterParam');
               }
             )),
             if (isMobile) SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1729,8 +1754,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
                         final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&language=${(epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
                       });
                     }, childCount: epData.total))
                     else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
@@ -1743,8 +1768,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
                         final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&language=${(epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
                       });
                     }, childCount: epData.total)),
                       if (epData.specials.isNotEmpty) ...[
@@ -1768,8 +1793,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final spQuality = sp.quality ?? spSource?.quality ?? '';
                         return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, isMobile: true, scrollController: _scrollController, onTap: () {
                           final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                          final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=$spNum&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&language=${(spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
+                          final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=$spNum&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
                         });
                       }, childCount: epData.specials.length))
                       else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
@@ -1778,8 +1803,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         final spQuality = sp.quality ?? spSource?.quality ?? '';
                         return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, onTap: () {
                           final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                          final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}';
-                          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=${sp.number}&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&language=${(spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
+                          final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=${sp.number}&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
                         });
                       }, childCount: epData.specials.length)),
                     ],
@@ -2130,12 +2155,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ? (detail.banner ?? detail.backdrop) 
         : (detail is MovieDetail ? ((detail as MovieDetail).backdrop ?? (detail as MovieDetail).poster) : null);
 
-    final String animeTitle = detail is AnimeDetail ? (detail as AnimeDetail).title : (detail is MovieDetail ? (detail as MovieDetail).title : '');
+    final String animeTitle = (detail is AnimeDetail ? (detail as AnimeDetail).title : (detail is MovieDetail ? (detail as MovieDetail).title : ''));
+    final String? logoUrl = (detail is AnimeDetail ? (detail as AnimeDetail).logo : (detail is MovieDetail ? (detail as MovieDetail).logo : null));
 
     if (ops.isEmpty && eds.isEmpty) return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay temas musicales disponibles', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
     return [
-      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: fallbackImg, animeTitle: animeTitle), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
-      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: fallbackImg, animeTitle: animeTitle), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: fallbackImg, animeTitle: animeTitle, logoUrl: logoUrl), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: fallbackImg, animeTitle: animeTitle, logoUrl: logoUrl), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
     ];
   }
 

@@ -1,9 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
+import '../../core/utils/responsive_utils.dart';
 import 'marquee_text.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -117,24 +118,27 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
             children: [
               AspectRatio(
                 aspectRatio: 2 / 3,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: _isActive
-                        ? [BoxShadow(color: Colors.white.withOpacity(0.2), blurRadius: 15, spreadRadius: 1)]
-                        : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
-                  ),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // 1. EL PÓSTER (Base)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        clipBehavior: Clip.antiAliasWithSaveLayer,
-                        child: AnimatedScale(
-                          scale: _isActive ? 1.12 : 1.0,
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeOutCubic,
+                  child: AnimatedContainer(
+                    duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
+                    curve: Curves.easeOutQuint,
+                    transform: Matrix4.translationValues(0, _isActive ? -6 : 0, 0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: _isActive
+                          ? [BoxShadow(color: Colors.white.withOpacity(0.18), blurRadius: 30, spreadRadius: 2)]
+                          : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // 1. EL PÓSTER (Base)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          clipBehavior: Clip.antiAliasWithSaveLayer,
+                          child: AnimatedScale(
+                            scale: _isActive ? 1.10 : 1.0,
+                            duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
+                            curve: Curves.easeOutQuint,
                           child: Builder(
                             builder: (context) {
                               final dpr = MediaQuery.of(context).devicePixelRatio;
@@ -256,8 +260,8 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: _isActive ? Colors.white : Colors.white12,
-                              width: _isActive ? 3.0 : 1.0,
+                              color: _isActive ? Colors.white : Colors.transparent,
+                              width: _isActive ? 3.0 : 0.0,
                             ),
                           ),
                         ),

@@ -19,7 +19,7 @@ class MockAurisRepository implements AurisRepository {
     });
   }
 
-  @override Future<AnimeDetail?> getAnimeDetail({required String title, int? malId, String? metadataTitle, int? year, int? season, String? kind, String? url, String? type, String? imgSize}) async {
+  @override Future<AnimeDetail?> getAnimeDetail({required String title, int? malId, String? metadataTitle, int? year, int? season, String? kind, String? url, String? type, String? server, String? imgSize}) async {
     return mockDetail;
   }
 

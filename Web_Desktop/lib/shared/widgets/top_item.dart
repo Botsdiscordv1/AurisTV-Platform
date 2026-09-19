@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
-import 'focusable_poster_card.dart';
 
 class TopItem extends StatelessWidget {
   final int index;
@@ -49,7 +48,7 @@ class TopItem extends StatelessWidget {
 
     return Container(
       width: numberVisiblePart + posterWidth,
-      margin: const EdgeInsets.only(right: 24), // Más aire entre tarjetas
+      margin: EdgeInsets.only(right: context.useMobileLayout ? 8 : 24), // Senior Fix: Separación adaptativa para tablets
       child: Stack(
         clipBehavior: Clip.none,
         children: [

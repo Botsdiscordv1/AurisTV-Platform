@@ -6,7 +6,6 @@ import 'package:collection/collection.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
-import '../../../shared/widgets/focusable_poster_card.dart';
 import 'providers/search_provider.dart';
 import 'widgets/search_widgets.dart';
 
@@ -118,6 +117,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => context.pop(),
+        ),
         backgroundColor: const Color(0xFF0B0B0D),
         surfaceTintColor: Colors.transparent,
         elevation: 0,

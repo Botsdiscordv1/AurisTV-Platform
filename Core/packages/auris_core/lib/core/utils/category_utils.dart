@@ -43,3 +43,32 @@ String inferOpenCategory(SearchResult result, [String fallback = 'all']) {
 
   return fallback;
 }
+
+/// Determina de forma robusta si un contenido es una película o formato largo
+/// para ajustar la UI (ocultar "Ep 1", formatear tiempo en horas, etc.)
+bool isMovieLike(String? category, [String? title, int? durationMs]) {
+  final String c = (category ?? '').toLowerCase();
+  final String t = (title ?? '').toLowerCase();
+
+  // 1. Check por categoría (Incluye variantes de servidores)
+  if (c == 'movie' || c == 'movie_anime' || c == 'anime-movies' || 
+      c == 'anime_movie' || c.contains('pelicula') || c.contains('película')) {
+    return true;
+  }
+  
+  // 2. Check por título (Palabras clave de largometraje)
+  final bool hasMovieKeywords = t.contains('pelicula') || t.contains('película') || 
+      t.contains('movie') || t.contains('especial') || t.contains('ova');
+      
+  if (hasMovieKeywords || t.contains('película:') || t.contains('pelicula:')) {
+    return true;
+  }
+
+  // 3. Check por duración (Senior Logic: > 30 min = Película/Especial largo)
+  if (durationMs != null && durationMs > 30 * 60 * 1000) {
+    return true;
+  }
+  
+  return false;
+}
+

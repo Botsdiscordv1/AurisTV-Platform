@@ -24,7 +24,6 @@ class PlayerSessionState extends ActivePlayerState {
     super.season,
     super.source,
     super.url,
-    super.language,
     super.availableSources,
     super.availableTracks,
     super.availableEpisodes,
@@ -41,7 +40,6 @@ class PlayerSessionState extends ActivePlayerState {
         season: s.season,
         source: s.source,
         url: s.url,
-        language: s.language,
         availableSources: s.availableSources,
         availableTracks: s.availableTracks,
         availableEpisodes: s.availableEpisodes,
@@ -73,7 +71,6 @@ class PlayerSessionNotifier extends ActivePlayerNotifier {
       episode: ep.number.toString(),
       season: state.season,
       source: state.source,
-      language: state.language,
       triggerOpen: false,
     );
     try {
@@ -84,14 +81,21 @@ class PlayerSessionNotifier extends ActivePlayerNotifier {
       Map<String, String> headers = const {};
       int idx = 0;
       if (tracks.isNotEmpty) {
-        final lang = state.language;
-        if (lang != null) {
-          final latIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'DUB');
-          final subIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'SUB');
-          final isLat = lang == 'LAT' || lang == 'DUB';
-          if (isLat && latIdx >= 0) idx = latIdx;
-          else if (subIdx >= 0) idx = subIdx;
-        }
+        // Senior Fix: Usar lógica centralizada de idioma basada en ajustes
+        final settings = ref.read(settingsProvider);
+        final String pref = settings.preferredLanguage.toLowerCase();
+        final String targetType = pref == 'latino' ? 'DUB' : (pref == 'castellano' ? 'CAST' : 'SUB');
+
+        final latIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'DUB');
+        final castIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'CAST');
+        final subIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'SUB');
+
+        if (targetType == 'DUB' && latIdx >= 0) idx = latIdx;
+        else if (targetType == 'CAST' && castIdx >= 0) idx = castIdx;
+        else if (subIdx >= 0) idx = subIdx;
+        else if (latIdx >= 0) idx = latIdx;
+        else if (castIdx >= 0) idx = castIdx;
+
         streamUrl = tracks[idx].url;
         headers = tracks[idx].headers;
         updateSession(tracks: tracks, selectedIndex: idx);

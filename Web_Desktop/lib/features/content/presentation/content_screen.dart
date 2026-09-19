@@ -17,7 +17,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 import 'package:auristv_web/core/utils/responsive_utils.dart';
 import 'package:auristv_web/core/utils/url_utils.dart';
-import 'package:auristv_web/shared/widgets/focusable_poster_card.dart';
 import 'package:auristv_web/shared/widgets/full_screen_viewer.dart';
 import 'package:auristv_web/features/player/presentation/player_screen.dart';
 import 'package:auristv_web/core/router/app_router.dart';
@@ -1023,7 +1022,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                       source: 'YouTube',
                       episode: 'Trailer',
                       serverName: 'YouTube',
-                      language: 'Trailer',
                       totalEpisodes: 1,
                       posterUrl: widget.poster,
                       bannerUrl: widget.banner,
@@ -1533,7 +1531,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           top: isMobile ? 35 : (desktopTop ?? 40), 
           left: isMobile ? 15 : 40, 
           child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), 
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28),
             onPressed: () { 
               if (mounted) {
                 // Senior Web Fix: Preferimos .pop() si es posible para mantener el estado del Shell.
@@ -2296,8 +2294,8 @@ Widget _buildEpisodesSkeleton(BuildContext context, bool isMobile) {
 }
 
 class _ThemeCard extends StatefulWidget {
-  final AnimeThemeInfo theme; final bool isOP; final String? fallbackImage; final String animeTitle;
-  const _ThemeCard({required this.theme, required this.isOP, this.fallbackImage, required this.animeTitle});
+  final AnimeThemeInfo theme; final bool isOP; final String? fallbackImage; final String animeTitle; final String? logoUrl;
+  const _ThemeCard({required this.theme, required this.isOP, this.fallbackImage, required this.animeTitle, this.logoUrl});
   @override State<_ThemeCard> createState() => _ThemeCardState();
 }
 
@@ -2326,8 +2324,8 @@ class _ThemeCardState extends State<_ThemeCard> {
               source: 'YouTube',
               episode: typeLabel,
               serverName: 'YouTube',
-              language: 'SUB',
               totalEpisodes: 1,
+              logoUrl: widget.logoUrl,
             );
             UrlUtils.openPlayer(context, player);
           }
@@ -2353,8 +2351,8 @@ class _ThemeCardState extends State<_ThemeCard> {
                 source: 'Themes',
                 episode: typeLabel,
                 serverName: 'Themes',
-                language: 'SUB',
                 totalEpisodes: 1,
+                logoUrl: widget.logoUrl,
                 video720: url720.isNotEmpty ? url720 : null,
                 video1080: url1080.isNotEmpty ? url1080 : null,
                 title: widget.animeTitle, // Pasamos el título del anime a través del nuevo parámetro
@@ -2825,6 +2823,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
       final detailAsync = detailState.detail;
       final detailData = detailAsync.valueOrNull?.main;
+      final String? _detailLogo = detailData?.logo;
       final isMovieCategory = detailState.isMovieish;
       final currentSeason = detailState.currentSeason;
       final totalSeasons = detailState.totalSeasons;
@@ -2833,6 +2832,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       final episodesAsync = detailState.episodes;
       final unifiedRelationsAsync = detailState.relations;
       final seasonTitle = detailState.seasonTitle;
+      final epBundle = episodesAsync.valueOrNull;
+      final epData = epBundle?.response;
 
       final dataReady = detailAsync.hasValue || activeSources.isNotEmpty;
       if (dataReady && !_showContent) {
@@ -2889,6 +2890,34 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       final history = historyAsync.valueOrNull ?? [];
       final detailLoading = detailAsync.isLoading && detailAsync.valueOrNull == null;
 
+      // Senior Pre-fetch Strategy:
+      // Al abrir detalles, disparamos la extracción de la fuente seleccionada en segundo plano
+      // (ya sea película o el episodio a reanudar). Así, al pulsar "Reproducir",
+      // el stream ya estará caliente en el caché de Riverpod.
+      if (currentSource != null && _showContent) {
+        String? prefetchUrl;
+        if (isMovieCategory) {
+          // Senior Fix: Para películas usamos la URL directa de la fuente,
+          // igual que hace el botón onPlay, para asegurar el Cache Hit.
+          prefetchUrl = currentSource.url;
+        } else {
+          final latest = history.where((h) => h.contentId == widget.title).firstOrNull;
+          int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
+          final epData = episodesAsync.valueOrNull?.response;
+          final epSource = episodesAsync.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
+          final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
+          prefetchUrl = _episodeUrlFor(ep, epSource.url, epSource.source, epNum);
+        }
+
+        if (prefetchUrl.isNotEmpty) {
+          ref.watch(extractProvider(ExtractParams(
+            url: prefetchUrl,
+            source: currentSource.source,
+            category: widget.category,
+          )));
+        }
+      }
+
       return Scaffold(
         backgroundColor: const Color(0xFF0B0B0D),
         body: AnimatedOpacity(
@@ -2934,11 +2963,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                       source: effectiveSrc,
                       episode: '1',
                       serverName: simplifySourceName(effectiveSrc),
-                      language: ((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
                       category: widget.category,
                       totalEpisodes: 1,
                       posterUrl: playSource?.thumbnail,
                       bannerUrl: heroBanner,
+                      logoUrl: _detailLogo,
                     );
                     UrlUtils.openPlayer(context, player);
                   } else {
@@ -2956,11 +2985,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                       episode: epNum.toString(),
                       season: latest?.season ?? currentSeason,
                       serverName: simplifySourceName(epSource?.source ?? effectiveSrc),
-                      language: (epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB',
                       startPosition: latest?.positionInMilliseconds,
                       category: widget.category,
                       totalEpisodes: epData?.total ?? 0,
                       title: seasonTitle ?? widget.title,
+                      logoUrl: _detailLogo,
                       posterUrl: currentSource?.thumbnail ?? widget.result?.thumbnail,
                       bannerUrl: episodeThumb,
                     );
@@ -2977,160 +3006,284 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 ])),
                 const SizedBox(height: 24),
               ]))),
-              SliverMainAxisGroup(slivers: [
+                SliverMainAxisGroup(slivers: [
                 SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   _buildTabBar(tabLabels, selectedTabIndex, hPadding, isMobile),
                   const SizedBox(height: 16),
                 ]))),
-                if (selectedTabIndex == episodesTabIndex) () {
-                  final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
-
-                  if (epBundle != null) {
-                    _lastEpisodes = epBundle;
-                    final epData = epBundle.response;
-
-                    return SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverMainAxisGroup(slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.only(bottom: isMobile ? 6 : 32),
-                          child: Text(
-                            '${epData.total} episodios',
-                            style: TextStyle(
-                              color: const Color(0xFFA5A5A5),
-                              fontSize: isMobile ? 15 : 20,
-                              fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal,
-                            )
-                          )
-                        )
-                      ),
-                      if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
-                        final ep = index < epData.episodes.length ? epData.episodes[index] : null;
-                        final epNum = (ep?.number ?? index + 1).toString();
-                        final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                        final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                        final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                        return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
-                          final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                          final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                          final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                          final player = PlayerScreen(
-                            contentId: widget.title,
-                            sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? widget.url, tapSource?.source ?? (currentSource?.source ?? widget.source), ep?.number ?? index + 1),
-                            source: tapSource?.source ?? (currentSource?.source ?? widget.source),
-                            episode: (ep?.number ?? index + 1).toString(),
-                            season: currentSeason,
-                            serverName: simplifySourceName(tapSource?.source ?? (currentSource?.source ?? widget.source)),
-                            language: (epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
-                            startPosition: hist?.positionInMilliseconds,
-                            category: widget.category,
-                            totalEpisodes: epData.total,
-                            title: seasonTitle ?? widget.title,
-                            posterUrl: tapSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
-                            bannerUrl: epThumb,
-                          );
-                          UrlUtils.openPlayer(context, player);
-                        });
-                      }, childCount: epData.total))
-                      else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
-                        final ep = index < epData.episodes.length ? epData.episodes[index] : null;
-                        final epNum = (ep?.number ?? index + 1).toString();
-                        final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                        final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                        final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                        return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
-                          final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                          final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                          final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                          final player = PlayerScreen(
-                            contentId: widget.title,
-                            sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? widget.url, tapSource?.source ?? (currentSource?.source ?? widget.source), ep?.number ?? index + 1),
-                            source: tapSource?.source ?? (currentSource?.source ?? widget.source),
-                            episode: (ep?.number ?? index + 1).toString(),
-                            season: currentSeason,
-                            serverName: simplifySourceName(tapSource?.source ?? (currentSource?.source ?? widget.source)),
-                            language: (epQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
-                            startPosition: hist?.positionInMilliseconds,
-                            category: widget.category,
-                            totalEpisodes: epData.total,
-                            title: seasonTitle ?? widget.title,
-                            posterUrl: tapSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
-                            bannerUrl: epThumb,
-                          );
-                          UrlUtils.openPlayer(context, player);
-                        });
-                      }, childCount: epData.total)),
-                        if (epData.specials.isNotEmpty) ...[
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.only(top: isMobile ? 28 : 40, bottom: isMobile ? 16 : 32),
-                            child: Text(
-                              'Temporada 0',
-                              style: TextStyle(
-                                color: const Color(0xFFA5A5A5),
-                                fontSize: isMobile ? 15 : 20,
-                                fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal,
+                if (selectedTabIndex == episodesTabIndex)
+                  if (epBundle != null && epData != null)
+                    SliverPadding(
+                      padding: EdgeInsets.symmetric(horizontal: hPadding),
+                      sliver: SliverMainAxisGroup(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.only(bottom: isMobile ? 6 : 32),
+                              child: Text(
+                                '${epData.total} episodios',
+                                style: TextStyle(
+                                  color: const Color(0xFFA5A5A5),
+                                  fontSize: isMobile ? 15 : 20,
+                                  fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal,
+                                ),
                               ),
                             ),
                           ),
+                          if (isMobile)
+                            SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                                  final epNum = (ep?.number ?? index + 1).toString();
+                                  final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                                  final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                                  final epQuality = ep?.quality ?? epSource?.quality ?? '';
+                                  return _EpisodeCard(
+                                    episodeNumber: ep?.number ?? index + 1,
+                                    title: ep?.title ?? 'Episodio ${index + 1}',
+                                    description: ep?.description ?? '',
+                                    imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''),
+                                    fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''),
+                                    releaseDate: ep?.airDate,
+                                    duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null),
+                                    quality: epQuality,
+                                    episodeUrl: ep?.url,
+                                    source: epSource?.source ?? currentSource?.source,
+                                    category: widget.category,
+                                    certification: certification,
+                                    isMobile: true,
+                                    scrollController: _scrollController,
+                                    progress: epHistory?.progressPercentage,
+                                    onTap: () {
+                                      final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                                      final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                                      final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                                      final player = PlayerScreen(
+                                        contentId: widget.title,
+                                        sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? widget.url, tapSource?.source ?? (currentSource?.source ?? widget.source), ep?.number ?? index + 1),
+                                        source: tapSource?.source ?? (currentSource?.source ?? widget.source),
+                                        episode: (ep?.number ?? index + 1).toString(),
+                                        season: currentSeason,
+                                        serverName: simplifySourceName(tapSource?.source ?? (currentSource?.source ?? widget.source)),
+                                        startPosition: hist?.positionInMilliseconds,
+                                        category: widget.category,
+                                        totalEpisodes: epData.total,
+                                        title: seasonTitle ?? widget.title,
+                                        logoUrl: _detailLogo,
+                                        posterUrl: tapSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
+                                        bannerUrl: epThumb,
+                                      );
+                                      UrlUtils.openPlayer(context, player);
+                                    },
+                                  );
+                                },
+                                childCount: epData.total,
+                              ),
+                            )
+                          else
+                            SliverGrid(
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: episodesCrossAxisCount,
+                                mainAxisSpacing: 20,
+                                crossAxisSpacing: 24,
+                                childAspectRatio: episodesAspectRatio,
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                                  final epNum = (ep?.number ?? index + 1).toString();
+                                  final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                                  final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                                  final epQuality = ep?.quality ?? epSource?.quality ?? '';
+                                  return _EpisodeCard(
+                                    episodeNumber: ep?.number ?? index + 1,
+                                    title: ep?.title ?? 'Episodio ${index + 1}',
+                                    description: ep?.description ?? '',
+                                    imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''),
+                                    fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''),
+                                    releaseDate: ep?.airDate,
+                                    duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null),
+                                    quality: epQuality,
+                                    episodeUrl: ep?.url,
+                                    source: epSource?.source ?? currentSource?.source,
+                                    category: widget.category,
+                                    certification: certification,
+                                    scrollController: _scrollController,
+                                    progress: epHistory?.progressPercentage,
+                                    onTap: () {
+                                      final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                                      final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                                      final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                                      final player = PlayerScreen(
+                                        contentId: widget.title,
+                                        sourceUrl: _episodeUrlFor(ep, tapSource?.url ?? widget.url, tapSource?.source ?? (currentSource?.source ?? widget.source), ep?.number ?? index + 1),
+                                        source: tapSource?.source ?? (currentSource?.source ?? widget.source),
+                                        episode: (ep?.number ?? index + 1).toString(),
+                                        season: currentSeason,
+                                        serverName: simplifySourceName(tapSource?.source ?? (currentSource?.source ?? widget.source)),
+                                        startPosition: hist?.positionInMilliseconds,
+                                        category: widget.category,
+                                        totalEpisodes: epData.total,
+                                        title: seasonTitle ?? widget.title,
+                                        logoUrl: _detailLogo,
+                                        posterUrl: tapSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
+                                        bannerUrl: epThumb,
+                                      );
+                                      UrlUtils.openPlayer(context, player);
+                                    },
+                                  );
+                                },
+                                childCount: epData.total,
+                              ),
+                            ),
+                          if (epData.specials.isNotEmpty) ...[
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.only(top: isMobile ? 28 : 40, bottom: isMobile ? 16 : 32),
+                                child: Text(
+                                  'Temporada 0',
+                                  style: TextStyle(
+                                    color: const Color(0xFFA5A5A5),
+                                    fontSize: isMobile ? 15 : 20,
+                                    fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (isMobile)
+                              SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final sp = epData.specials[index];
+                                    final spNum = sp.number;
+                                    final spSource = currentSource;
+                                    final spQuality = sp.quality ?? spSource?.quality ?? '';
+                                    return _EpisodeCard(
+                                      episodeNumber: sp.number,
+                                      title: sp.title ?? 'Especial',
+                                      description: sp.description ?? '',
+                                      imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''),
+                                      fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''),
+                                      releaseDate: sp.airDate,
+                                      duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null),
+                                      quality: spQuality,
+                                      episodeUrl: sp.url,
+                                      source: spSource?.source ?? currentSource?.source,
+                                      category: widget.category,
+                                      certification: certification,
+                                      episodeType: sp.episodeType,
+                                      isMobile: true,
+                                      scrollController: _scrollController,
+                                      onTap: () {
+                                        final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
+                                        final player = PlayerScreen(
+                                          contentId: widget.title,
+                                          sourceUrl: _episodeUrlFor(sp, spSource?.url ?? widget.url, spSource?.source ?? (currentSource?.source ?? widget.source), sp.number),
+                                          source: spSource?.source ?? (currentSource?.source ?? widget.source),
+                                          episode: spNum.toString(),
+                                          season: 0,
+                                          serverName: simplifySourceName(spSource?.source ?? (currentSource?.source ?? widget.source)),
+                                          category: widget.category,
+                                          totalEpisodes: epData.total,
+                                          title: seasonTitle ?? widget.title,
+                                          logoUrl: _detailLogo,
+                                          posterUrl: spSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
+                                          bannerUrl: epThumb,
+                                        );
+                                        UrlUtils.openPlayer(context, player);
+                                      },
+                                    );
+                                  },
+                                  childCount: epData.specials.length,
+                                ),
+                              )
+                            else
+                              SliverGrid(
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: episodesCrossAxisCount,
+                                  mainAxisSpacing: 20,
+                                  crossAxisSpacing: 24,
+                                  childAspectRatio: episodesAspectRatio,
+                                ),
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final sp = epData.specials[index];
+                                    final spSource = currentSource;
+                                    final spQuality = sp.quality ?? spSource?.quality ?? '';
+                                    return _EpisodeCard(
+                                      episodeNumber: sp.number,
+                                      title: sp.title ?? 'Especial',
+                                      description: sp.description ?? '',
+                                      imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''),
+                                      fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''),
+                                      releaseDate: sp.airDate,
+                                      duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null),
+                                      quality: spQuality,
+                                      episodeUrl: sp.url,
+                                      source: spSource?.source ?? currentSource?.source,
+                                      category: widget.category,
+                                      certification: certification,
+                                      episodeType: sp.episodeType,
+                                      scrollController: _scrollController,
+                                      onTap: () {
+                                        final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
+                                        final player = PlayerScreen(
+                                          contentId: widget.title,
+                                          sourceUrl: _episodeUrlFor(sp, spSource?.url ?? widget.url, spSource?.source ?? (currentSource?.source ?? widget.source), sp.number),
+                                          source: spSource?.source ?? (currentSource?.source ?? widget.source),
+                                          episode: sp.number.toString(),
+                                          season: 0,
+                                          serverName: simplifySourceName(spSource?.source ?? (currentSource?.source ?? widget.source)),
+                                          category: widget.category,
+                                          totalEpisodes: epData.total,
+                                          title: seasonTitle ?? widget.title,
+                                          logoUrl: _detailLogo,
+                                          posterUrl: spSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
+                                          bannerUrl: epThumb,
+                                        );
+                                        UrlUtils.openPlayer(context, player);
+                                      },
+                                    );
+                                  },
+                                  childCount: epData.specials.length,
+                                ),
+                              ),
+                          ],
+                          SliverToBoxAdapter(child: SizedBox(height: isMobile ? 32 : 150)),
+                        ],
+                      ),
+                    )
+                  else
+                    episodesAsync.when(
+                      data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                      loading: () => SliverPadding(
+                        padding: EdgeInsets.symmetric(horizontal: hPadding),
+                        sliver: _buildEpisodesSkeleton(context, isMobile),
+                      ),
+                      error: (err, _) => SliverToBoxAdapter(
+                        child: Center(
+                          child: Text(
+                            'Error: $err',
+                            style: const TextStyle(color: const Color(0xFFA5A5AA)),
+                          ),
                         ),
-                        if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
-                          final sp = epData.specials[index];
-                          final spNum = sp.number;
-                          final spSource = currentSource;
-                          final spQuality = sp.quality ?? spSource?.quality ?? '';
-                          return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, isMobile: true, scrollController: _scrollController, onTap: () {
-                            final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                            final player = PlayerScreen(
-                              contentId: widget.title,
-                              sourceUrl: _episodeUrlFor(sp, spSource?.url ?? widget.url, spSource?.source ?? (currentSource?.source ?? widget.source), sp.number),
-                              source: spSource?.source ?? (currentSource?.source ?? widget.source),
-                              episode: spNum.toString(),
-                              season: 0,
-                              serverName: simplifySourceName(spSource?.source ?? (currentSource?.source ?? widget.source)),
-                              language: (spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
-                              category: widget.category,
-                              totalEpisodes: epData.total,
-                              title: seasonTitle ?? widget.title,
-                              posterUrl: spSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
-                              bannerUrl: epThumb,
-                            );
-                            UrlUtils.openPlayer(context, player);
-                          });
-                        }, childCount: epData.specials.length))
-                        else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
-                          final sp = epData.specials[index];
-                          final spSource = currentSource;
-                          final spQuality = sp.quality ?? spSource?.quality ?? '';
-                          return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, onTap: () {
-                            final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                            final player = PlayerScreen(
-                              contentId: widget.title,
-                              sourceUrl: _episodeUrlFor(sp, spSource?.url ?? widget.url, spSource?.source ?? (currentSource?.source ?? widget.source), sp.number),
-                              source: spSource?.source ?? (currentSource?.source ?? widget.source),
-                              episode: sp.number.toString(),
-                              season: 0,
-                              serverName: simplifySourceName(spSource?.source ?? (currentSource?.source ?? widget.source)),
-                              language: (spQuality.toLowerCase().contains('latino')) ? 'LAT' : 'SUB',
-                              category: widget.category,
-                              totalEpisodes: epData.total,
-                              title: seasonTitle ?? widget.title,
-                              posterUrl: spSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
-                              bannerUrl: epThumb,
-                            );
-                            UrlUtils.openPlayer(context, player);
-                          });
-                        }, childCount: epData.specials.length)),
-                      ],
-                      SliverToBoxAdapter(child: SizedBox(height: isMobile ? 32 : 150)),
-                    ]));
-                  }
-
-                  return episodesAsync.when(
-                    data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-                    loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: _buildEpisodesSkeleton(context, isMobile)),
-                    error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))),
-                  );
-                }(),
+                      ),
+                    ),
+                if (selectedTabIndex == relatedTabIndex) ..._buildRelatedTab(
+                  hPadding,
+                  unifiedRelations: unifiedRelationsAsync.valueOrNull,
+                  currentSource: currentSource,
+                ),
+                if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(detailData, hPadding),
+                if (selectedTabIndex == detailsTabIndex) ..._buildDetailsTab(detailData, hPadding, inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, sourceRating: currentSource?.score, showRatingSkeleton: currentSource?.score == null && detailLoading),
+                if (selectedTabIndex == galleryTabIndex) ..._buildGalleryTab(
+                  hPadding,
+                  isMovieCategory ? 'movie' : 'tv',
+                  detailData?.title ?? widget.title,
+                  detailData is AnimeDetail ? (detailData as AnimeDetail).year : widget.year,
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 if (selectedTabIndex == relatedTabIndex) ..._buildRelatedTab(
                   hPadding,
                   unifiedRelations: unifiedRelationsAsync.valueOrNull,
@@ -3477,12 +3630,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ? (detail.banner ?? detail.backdrop)
         : (detail is MovieDetail ? ((detail as MovieDetail).backdrop ?? (detail as MovieDetail).poster) : null);
 
-    final String animeTitle = detail is AnimeDetail ? (detail as AnimeDetail).title : (detail is MovieDetail ? (detail as MovieDetail).title : '');
+    final String animeTitle = detail is AnimeDetail ? detail.title : (detail is MovieDetail ? detail.title : '');
+    final String? logoUrl = detail is AnimeDetail ? detail.logo : (detail is MovieDetail ? detail.logo : null);
 
     if (ops.isEmpty && eds.isEmpty) return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay temas musicales disponibles', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
     return [
-      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: fallbackImg, animeTitle: animeTitle), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
-      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: fallbackImg, animeTitle: animeTitle), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: fallbackImg, animeTitle: animeTitle, logoUrl: logoUrl), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: fallbackImg, animeTitle: animeTitle, logoUrl: logoUrl), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
     ];
   }
 

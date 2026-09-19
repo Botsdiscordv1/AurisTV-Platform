@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../providers/search_provider.dart';
-import '../../../../shared/widgets/focusable_poster_card.dart';
 
 class SearchHistorySection extends ConsumerWidget {
   final Function(String) onQueryTap;

@@ -53,31 +53,39 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       title: history.title,
       posterUrl: history.posterUrl,
       bannerUrl: history.bannerUrl,
-      language: history.language,
     );
     UrlUtils.openPlayer(context, player);
   }
 
   MediaItem _historyToMediaItem(PlaybackHistory h) {
+    final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
+
     String displayTitle = h.title ?? 'Contenido';
-    final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
-    if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+    if (isMovieish) {
+      displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '').trim();
+    } else if (h.episode != null && h.episode!.isNotEmpty) {
       displayTitle = 'Ep ${h.episode} • $displayTitle';
     }
 
     String remainingText = '';
     final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
     if (remainingMs > 0) {
-      final minutes = (remainingMs / 60000).ceil();
-      remainingText = 'Quedan $minutes min';
+      remainingText = 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}';
     }
+
+    final String? rawUrl = h.bannerUrl ?? h.posterUrl;
 
     return MediaItem(
       id: h.contentId,
       title: displayTitle,
       posterUrl: h.posterUrl ?? '',
-      bannerUrl: h.bannerUrl,
-      type: isMovie ? MediaType.movie : MediaType.anime,
+      bannerUrl: ApiEndpoints.proxyImage(
+        rawUrl,
+        // Senior Optimization: 1280px para películas/movie_anime para nitidez en Wide Cards
+        width: isMovieish ? 1280 : 800,
+      ),
+      logoUrl: h.logoUrl != null ? ApiEndpoints.proxyImage(h.logoUrl!) : null,
+      type: isMovieish ? MediaType.movie : MediaType.anime,
       subtitle: remainingText,
       playbackHistory: h,
     );

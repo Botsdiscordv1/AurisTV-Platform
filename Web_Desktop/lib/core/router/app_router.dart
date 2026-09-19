@@ -78,6 +78,15 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
+        // Rama 3: Ajustes / Perfil
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/settings',
+              builder: (context, state) => const SettingsScreen(),
+            ),
+          ],
+        ),
       ],
     ),
 
@@ -124,22 +133,17 @@ final GoRouter appRouter = GoRouter(
           episode: params['episode'] ?? '1',
           season: int.tryParse(params['season'] ?? ''),
           serverName: params['serverName'],
-          language: params['language'],
           category: params['category'],
           totalEpisodes: int.tryParse(params['totalEpisodes'] ?? ''),
           title: params['title'],
           posterUrl: params['posterUrl'],
           bannerUrl: params['bannerUrl'],
+          logoUrl: params['logoUrl'],
         );
       },
     ),
 
     // Rutas Globales
-    GoRoute(
-      parentNavigatorKey: rootNavigatorKey,
-      path: '/settings',
-      builder: (context, state) => const SettingsScreen(),
-    ),
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,
       path: '/settings/avatar',

@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../core/theme/editorial_themes.dart';
-import 'marquee_text.dart';
 import 'editorial_animation_controller.dart';
 
 const String _mythicCornerSvg = r'''
@@ -78,7 +77,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> {
                   aspectRatio: 2 / 3,
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: _isActive ? [BoxShadow(color: const Color(0xFF6C32FF).withOpacity(0.3), blurRadius: 15, spreadRadius: 1)] : [],
                     ),
                     child: AnimatedBuilder(
@@ -90,7 +89,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> {
                           clipBehavior: Clip.none,
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
@@ -239,7 +238,7 @@ class _MythicBorder extends StatelessWidget {
           stops: [0.0, (value - 0.2).clamp(0.0, 1.0), value, (value + 0.2).clamp(0.0, 1.0), 1.0],
         ).createShader(bounds);
       },
-      child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white, width: 2.5))),
+      child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white, width: 2.5))),
     );
   }
 }

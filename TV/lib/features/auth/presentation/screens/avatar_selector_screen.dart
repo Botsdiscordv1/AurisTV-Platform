@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../providers/auth_provider.dart';
+import 'package:auris_core/auris_core.dart';
 
 class AvatarSelectorScreen extends ConsumerStatefulWidget {
   const AvatarSelectorScreen({super.key});

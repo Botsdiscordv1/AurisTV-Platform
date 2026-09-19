@@ -12,10 +12,10 @@ class PlaybackHistory {
   final String? title;
   final String? posterUrl;
   final String? bannerUrl;
+  final String? logoUrl;
   final String? category;
   final String? source;
   final String? url;
-  final String? language;
   final List<SearchResult>? alternativeSources;
   
   final double progress;
@@ -32,10 +32,10 @@ class PlaybackHistory {
     this.title,
     this.posterUrl,
     this.bannerUrl,
+    this.logoUrl,
     this.category,
     this.source,
     this.url,
-    this.language,
     this.alternativeSources,
     double? progress,
     bool? isCompleted,
@@ -56,10 +56,10 @@ class PlaybackHistory {
       'title': title,
       'posterUrl': posterUrl,
       'bannerUrl': bannerUrl,
+      'logoUrl': logoUrl,
       'category': category,
       'source': source,
       'url': url,
-      'language': language,
       'alternativeSources': alternativeSources?.map((e) => e.toJson()).toList(),
       'progress': progress,
       'isCompleted': isCompleted,
@@ -90,10 +90,10 @@ class PlaybackHistory {
       title: json['title'] as String?,
       posterUrl: json['posterUrl'] as String?,
       bannerUrl: json['bannerUrl'] as String?,
+      logoUrl: json['logoUrl'] as String?,
       category: json['category'] as String?,
       source: json['source'] as String?,
       url: json['url'] as String?,
-      language: json['language'] as String?,
       alternativeSources: json['alternativeSources'] != null 
           ? (json['alternativeSources'] as List<dynamic>)
               .map((e) => SearchResult.fromJson(e as Map))
@@ -129,10 +129,10 @@ class PlaybackHistory {
     String? title,
     String? posterUrl,
     String? bannerUrl,
+    String? logoUrl,
     String? category,
     String? source,
     String? url,
-    String? language,
     List<SearchResult>? alternativeSources,
     double? progress,
     bool? isCompleted,
@@ -148,10 +148,10 @@ class PlaybackHistory {
       title: title ?? this.title,
       posterUrl: posterUrl ?? this.posterUrl,
       bannerUrl: bannerUrl ?? this.bannerUrl,
+      logoUrl: logoUrl ?? this.logoUrl,
       category: category ?? this.category,
       source: source ?? this.source,
       url: url ?? this.url,
-      language: language ?? this.language,
       alternativeSources: alternativeSources ?? this.alternativeSources,
       progress: progress ?? this.progress,
       isCompleted: isCompleted ?? this.isCompleted,

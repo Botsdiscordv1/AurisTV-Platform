@@ -110,7 +110,7 @@ class SupabasePlaybackHistoryRepository implements PlaybackHistoryRepository {
           .eq('profile_id', profileId)
           .order('updated_at', ascending: false);
 
-      return (response as List).map((e) {
+      return (response as List).map<PlaybackHistory>((e) {
         final map = Map<String, dynamic>.from(e);
         final metadata = map['metadata'] as Map<String, dynamic>? ?? {};
         return PlaybackHistory(
@@ -129,7 +129,7 @@ class SupabasePlaybackHistoryRepository implements PlaybackHistoryRepository {
           category: metadata['category'],
           source: metadata['source'],
           url: metadata['url'],
-          language: metadata['language'],
+          logoUrl: metadata['logo_url'],
         );
       }).toList();
     } catch (e) {
@@ -163,7 +163,7 @@ class SupabasePlaybackHistoryRepository implements PlaybackHistoryRepository {
           'category': history.category,
           'source': history.source,
           'url': history.url,
-          'language': history.language,
+          'logo_url': history.logoUrl,
         },
       }, onConflict: 'user_id,profile_id,content_id,season,episode');
     } catch (e) {

@@ -53,6 +53,60 @@ class FilterParams {
     this.source,
   });
 
+  factory FilterParams.fromSectionFilters(SectionFilters filters, {int page = 1}) {
+    final String? effectiveGenre = filters.genreSlug ?? 
+        (filters.genres != null && filters.genres!.isNotEmpty ? filters.genres!.first : null);
+        
+    final int? effectiveYear = filters.year ?? 
+        (filters.years != null && filters.years!.isNotEmpty ? filters.years!.first : null);
+        
+    final String? effectiveSource = filters.sources != null && filters.sources!.isNotEmpty
+        ? filters.sources!.firstWhere((s) => s.toLowerCase() != 'sqlite', orElse: () => filters.sources!.first)
+        : null;
+
+    return FilterParams(
+      genre: effectiveGenre,
+      year: effectiveYear,
+      category: filters.category,
+      source: effectiveSource,
+      page: page,
+    );
+  }
+
+  factory FilterParams.fromSeeMore(SectionSeeMore seeMore, {int? overridePage}) {
+    final p = seeMore.params;
+    
+    // Extraer año de forma segura sin importar si viene como int, String o lista
+    int? parsedYear;
+    if (p['year'] != null) {
+      if (p['year'] is num) parsedYear = (p['year'] as num).toInt();
+      else if (p['year'] is String) parsedYear = int.tryParse(p['year'] as String);
+    } else if (p['years'] is List && (p['years'] as List).isNotEmpty) {
+      final firstYear = (p['years'] as List).first;
+      if (firstYear is num) parsedYear = firstYear.toInt();
+      else if (firstYear is String) parsedYear = int.tryParse(firstYear);
+    }
+
+    // Extraer source limpiando 'sqlite' si viene en un array o usando el string directo
+    String? parsedSource;
+    if (p['source'] != null) {
+      parsedSource = p['source'].toString();
+    } else if (p['sources'] is List && (p['sources'] as List).isNotEmpty) {
+      final list = (p['sources'] as List).map((e) => e.toString()).toList();
+      parsedSource = list.firstWhere((s) => s.toLowerCase() != 'sqlite', orElse: () => list.first);
+    }
+
+    return FilterParams(
+      genre: p['genre']?.toString() ?? p['genreSlug']?.toString() ?? p['genero']?.toString(),
+      year: parsedYear,
+      category: p['category']?.toString() ?? p['tipo']?.toString() ?? p['kind']?.toString(),
+      status: p['status']?.toString() ?? p['estado']?.toString(),
+      idioma: p['idioma']?.toString(),
+      source: parsedSource,
+      page: overridePage ?? (p['page'] as num?)?.toInt() ?? 1,
+    );
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

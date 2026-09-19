@@ -9,7 +9,6 @@ import 'package:auris_core/auris_core.dart';
 import 'package:auristv_web/core/router/app_router.dart';
 import 'package:auristv_web/core/utils/responsive_utils.dart';
 import 'package:auristv_web/core/utils/url_utils.dart';
-import 'package:auristv_web/shared/widgets/focusable_poster_card.dart';
 import 'package:auristv_web/features/search/presentation/providers/search_provider.dart';
 import 'package:auristv_web/features/search/presentation/widgets/search_widgets.dart';
 import 'package:auristv_web/features/home/widgets/unified_section.dart';
@@ -452,7 +451,6 @@ class _ContinueWatchingSection extends ConsumerWidget {
       title: item.title,
       posterUrl: item.posterUrl,
       bannerUrl: item.bannerUrl,
-      language: item.language,
     );
     UrlUtils.openPlayer(context, player);
   }

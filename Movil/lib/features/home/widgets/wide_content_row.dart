@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/utils/responsive_utils.dart';
-import '../../../shared/widgets/focusable_wide_card.dart';
+import 'package:collection/collection.dart';
 import 'package:auris_core/auris_core.dart';
 
 class WideContentItem {
@@ -34,6 +33,7 @@ class WideContentRow extends StatefulWidget {
   final String title;
   final String? subtitle;
   final List<WideContentItem> items;
+  final SectionSeeMore? verMas;
   final void Function(WideContentItem item) onItemTap;
 
   const WideContentRow({
@@ -41,6 +41,7 @@ class WideContentRow extends StatefulWidget {
     required this.title,
     this.subtitle,
     required this.items,
+    this.verMas,
     required this.onItemTap,
   });
 
@@ -109,41 +110,85 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final cardWidth = ResponsiveUtils.bannerWidth(context);
     final cardHeight = ResponsiveUtils.bannerHeight(context);
-    final rowHeight = ResponsiveUtils.bannerRowHeight(context);
+    
+    // Senior Fix: Detectar si alguna tarjeta tiene subtítulo para ajustar la altura de la fila y ganar espacio vertical.
+    final bool hasSubtitles = widget.items.any((item) => item.subtitle != null && item.subtitle!.isNotEmpty);
+    final rowHeight = ResponsiveUtils.bannerRowHeight(context, hasSubtitle: hasSubtitles);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: context.useMobileLayout ? 18 : 32), // Senior Fix: Adaptativo 18px / 32px
+      padding: EdgeInsets.only(bottom: context.useMobileLayout ? 12 : 24), // Senior Fix: Ajustado para paridad con Poster
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.title,
-                  style: GoogleFonts.poppins(
-                    fontSize: ResponsiveUtils.rowTitleFontSize(context),
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.subtitle!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withOpacity(0.5),
+          GestureDetector(
+            onTap: widget.verMas == null ? null : () {
+              final params = FilterParams.fromSeeMore(widget.verMas!);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SectionGridExplorer(
+                    args: SectionExplorerArgs(
+                      title: widget.title,
+                      baseParams: params,
+                      verMas: widget.verMas,
+                      initialItems: widget.items.map((wi) => wi.originalItem as MediaItem).toList(),
+                      onItemTap: (m) {
+                        // Senior Fix: Evitamos 'No element' buscando de forma segura o reconstruyendo al vuelo
+                        final match = widget.items.firstWhereOrNull((wi) => wi.id == m.id);
+                        widget.onItemTap(match ?? WideContentItem(
+                          id: m.id,
+                          title: m.title,
+                          imageUrl: m.bannerUrl ?? m.posterUrl,
+                          originalItem: m,
+                        ));
+                      },
                     ),
                   ),
-                ],
-              ],
+                ),
+              );
+            },
+            child: MouseRegion(
+              cursor: widget.verMas != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: GoogleFonts.poppins(
+                        fontSize: ResponsiveUtils.rowTitleFontSize(context),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    if (widget.verMas != null) ...[
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: Colors.white70,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
+          if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Text(
+                widget.subtitle!,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.5),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8), // Senior: Unificado a 8px
           MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
@@ -170,7 +215,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                           scrollDirection: Axis.horizontal,
                           padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px vertical
                           itemCount: widget.items.length,
-                          separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
+                          separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 24),
                           itemBuilder: (context, index) {
                             final item = widget.items[index];
                             

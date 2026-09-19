@@ -40,7 +40,6 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? episode;
   final int? season;
   final String? serverName;
-  final String? language;
   final int? startPosition;
   final String? category;
   final int? totalEpisodes;
@@ -49,6 +48,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? episodeTitle;
   final String? posterUrl;
   final String? bannerUrl;
+  final String? logoUrl;
   final String? video720;
   final String? video1080;
   final bool skipResume;
@@ -61,7 +61,6 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.episode,
     this.season,
     this.serverName,
-    this.language,
     this.startPosition,
     this.category,
     this.totalEpisodes,
@@ -70,6 +69,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.episodeTitle,
     this.posterUrl,
     this.bannerUrl,
+    this.logoUrl,
     this.video720,
     this.video1080,
     this.skipResume = false,
@@ -309,6 +309,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       metadataTitle: widget.metadataTitle,
       posterUrl: widget.posterUrl,
       bannerUrl: widget.bannerUrl,
+      logoUrl: widget.logoUrl,
       category: widget.category,
       year: null, 
       positionMs: _player!.state.position.inMilliseconds,
@@ -415,10 +416,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       title: widget.title,
       posterUrl: widget.posterUrl,
       bannerUrl: widget.bannerUrl,
+      logoUrl: widget.logoUrl,
       category: widget.category,
       source: widget.source,
       url: _currentSourceUrl,
-      language: _currentLanguage,
       alternativeSources: ref.read(activeContentSourcesProvider),
       force: force,
     );
@@ -576,7 +577,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _currentSourceUrl = widget.sourceUrl;
     _currentSource = widget.source;
     _currentServerName = widget.serverName;
-    _currentLanguage = widget.language;
     _currentEpisode = widget.episode;
 
     _policy = PlaybackPolicyResolver.resolve(
@@ -602,8 +602,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _allTracks = activePlayer.availableTracks;
       _selectedTrackIndex = activePlayer.selectedTrackIndex;
       _extractTracks = _allTracks.where((t) => !t.isEmbed).toList();
-      _currentLanguage = activePlayer.language;
-      if (_currentLanguage == null && _allTracks.isNotEmpty) {
+
+      if (_allTracks.isNotEmpty) {
         final t = _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0];
         _currentLanguage = trackQualityType(t.quality) == 'SUB' ? 'SUB' : 'LAT';
         if (trackQualityType(t.quality) == 'CAST') _currentLanguage = 'CAST';
@@ -627,9 +627,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
       if (activePlayer.url != null && activePlayer.url!.isNotEmpty) {
         _currentSourceUrl = activePlayer.url!;
-      }
-      if (activePlayer.language != null) {
-        _currentLanguage = activePlayer.language;
       }
     }
 
@@ -675,7 +672,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         SearchResult(
           title: widget.title ?? widget.serverName ?? widget.source,
           url: widget.sourceUrl,
-          quality: widget.language ?? '',
+          quality: '',
           thumbnail: '',
           source: widget.source,
         ),
@@ -742,7 +739,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
 
     final newLang = trackQualityType(track.quality) == 'SUB' ? 'SUB' : trackQualityType(track.quality) == 'CAST' ? 'CAST' : 'LAT';
-    ref.read(activePlayerProvider.notifier).updateSession(selectedIndex: index, language: newLang);
+    ref.read(activePlayerProvider.notifier).updateSession(selectedIndex: index);
 
     _initPlayer(track.url, track.headers);
     _startHideTimer();
@@ -808,7 +805,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         episode: _activeEpisode,
         season: widget.season,
         source: newSource.source,
-        language: _currentLanguage,
         triggerOpen: false,
       );
     }
@@ -1408,10 +1404,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Language Fix: Persistir el idioma que el usuario eligió realmente
     // (por si cambió la pista manualmente), para que el siguiente episodio
     // mantenga LAT/SUB aunque la pantalla se reconstruya.
-    if (_currentLanguage != null) {
-      queryParams['language'] = _currentLanguage!;
-    }
-    
+
     // Usamos context.replace para sustituir la entrada actual en el historial
     // Esto asegura que al retroceder (Mouse 4) no volvamos al episodio anterior.
     context.replace(Uri(path: newPath, queryParameters: queryParams).toString());
@@ -1440,7 +1433,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (tracks.isNotEmpty) {
         // Senior Language Fix: Respetar el idioma elegido (LAT/SUB) al reproducir
         // el episodio pre-cargado, con fallback a SUB si el doblaje aún no existe.
-        final trackIdx = _indexForLanguage(tracks, _currentLanguage);
+        final trackIdx = _indexForLanguage(tracks);
         final initialTrack = tracks[trackIdx];
         _selectedTrackIndex = trackIdx;
         // Senior Quality Fix: Cargar las calidades de la pista pre-cargada.
@@ -1475,27 +1468,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
-  /// Senior Language Fix: Devuelve el índice de la pista a reproducir según el
-  /// idioma elegido. Si el doblaje (LAT) aún no está subido para este episodio,
-  /// cae automáticamente al SUB; si tampoco hay SUB, usa la primera disponible.
-  int _indexForLanguage(List<VideoTrackOption> tracks, String? language) {
+  /// Senior Language Strategy: Selecciona automáticamente la pista inicial basándose 
+  /// exclusivamente en los Ajustes del Usuario, ignorando etiquetas externas.
+  /// Prioridad: Preferencia -> SUB (como fallback universal) -> Primera disponible.
+  int _indexForLanguage(List<VideoTrackOption> tracks) {
     if (tracks.isEmpty) return 0;
 
-    // Senior Fix: Usar preferencia del usuario si no hay un idioma forzado por la navegación
     final settings = ref.read(settingsProvider);
-    final String pref = settings.preferredLanguage;
-    final String effectiveLang = language ?? (pref == 'latino' ? 'LAT' : (pref == 'castellano' ? 'CAST' : 'SUB'));
-
-    final isLat = effectiveLang == 'LAT' || effectiveLang == 'DUB';
-    final isCast = effectiveLang == 'CAST';
+    final String pref = settings.preferredLanguage.toLowerCase();
+    
+    // Mapeo de preferencia a tipo de track técnico
+    final String targetType = pref == 'latino' ? 'DUB' : (pref == 'castellano' ? 'CAST' : 'SUB');
 
     final latIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'DUB');
     final castIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'CAST');
     final subIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'SUB');
 
-    if (isLat && latIdx >= 0) return latIdx;
-    if (isCast && castIdx >= 0) return castIdx;
+    // 1. Intentar coincidir con la preferencia exacta
+    if (targetType == 'DUB' && latIdx >= 0) return latIdx;
+    if (targetType == 'CAST' && castIdx >= 0) return castIdx;
+    if (targetType == 'SUB' && subIdx >= 0) return subIdx;
+
+    // 2. Fallback Senior: Si la preferencia no está disponible (ej: no hay DUB aún), 
+    // siempre priorizamos SUB antes que cualquier otra cosa para asegurar contenido.
     if (subIdx >= 0) return subIdx;
+
+    // 3. Last Resort: La primera pista que responda (normalmente el servidor original)
     return latIdx >= 0 ? latIdx : (castIdx >= 0 ? castIdx : 0);
   }
 
@@ -1980,8 +1978,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       item: MediaItem(
         id: widget.contentId,
         title: widget.title ?? _displayTitle,
-        posterUrl: widget.posterUrl ?? '',
+          posterUrl: widget.posterUrl ?? '',
         bannerUrl: widget.bannerUrl,
+        logoUrl: widget.logoUrl,
         type: widget.category == 'movie' ? MediaType.movie : MediaType.anime,
       ),
       url: videoUrl,
@@ -2705,7 +2704,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ref.read(activePlayerProvider.notifier).updateSession(
         tracks: _allTracks,
         selectedIndex: _selectedTrackIndex,
-        language: _currentLanguage,
       );
     }
     if (_groupedSources.isNotEmpty) {
@@ -2751,8 +2749,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // 2. Forzar restauración del sistema (Orientación + UI)
     if (_isMobileDevice) {
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
-      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      // Senior Fix: Disparar de forma paralela sin 'await' para evitar retrasos en transiciones
+      // y eliminar el efecto de estiramiento visual en pantallas móviles de refresco rápido.
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       VolumeController().showSystemUI = true;
       ScreenBrightnessController.resetBrightness();
     }
@@ -2872,7 +2872,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           final playableTracks = tracks.where((t) => !t.isDownload).toList();
           if (!_hasInitialized) {
             _hasInitialized = true;
-            _selectedTrackIndex = _indexForLanguage(playableTracks, _currentLanguage);
+            _selectedTrackIndex = _indexForLanguage(playableTracks);
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
               final safeIdx = _selectedTrackIndex < playableTracks.length ? _selectedTrackIndex : 0;
@@ -2898,7 +2898,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         },
         loading: () => Stack(children: [
             const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Conectando con la fuente...', style: TextStyle(color: Colors.white54))])),
-            Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), onPressed: _exitPlayer))),
+            Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28), onPressed: _exitPlayer))),
           ]),
         error: (err, _) => Stack(children: [
             Center(
@@ -2922,7 +2922,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       children: [
                         OutlinedButton.icon(
                           onPressed: _exitPlayer, 
-                          icon: const Icon(Icons.arrow_back),
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded),
                           label: const Text('Volver'),
                         ),
                         const SizedBox(width: 16),
@@ -3038,7 +3038,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28),
             onPressed: _exitPlayer,
           ),
           const Spacer(),
@@ -3478,7 +3478,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             left: 16,
             child: SafeArea(
               child: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 30),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 30),
                 onPressed: _exitPlayer,
                 style: IconButton.styleFrom(backgroundColor: Colors.black45),
               ),
@@ -3519,7 +3519,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           left: 16,
           child: SafeArea(
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 30),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 30),
               onPressed: _exitPlayer,
               style: IconButton.styleFrom(backgroundColor: Colors.black45),
             ),
@@ -4132,7 +4132,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                    ),
                    _EpisodesCarouselPanel(
                      title: widget.title ?? widget.contentId,
-                     sourceUrl: widget.sourceUrl,
+                     sourceUrl: _currentSourceUrl,
                      source: _currentSource,
                      currentEpisode: _activeEpisode,
                      season: widget.season ?? 1,
@@ -4141,23 +4141,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                      onEpisodeSelected: (epNum, epUrl, epTitle) {
                        if (epNum.toString() == _activeEpisode) return;
                        
-                       // Senior Navigation Fix: Reemplazar la URL actual para limpiar historial de "Mouse 4"
+                       // Senior Fix Definitivo: Priorizamos epUrl del carrusel. 
+                       // Si viene vacío (común en JKAnime), reconstruimos usando la URL activa actual.
+                       final String resolvedEpisodeUrl = epUrl.isNotEmpty 
+                          ? epUrl 
+                          : buildEpisodeUrl(_currentSourceUrl, _currentSource ?? '', epNum);
+
+                       debugPrint('[player] Cambiando episodio desde carrusel a URL: $resolvedEpisodeUrl');
+
+                       // Senior Autoplay Fix: Parar el player actual INMEDIATAMENTE para evitar solapamientos de GlobalKey
+                       _player?.stop();
+
+                       // Senior Navigation Fix: Reemplazar la URL actual para limpiar historial
+                       // Al usar context.replace, GoRouter recrea el PlayerScreen. No necesitamos llamar a setState
+                       // en esta instancia porque será destruida de inmediato.
                        final String newPath = '/player/${widget.contentId}';
                        final queryParameters = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
                        queryParameters['episode'] = epNum.toString();
-                       queryParameters['url'] = epUrl;
+                       queryParameters['url'] = resolvedEpisodeUrl;
+                       queryParameters['skipResume'] = '1';
+                       
+                       // Senior Sync Fix: Invalidar el extractor para que la nueva instancia reciba datos frescos
+                       ref.invalidate(extractProvider);
+                       
                        context.replace(Uri(path: newPath, queryParameters: queryParameters).toString());
-
-                       setState(() {
-                         _showEpisodesOverlay = false;
-                         _currentEpisode = epNum.toString();
-                         _currentSourceUrl = epUrl;
-                         _hasInitialized = false;
-                         _resumePosition = 0;
-                         _isAutoplayResume = false;
-                         _hasResetPosition = false;
-                         _isStabilizing = true;
-                       });
                      }
                    ),
                  ],
@@ -4465,7 +4472,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     : null;
 
                 String label = currentTrack?.quality ?? _currentTrackQuality;
-                if (label.isEmpty) label = _currentLanguage ?? widget.language ?? '';
+                if (label.isEmpty) label = _currentLanguage ?? '';
 
                 Color color = const Color(0xFFEF7A1E);
                 if (currentTrack?.color != null) {

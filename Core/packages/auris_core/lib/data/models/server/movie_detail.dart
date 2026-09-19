@@ -30,8 +30,10 @@ class MovieDetail {
   final String? overview;
   final String? poster;
   final String? backdrop;
+  final String? banner;
   final String? logo;
   final double? rating;
+  final double? score;
   final int? voteCount;
   final String? releaseDate;
   final int? runtime;
@@ -63,8 +65,10 @@ class MovieDetail {
     this.overview,
     this.poster,
     this.backdrop,
+    this.banner,
     this.logo,
     this.rating,
+    this.score,
     this.voteCount,
     this.releaseDate,
     this.runtime,
@@ -113,11 +117,13 @@ class MovieDetail {
       title: root['title'] as String? ?? '',
       originalTitle: root['originalTitle'] as String?,
       overview: SynopsisCleaner.clean(root['overview'] as String?),
-      poster: ApiEndpoints.proxyImage(root['poster'] as String?, policy: ImageSize.poster),
-      backdrop: ApiEndpoints.proxyImage(json['backdrop'] as String?, policy: ImageSize.full),
-      logo: ApiEndpoints.proxyImage(json['logo'] as String?, policy: ImageSize.tiny),
-      rating: (json['rating'] as num?)?.toDouble(),
-      voteCount: json['voteCount'] as int?,
+      poster: ApiEndpoints.proxyImage(root['poster'] as String? ?? root['posterUrl'] as String?, policy: ImageSize.poster),
+      backdrop: ApiEndpoints.proxyImage(root['backdrop'] as String? ?? root['backdrop_url'] as String? ?? root['backdropUrl'] as String? ?? root['banner'] as String?, policy: ImageSize.full),
+      banner: ApiEndpoints.proxyImage(root['banner'] as String? ?? root['backdrop'] as String? ?? root['backdrop_url'] as String?, policy: ImageSize.banner),
+      logo: ApiEndpoints.proxyImage(root['logo'] as String?, policy: ImageSize.tiny),
+      rating: (root['rating'] as num? ?? root['score'] as num?)?.toDouble(),
+      score: (root['score'] as num? ?? root['rating'] as num?)?.toDouble(),
+      voteCount: root['voteCount'] as int?,
       releaseDate: root['releaseDate'] as String?,
       runtime: root['runtime'] as int?,
       episodeRuntime: root['episodeRuntime'] as int?,
@@ -156,7 +162,7 @@ class MovieDetail {
               ?.map((e) => PlatformInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      trailerKey: root['trailerKey'] as String?,
+      trailerKey: root['trailerKey'] as String? ?? root['trailer_key'] as String?,
       trailerType: root['trailerType'] as String?,
       homepage: root['homepage'] as String?,
       isMovie: root['isMovie'] as bool? ?? _inferIsMovie(root),

@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
-import '../../../shared/widgets/focusable_poster_card.dart';
 
 final _scheduleProvider = FutureProvider<ScheduleResponse>((ref) async {
   final repo = ref.watch(aurisRepositoryProvider);
@@ -21,7 +20,13 @@ class ScheduleScreen extends ConsumerWidget {
     final scheduleAsync = ref.watch(_scheduleProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Calendario')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Calendario'),
+      ),
       body: scheduleAsync.when(
         data: (schedule) => _ScheduleBody(schedule: schedule),
         loading: () => const Center(child: CircularProgressIndicator()),

@@ -16,6 +16,7 @@ class AnimeDetail {
   final String? banner;
   final String? logo;
   final double? rating;
+  final double? score;
   final int? episodes;
   final List<String> genres;
   final String? format;
@@ -50,6 +51,7 @@ class AnimeDetail {
     this.banner,
     this.logo,
     this.rating,
+    this.score,
     this.episodes,
     this.genres = const [],
     this.format,
@@ -87,7 +89,12 @@ class AnimeDetail {
     final trailerData =
         anime['trailer'] is Map
             ? TrailerInfo.fromJson(Map<String, dynamic>.from(anime['trailer'] as Map))
-            : null;
+            : (anime['trailerKey'] != null || anime['trailer_key'] != null)
+                ? TrailerInfo(
+                    site: 'youtube', 
+                    videoId: (anime['trailerKey'] ?? anime['trailer_key'])?.toString()
+                  )
+                : null;
 
     final openings = <AnimeThemeInfo>[];
     final endings = <AnimeThemeInfo>[];
@@ -133,21 +140,27 @@ class AnimeDetail {
       poster: ApiEndpoints.proxyImage(
         visuals?['poster'] as String? ??
         root['poster'] as String? ??
+        visuals?['posterUrl'] as String? ??
+        root['posterUrl'] as String? ??
         root['thumbnail'] as String?,
         policy: ImageSize.poster
       ),
       backdrop: ApiEndpoints.proxyImage(
         visuals?['backdrop'] as String? ??
         root['backdrop'] as String? ??
+        visuals?['backdrop_url'] as String? ??
+        root['backdrop_url'] as String? ??
         root['banner'] as String?, 
         policy: ImageSize.full
       ),
       banner: ApiEndpoints.proxyImage(
-        visuals?['banner'] as String? ?? root['banner'] as String?, 
+        visuals?['banner'] as String? ?? root['banner'] as String? ??
+        visuals?['backdrop'] as String? ?? root['backdrop'] as String?, 
         policy: ImageSize.banner
       ),
       logo: ApiEndpoints.proxyImage(visuals?['logo'] as String? ?? root['logo'] as String?, policy: ImageSize.tiny),
-      rating: (anime['score'] as num?)?.toDouble(),
+      rating: (anime['score'] as num? ?? anime['rating'] as num? ?? root['score'] as num? ?? root['rating'] as num?)?.toDouble(),
+      score: (anime['score'] as num? ?? anime['rating'] as num? ?? root['score'] as num? ?? root['rating'] as num?)?.toDouble(),
       episodes: anime['episodes'] as int?,
       genres: () {
         // genresTranslated vive en anime, debajo de genres (como movies).

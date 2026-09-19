@@ -3,12 +3,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../../shared/widgets/focusable_poster_card.dart';
 
 class ContentRow extends StatefulWidget {
   final String title;
   final String? subtitle;
   final List<MediaItem> items;
+  final SectionSeeMore? verMas;
   final double horizontalPadding;
   final void Function(MediaItem item) onItemTap;
 
@@ -17,6 +17,7 @@ class ContentRow extends StatefulWidget {
     required this.title,
     this.subtitle,
     required this.items,
+    this.verMas,
     required this.onItemTap,
     this.horizontalPadding = 48.0,
   });
@@ -101,38 +102,70 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false); // Senior Fix: showInfo is false
 
     return Padding(
-      padding: EdgeInsets.only(bottom: context.useMobileLayout ? 18 : 32), // Senior Fix: Adaptativo 18px / 32px
+      padding: EdgeInsets.only(bottom: context.useMobileLayout ? 12 : 24), // Senior Fix: Ajustado para paridad con Wide
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.title,
-                  style: GoogleFonts.poppins(
-                    fontSize: ResponsiveUtils.rowTitleFontSize(context),
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.subtitle!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withOpacity(0.5),
+          GestureDetector(
+            onTap: widget.verMas == null ? null : () {
+              final params = FilterParams.fromSeeMore(widget.verMas!);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SectionGridExplorer(
+                    args: SectionExplorerArgs(
+                      title: widget.title,
+                      baseParams: params,
+                      verMas: widget.verMas,
+                      initialItems: widget.items,
+                      onItemTap: widget.onItemTap,
                     ),
                   ),
-                ],
-              ],
+                ),
+              );
+            },
+            child: MouseRegion(
+              cursor: widget.verMas != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: GoogleFonts.poppins(
+                        fontSize: ResponsiveUtils.rowTitleFontSize(context),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    if (widget.verMas != null) ...[
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: Colors.white70,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
+          if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Text(
+                widget.subtitle!,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.5),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8), 
           MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
@@ -160,7 +193,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                           scrollDirection: Axis.horizontal,
                           padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Zero padding
                           itemCount: widget.items.length,
-                          separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
+                          separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 24),
                           itemBuilder: (context, index) {
                             final item = widget.items[index];
                             return Focus(

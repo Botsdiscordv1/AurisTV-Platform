@@ -239,7 +239,6 @@ final GoRouter appRouter = GoRouter(
         final seasonStr = state.uri.queryParameters['season'];
         final season = (seasonStr != null && seasonStr.isNotEmpty) ? int.tryParse(seasonStr) : null;
         final serverName = state.uri.queryParameters['serverName'];
-        final language = state.uri.queryParameters['language'];
         final startPosition = int.tryParse(state.uri.queryParameters['startPosition'] ?? '');
         final category = state.uri.queryParameters['category'];
         final totalEpisodes = int.tryParse(state.uri.queryParameters['totalEpisodes'] ?? '');
@@ -250,6 +249,7 @@ final GoRouter appRouter = GoRouter(
         final episodeTitle = state.uri.queryParameters['episodeTitle'];
         final posterUrl = state.uri.queryParameters['posterUrl'];
         final bannerUrl = state.uri.queryParameters['bannerUrl'];
+        final logoUrl = state.uri.queryParameters['logoUrl'];
         
         final video720 = state.uri.queryParameters['video720'];
         final video1080 = state.uri.queryParameters['video1080'];
@@ -262,7 +262,6 @@ final GoRouter appRouter = GoRouter(
           episode: episode,
           season: season,
           serverName: serverName,
-          language: language,
           startPosition: startPosition,
           category: category,
           totalEpisodes: totalEpisodes,
@@ -271,6 +270,7 @@ final GoRouter appRouter = GoRouter(
           episodeTitle: episodeTitle,
           posterUrl: posterUrl,
           bannerUrl: bannerUrl,
+          logoUrl: logoUrl,
           video720: video720,
           video1080: video1080,
           skipResume: skipResume,

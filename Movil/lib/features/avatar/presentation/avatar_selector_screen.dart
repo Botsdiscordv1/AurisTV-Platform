@@ -53,6 +53,10 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text('Editar Perfil'),
         backgroundColor: backgroundColor,
         surfaceTintColor: Colors.transparent,

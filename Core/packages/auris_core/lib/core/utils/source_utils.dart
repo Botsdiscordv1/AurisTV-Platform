@@ -17,7 +17,14 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
     final slug = parts.isNotEmpty ? parts.last : 'anime';
     return 'https://animejara.com/episode/$slug-${season}x$episode/';
   } else if (s.contains('jkanime')) {
-    pathUrl = '$path/$episode/';
+    // Senior Fix: Si la URL ya termina en un número (es un episodio), reemplazamos el segmento
+    final parts = trimmed.split('/');
+    if (parts.isNotEmpty && int.tryParse(parts.last) != null) {
+      parts.removeLast();
+      pathUrl = '${parts.join('/')}/$episode/';
+    } else {
+      pathUrl = '$trimmed/$episode/';
+    }
   } else if (s.contains('animed23')) {
     final parts = path.split('/');
     final slug = parts.last;

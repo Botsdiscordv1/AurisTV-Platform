@@ -100,8 +100,7 @@ class GlobalMiniPlayerOverlay extends ConsumerWidget {
         if (state.currentItem != null) {
           // Senior: Sincroniza uiState antes del push para que PlayerScreen vea isFull=true y no oculte extract
           ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
-          final posterParam = '&posterUrl=${Uri.encodeComponent(state.currentItem!.posterUrl)}&bannerUrl=${Uri.encodeComponent(state.currentItem!.bannerUrl ?? '')}';
-          final langParam = state.language != null ? '&language=${Uri.encodeComponent(state.language!)}' : '';
+          final posterParam = '&posterUrl=${Uri.encodeComponent(state.currentItem!.posterUrl)}&bannerUrl=${Uri.encodeComponent(state.currentItem!.bannerUrl ?? '')}&logoUrl=${Uri.encodeComponent(state.currentItem!.logoUrl ?? '')}';
           final serverParam = state.source != null ? '&serverName=${Uri.encodeComponent(simplifySourceName(state.source!))}' : '';
           final uri = '/player/${Uri.encodeComponent(state.currentItem!.title)}'
               '?source=${Uri.encodeComponent(state.source ?? '')}'
@@ -109,7 +108,7 @@ class GlobalMiniPlayerOverlay extends ConsumerWidget {
               '&episode=${Uri.encodeComponent(state.episode ?? '')}'
               '&season=${state.season ?? ''}'
               '&category=${state.currentItem!.type.name}'
-              '$posterParam$langParam$serverParam';
+              '$posterParam$serverParam';
           
           appRouter.push(uri);
         }

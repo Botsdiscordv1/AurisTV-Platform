@@ -38,23 +38,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
+    final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
+
     String displayTitle = h.title ?? 'Contenido';
-    final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
-    if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+    if (isMovieish) {
+      displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '').trim();
+    } else if (h.episode != null && h.episode!.isNotEmpty) {
       displayTitle = 'Ep ${h.episode} • $displayTitle';
     }
 
     String remainingText = '';
     final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
     if (remainingMs > 0) {
-      final minutes = (remainingMs / 60000).ceil();
-      remainingText = 'Quedan $minutes min';
+      remainingText = 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}';
     }
+
+    final String? rawUrl = h.bannerUrl ?? h.posterUrl;
+    final String? logoUrl = h.logoUrl;
 
     return WideContentItem(
       id: h.contentId,
       title: displayTitle,
-      imageUrl: h.posterUrl ?? h.bannerUrl ?? '',
+      imageUrl: ApiEndpoints.proxyImage(
+        rawUrl,
+        // Senior Optimization: 1280px para películas/movie_anime para nitidez en Wide Cards
+        width: isMovieish ? 1280 : 800,
+      ),
+      logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
       progress: h.progress,
       subtitle: remainingText,
       onDelete: () {
@@ -74,8 +84,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         '&category=${Uri.encodeComponent(item.category ?? "anime")}'
         '&title=${Uri.encodeComponent(item.title ?? "")}'
         '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-        '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
-        '&language=${Uri.encodeComponent(item.language ?? "")}';
+        '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}';
     context.push(uri);
   }
 

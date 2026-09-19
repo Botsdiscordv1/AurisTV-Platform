@@ -399,6 +399,32 @@ class AurisRepositoryImpl implements AurisRepository {
   }
 
   @override
+  Future<int> getHomeVersion({String? category}) async {
+    try {
+      final String normalizedCat = category != null ? switch (category.toLowerCase()) {
+        'animes' => 'anime',
+        'películas' => 'peliculas',
+        'series' => 'series',
+        'kdrama' => 'kdrama',
+        _ => category.toLowerCase(),
+      } : 'inicio';
+
+      final response = await _client.get(
+        ApiEndpoints.homeVersion,
+        baseUrl: ApiEndpoints.baseUrlForCategory(normalizedCat),
+      );
+      
+      if (response.data is Map) {
+        return (response.data['version'] as num?)?.toInt() ?? 0;
+      }
+      return 0;
+    } catch (e) {
+      debugPrint('[AurisRepo] getHomeVersion error: $e');
+      return 0;
+    }
+  }
+
+  @override
   Future<AnimeDetail?> getAnimeDetail({
     required String title,
     int? malId,
@@ -408,6 +434,7 @@ class AurisRepositoryImpl implements AurisRepository {
     String? kind,
     String? url,
     String? type,
+    String? server,
     String? imgSize, // Senior Fix: Soporte para el nuevo parámetro &img del servidor
   }) async {
     final normalizedTitle = cleanTitleForDisplay(stripSeasonSuffix(title)).toLowerCase().trim();
@@ -430,7 +457,7 @@ class AurisRepositoryImpl implements AurisRepository {
     final response = await _client.get(
       ApiEndpoints.detailAnime,
       queryParameters: params,
-      baseUrl: ApiEndpoints.animeBaseUrl,
+      baseUrl: server ?? ApiEndpoints.animeBaseUrl,
       options: Options(
         connectTimeout: const Duration(seconds: 40),
         receiveTimeout: const Duration(seconds: 90),
@@ -456,8 +483,21 @@ class AurisRepositoryImpl implements AurisRepository {
   }) async {
     final normalizedTitle = cleanTitleForDisplay(stripSeasonSuffix(title)).toLowerCase().trim();
     final normalizedUrl = url?.split('?').first.split('#').first ?? '';
-    final normalizedCat = category.toLowerCase().trim();
-    final cacheKey = '$normalizedTitle|$year|$normalizedUrl|$normalizedCat';
+    
+    // Senior Fix: Normalizar categoría para asegurar cache determinista y peticiones correctas.
+    String technicalCategory = category.toLowerCase().trim();
+    final String? rawKind = kind?.toLowerCase();
+    if (rawKind == 'movie' || rawKind == 'pelicula') {
+      technicalCategory = 'movie';
+    } else if (rawKind == 'series' || rawKind == 'tv') {
+      technicalCategory = 'series';
+    } else if (rawKind == 'kdrama' || rawKind == 'dorama') {
+      technicalCategory = 'kdrama';
+    } else if (rawKind == 'anime' || rawKind == 'movie_anime') {
+      technicalCategory = rawKind!;
+    }
+
+    final cacheKey = '$normalizedTitle|$year|$normalizedUrl|$technicalCategory';
     if (_movieCache.containsKey(cacheKey)) {
       debugPrint('[AurisRepo] Cache HIT for Movie: $title');
       return _movieCache[cacheKey];
@@ -466,16 +506,14 @@ class AurisRepositoryImpl implements AurisRepository {
     final params = <String, dynamic>{'title': title};
     if (year != null) params['year'] = year;
     if (metadataTitle != null) params['metadataTitle'] = metadataTitle;
-    if (year != null) params['year'] = year;
-    if (metadataTitle != null) params['metadataTitle'] = metadataTitle;
     if (type != null) params['type'] = type;
     if (kind != null) params['kind'] = kind;
     if (imgSize != null) params['img'] = imgSize;
-    params['category'] = category;
+    params['category'] = technicalCategory;
     final response = await _client.get(
       ApiEndpoints.detailMovie,
       queryParameters: params,
-      baseUrl: server ?? ApiEndpoints.baseUrlForCategory(category),
+      baseUrl: server ?? ApiEndpoints.baseUrlForCategory(technicalCategory),
       options: Options(
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 60),
@@ -565,7 +603,7 @@ class AurisRepositoryImpl implements AurisRepository {
             mediaType = MediaType.movie;
           }
 
-          final String? bannerSource = m['bannerUrl'] ?? m['banner'] ?? m['backdrop'];
+          final String? bannerSource = m['bannerUrl'] ?? m['banner'] ?? m['backdrop'] ?? m['backdropUrl'];
           
           // Senior Optimization: Aplicar políticas de imagen centralizadas
           final String bannerUrl = isFHD 
@@ -577,7 +615,7 @@ class AurisRepositoryImpl implements AurisRepository {
             url: scraperUrl ?? itemId,
             source: m['source'] ?? (mediaType == MediaType.anime ? 'AniList' : 'TMDB'),
             quality: 'HD',
-            thumbnail: m['posterUrl'] ?? m['thumbnail'] ?? '',
+            thumbnail: m['posterUrl'] ?? m['poster'] ?? m['thumbnail'] ?? '',
             banner: bannerSource ?? '',
             romaji: m['romaji'],
             english: m['english'],
@@ -591,7 +629,7 @@ class AurisRepositoryImpl implements AurisRepository {
             title: m['title'] ?? '',
             romaji: m['romaji'],
             english: m['english'],
-            posterUrl: ApiEndpoints.proxyImage(m['posterUrl'] ?? m['thumbnail']),
+            posterUrl: ApiEndpoints.proxyImage(m['posterUrl'] ?? m['poster'] ?? m['thumbnail']),
             bannerUrl: bannerUrl,
             logoUrl: m['logoUrl'] ?? m['logo'],
             trailerKey: m['trailerKey'] ?? m['trailer_key'],
@@ -838,13 +876,14 @@ class AurisRepositoryImpl implements AurisRepository {
   }
 
   @override
-  Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false}) async {
+  Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken}) async {
     final params = <String, dynamic>{'url': url, 'source': source};
     if (direct) params['native'] = '1';
     final response = await _client.get(
       ApiEndpoints.extract,
       queryParameters: params,
       baseUrl: ApiEndpoints.baseUrlForSource(source, category),
+      cancelToken: cancelToken,
     );
     return ExtractResult.fromJson(response.data as Map<String, dynamic>);
   }

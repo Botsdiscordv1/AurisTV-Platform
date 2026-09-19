@@ -81,11 +81,13 @@ class ApiEndpoints {
   static String get kdramasBaseUrl => baseUrlForPort(_kdramasPort);
 
   static String baseUrlForCategory(String category) {
-    final c = category.toLowerCase();
+    final c = category.toLowerCase().trim();
     if (c == 'kdrama' || c == 'kdramas' || c == 'dorama' || c == 'doramas') return kdramasBaseUrl;
     if (c == 'anime' || c == 'animes' || c == 'animé' ||
         c == 'anime-seasonal' || c == 'anime-movies' ||
-        c == 'movie_anime') return animeBaseUrl; // Senior Fix: inicio removido, animes es el target
+        c == 'movie_anime') return animeBaseUrl;
+    // Senior Fix: Mapeo explícito de tipos genéricos al servidor de películas/series
+    if (c == 'movie' || c == 'series' || c == 'tv' || c == 'movie_western' || c == 'series_western') return moviesSeriesBaseUrl;
     return moviesSeriesBaseUrl;
   }
 
@@ -259,6 +261,7 @@ class ApiEndpoints {
   static const String filter = '/api/filter';
   static const String homeHero = '/api/home/hero'; // Senior Fix: Nuevo endpoint dedicado para HeroBanner
   static const String homeEditorial = '/api/home/editorial';
+  static const String homeVersion = '/api/home/version'; // Senior Fix: Endpoint de sincronización ligera
   static String homeRecent(int limit) => '/api/home/recent?limit=$limit';
   static String homeTop(int limit) => '/api/home/top?limit=$limit';
   static const String schedule = '/api/schedule';

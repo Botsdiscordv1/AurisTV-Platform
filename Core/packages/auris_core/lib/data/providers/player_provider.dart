@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
+import 'package:dio/dio.dart';
 import '../../auris_core.dart';
 
 final animeDetailProvider =
@@ -55,47 +56,62 @@ final unifiedContentDetailProvider =
   final bool isFromMovieServer = sourceServer == ApiEndpoints.moviesSeriesBaseUrl || 
                                 sourceServer == ApiEndpoints.kdramasBaseUrl;
 
-  final rawKind = params.kind?.toLowerCase();
+  final String? rawKind = params.kind?.toLowerCase();
+  final String? rawType = params.type?.toLowerCase();
+
+  // Senior Decision: Prioridad absoluta al 'kind' para evitar 404s en servidores incorrectos.
+  // Si el kind es genérico (series/movie), debe ir al puerto 3001, incluso si la categoría es anime.
+  final bool isExplicitAnimeKind = rawKind == 'anime' || rawKind == 'movie_anime' || rawKind == 'tv_anime';
+  final bool isExplicitMovieSeriesKind = rawKind == 'movie' || rawKind == 'series' || rawKind == 'pelicula';
+  final bool isExplicitKdramaKind = rawKind == 'kdrama' || rawKind == 'dorama';
+
+  // 1. Determinar el servidor objetivo basándose en los metadatos más granulares
+  String? effectiveBaseUrl;
+  String technicalCategory = params.category.toLowerCase().trim();
+
+  if (isExplicitAnimeKind || rawType == 'anime' || rawType == 'movie_anime') {
+    effectiveBaseUrl = ApiEndpoints.animeBaseUrl;
+    technicalCategory = (rawKind == 'movie_anime' || rawType == 'movie_anime') ? 'movie_anime' : 'anime';
+  } else if (isExplicitMovieSeriesKind || rawType == 'movie' || rawType == 'series') {
+    effectiveBaseUrl = ApiEndpoints.moviesSeriesBaseUrl;
+    technicalCategory = (rawKind == 'movie' || rawKind == 'pelicula' || rawType == 'movie') ? 'movie' : 'series';
+  } else if (isExplicitKdramaKind) {
+    effectiveBaseUrl = ApiEndpoints.kdramasBaseUrl;
+    technicalCategory = 'kdrama';
+  } else {
+    // Fallback a source o categoría
+    effectiveBaseUrl = sourceServer ?? ApiEndpoints.baseUrlForCategory(params.category);
+  }
 
   AnimeDetail? anime;
   MovieDetail? movie;
 
-  // Senior Priority Logic: Priorizar estrictamente 'kind' o 'type' sobre 'category'
-  // ya que la categoría de la sección/UI puede ser ambigua (ej: 'inicio').
-  final String? rawType = params.type?.toLowerCase();
-  final bool isStrictAnime = rawKind == 'anime' || 
-                             rawType == 'anime' ||
-                             rawKind == 'tv_anime' ||
-                             rawKind == 'movie_anime' ||
-                             rawType == 'movie_anime' ||
-                             params.category.toLowerCase() == 'anime';
+  // 2. Determinar lógica de procesamiento (Anime vs Película/Serie)
+  final bool isStrictAnime = effectiveBaseUrl == ApiEndpoints.animeBaseUrl;
 
   final bool isMovieFormat = rawKind == 'movie' || 
                              rawKind == 'pelicula' || 
                              rawKind == 'movie_anime' ||
                              rawType == 'movie_anime' ||
-                             params.type?.toLowerCase() == 'movie';
+                             rawType == 'movie';
 
   // Senior Decision: Si el formato es una película (incluyendo movie_anime), 
   // debemos usar obligatoriamente getMovieDetail para mapear la estructura cinematográfica 
   // (runtime, cast, plataformas) en lugar de la estructura capitulada de series de anime.
   if (isMovieFormat) {
-    // movie_anime SIEMPRE pertenece al backend de anime, sin importar el source
-    final String? targetServer = (rawKind == 'movie_anime' || rawType == 'movie_anime')
-        ? ApiEndpoints.animeBaseUrl
-        : sourceServer;
+    // Si el servidor efectivo es el de anime (para movie_anime) o se resolvió pelis/series
     movie = await repo.getMovieDetail(
       title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
       year: params.year,
       metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle!)) : null,
       url: params.url,
       type: params.type,
-      category: (rawKind == 'movie_anime' || rawType == 'movie_anime') ? 'movie_anime' : params.category,
-      server: targetServer,
+      category: technicalCategory,
+      server: effectiveBaseUrl,
       kind: params.kind,
       imgSize: 'original',
     );
-  } else if (isStrictAnime || isFromAnimeServer) {
+  } else if (isStrictAnime) {
     // Consulta al servidor de anime para series de TV
     anime = await repo.getAnimeDetail(
       title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
@@ -105,6 +121,7 @@ final unifiedContentDetailProvider =
       kind: params.kind,
       url: params.url,
       type: params.type,
+      server: effectiveBaseUrl,
       imgSize: 'original',
     );
   } else {
@@ -114,7 +131,8 @@ final unifiedContentDetailProvider =
       metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle!)) : null,
       url: params.url,
       type: params.type,
-      category: params.category,
+      category: technicalCategory,
+      server: effectiveBaseUrl,
       kind: params.kind,
       imgSize: 'original',
     );
@@ -176,8 +194,17 @@ class ExtractParams {
 
 final extractProvider =
     FutureProvider.autoDispose.family<ExtractResult, ExtractParams>((ref, params) async {
+  final CancelToken cancelToken = CancelToken();
+  ref.onDispose(() => cancelToken.cancel('Provider disposed'));
+  
   final repo = ref.watch(aurisRepositoryProvider);
-  return repo.extractVideo(params.url, params.source, category: params.category, direct: !kIsWeb);
+  return repo.extractVideo(
+    params.url, 
+    params.source, 
+    category: params.category, 
+    direct: !kIsWeb,
+    cancelToken: cancelToken,
+  );
 });
 
 /// Senior Cache: Almacena la extracción del siguiente episodio para carga instantánea.

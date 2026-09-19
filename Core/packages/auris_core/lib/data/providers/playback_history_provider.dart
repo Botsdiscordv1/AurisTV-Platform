@@ -85,10 +85,10 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     String? title,
     String? posterUrl,
     String? bannerUrl,
+    String? logoUrl,
     String? category,
     String? source,
     String? url,
-    String? language,
     List<SearchResult>? alternativeSources,
     bool force = false,
   }) {
@@ -134,10 +134,10 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       title: title ?? existingHistory?.title,
       posterUrl: posterUrl ?? existingHistory?.posterUrl,
       bannerUrl: bannerUrl ?? existingHistory?.bannerUrl,
+      logoUrl: logoUrl ?? existingHistory?.logoUrl,
       category: category ?? existingHistory?.category,
       source: source ?? existingHistory?.source,
       url: url ?? existingHistory?.url,
-      language: language ?? existingHistory?.language,
       alternativeSources: alternativeSources ?? existingHistory?.alternativeSources,
       profileId: profileId,
     );

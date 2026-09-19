@@ -19,7 +19,6 @@ class ActivePlayerState {
   final int? season;
   final String? source;
   final String? url;
-  final String? language;
   
   // Senior: Session Persistence & Continuity Data
   final List<SearchResult> availableSources;
@@ -37,7 +36,6 @@ class ActivePlayerState {
     this.season,
     this.source,
     this.url,
-    this.language,
     this.availableSources = const [],
     this.availableTracks = const [],
     this.availableEpisodes = const [],
@@ -54,7 +52,6 @@ class ActivePlayerState {
     int? season,
     String? source,
     String? url,
-    String? language,
     List<SearchResult>? availableSources,
     List<VideoTrackOption>? availableTracks,
     List<EpisodeInfo>? availableEpisodes,
@@ -69,7 +66,6 @@ class ActivePlayerState {
       season: season ?? this.season,
       source: source ?? this.source,
       url: url ?? this.url,
-      language: language ?? this.language,
       availableSources: availableSources ?? this.availableSources,
       availableTracks: availableTracks ?? this.availableTracks,
       availableEpisodes: availableEpisodes ?? this.availableEpisodes,
@@ -148,6 +144,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
             title: item.title,
             posterUrl: item.posterUrl,
             bannerUrl: effectiveBanner,
+            logoUrl: item.logoUrl,
             category: item.type.name,
             episode: state.episode,
             season: state.season,
@@ -180,7 +177,6 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     String? episode,
     int? season,
     String? source,
-    String? language,
     bool triggerOpen = true,
   }) async {
     initPlayerIfNeeded();
@@ -202,7 +198,6 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
       episode: episode,
       season: season,
       source: source,
-      language: language ?? state.language,
       uiState: PlayerUIState.full,
       // Senior Fix: Solo limpiar sesión si es un contenido nuevo de verdad
       availableSources: isSameContent ? state.availableSources : [],
@@ -266,7 +261,6 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     List<VideoTrackOption>? tracks,
     List<EpisodeInfo>? episodes,
     int? selectedIndex,
-    String? language,
   }) {
     final List<SearchResult> nextSources = (sources != null && sources.isNotEmpty) 
         ? sources 
@@ -298,7 +292,6 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
         availableTracks: nextTracks,
         availableEpisodes: nextEpisodes,
         selectedTrackIndex: selectedIndex ?? state.selectedTrackIndex,
-        language: language ?? state.language,
         currentItem: nextItem,
       );
     } catch (_) {
@@ -322,10 +315,10 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
           title: item.title,
           posterUrl: item.posterUrl,
           bannerUrl: item.bannerUrl,
+          logoUrl: item.logoUrl,
           category: item.type.name,
           source: state.source,
           url: state.url,
-          language: state.language,
           alternativeSources: state.availableSources,
           force: true,
         );
@@ -342,7 +335,6 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
         uiState: PlayerUIState.none, 
         currentItem: null, 
         url: null,
-        language: null,
         availableSources: [],
         availableTracks: [],
         availableEpisodes: [],
@@ -380,7 +372,6 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
       episode: ep.number.toString(),
       season: state.season,
       source: state.source,
-      language: state.language,
       triggerOpen: false,
     );
     try {
@@ -391,14 +382,23 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
       Map<String, String> headers = const {};
       int idx = 0;
       if (tracks.isNotEmpty) {
-        final lang = state.language;
-        if (lang != null) {
-          final latIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'DUB');
-          final subIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'SUB');
-          final isLat = lang == 'LAT' || lang == 'DUB';
-          if (isLat && latIdx >= 0) idx = latIdx;
-          else if (subIdx >= 0) idx = subIdx;
-        }
+        // Senior Fix: Usamos la lógica de idioma centralizada basada en ajustes
+        // La implementación se delega al _indexForLanguage que ahora consulta settingsProvider.
+        // Como estamos en el notifier, necesitamos el provider.
+        final settings = ref.read(settingsProvider);
+        final String pref = settings.preferredLanguage.toLowerCase();
+        final String targetType = pref == 'latino' ? 'DUB' : (pref == 'castellano' ? 'CAST' : 'SUB');
+
+        final latIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'DUB');
+        final castIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'CAST');
+        final subIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'SUB');
+
+        if (targetType == 'DUB' && latIdx >= 0) idx = latIdx;
+        else if (targetType == 'CAST' && castIdx >= 0) idx = castIdx;
+        else if (subIdx >= 0) idx = subIdx;
+        else if (latIdx >= 0) idx = latIdx;
+        else if (castIdx >= 0) idx = castIdx;
+
         streamUrl = tracks[idx].url;
         headers = tracks[idx].headers;
         updateSession(tracks: tracks, selectedIndex: idx);

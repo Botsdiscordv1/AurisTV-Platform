@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/prime_expandable_card.dart';
-import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../../shared/widgets/top_item.dart';
 
 class EditorialContentRow extends StatefulWidget {
@@ -12,6 +11,7 @@ class EditorialContentRow extends StatefulWidget {
   final List<MediaItem> items;
   final EditorialBadge badge;
   final bool forceTopDesign;
+  final SectionSeeMore? verMas;
   final void Function(MediaItem item) onItemTap;
 
   const EditorialContentRow({
@@ -22,6 +22,7 @@ class EditorialContentRow extends StatefulWidget {
     required this.badge,
     required this.onItemTap,
     this.forceTopDesign = false,
+    this.verMas,
   });
 
   @override
@@ -100,34 +101,66 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.title,
-                  style: GoogleFonts.poppins(
-                    fontSize: ResponsiveUtils.rowTitleFontSize(context),
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.subtitle!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withOpacity(0.5),
+          GestureDetector(
+            onTap: widget.verMas == null ? null : () {
+              final params = FilterParams.fromSeeMore(widget.verMas!);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SectionGridExplorer(
+                    args: SectionExplorerArgs(
+                      title: widget.title,
+                      baseParams: params,
+                      verMas: widget.verMas,
+                      initialItems: widget.items,
+                      onItemTap: widget.onItemTap,
                     ),
                   ),
-                ],
-              ],
+                ),
+              );
+            },
+            child: MouseRegion(
+              cursor: widget.verMas != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: GoogleFonts.poppins(
+                        fontSize: ResponsiveUtils.rowTitleFontSize(context),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    if (widget.verMas != null) ...[
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: Colors.white70,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
+          if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Text(
+                widget.subtitle!,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.5),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           _buildStandardRow(isMobile, horizontalPadding),
         ],
@@ -152,7 +185,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                 clipBehavior: Clip.none, // Senior: Asegura visibilidad de sombras sin padding
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px
                 itemCount: widget.items.length,
-                separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 18),
+                separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 18),
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
                   return SizedBox(
@@ -189,32 +222,43 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
         children: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   widget.title,
                   style: GoogleFonts.poppins(
-                    fontSize: ResponsiveUtils.rowTitleFontSize(context) + 4.0,
+                    fontSize: ResponsiveUtils.rowTitleFontSize(context),
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
-                    letterSpacing: -0.8,
+                    letterSpacing: -0.4,
                   ),
                 ),
-                if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.subtitle!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withOpacity(0.5),
-                    ),
+                if (widget.verMas != null) ...[
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Colors.white70,
                   ),
                 ],
               ],
             ),
           ),
+          if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Text(
+                widget.subtitle!,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withOpacity(0.5),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),

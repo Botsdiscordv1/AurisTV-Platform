@@ -8,7 +8,6 @@ import '../../../core/utils/responsive_utils.dart';
 import 'package:auristv_web/core/router/app_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
-import '../../../shared/widgets/focusable_poster_card.dart';
 
 final _scheduleProvider = FutureProvider<ScheduleResponse>((ref) async {
   final repo = ref.watch(aurisRepositoryProvider);
@@ -29,6 +28,10 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text('Calendario'),
         backgroundColor: const Color(0xFF0B0B0D),
         surfaceTintColor: Colors.transparent,

@@ -26,12 +26,14 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
         ? 'movie_anime' 
         : switch (item.type) {
             MediaType.movie => 'movie',
+            MediaType.series => 'series',
             MediaType.kdrama => 'kdrama',
             _ => 'anime',
           },
     'animes' => 'anime',
     'anime_movies' => 'movie_anime',
     'películas' => 'movie',
+    'series' => 'series',
     'kdrama' => 'kdrama',
     _ => 'all',
   };
@@ -159,6 +161,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               subtitle: row.subtitle,
               items: row.items,
               badge: row.badge,
+              verMas: row.verMas,
               onItemTap: (item) => openHomeDetails(context, item, targetCat),
             ),
           ));
@@ -184,12 +187,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
+    final SectionSeeMore? verMas = section.data is EditorialRow ? (section.data as EditorialRow).verMas : null;
+
     return UnifiedSection(
       presentation: section.presentation,
       title: section.title,
       subtitle: section.subtitle,
       items: section.items,
       badge: section.badge,
+      verMas: verMas,
       onItemTap: (item) => openHomeDetails(context, item, ref.read(homeCategoryProvider)),
     );
   }
@@ -267,7 +273,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               source: 'YouTube',
                               episode: 'Trailer',
                               serverName: 'YouTube',
-                              language: 'Trailer',
                               category: item.type.name,
                               title: item.title,
                               posterUrl: item.posterUrl,
@@ -299,8 +304,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 data: (sections) => SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
+                      final section = sections[index];
                       return RepaintBoundary(
-                        child: _buildSection(sections[index], horizontalPadding),
+                        key: ValueKey('section_${section.id}'), // Senior Fix: Diffing Engine para preservación de estado
+                        child: _buildSection(section, horizontalPadding),
                       );
                     },
                     childCount: sections.length,
@@ -910,10 +917,13 @@ class _ContinueWatchingSection extends ConsumerWidget {
         if (filteredItems.isEmpty) return const SizedBox.shrink();
 
         return RepaintBoundary(
-          child: WideContentRow(
-            title: 'Continuar Viendo',
-            items: filteredItems.map((h) => _mapHistoryToWide(ref, h)).toList(),
-            onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8), // Senior Fix: Espacio extra para que no se pegue el texto de progreso
+            child: WideContentRow(
+              title: 'Continuar Viendo',
+              items: filteredItems.map((h) => _mapHistoryToWide(ref, h)).toList(),
+              onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
+            ),
           ),
         );
       },
@@ -924,24 +934,35 @@ class _ContinueWatchingSection extends ConsumerWidget {
   }
 
   WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
+    final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
+
     String displayTitle = h.title ?? 'Contenido';
-    final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
-    if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+    // Senior Logic: No mostramos el prefijo "Ep X" para películas y limpiamos el título si ya lo trae.
+    if (isMovieish) {
+      displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[.\-•]\s*'), '').trim();
+    } else if (h.episode != null && h.episode!.isNotEmpty) {
       displayTitle = 'Ep ${h.episode} • $displayTitle';
     }
 
     String remainingText = '';
     final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
     if (remainingMs > 0) {
-      final minutes = (remainingMs / 60000).ceil();
-      remainingText = 'Quedan $minutes min';
+      // Senior UI: Formato elegante "X horas y Y minutos"
+      remainingText = 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}';
     }
+
+    final String? rawUrl = h.bannerUrl ?? h.posterUrl;
+    final String? logoUrl = h.logoUrl;
 
     return WideContentItem(
       id: h.contentId,
       title: displayTitle,
-      imageUrl: h.bannerUrl ?? h.posterUrl ?? '',
-      logoUrl: null, // Historial normalmente no tiene logo independiente guardado aún
+      imageUrl: ApiEndpoints.proxyImage(
+        rawUrl,
+        // Senior Optimization: 1280px para películas/movie_anime para nitidez en Wide Cards
+        width: isMovieish ? 1280 : 800,
+      ),
+      logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
       progress: h.progress,
       subtitle: remainingText,
       onDelete: () {

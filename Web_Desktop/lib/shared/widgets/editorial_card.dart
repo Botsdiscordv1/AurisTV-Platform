@@ -3,7 +3,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../core/theme/editorial_themes.dart';
 import '../../core/utils/responsive_utils.dart';
-import 'marquee_text.dart';
 import 'editorial_animation_controller.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -74,7 +73,7 @@ class _EditorialCardState extends State<EditorialCard> {
                 width: widget.width,
                 height: widget.height,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
                       color: theme.primary.withOpacity(_isHovered ? 0.35 : 0.15),
@@ -91,7 +90,7 @@ class _EditorialCardState extends State<EditorialCard> {
                       child: Container(
                         decoration: BoxDecoration(
                           color: darkBg,
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: theme.primary.withOpacity(0.3),
                             width: 1.0,
@@ -110,7 +109,7 @@ class _EditorialCardState extends State<EditorialCard> {
                               color: Colors.white.withOpacity(0.05),
                               width: 0.5,
                             ),
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
                       ),
@@ -121,7 +120,7 @@ class _EditorialCardState extends State<EditorialCard> {
                       child: Padding(
                         padding: const EdgeInsets.all(4.0),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(1),
+                          borderRadius: BorderRadius.circular(8),
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
@@ -406,7 +405,7 @@ class _MythicBorder extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white, width: 1.2),
         ),
       ),

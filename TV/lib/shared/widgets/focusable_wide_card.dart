@@ -96,12 +96,38 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                             scale: isSelected ? 1.12 : 1.0,
                             duration: const Duration(milliseconds: 400),
                             curve: Curves.easeOutCubic,
-                            child: CachedNetworkImage(
-                              imageUrl: widget.imageUrl,
-                              fit: BoxFit.cover,
-                              filterQuality: FilterQuality.medium,
-                              placeholder: (context, url) => Container(color: Colors.white10),
-                              errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                CachedNetworkImage(
+                                  imageUrl: widget.imageUrl,
+                                  fit: BoxFit.cover,
+                                  filterQuality: FilterQuality.medium,
+                                  placeholder: (context, url) => Container(color: Colors.white10),
+                                  errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+                                ),
+                                // Senior Fix: El logo ahora escala junto con la imagen para un efecto orgánico
+                                if (widget.logoUrl != null && widget.logoUrl!.isNotEmpty)
+                                  Positioned(
+                                    bottom: 16, // Elevado para mejor balance visual
+                                    left: 12,
+                                    right: 12,
+                                    child: Center(
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          maxWidth: widget.width * 0.75, // Expandido para logos anchos
+                                          maxHeight: widget.height * 0.35,
+                                        ),
+                                        child: CachedNetworkImage(
+                                          imageUrl: widget.logoUrl!,
+                                          fit: BoxFit.contain,
+                                          filterQuality: FilterQuality.medium,
+                                          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           Positioned.fill(
@@ -117,26 +143,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                               ),
                             ),
                           ),
-                          if (widget.logoUrl != null && widget.logoUrl!.isNotEmpty)
-                            Positioned(
-                              bottom: 12,
-                              left: 12,
-                              right: 12,
-                              child: Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth: widget.width * 0.6,
-                                    maxHeight: widget.height * 0.4,
-                                  ),
-                                  child: CachedNetworkImage(
-                                    imageUrl: widget.logoUrl!,
-                                    fit: BoxFit.contain,
-                                    filterQuality: FilterQuality.medium,
-                                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                                  ),
-                                ),
-                              ),
-                            ),
+                          // Ya no incluimos el logo aquí, ahora reside dentro de la capa de escala
                           if (widget.onDelete != null && (isSelected || isMobile))
                             Positioned(
                               top: 8, left: 8,

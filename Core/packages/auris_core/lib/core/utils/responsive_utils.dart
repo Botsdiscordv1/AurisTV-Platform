@@ -113,13 +113,27 @@ class ResponsiveUtils {
     return (width * percentage).clamp(24.0, 100.0);
   }
 
-  /// Senior UI Strategy: Devuelve el ancho ideal del póster según el dispositivo.
-  /// Evita tarjetas gigantes en tablets y asegura densidad en desktop.
   static double posterWidth(BuildContext context) {
+    final double width = MediaQuery.of(context).size.width;
+    final Orientation orientation = MediaQuery.of(context).orientation;
     final b = getBreakpoint(context);
-    if (b == Breakpoint.base) return 125.0;
-    if (b == Breakpoint.sm) return 140.0;
-    if (b == Breakpoint.md) return 160.0;
+    
+    // Senior Fix: Densidad Dinámica Total. 
+    // Evitamos valores hardcodeados para que tablets y plegables no tengan posters gigantes.
+    if (b < Breakpoint.md) {
+      if (width > 550 || orientation == Orientation.landscape) {
+        return (width / 6.5).clamp(80.0, 110.0);
+      }
+      return (width / 3.5).clamp(100.0, 125.0);
+    }
+    
+    // Para Tablets (Z Fold / iPad / Android Tablets)
+    if (b == Breakpoint.md) {
+      // Forzamos una densidad de ~6.5 posters para aprovechar el ancho sin gigantismo
+      return (width / 6.5).clamp(110.0, 140.0);
+    }
+    
+    // Para Desktop y Tablets Grandes
     if (b == Breakpoint.lg) return 180.0;
     return 200.0;
   }
@@ -137,18 +151,30 @@ class ResponsiveUtils {
     final double posterH = posterHeight(context);
     if (!hasInfo) {
       // Senior Tuning: Altura exacta del póster + margen para sombra/zoom
-      return posterH + (b < Breakpoint.md ? 8.0 : 12.0);
+      return posterH + (b < Breakpoint.md ? 12.0 : 16.0);
     }
     // Espacio para póster + Gap (8) + Texto (22-28) + Margen sombra
     return posterH + (b < Breakpoint.md ? 42.0 : 55.0);
   }
 
-  /// Senior UI Strategy: Ancho de banners (Wide Cards) adaptativo.
   static double bannerWidth(BuildContext context) {
+    final double width = MediaQuery.of(context).size.width;
+    final Orientation orientation = MediaQuery.of(context).orientation;
     final b = getBreakpoint(context);
-    if (b == Breakpoint.base) return 260.0;
-    if (b == Breakpoint.sm) return 300.0;
-    if (b == Breakpoint.md) return 340.0;
+    
+    if (b < Breakpoint.md) {
+      if (width > 550 || orientation == Orientation.landscape) {
+        return (width / 3.2).clamp(200.0, 260.0);
+      }
+      return (width / 1.35).clamp(240.0, 310.0);
+    }
+
+    // Senior Fix: Para Tablets y Plegables (Z Fold)
+    if (b == Breakpoint.md) {
+      // Aumentamos densidad a ~3.2 para que los banners sean elegantes y no ocupen media pantalla
+      return (width / 3.2).clamp(240.0, 290.0);
+    }
+    
     if (b == Breakpoint.lg) return 380.0;
     return 420.0;
   }
@@ -159,20 +185,23 @@ class ResponsiveUtils {
   }
 
   /// Altura del contenedor de la fila Wide.
-  static double bannerRowHeight(BuildContext context) {
+  /// [hasSubtitle] - Si es true (Continuar Viendo / Categorías), reserva espacio para el texto inferior.
+  static double bannerRowHeight(BuildContext context, {bool hasSubtitle = true}) {
     final b = getBreakpoint(context);
-    // bannerHeight + cardGap (12) + textArea (42) + shadowMargin (8)
-    return bannerHeight(context) + sp(context, 42) + (b < Breakpoint.md ? 20.0 : 28.0);
+    // bannerHeight + (subtitleArea (20) if needed)
+    final double extraSpace = hasSubtitle ? sp(context, 20) : 0;
+    // Senior Fix: Sincronizado con rowHeight (Posters) para paridad visual absoluta (12px mobile / 16px desktop)
+    return bannerHeight(context) + extraSpace + (b < Breakpoint.md ? 12.0 : 16.0);
   }
 
   /// Senior UI Strategy: Tamaños de fuente adaptativos para títulos de filas.
   static double rowTitleFontSize(BuildContext context) {
     final b = getBreakpoint(context);
-    if (b == Breakpoint.base) return 18.0;
-    if (b == Breakpoint.sm) return 20.0;
-    if (b == Breakpoint.md) return 22.0;
-    if (b == Breakpoint.lg) return 24.0;
-    return 26.0;
+    if (b == Breakpoint.base) return 14.0;
+    if (b == Breakpoint.sm) return 15.0;
+    if (b == Breakpoint.md) return 17.0;
+    if (b == Breakpoint.lg) return 18.0;
+    return 19.0;
   }
 
   /// Senior UI Strategy: Tamaños de fuente adaptativos para títulos de tarjetas (Banners).
@@ -236,7 +265,8 @@ class ResponsiveUtils {
     if (b >= Breakpoint.lg) {
       return size * (width / 1440.0).clamp(0.9, 1.25);
     }
-    return size * (width / 375.0).clamp(0.85, 1.3);
+    // Senior Fix: Escala suavizada para evitar deformaciones en pantallas intermedias (Fold/Tablets Portrait)
+    return size * (width / 375.0).clamp(0.85, 1.2);
   }
 
   /// Ancho máximo de seguridad para el contenido cinematográfico (4K).

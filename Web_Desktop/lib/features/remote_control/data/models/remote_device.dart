@@ -16,6 +16,7 @@ class RemoteDevice {
   final String? metadataTitle;
   final String? posterUrl;
   final String? bannerUrl;
+  final String? logoUrl;
   final String? category;
   final String? year;
 
@@ -44,6 +45,7 @@ class RemoteDevice {
     this.metadataTitle,
     this.posterUrl,
     this.bannerUrl,
+    this.logoUrl,
     this.category,
     this.year,
     this.positionMs = 0,
@@ -70,6 +72,7 @@ class RemoteDevice {
       metadataTitle: json['metadata_title'],
       posterUrl: json['poster_url'],
       bannerUrl: json['banner_url'],
+      logoUrl: json['logo_url'],
       category: json['category'],
       year: json['year'],
       positionMs: json['position_ms'] ?? 0,
@@ -97,6 +100,7 @@ class RemoteDevice {
       'metadata_title': metadataTitle,
       'poster_url': posterUrl,
       'banner_url': bannerUrl,
+      'logo_url': logoUrl,
       'category': category,
       'year': year,
       'position_ms': positionMs,
@@ -126,6 +130,7 @@ class RemoteDevice {
     String? metadataTitle,
     String? posterUrl,
     String? bannerUrl,
+    String? logoUrl,
     String? category,
     String? year,
     int? positionMs,
@@ -150,6 +155,7 @@ class RemoteDevice {
       metadataTitle: metadataTitle ?? this.metadataTitle,
       posterUrl: posterUrl ?? this.posterUrl,
       bannerUrl: bannerUrl ?? this.bannerUrl,
+      logoUrl: logoUrl ?? this.logoUrl,
       category: category ?? this.category,
       year: year ?? this.year,
       positionMs: positionMs ?? this.positionMs,

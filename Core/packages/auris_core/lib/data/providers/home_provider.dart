@@ -3,7 +3,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
-import '../../auris_core.dart';
+import '../../auris_core.dart' hide SectionComposer, ComposedHomeSection, CompositionPreferences;
+import '../../core/utils/section_composer.dart';
 
 /// Senior: Global state for the Hero Banner mute status to allow control across platforms.
 final heroBannerMutedProvider = StateProvider<bool>((ref) => true);
@@ -254,6 +255,7 @@ class EditorialRow {
   final List<MediaItem> items;
   final bool isMovie;
   final SectionPresentation format;
+  final SectionSeeMore? verMas;
   
   const EditorialRow({
     required this.badge, 
@@ -262,6 +264,7 @@ class EditorialRow {
     this.subtitle, 
     this.isMovie = false,
     this.format = SectionPresentation.poster,
+    this.verMas,
   });
 }
 
@@ -294,193 +297,101 @@ class HomeLayoutSection {
 }
 
 /// Senior: Orchestrator for the Home Screen layout.
-/// Unificado para manejar personalización por categorías desde el servidor.
-final homeLayoutProvider = FutureProvider<List<ComposedHomeSection>>((ref) async {
+/// Totalmente reactivo y asíncrono en múltiples etapas para máxima velocidad (UX Instantánea).
+final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async* {
   final currentCategory = ref.watch(homeCategoryProvider);
-  return _getHomeLayout(ref, currentCategory);
-});
-
-Future<List<ComposedHomeSection>> _getHomeLayout(Ref ref, String category) async {
   final repo = ref.watch(aurisRepositoryProvider);
   final authState = ref.watch(authProvider);
   final String userId = authState?.activeProfileId ?? authState?.id ?? 'guest_profile';
   final box = Hive.box('home_cache');
-  
-  // Senior Fix: Caché aislada por usuario Y categoría para evitar colisiones visuales
-  final cacheKey = 'personalized_home_${userId}_$category';
+  final cacheKey = 'personalized_home_${userId}_$currentCategory';
 
-  try {
-    // 1. Intentar cargar desde caché para velocidad instantánea (Optimistic UI)
-    final cachedData = box.get(cacheKey);
-    if (cachedData != null) {
-      try {
-        final homeResponse = HomeResponse.fromJson(Map<String, dynamic>.from(cachedData as Map));
-        PersonalizationMonitor.instance.logMetric('home_cache_hit', true, tags: {'userId': userId, 'category': category});
-        _processPersonalizedHome(homeResponse, ref); // Disparar refresco en segundo plano
-        
-        final rawSections = _mapResponseToLayout(homeResponse, category);
-        // Senior Fix: Fusionar editorial también en hit de caché
-        if (category == 'inicio') {
-          // Inicio: 2 random por categoría (películas/series/animes) para scroll infinito sin reciclar top
-          final rnd = Random();
-          for (final cat in ['películas', 'series', 'animes']) {
-            try {
-              final edCache = box.get('editorial_sections_$cat');
-              List<EditorialSection> pool = [];
-              if (edCache is List && edCache.isNotEmpty) {
-                try {
-                  pool = edCache.map((e) => EditorialSection.fromJson(Map<String, dynamic>.from(e as Map))).toList();
-                } catch (e) {
-                  debugPrint('[homeLayoutProvider] edCache parse fail $cat: $e');
-                }
-              }
-              if (pool.isEmpty) {
-                final repoCached = ref.read(aurisRepositoryProvider);
-                final edNet = await repoCached.getEditorial(imgSize: 'w780', category: cat)
-                    .timeout(const Duration(seconds: 4))
-                    .catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []));
-                if (edNet.sections.isNotEmpty) {
-                  try { await box.put('editorial_sections_$cat', edNet.sections.map((e) => e.toJson()).toList()); } catch (_) {}
-                  pool = edNet.sections;
-                }
-              }
-              if (pool.isEmpty) continue;
-              pool.shuffle(rnd);
-              final picks = pool.take(2);
-              for (final s in picks) {
-                final mapped = _mapEditorialResponseToLayout(EditorialResponse(generatedAt: '', locale: 'es-MX', sections: [s]), cat).first;
-                if (!rawSections.any((x) => x.title == mapped.title)) rawSections.add(mapped);
-              }
-              debugPrint('[homeLayoutProvider] inicio cache hit editorial $cat: 2/${pool.length}');
-            } catch (e) {
-              debugPrint('[homeLayoutProvider] inicio cache editorial $cat error: $e');
-            }
-          }
-        } else if (category != 'inicio') {
-          try {
-            final edCache = box.get('editorial_sections_$category');
-            bool mergedFromCache = false;
-            if (edCache is List && edCache.isNotEmpty) {
-              try {
-                final edSections = edCache
-                    .map((e) => EditorialSection.fromJson(Map<String, dynamic>.from(e as Map)))
-                    .toList();
-                if (edSections.isNotEmpty) {
-                  final edResponse = EditorialResponse(generatedAt: '', locale: 'es-MX', sections: edSections);
-                  final edMapped = _mapEditorialResponseToLayout(edResponse, category);
-                  for (final ed in edMapped) {
-                    if (!rawSections.any((s) => s.title == ed.title)) rawSections.add(ed);
-                  }
-                  mergedFromCache = edMapped.isNotEmpty;
-                  debugPrint('[homeLayoutProvider] cache hit editorial merged from Hive $category: ${edMapped.length}');
-                }
-              } catch (e) {
-                debugPrint('[homeLayoutProvider] edCache parse fail $category: $e');
-              }
-            }
-            if (!mergedFromCache) {
-              final repoCached = ref.read(aurisRepositoryProvider);
-              final edNet = await repoCached.getEditorial(imgSize: 'w780', category: category)
-                  .timeout(const Duration(seconds: 5))
-                  .catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []));
-              if (edNet.sections.isNotEmpty) {
-                try { await box.put('editorial_sections_$category', edNet.sections.map((e) => e.toJson()).toList()); } catch (_) {}
-                final edMapped = _mapEditorialResponseToLayout(edNet, category);
-                int added = 0;
-                for (final ed in edMapped) {
-                  if (!rawSections.any((s) => s.title == ed.title)) { rawSections.add(ed); added++; }
-                }
-                debugPrint('[homeLayoutProvider] cache hit editorial merged from network $category: $added/${edMapped.length}');
-              } else {
-                debugPrint('[homeLayoutProvider] editorial network empty for $category');
-              }
-            }
-          } catch (e) {
-            debugPrint('[homeLayoutProvider] editorial merge error $category: $e');
-          }
-        }
-        return SectionComposer.compose(rawSections);
-      } catch (e) {
-        debugPrint('[homeLayoutProvider] Cache parsing error for $category: $e');
-      }
-    }
-
-    // 2. Carga real desde el servidor (Redirigido al puerto específico por el Repositorio)
-    final stopwatch = Stopwatch()..start();
-    
-    // Senior Strategy: Inicio trae 2 random por categoría, otras categorías 1 editorial completa
-    final futures = [
-      repo.getUserHome(userId: userId, category: category).timeout(const Duration(seconds: 10)),
-      if (category == 'inicio') ...[
-        repo.getEditorial(imgSize: 'w780', category: 'películas').timeout(const Duration(seconds: 8)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
-        repo.getEditorial(imgSize: 'w780', category: 'series').timeout(const Duration(seconds: 8)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
-        repo.getEditorial(imgSize: 'w780', category: 'animes').timeout(const Duration(seconds: 8)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
-      ] else
-        repo.getEditorial(imgSize: 'w780', category: category).timeout(const Duration(seconds: 8)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []))
-    ];
-
-    final results = await Future.wait(futures);
-    final homeResponse = results[0] as HomeResponse;
-    final List<EditorialResponse> editorialResponses = results.length > 1 ? results.sublist(1).cast<EditorialResponse>() : [];
-    
-    stopwatch.stop();
-
-    PersonalizationMonitor.instance.logMetric('home_fetch_latency_ms', stopwatch.elapsedMilliseconds, tags: {'userId': userId, 'category': category});
-    
+  // Senior Fix: Smart Polling. Consultamos una versión ligera del Home cada 15 min.
+  // Solo invalidamos y descargamos megas de datos si el servidor indica cambios.
+  final refreshTimer = Timer.periodic(const Duration(minutes: 15), (_) async {
     try {
-      PersonalizationMonitor.instance.auditHomeResponse(homeResponse);
-    } catch (e) {
-      debugPrint('[HomeProvider] Audit error (ignored): $e');
-    }
-    
-    // Guardar en caché el home personalizado principal
-    await box.put(cacheKey, homeResponse.toJson());
+      final repo = ref.read(aurisRepositoryProvider);
+      final remoteVersion = await repo.getHomeVersion(category: currentCategory);
+      final localVersion = box.get('home_ver_${userId}_$currentCategory') ?? 0;
 
-    // 3. Mapear y Fusionar
-    final rawSections = _mapResponseToLayout(homeResponse, category);
-    
-    if (category == 'inicio' && editorialResponses.isNotEmpty) {
-      final rnd = Random();
-      final catNames = ['películas', 'series', 'animes'];
-      for (int i = 0; i < editorialResponses.length; i++) {
-        final ed = editorialResponses[i];
-        final cat = i < catNames.length ? catNames[i] : category;
-        if (ed.sections.isEmpty) continue;
-        try { await box.put('editorial_sections_$cat', ed.sections.map((e) => e.toJson()).toList()); } catch (_) {}
-        final pool = List<EditorialSection>.from(ed.sections)..shuffle(rnd);
-        final picks = pool.take(2);
-        for (final s in picks) {
-          final mapped = _mapEditorialResponseToLayout(EditorialResponse(generatedAt: ed.generatedAt, locale: ed.locale, sections: [s]), cat).first;
-          if (!rawSections.any((x) => x.title == mapped.title)) rawSections.add(mapped);
-        }
+      if (remoteVersion > localVersion) {
+        debugPrint('[HomeProvider] ¡Nueva versión de Home detectada ($remoteVersion)! Actualizando...');
+        await box.put('home_ver_${userId}_$currentCategory', remoteVersion);
+        ref.invalidateSelf();
       }
-    } else if (editorialResponses.isNotEmpty) {
-      final ed = editorialResponses.first;
-      if (ed.sections.isNotEmpty) {
-        try { await box.put('editorial_sections_$category', ed.sections.map((e) => e.toJson()).toList()); } catch (_) {}
-        final edSections = _mapEditorialResponseToLayout(ed, category);
-        for (final sec in edSections) {
-          if (!rawSections.any((s) => s.title == sec.title)) rawSections.add(sec);
+    } catch (_) {}
+  });
+
+  ref.onDispose(() => refreshTimer.cancel());
+
+  final List<HomeLayoutSection> rawSections = [];
+  final Set<String> sectionTitles = {};
+
+  void addUniqueSections(List<HomeLayoutSection> newSections) {
+    for (final s in newSections) {
+      if (s.title != null && sectionTitles.add(s.title!)) {
+        rawSections.add(s);
+      } else if (s.type == HomeSectionType.continueWatching) {
+        if (!rawSections.any((x) => x.type == HomeSectionType.continueWatching)) {
+          rawSections.add(s);
         }
       }
     }
-
-    try {
-      return SectionComposer.compose(rawSections);
-    } catch (e) {
-      debugPrint('[HomeProvider] Composer error: $e');
-      return SectionComposer.compose([]); 
-    }
-  } catch (e, stack) {
-    PersonalizationMonitor.instance.logMetric('home_error', e.toString(), tags: {'userId': userId, 'category': category});
-    debugPrint('[homeLayoutProvider] Personalized Home failed for $category: $e');
-    debugPrint(stack.toString());
   }
 
-  // --- FALLBACK AL HOME EDITORIAL ACTUAL (Categorizado) ---
-  final rawSections = await _getEditorialFallback(ref, category);
-  return SectionComposer.compose(rawSections);
-}
+  // --- ETAPA 1: CACHÉ (Instantánea) ---
+  final cachedData = box.get(cacheKey);
+  if (cachedData != null) {
+    try {
+      final homeResponse = HomeResponse.fromJson(Map<String, dynamic>.from(cachedData as Map));
+      addUniqueSections(_mapResponseToLayout(homeResponse, currentCategory));
+      yield SectionComposer.compose(rawSections);
+    } catch (_) {}
+  }
+
+  // --- ETAPA 2: EDITORIAL (Rápida ~400ms) ---
+  final editorialFutures = <Future<EditorialResponse>>[
+    if (currentCategory == 'inicio') ...[
+      repo.getEditorial(imgSize: 'w780', category: 'películas').timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+      repo.getEditorial(imgSize: 'w780', category: 'series').timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+      repo.getEditorial(imgSize: 'w780', category: 'animes').timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+    ] else
+      repo.getEditorial(imgSize: 'w780', category: currentCategory).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []))
+  ];
+
+  final userHomeFuture = repo.getUserHome(userId: userId, category: currentCategory).timeout(const Duration(seconds: 15)).catchError((e) {
+    debugPrint('[homeLayoutProvider] user/home error: $e');
+    return const HomeResponse(userId: '', maturityLevel: '', sections: [], generatedAt: '');
+  });
+
+  final editorialResponses = await Future.wait(editorialFutures);
+  for (final ed in editorialResponses) {
+    if (ed.sections.isNotEmpty) {
+      final mapped = _mapEditorialResponseToLayout(ed, currentCategory);
+      addUniqueSections(mapped);
+    }
+  }
+  
+  yield SectionComposer.compose(rawSections);
+
+  // --- ETAPA 3: PERSONALIZACIÓN (Lenta ~4-10s) ---
+  final homeResponse = await userHomeFuture;
+  if (homeResponse.sections.isNotEmpty) {
+    final personalizedSections = _mapResponseToLayout(homeResponse, currentCategory);
+    await box.put(cacheKey, homeResponse.toJson());
+    
+    final List<HomeLayoutSection> finalSections = [];
+    final Set<String> finalTitles = {};
+    for (final s in personalizedSections) {
+      if (s.title != null && finalTitles.add(s.title!)) finalSections.add(s);
+      else if (s.type == HomeSectionType.continueWatching) finalSections.add(s);
+    }
+    for (final s in rawSections) {
+      if (s.title != null && !finalTitles.contains(s.title)) finalSections.add(s);
+    }
+    yield SectionComposer.compose(finalSections);
+  }
+});
 
 List<HomeLayoutSection> _mapEditorialResponseToLayout(EditorialResponse response, String category) {
   final List<HomeLayoutSection> layout = [];
@@ -488,10 +399,11 @@ List<HomeLayoutSection> _mapEditorialResponseToLayout(EditorialResponse response
     if (section.items.isEmpty) continue;
 
     final presentation = SectionPresentationResolver.resolve(
-      section.badge, 
-      id: section.title, 
+      section.badge,
+      id: section.title,
       serverFormat: section.format,
     );
+    debugPrint('[HomeProvider] editorial "${section.title}" badge="${section.badge}" serverFormat="${section.format}" -> $presentation');
     final isMovie = section.badge.toLowerCase().contains('movie') || category == 'películas';
 
     final row = EditorialRow(
@@ -501,6 +413,7 @@ List<HomeLayoutSection> _mapEditorialResponseToLayout(EditorialResponse response
       items: section.items.map((e) => _mapEditorialItemToMediaItem(e, sectionId: section.id)).toList(),
       isMovie: isMovie,
       format: presentation,
+      verMas: section.verMas,
     );
 
     layout.add(HomeLayoutSection(
@@ -554,10 +467,11 @@ List<HomeLayoutSection> _mapResponseToLayout(HomeResponse response, String categ
 
       // 2. [Senior UX Resolver] Determinar presentación visual mediante el Resolver Global
       final presentation = SectionPresentationResolver.resolve(
-        section.type, 
+        section.type,
         id: section.title,
         serverFormat: section.format,
       );
+      debugPrint('[HomeProvider] section "${section.title}" type="${section.type}" serverFormat="${section.format}" -> $presentation');
 
       final row = EditorialRow(
         badge: badge,
@@ -566,6 +480,7 @@ List<HomeLayoutSection> _mapResponseToLayout(HomeResponse response, String categ
         items: mediaItems,
         isMovie: mediaItems.any((item) => item.type == MediaType.movie),
         format: presentation,
+        verMas: section.verMas,
       );
 
       layout.add(HomeLayoutSection(
@@ -751,6 +666,7 @@ final editorialRowsProvider = FutureProvider.family<List<EditorialRow>, String>(
       isMovie: isMovie,
       format: presentation,
       items: section.items.map((e) => _mapEditorialItemToMediaItem(e, sectionId: section.id)).toList(),
+      verMas: section.verMas,
     );
   }).toList();
 
@@ -828,7 +744,6 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
     year: int.tryParse(result.year ?? ''),
     episode: result.episode,
     airingAt: result.airingAt,
-    trailerKey: result.trailerKey,
     synopsis: result.synopsis,
     subtitle: displaySubtitle,
     aired: type == MediaType.movie || (result.subtitle?.toLowerCase().contains('finalizado') ?? false) || (result.status?.toLowerCase().contains('finalizado') ?? false),
@@ -850,6 +765,7 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
       year: int.tryParse(result.year ?? ''),
       score: result.rating,
       synopsis: result.synopsis,
+      trailerKey: result.trailerKey,
       kind: result.kind,
       type: result.type,
       genres: result.genres,

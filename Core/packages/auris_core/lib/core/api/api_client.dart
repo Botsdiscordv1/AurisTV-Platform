@@ -34,27 +34,9 @@ class ApiClient {
   Interceptor _apiResponseInterceptor() {
     return InterceptorsWrapper(
       onResponse: (response, handler) {
-        if (response.data is Map<String, dynamic>) {
-          final map = response.data as Map<String, dynamic>;
-          if (map.containsKey('success')) {
-            if (map['success'] == true) {
-              response.data = map['data'];
-              handler.next(response);
-            } else {
-              handler.reject(
-                DioException(
-                  requestOptions: response.requestOptions,
-                  response: response,
-                  type: DioExceptionType.badResponse,
-                  message: map['message'] as String? ??
-                      (map['error'] is Map ? (map['error'] as Map)['message'] as String? : null) ??
-                      'Unknown error',
-                ),
-              );
-            }
-            return;
-          }
-        }
+        // Senior Fix: Desactivamos el desempaquetado automático de 'success' 
+        // para evitar rechazar respuestas legítimas de microservicios que no 
+        // usan el wrapper {success: true, data: ...} de forma estricta.
         handler.next(response);
       },
       onError: (error, handler) {

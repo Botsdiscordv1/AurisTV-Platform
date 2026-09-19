@@ -302,6 +302,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
     String? metadataTitle,
     String? posterUrl,
     String? bannerUrl,
+    String? logoUrl, // Senior Fix: Soporte para logo en control remoto
     String? category,
     String? year,
     int? positionMs,
@@ -321,6 +322,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
       metadataTitle: metadataTitle,
       posterUrl: posterUrl,
       bannerUrl: bannerUrl,
+      logoUrl: logoUrl,
       category: category,
       year: year,
       positionMs: positionMs,

@@ -953,13 +953,20 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
         // 2. EL LOGO / TÍTULO
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
-          CachedNetworkImage(
-            key: ValueKey('logo_${item.id}'),
-            imageUrl: item.logoUrl!, 
-            height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.1 : 1.35), 
-            fit: BoxFit.contain, 
-            alignment: Alignment.bottomLeft,
-            fadeInDuration: const Duration(milliseconds: 100),
+          Container(
+            constraints: BoxConstraints(
+              // Senior Fix: Limitamos el ancho máximo del logo para evitar que títulos 
+              // panorámicos (ej: Spider-Man) dominen demasiado la pantalla.
+              maxWidth: screenWidth * (isIntermediate ? 0.35 : 0.38),
+              maxHeight: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.1 : 1.35),
+            ),
+            child: CachedNetworkImage(
+              key: ValueKey('logo_${item.id}'),
+              imageUrl: item.logoUrl!, 
+              fit: BoxFit.contain, 
+              alignment: Alignment.bottomLeft,
+              fadeInDuration: const Duration(milliseconds: 100),
+            ),
           )
         else
           Text(

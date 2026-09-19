@@ -770,6 +770,34 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final detailData = detailState.detail.valueOrNull?.main;
     final currentSource = detailState.selectedSource;
+    final history = ref.watch(playbackHistoryStateProvider).valueOrNull ?? [];
+
+    // Senior Pre-fetch Strategy:
+    // Al abrir detalles, disparamos la extracción de la fuente seleccionada en segundo plano
+    // (ya sea película o el episodio a reanudar). Así, al pulsar "Reproducir", 
+    // el stream ya estará caliente en el caché de Riverpod.
+    if (currentSource != null && _showContent) {
+      String? prefetchUrl;
+      if (detailState.isMovieish) {
+        prefetchUrl = currentSource.url;
+      } else {
+        final latest = history.where((h) => h.contentId == widget.title).firstOrNull;
+        int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
+        final epData = detailState.episodes.valueOrNull?.response;
+        final epSource = detailState.episodes.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
+        final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
+        prefetchUrl = _episodeUrlFor(ep, epSource.url, epSource.source, epNum);
+      }
+
+      if (prefetchUrl.isNotEmpty) {
+        ref.watch(extractProvider(ExtractParams(
+          url: prefetchUrl,
+          source: currentSource.source,
+          category: widget.category,
+        )));
+      }
+    }
+
     final heroBanner = ApiEndpoints.proxyImage(DetailBackdropResolver.resolve(detail: detailData, bannerParam: widget.banner, sourceBanner: detailState.allSources.isNotEmpty ? detailState.allSources.first.banner : null, season: detailState.currentSeason), highQuality: true);
 
     return Scaffold(
@@ -780,7 +808,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSeasonSelected: (s) => ref.setSeason(detailParams, s), episodesAsync: detailState.episodes, category: widget.category, title: widget.title, bannerUrl: heroBanner, onPlayEpisode: (ep, epSource, total) {
             final epNum = ep.number; final effectiveSrc = epSource?.source ?? widget.source; final playEpisodesUrl = epSource?.url ?? widget.url; final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, detailState.currentSeason, epNum.toString());
             final epThumb = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
-            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${detailState.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&language=${(epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB'}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=$total&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}');
+            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${detailState.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=$total&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}');
           })));
         },
         inferredSeasonAirDate: detailState.episodes.valueOrNull?.response.seasonAirDate, 
@@ -791,7 +819,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           final playEpisodesUrl = playSource?.url ?? widget.url;
           if (detailState.isMovieish) {
             final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Película', thumbnail: ApiEndpoints.proxyImage(playSource?.thumbnail));
-            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1)}&episode=1&serverName=${simplifySourceName(effectiveSrc)}&language=${((playSource?.quality ?? '').toLowerCase().contains('latino')) ? 'LAT' : 'SUB'}&startPosition=&category=${widget.category}&totalEpisodes=1&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}');
+            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1)}&episode=1&serverName=${simplifySourceName(effectiveSrc)}&startPosition=&category=${widget.category}&totalEpisodes=1&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}');
             return;
           }
           final latest = ref.read(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull;
@@ -800,7 +828,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           final epSource = detailState.episodes.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
           final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
           final epThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
-          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? detailState.currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&language=${(epSource?.quality.toLowerCase().contains('latino') ?? false) ? 'LAT' : 'SUB'}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}');
+          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? detailState.currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}');
         }
       ),
     );

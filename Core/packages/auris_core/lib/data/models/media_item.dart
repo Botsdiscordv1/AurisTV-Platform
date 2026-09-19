@@ -125,7 +125,20 @@ extension MediaItemToSeed on MediaItem {
         romaji: romaji,
         english: english,
         year: year,
+        trailerKey: trailerKey,
         slug: null,
+        kind: switch (type) {
+          MediaType.movie => 'movie',
+          MediaType.series => 'series',
+          MediaType.kdrama => 'kdrama',
+          MediaType.anime => 'anime',
+        },
+        type: switch (type) {
+          MediaType.movie => 'movie',
+          MediaType.series => 'series',
+          MediaType.kdrama => 'kdrama',
+          MediaType.anime => 'anime',
+        },
       );
 }
 

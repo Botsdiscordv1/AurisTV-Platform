@@ -17,6 +17,27 @@ class AurisStringUtils {
 
     return text;
   }
+
+  /// Formatea una duración en milisegundos a un string legible de tiempo restante.
+  /// 
+  /// Ejemplo: 109 min -> "1 hora y 49 minutos"
+  /// 45 min -> "45 minutos"
+  static String formatRemainingTime(int milliseconds) {
+    if (milliseconds <= 0) return '';
+    
+    final minutes = (milliseconds / 60000).ceil();
+    if (minutes < 60) {
+      return '$minutes ${minutes == 1 ? 'minuto' : 'minutos'}';
+    }
+    
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+    
+    final hoursText = '$hours ${hours == 1 ? 'hora' : 'horas'}';
+    if (remainingMinutes == 0) return hoursText;
+    
+    return '$hoursText y $remainingMinutes ${remainingMinutes == 1 ? 'minuto' : 'minutos'}';
+  }
 }
 
 /// Formateador para campos de texto que capitaliza solo la primera letra automáticamente.

@@ -16,6 +16,7 @@ class CompositionPreferences {
 
 /// A section that has been composed with a specific presentation and order.
 class ComposedHomeSection {
+  final String id; // Senior Fix: Identificador estable para Diffing Engine y preservación de estado
   final HomeSectionType type;
   final String title;
   final String? subtitle;
@@ -25,6 +26,7 @@ class ComposedHomeSection {
   final EditorialBadge? badge;
 
   const ComposedHomeSection({
+    required this.id,
     required this.type,
     required this.title,
     required this.presentation,
@@ -91,6 +93,7 @@ class SectionComposer {
       }
 
       return ComposedHomeSection(
+        id: '${raw.type.name}_$title',
         type: raw.type,
         title: title,
         subtitle: subtitle,

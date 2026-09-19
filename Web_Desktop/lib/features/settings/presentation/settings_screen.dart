@@ -24,7 +24,7 @@ class SettingsScreen extends ConsumerWidget {
         backgroundColor: const Color(0xFF0B0B0D),
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () {
             if (context.canPop()) {
               context.pop();

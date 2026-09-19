@@ -183,7 +183,7 @@ class SearchResult {
       fromDiscovery: json['fromDiscovery'] as bool?,
       score: _parseDouble(json['score']),
       fullDate: json['fullDate']?.toString(),
-      trailerKey: json['trailerKey']?.toString(),
+      trailerKey: json['trailerKey']?.toString() ?? json['trailer_key']?.toString(),
       synopsis: json['synopsis']?.toString(),
       status: json['status']?.toString(),
       kind: json['kind']?.toString(),

@@ -25,12 +25,14 @@ void openTVDetails(BuildContext context, MediaItem item, String uiCategory) {
         ? 'movie_anime'
         : switch (item.type) {
             MediaType.movie => 'movie',
+            MediaType.series => 'series',
             MediaType.kdrama => 'kdrama',
             _ => 'anime',
           },
     'animes' => isAnimeMovie ? 'movie_anime' : 'anime',
     'anime_movies' => 'movie_anime',
     'películas' => isAnimeMovie ? 'movie_anime' : 'movie',
+    'series' => 'series',
     'kdrama' => 'kdrama',
     _ => isAnimeMovie ? 'movie_anime' : 'all',
   };
@@ -166,7 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildSection(HomeLayoutSection section, double horizontalPadding) {
+  Widget _buildSection(ComposedHomeSection section, double horizontalPadding) {
     switch (section.type) {
       case HomeSectionType.continueWatching:
         return _ContinueWatchingSection(horizontalPadding: horizontalPadding);
@@ -256,16 +258,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  WideContentItem _wideItemFromMedia(MediaItem m, {Widget? badgeOverlay}) => WideContentItem(
-        id: m.id,
-        title: m.title,
-        imageUrl: m.bannerUrl ?? m.posterUrl,
-        logoUrl: m.logoUrl,
-        subtitle: m.subtitle,
-        rating: formatRating(m.rating),
-        badgeOverlay: badgeOverlay,
-        originalItem: m,
-      );
+  WideContentItem _wideItemFromMedia(MediaItem m, {Widget? badgeOverlay}) {
+    final bool isMovieish = m.type == MediaType.movie || m.card?.kind == 'movie_anime';
+    return WideContentItem(
+      id: m.id,
+      title: m.title,
+      imageUrl: ApiEndpoints.proxyImage(
+        m.bannerUrl ?? m.posterUrl,
+        width: isMovieish ? 1280 : 800,
+      ),
+      logoUrl: m.logoUrl,
+      subtitle: m.subtitle,
+      rating: formatRating(m.rating),
+      badgeOverlay: badgeOverlay,
+      originalItem: m,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -690,17 +698,29 @@ class _ContinueWatchingSection extends ConsumerWidget {
         return WideContentRow(
           title: 'Continuar Viendo',
           items: filteredItems.take(10).map((h) {
+            final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
+            
             String displayTitle = h.title ?? 'Contenido';
-            if (h.episode != null && h.episode!.isNotEmpty) {
+            if (isMovieish) {
+              displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '').trim();
+            } else if (h.episode != null && h.episode!.isNotEmpty) {
               displayTitle = 'Ep ${h.episode} • $displayTitle';
             }
+
+            final String? rawUrl = h.bannerUrl ?? h.posterUrl;
+            final String? logoUrl = h.logoUrl;
+            final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
 
             return WideContentItem(
               id: h.contentId,
               title: displayTitle,
-              imageUrl: h.bannerUrl ?? h.posterUrl ?? '',
+              imageUrl: ApiEndpoints.proxyImage(
+                rawUrl,
+                width: isMovieish ? 1280 : 800,
+              ),
+              logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
               progress: h.progressPercentage,
-              subtitle: 'Quedan ${(h.durationInMilliseconds - h.positionInMilliseconds) ~/ 60000} min',
+              subtitle: remainingMs > 0 ? 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}' : '',
               onDelete: () => ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode),
               originalItem: h,
             );

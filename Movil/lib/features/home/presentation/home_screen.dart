@@ -51,12 +51,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final String category = switch (uiCategory) {
       'inicio' => switch (item.type) {
         MediaType.movie => 'movie',
+        MediaType.series => 'series',
         MediaType.kdrama => 'kdrama',
         _ => 'anime',
       },
       'animes' => 'anime',
       'anime_movies' => 'movie_anime',
       'películas' => 'movie',
+      'series' => 'series',
       'kdrama' => 'kdrama',
       _ => 'all',
     };
@@ -106,6 +108,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   title: row.title,
                   subtitle: row.subtitle,
                   items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
+                  verMas: row.verMas,
                   onItemTap: (wideItem) => onTap(context, wideItem.originalItem as MediaItem, targetCat),
                 ),
               ),
@@ -118,6 +121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   subtitle: row.subtitle,
                   items: row.items,
                   badge: row.badge,
+                  verMas: row.verMas,
                   onItemTap: (item) => onTap(context, item, targetCat),
                 ),
               ),
@@ -150,6 +154,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             items: row.items,
             badge: row.badge,
             forceTopDesign: true,
+            verMas: row.verMas,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           );
         } else if (row.format == SectionPresentation.wide) {
@@ -157,6 +162,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             title: row.title,
             subtitle: row.subtitle,
             items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
+            verMas: row.verMas,
             onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
           );
         } else {
@@ -165,6 +171,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             subtitle: row.subtitle,
             items: row.items,
             badge: row.badge,
+            verMas: row.verMas,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           );
         }
@@ -250,6 +257,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             items: row.items,
             badge: row.badge,
             forceTopDesign: true,
+            verMas: row.verMas,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           );
         } else if (row.format == SectionPresentation.wide) {
@@ -257,6 +265,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             title: row.title,
             subtitle: row.subtitle,
             items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
+            verMas: row.verMas,
             onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
           );
         } else {
@@ -265,6 +274,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             subtitle: row.subtitle,
             items: row.items,
             horizontalPadding: horizontalPadding,
+            verMas: row.verMas,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           );
         }
@@ -294,16 +304,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  WideContentItem _wideItemFromMedia(MediaItem m, {Widget? badgeOverlay}) => WideContentItem(
-        id: m.id,
-        title: m.title,
-        imageUrl: m.bannerUrl ?? m.posterUrl,
-        logoUrl: m.logoUrl,
-        subtitle: m.subtitle,
-        rating: formatRating(m.rating),
-        badgeOverlay: badgeOverlay,
-        originalItem: m,
-      );
+  WideContentItem _wideItemFromMedia(MediaItem m, {Widget? badgeOverlay}) {
+    final bool isMovieish = m.type == MediaType.movie || m.card?.kind == 'movie_anime';
+    return WideContentItem(
+      id: m.id,
+      title: m.title,
+      imageUrl: ApiEndpoints.proxyImage(
+        m.bannerUrl ?? m.posterUrl,
+        // Senior Optimization: 1280px para películas/movie_anime para nitidez en Wide Cards
+        width: isMovieish ? 1280 : 800,
+      ),
+      logoUrl: m.logoUrl,
+      subtitle: m.subtitle,
+      rating: formatRating(m.rating),
+      badgeOverlay: badgeOverlay,
+      originalItem: m,
+    );
+  }
 
   bool _isHighQualityThumbnail(String? url) {
     if (url == null || url.isEmpty) return false;
@@ -424,7 +441,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final section = sections[index];
-                        return _buildSection(section, horizontalPadding);
+                        return RepaintBoundary(
+                          key: ValueKey('section_${section.id}'), // Senior Fix: Diffing Engine para preservación de estado
+                          child: _buildSection(section, horizontalPadding),
+                        );
                       },
                       childCount: sections.length,
                     ),
@@ -443,7 +463,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 layoutAsync.when(
                   data: (sections) => SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _buildSection(sections[index], horizontalPadding),
+                      (context, index) {
+                        final section = sections[index];
+                        return RepaintBoundary(
+                          key: ValueKey('section_${section.id}'), // Senior Fix: Diffing Engine para preservación de estado
+                          child: _buildSection(section, horizontalPadding),
+                        );
+                      },
                       childCount: sections.length,
                     ),
                   ),
@@ -1287,10 +1313,13 @@ class _ContinueWatchingSection extends ConsumerWidget {
         if (filteredItems.isEmpty) return const SizedBox.shrink();
 
         return RepaintBoundary(
-          child: WideContentRow(
-            title: 'Continuar Viendo',
-            items: filteredItems.map((h) => _mapHistoryToWide(ref, h)).toList(),
-            onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8), // Senior Fix: Espacio extra para que no se pegue el texto de progreso
+            child: WideContentRow(
+              title: 'Continuar Viendo',
+              items: filteredItems.map((h) => _mapHistoryToWide(ref, h)).toList(),
+              onItemTap: (wideItem) => _onTap(context, wideItem.originalItem as PlaybackHistory),
+            ),
           ),
         );
       },
@@ -1301,23 +1330,33 @@ class _ContinueWatchingSection extends ConsumerWidget {
   }
 
   WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
+    final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
+
     String displayTitle = h.title ?? 'Contenido';
-    final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
-    if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+    if (isMovieish) {
+      displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '').trim();
+    } else if (h.episode != null && h.episode!.isNotEmpty) {
       displayTitle = 'Ep ${h.episode} • $displayTitle';
     }
 
     String remainingText = '';
     final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
     if (remainingMs > 0) {
-      final minutes = (remainingMs / 60000).ceil();
-      remainingText = 'Quedan $minutes min';
+      remainingText = 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}';
     }
+
+    final String? rawUrl = h.bannerUrl ?? h.posterUrl;
+    final String? logoUrl = h.logoUrl;
 
     return WideContentItem(
       id: h.contentId,
       title: displayTitle,
-      imageUrl: h.bannerUrl ?? h.posterUrl ?? '',
+      imageUrl: ApiEndpoints.proxyImage(
+        rawUrl,
+        // Senior Optimization: 1280px para películas/movie_anime para nitidez en Wide Cards
+        width: isMovieish ? 1280 : 800,
+      ),
+      logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
       progress: h.progress,
       subtitle: remainingText,
       onDelete: () {
@@ -1337,8 +1376,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
         '&category=${Uri.encodeComponent(item.category ?? "anime")}'
         '&title=${Uri.encodeComponent(item.title ?? "")}'
         '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-        '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
-        '&language=${Uri.encodeComponent(item.language ?? "")}';
+        '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}';
     context.push(uri);
   }
 }

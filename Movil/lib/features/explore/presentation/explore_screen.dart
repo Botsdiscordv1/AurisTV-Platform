@@ -5,7 +5,6 @@ import 'package:collection/collection.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
-import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../schedule/presentation/schedule_screen.dart';
 
 final _exploreFilterProvider = StateProvider<String>((ref) => 'En Emisión');

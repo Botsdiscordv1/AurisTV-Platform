@@ -131,6 +131,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           final h = history[index];
                           
                           // Senior Logic: Misma lógica de imagen que en Home
+                          final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
                           final bool useEpisodeThumb = _isHighQualityThumbnail(h.posterUrl);
                           final String finalImageUrl = useEpisodeThumb 
                               ? (h.posterUrl ?? '') 
@@ -138,8 +139,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
                           // Formateo de Título
                           String displayTitle = h.title ?? 'Contenido';
-                          final bool isMovie = h.category?.toLowerCase().contains('movie') ?? false;
-                          if (!isMovie && h.episode != null && h.episode!.isNotEmpty) {
+                          if (isMovieish) {
+                            displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '').trim();
+                          } else if (h.episode != null && h.episode!.isNotEmpty) {
                             displayTitle = 'Ep ${h.episode} • $displayTitle';
                           }
 
@@ -147,20 +149,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           String remainingText = '';
                           final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
                           if (remainingMs > 0) {
-                            final duration = Duration(milliseconds: remainingMs);
-                            final hours = duration.inHours;
-                            final minutes = duration.inMinutes % 60;
-                            if (hours > 0) {
-                              remainingText = '$hours h $minutes min restantes';
-                            } else {
-                              remainingText = '${minutes > 0 ? minutes : 1} min restantes';
-                            }
+                            remainingText = 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}';
                           }
 
                           return _HistoryCard(
                             item: h,
                             displayTitle: displayTitle,
-                            imageUrl: finalImageUrl,
+                            imageUrl: ApiEndpoints.proxyImage(
+                              finalImageUrl,
+                              // Senior Optimization: 1280px para películas/movie_anime para nitidez en TV
+                              width: isMovieish ? 1280 : 800,
+                            ),
+                            logoUrl: h.logoUrl,
                             remainingText: remainingText,
                           );
                         },
@@ -313,12 +313,14 @@ class _HistoryCard extends StatelessWidget {
   final PlaybackHistory item;
   final String displayTitle;
   final String imageUrl;
+  final String? logoUrl;
   final String remainingText;
 
   const _HistoryCard({
     required this.item,
     required this.displayTitle,
     required this.imageUrl,
+    this.logoUrl,
     required this.remainingText,
   });
 
@@ -335,8 +337,7 @@ class _HistoryCard extends StatelessWidget {
             '&category=${Uri.encodeComponent(item.category ?? "anime")}'
             '&title=${Uri.encodeComponent(item.title ?? "")}'
             '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-            '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}'
-            '&language=${Uri.encodeComponent(item.language ?? "")}';
+            '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}';
         context.push(uri);
       },
       child: SizedBox(
@@ -356,6 +357,25 @@ class _HistoryCard extends StatelessWidget {
                       placeholder: (_, __) => Container(color: Colors.white10),
                       errorWidget: (_, __, ___) => Container(color: Colors.white10),
                     ),
+                    if (logoUrl != null && logoUrl!.isNotEmpty)
+                      Positioned(
+                        bottom: 12,
+                        left: 8,
+                        right: 8,
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              maxWidth: 180,
+                              maxHeight: 60,
+                            ),
+                            child: CachedNetworkImage(
+                              imageUrl: ApiEndpoints.proxyImage(logoUrl!),
+                              fit: BoxFit.contain,
+                              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                            ),
+                          ),
+                        ),
+                      ),
                     Positioned(
                       bottom: 0, left: 0, right: 0,
                       child: Container(
