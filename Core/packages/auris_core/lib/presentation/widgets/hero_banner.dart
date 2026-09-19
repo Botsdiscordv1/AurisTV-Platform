@@ -357,9 +357,11 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     if (widget.items.isEmpty) return const SizedBox.shrink();
     final double screenWidth = MediaQuery.of(context).size.width;
     
-    // Senior Strategy: Tablets (MD) usan Layout Mobile para mejor legibilidad vertical,
-    // pero a partir de LG (1024) saltamos a Cinematic.
-    final bool useMobileLayout = context.breakpoint < Breakpoint.lg;
+    // Senior Strategy: Dispositivos con ancho > 600 (como Z Fold desplegado) 
+    // usan el Layout "Cápsula" (cinematic) para optimizar el espacio vertical.
+    final bool useMobileLayout = context.breakpoint < Breakpoint.sm || 
+                                (context.breakpoint < Breakpoint.lg && screenWidth < 600);
+    
     final HeroBannerLayout layout = widget.layout ?? (useMobileLayout ? HeroBannerLayout.mobile : HeroBannerLayout.cinematic);
 
     return VisibilityDetector(

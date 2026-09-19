@@ -228,11 +228,22 @@ class ResponsiveUtils {
   /// Evita que el banner sea demasiado "fino" en tablets y demasiado "alto" en monitores ultrawide.
   static double heroAspectRatio(BuildContext context) {
     final b = getBreakpoint(context);
+    final double width = MediaQuery.of(context).size.width;
+
     if (b == Breakpoint.base) return 16 / 11;
-    if (b == Breakpoint.sm) return 16 / 10;
-    if (b == Breakpoint.md) return 2.0; // Tablets: Más inmersivo pero menos ancho que desktop
+    
+    // Senior Fix: Para plegables y móviles anchos (sm/md), aumentamos el ratio 
+    // para evitar que el banner vertical asfixie el contenido inferior.
+    if (b == Breakpoint.sm) {
+      return width > 600 ? 2.2 : 1.8;
+    }
+    
+    if (b == Breakpoint.md) {
+      return 2.3; // Tablets: Más cinemático y menos alto
+    }
+    
     if (b == Breakpoint.lg) return 2.4;
-    return 2.8; // Restaurado a 2.8 para no afectar a Desktop Web
+    return 2.8; 
   }
 
   /// Senior UI Strategy: Tamaños de fuente para el HeroBanner (Cinematic).
