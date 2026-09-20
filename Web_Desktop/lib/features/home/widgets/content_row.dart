@@ -169,8 +169,8 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
           ],
           const SizedBox(height: 8),
           MouseRegion(
-            onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
-            onExit: (_) { if (mounted) setState(() => _isHovered = false); },
+            onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+            onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
             child: Stack(
               children: [
                 LayoutBuilder(
@@ -312,7 +312,7 @@ class _SeeMoreButtonState extends State<_SeeMoreButton> {
   @override
   Widget build(BuildContext context) {
     return FocusableActionDetector(
-      onShowHoverHighlight: (show) => setState(() => _isHovered = show),
+      onShowHoverHighlight: (show) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = show); }); },
       child: MouseRegion(
         child: Row(
           mainAxisSize: MainAxisSize.min,

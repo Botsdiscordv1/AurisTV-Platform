@@ -381,8 +381,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         }
       },
       child: MouseRegion(
-        onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
-        onExit: (_) { if (mounted) setState(() => _isHovered = false); },
+        onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+        onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
         child: Focus(
           autofocus: widget.autofocus,
           onFocusChange: (focused) {
@@ -594,9 +594,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                 ),
               ),
             ),
-            // Senior Fix Web: Escudo transparente con PointerInterceptor para "matar" 
+            // Senior Fix Web: Escudo transparente con PointerInterceptor para "matar"
             // los clics antes de que lleguen al iframe de YouTube.
-            if (kIsWeb)
+            // Solo se monta cuando el video ya es visible: un PointerInterceptor
+            // crea un DIV HTML que bloquea mouse/scroll aunque el AnimatedOpacity
+            // este en 0 o haya un IgnorePointer encima.
+            if (kIsWeb && _videoReady && _showTrailerLayer)
               Positioned.fill(
                 child: PointerInterceptor(
                   intercepting: true,

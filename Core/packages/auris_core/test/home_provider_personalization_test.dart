@@ -17,6 +17,7 @@ class MockPersonalizedRepo implements AurisRepository {
   Future<SearchResponse> filter({String? genre, int? year, String? category, String? status, String? idioma, int page = 1, String? source}) async => SearchResponse(results: [], query: '', category: category ?? '', count: 0);
 
   // Stubs
+  @override Future<int> getHomeVersion({String? category}) async => 0;
   @override Future<void> sendUserEvent({required String userId, required String animeId, required String event, String? sectionId}) async {}
   @override Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase, String? imgSize, CancelToken? cancelToken}) async => SearchResponse(results: [], query: query, category: category, count: 0);
   @override Stream<SearchResponse> searchStream(String category, String query, {int? year, String? server, String? phase, String? imgSize, CancelToken? cancelToken}) async* {}
@@ -26,10 +27,10 @@ class MockPersonalizedRepo implements AurisRepository {
   @override Future<List<MediaItem>> getHomeHero({String category = 'anime', String? imgSize}) async => [];
   @override Future<ScheduleResponse> getSchedule() async => const ScheduleResponse(days: [], season: '1', year: 2026, total: 0);
   @override Future<List<SourceInfo>> getSources() async => [];
-  @override Future<EditorialResponse> getEditorial({String? imgSize, String? category}) async => const EditorialResponse(generatedAt: '', locale: '', sections: []);
+  @override Future<EditorialResponse> getEditorial({String? imgSize, String? category, String? userId}) async => const EditorialResponse(generatedAt: '', locale: '', sections: []);
   @override Future<AnimeTitleInfo> getAnimeTitles(String query) async => const AnimeTitleInfo();
   @override Future<MovieTitleInfo> getMovieTitles(String query) async => const MovieTitleInfo();
-  @override Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false}) async => const ExtractResult(url: '', headers: {});
+  @override Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken}) async => const ExtractResult(url: '', headers: {});
   @override Future<String> resolveEpisodeUrl(String url, String source, int episode, {String? category}) async => '';
   @override Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year}) async => EpisodesResponse(episodes: const [], source: source, url: url, slug: '', total: 0);
   @override Future<List<OmdbEpisode>> getOmdbSeason({required String title, int season = 1, bool enrich = true}) async => [];
@@ -99,27 +100,24 @@ void main() {
 
     // 1. Cargar para Usuario A
     container.read(authProvider.notifier).state = UserAccount(id: userIdA, activeProfileId: userIdA);
-    final layoutA = await container.read(homeLayoutProvider.future);
-    // CW is always first (Functional Priority 0), Para A is Recommendation (Priority 1)
+    final layoutA = await container.read(homeLayoutProvider.stream).firstWhere((l) => l.any((s) => s.title == 'Para A'));
     expect(layoutA.any((s) => s.title == 'Para A'), isTrue);
 
     // 2. Cambiar a Usuario B
     container.read(authProvider.notifier).state = UserAccount(id: userIdB, activeProfileId: userIdB);
-    final layoutB = await container.read(homeLayoutProvider.future);
+    final layoutB = await container.read(homeLayoutProvider.stream).firstWhere((l) => l.any((s) => s.title == 'Para B'));
     expect(layoutB.any((s) => s.title == 'Para B'), isTrue);
 
     // 3. Verificar que el cache no se mezcla (Leyendo directamente de Hive)
     final box = Hive.box('home_cache');
-    final cacheA = box.get('personalized_home_$userIdA');
-    final cacheB = box.get('personalized_home_$userIdB');
+    final cacheA = box.get('personalized_home_${userIdA}_inicio');
+    final cacheB = box.get('personalized_home_${userIdB}_inicio');
 
     expect(cacheA['userId'], userIdA);
     expect(cacheB['userId'], userIdB);
   });
 
   test('homeLayoutProvider — Fallback to editorial on error', () async {
-    // 1. Simular error (Simplemente no devolviendo nada en el mock y que lance excepción)
-    // Cambiamos el mock para que lance error
     final containerError = ProviderContainer(
       overrides: [
         aurisRepositoryProvider.overrideWithValue(ErrorRepo()),
@@ -127,9 +125,8 @@ void main() {
       ],
     );
 
-    final layout = await containerError.read(homeLayoutProvider.future);
+    final layout = await containerError.read(homeLayoutProvider.stream).firstWhere((l) => l.any((s) => s.title == 'Recién añadido a AurisTV'));
     
-    // El fallback editorial contiene "Recién añadido a AurisTV"
     final titles = layout.map((s) => s.title).toList();
     expect(titles, contains('Recién añadido a AurisTV'));
   });
@@ -146,7 +143,7 @@ void main() {
           id: 'sec_1', 
           title: 'Section Forced Wide', 
           strategy: 's', 
-          type: 'editorial', // Default would be poster if title not matched
+          type: 'editorial', 
           priority: 1, 
           format: 'wide',
           items: [
@@ -168,7 +165,7 @@ void main() {
       generatedAt: ''
     );
 
-    final layout = await container.read(homeLayoutProvider.future);
+    final layout = await container.read(homeLayoutProvider.stream).firstWhere((l) => l.any((s) => s.title == 'Section Forced Wide'));
 
     final wideSection = layout.firstWhere((s) => s.title == 'Section Forced Wide');
     final top10Section = layout.firstWhere((s) => s.title == 'Section Forced Top10');
@@ -201,5 +198,24 @@ class ErrorRepo extends MockPersonalizedRepo {
   @override
   Future<HomeResponse> getUserHome({required String userId, String? category}) async {
     throw Exception("Backend Down");
+  }
+
+  @override
+  Future<EditorialResponse> getEditorial({String? imgSize, String? category, String? userId}) async {
+    return const EditorialResponse(
+      generatedAt: '2026-03-30T12:00:00Z',
+      locale: 'es-MX',
+      sections: [
+        EditorialSection(
+          id: 'recent',
+          title: 'Recién añadido a AurisTV',
+          badge: 'essential',
+          format: 'poster',
+          items: [
+            EditorialItem(id: 'item_1', title: 'Test Anime', posterUrl: 'url', badge: 'essential')
+          ],
+        )
+      ],
+    );
   }
 }

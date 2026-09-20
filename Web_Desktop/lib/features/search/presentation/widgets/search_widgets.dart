@@ -132,8 +132,8 @@ class _GenreCardState extends State<_GenreCard> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+      onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
       child: AnimatedScale(
         scale: _isHovered ? 1.05 : 1.0,
         duration: const Duration(milliseconds: 200),
@@ -272,8 +272,8 @@ class _ChartRowState extends State<_ChartRow> {
     final double itemWidth = widget.chart.isTop10 ? posterHeight * 1.1 : posterHeight * 0.7;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+      onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -389,8 +389,8 @@ class _StandardDiscoveryCardState extends State<_StandardDiscoveryCard> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+      onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedScale(

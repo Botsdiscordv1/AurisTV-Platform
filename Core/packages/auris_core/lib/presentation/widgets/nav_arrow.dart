@@ -59,7 +59,7 @@ class _NavArrowState extends State<NavArrow> {
       color: Colors.transparent,
       child: InkWell(
         onTap: widget.onTap,
-        onHover: (hovered) => setState(() => _isHovered = hovered),
+        onHover: (hovered) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = hovered); }); },
         hoverColor: Colors.transparent,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,

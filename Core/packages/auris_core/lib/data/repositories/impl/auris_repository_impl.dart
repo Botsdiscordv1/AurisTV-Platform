@@ -757,7 +757,7 @@ class AurisRepositoryImpl implements AurisRepository {
   }
 
   @override
-  Future<EditorialResponse> getEditorial({String? imgSize, String? category}) async {
+  Future<EditorialResponse> getEditorial({String? imgSize, String? category, String? userId}) async {
     Future<EditorialResponse?> fetchEditorial(String baseUrl, [String? targetCat]) async {
       try {
         final params = <String, dynamic>{'locale': 'es-MX'};
@@ -812,6 +812,30 @@ class AurisRepositoryImpl implements AurisRepository {
         if (res.generatedAt.compareTo(latestGeneratedAt) > 0) {
           latestGeneratedAt = res.generatedAt;
         }
+      }
+    }
+
+    if (userId != null && userId.isNotEmpty) {
+      try {
+        final response = await _client.get(
+          '/api/home/top10/personalized',
+          queryParameters: {'userId': userId},
+          baseUrl: ApiEndpoints.animeBaseUrl,
+        );
+        if (response.data != null && response.data is Map) {
+          final respMap = Map<String, dynamic>.from(response.data as Map);
+          final dataMap = respMap['data'] as Map<String, dynamic>?;
+          final sectionMap = dataMap?['section'] as Map<String, dynamic>?;
+          if (sectionMap != null) {
+            final personalizedSection = EditorialSection.fromJson(sectionMap);
+            final idx = allSections.indexWhere((s) => s.id == 'top10Airing');
+            if (idx != -1) {
+              allSections[idx] = personalizedSection;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[AurisRepo] Error fetching personalized top10: $e');
       }
     }
 

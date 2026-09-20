@@ -25,10 +25,12 @@ class MockAurisRepository implements AurisRepository {
   @override Future<HomeResponse> getUserHome({required String userId, String? category}) async => HomeResponse(userId: userId, maturityLevel: 'cold', sections: [], generatedAt: '');
   @override Future<ScheduleResponse> getSchedule() async => const ScheduleResponse(days: [], season: '1', year: 2026, total: 0);
   @override Future<List<SourceInfo>> getSources() async => [];
-  @override Future<EditorialResponse> getEditorial({String? imgSize, String? category}) async => const EditorialResponse(generatedAt: '', locale: '', sections: []);
+  @override Future<EditorialResponse> getEditorial({String? imgSize, String? category, String? userId}) async => const EditorialResponse(generatedAt: '', locale: '', sections: []);
+  @override Future<SearchResponse> filter({String? genre, int? year, String? category, String? status, String? idioma, int page = 1, String? source}) async => SearchResponse(results: [], query: '', category: category ?? '', count: 0);
+  @override Future<int> getHomeVersion({String? category}) async => 0;
   @override Future<AnimeTitleInfo> getAnimeTitles(String query) async => const AnimeTitleInfo();
   @override Future<MovieTitleInfo> getMovieTitles(String query) async => const MovieTitleInfo();
-  @override Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false}) async => const ExtractResult(url: '', headers: {});
+  @override Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken}) async => const ExtractResult(url: '', headers: {});
   @override Future<String> resolveEpisodeUrl(String url, String source, int episode, {String? category}) async => '';
   @override Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year}) async => EpisodesResponse(episodes: const [], source: source, url: url, slug: '', total: 0);
   @override Future<List<OmdbEpisode>> getOmdbSeason({required String title, int season = 1, bool enrich = true}) async => [];

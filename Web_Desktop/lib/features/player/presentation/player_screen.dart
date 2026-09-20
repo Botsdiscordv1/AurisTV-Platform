@@ -3744,7 +3744,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   MouseRegion(
                     onHover: (_) { 
                       if (ResponsiveUtils.isTactic(context)) return;
-                      if (!_showControls && !_isLocked) setState(() => _showControls = true); 
+                      if (!_showControls && !_isLocked) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _showControls = true); });
+                      }
                       _startHideTimer(); 
                     }, 
                     cursor: showAnyway ? SystemMouseCursors.basic : SystemMouseCursors.none, 
@@ -5395,8 +5397,8 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
     return Focus(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       child: MouseRegion(
-        onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
-        onExit: (_) { if (mounted) setState(() => _isHovered = false); },
+        onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+        onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
         child: GestureDetector(
           onTap: widget.onTap,
           child: AnimatedScale(

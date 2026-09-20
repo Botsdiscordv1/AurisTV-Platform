@@ -235,8 +235,10 @@ class EditorialSectionsNotifier extends FamilyAsyncNotifier<List<EditorialSectio
   Future<List<EditorialSection>> _refreshFromNetwork(String category) async {
     try {
       final repo = ref.read(aurisRepositoryProvider);
+      final authState = ref.read(authProvider);
+      final String userId = authState?.activeProfileId ?? authState?.id ?? 'guest_profile';
       // Senior Fix: Solicitamos calidad w780 para secciones editoriales para optimizar carga con soporte de categoría.
-      final response = await repo.getEditorial(imgSize: 'w780', category: category);
+      final response = await repo.getEditorial(imgSize: 'w780', category: category, userId: userId);
       final box = Hive.box('home_cache');
       await box.put('editorial_sections_$category', response.sections.map((e) => e.toJson()).toList());
       state = AsyncData(response.sections);
@@ -352,11 +354,11 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
   // --- ETAPA 2: EDITORIAL (Rápida ~400ms) ---
   final editorialFutures = <Future<EditorialResponse>>[
     if (currentCategory == 'inicio') ...[
-      repo.getEditorial(imgSize: 'w780', category: 'películas').timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
-      repo.getEditorial(imgSize: 'w780', category: 'series').timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
-      repo.getEditorial(imgSize: 'w780', category: 'animes').timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+      repo.getEditorial(imgSize: 'w780', category: 'películas', userId: userId).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+      repo.getEditorial(imgSize: 'w780', category: 'series', userId: userId).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+      repo.getEditorial(imgSize: 'w780', category: 'animes', userId: userId).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
     ] else
-      repo.getEditorial(imgSize: 'w780', category: currentCategory).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []))
+      repo.getEditorial(imgSize: 'w780', category: currentCategory, userId: userId).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []))
   ];
 
   final userHomeFuture = repo.getUserHome(userId: userId, category: currentCategory).timeout(const Duration(seconds: 15)).catchError((e) {

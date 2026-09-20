@@ -63,8 +63,8 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> {
         }
       },
       child: MouseRegion(
-        onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
-        onExit: (_) { if (mounted) setState(() => _isHovered = false); },
+        onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+        onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
         child: GestureDetector(
           onTap: widget.onTap,
           child: SizedBox(

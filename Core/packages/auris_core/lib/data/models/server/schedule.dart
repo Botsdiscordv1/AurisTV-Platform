@@ -14,11 +14,14 @@ class ScheduleResponse {
   });
 
   factory ScheduleResponse.fromJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> data = (json.containsKey('data') && json['data'] is Map)
+        ? Map<String, dynamic>.from(json['data'] as Map)
+        : json;
     return ScheduleResponse(
-      season: json['season'] as String? ?? '',
-      year: json['year'] as int? ?? 0,
-      total: json['total'] as int? ?? 0,
-      days: (json['days'] as List<dynamic>?)
+      season: data['season'] as String? ?? '',
+      year: data['year'] as int? ?? 0,
+      total: data['total'] as int? ?? 0,
+      days: (data['days'] as List<dynamic>?)
               ?.map((e) => ScheduleDay.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],

@@ -145,8 +145,8 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
         );
       },
       child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
+        onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+        onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
         child: GestureDetector(
           onPanStart: (_) {
             _snapController.stop();

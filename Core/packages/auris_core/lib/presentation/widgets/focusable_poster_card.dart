@@ -85,9 +85,15 @@ class FocusablePosterCard extends StatefulWidget {
 
 class _FocusablePosterCardState extends State<FocusablePosterCard> {
   bool _focused = false;
-  bool _hovered = false;
+  final ValueNotifier<bool> _hovered = ValueNotifier<bool>(false);
 
-  bool get _isActive => _focused || _hovered;
+  bool get _isActive => _focused || _hovered.value;
+
+  @override
+  void dispose() {
+    _hovered.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,8 +101,8 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
     final double normalWidth = ResponsiveUtils.posterWidth(context);
 
     return MouseRegion(
-      onEnter: (_) { if (mounted) setState(() => _hovered = true); },
-      onExit: (_) { if (mounted) setState(() => _hovered = false); },
+      onEnter: (_) { _hovered.value = true; },
+      onExit: (_) { _hovered.value = false; },
       child: Focus(
         onFocusChange: (focused) => setState(() => _focused = focused),
         onKeyEvent: (node, event) {
@@ -110,189 +116,180 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
           }
           return KeyEventResult.ignored;
         },
-        child: GestureDetector(
-          onTap: () => SafeTap.run(widget.onTap),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AspectRatio(
-                aspectRatio: 2 / 3,
-                  child: AnimatedContainer(
-                    duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
-                    curve: Curves.easeOutQuint,
-                    transform: Matrix4.translationValues(0, _isActive ? -6 : 0, 0),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: _isActive
-                          ? [BoxShadow(color: Colors.white.withOpacity(0.18), blurRadius: 30, spreadRadius: 2)]
-                          : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // 1. EL PÓSTER (Base)
-                        ClipRRect(
+        child: ValueListenableBuilder<bool>(
+          valueListenable: _hovered,
+          builder: (context, hovered, _) {
+            final isActive = _focused || hovered;
+            return GestureDetector(
+              onTap: () => SafeTap.run(widget.onTap),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AspectRatio(
+                    aspectRatio: 2 / 3,
+                      child: AnimatedContainer(
+                        duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
+                        curve: Curves.easeOutQuint,
+                        transform: Matrix4.translationValues(0, isActive ? -6 : 0, 0),
+                        decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          clipBehavior: Clip.antiAliasWithSaveLayer,
-                          child: AnimatedScale(
-                            scale: _isActive ? 1.10 : 1.0,
-                            duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
-                            curve: Curves.easeOutQuint,
-                          child: Builder(
-                            builder: (context) {
-                              final dpr = MediaQuery.of(context).devicePixelRatio;
-                              final targetWidth = (normalWidth * dpr).round();
-                              final targetHeight = (targetWidth * 1.5).round();
-
-                              return CachedNetworkImage(
-                                imageUrl: ApiEndpoints.proxyImage(
-                                  widget.posterUrl,
-                                  policy: ImageSize.poster,
-                                ),
-                                fit: BoxFit.cover,
-                                memCacheWidth: targetWidth.clamp(1, 2048),
-                                filterQuality: FilterQuality.medium,
-                                placeholder: (context, url) => _letterPlaceholder(widget.title),
-                                errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
-                              );
-                            }
-                          ),
+                          boxShadow: isActive
+                              ? [BoxShadow(color: Colors.white.withOpacity(0.18), blurRadius: 30, spreadRadius: 2)]
+                              : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
                         ),
-                      ),
-
-                      // 2. OVERLAYS (Clipeados individualmente o por el Stack)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        clipBehavior: Clip.antiAliasWithSaveLayer, // Senior Fix: Máxima calidad de recorte
                         child: Stack(
+                          fit: StackFit.expand,
                           children: [
-                            // TOP-LEFT: Airing
-                            if (widget.airingOverlay != null)
-                              Positioned(
-                                top: -1, left: -1, // Senior Fix: Sangrado para evitar fugas en la curva
-                                child: widget.airingOverlay!
-                              ),
-
-                            // TOP-RIGHT: Category
-                            if (widget.badge != null)
-                              Positioned(
-                                top: -1, right: -1, // Senior Fix: Sangrado
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: widget.badgeColor ?? const Color(0xFF1E1E26).withOpacity(0.9),
-                                    borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8)),
-                                    border: Border.all(color: Colors.white10, width: 0.5),
-                                  ),
-                                  child: Text(
-                                    widget.badge!,
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5
-                                    )
-                                  ),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              clipBehavior: Clip.antiAliasWithSaveLayer,
+                              child: AnimatedScale(
+                                scale: isActive ? 1.10 : 1.0,
+                                duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
+                                curve: Curves.easeOutQuint,
+                                child: Builder(
+                                  builder: (context) {
+                                    final dpr = MediaQuery.of(context).devicePixelRatio;
+                                    final targetWidth = (normalWidth * dpr).round();
+                                    return CachedNetworkImage(
+                                      imageUrl: ApiEndpoints.proxyImage(
+                                        widget.posterUrl,
+                                        policy: ImageSize.poster,
+                                      ),
+                                      fit: BoxFit.cover,
+                                      memCacheWidth: targetWidth.clamp(1, 2048),
+                                      filterQuality: FilterQuality.medium,
+                                      placeholder: (context, url) => _letterPlaceholder(widget.title),
+                                      errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
+                                    );
+                                  },
                                 ),
                               ),
+                            ),
 
-                            // BOTTOM-RIGHT: Season
-                            if (widget.badgeOverlay != null)
-                              Positioned(
-                                bottom: (widget.progress != null && widget.progress! > 0) ? 3 : -1,
-                                right: -1, // Senior Fix: Sangrado
-                                child: widget.badgeOverlay!
-                              ),
-
-                            // BOTTOM-LEFT: Episode/Status
-                            if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
-                              Positioned(
-                                bottom: (widget.progress != null && widget.progress! > 0) ? 3 : -1,
-                                left: -1, // Senior Fix: Sangrado
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: widget.subtitleColor ?? const Color(0xFF1E1E26).withOpacity(0.95),
-                                    borderRadius: const BorderRadius.only(topRight: Radius.circular(8)),
-                                    border: Border.all(color: Colors.white10, width: 0.5),
-                                  ),
-                                  child: Text(
-                                    widget.subtitle!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.3,
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              clipBehavior: Clip.antiAliasWithSaveLayer,
+                              child: Stack(
+                                children: [
+                                  if (widget.airingOverlay != null)
+                                    Positioned(
+                                      top: -1, left: -1,
+                                      child: widget.airingOverlay!
                                     ),
-                                  ),
-                                ),
-                              ),
-
-                            // PROGRESS BAR
-                            if (widget.progress != null && widget.progress! > 0)
-                              Positioned(
-                                bottom: 0, left: 0, right: 0,
-                                child: Container(
-                                  height: 4,
-                                  color: Colors.black45,
-                                  child: FractionallySizedBox(
-                                    alignment: Alignment.centerLeft,
-                                    widthFactor: widget.progress!.clamp(0.0, 1.0),
-                                    child: Container(
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFEF7A1E),
-                                        boxShadow: [BoxShadow(color: Color(0xFFEF7A1E), blurRadius: 4)],
+                                  if (widget.badge != null)
+                                    Positioned(
+                                      top: -1, right: -1,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: widget.badgeColor ?? const Color(0xFF1E1E26).withOpacity(0.9),
+                                          borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(8)),
+                                          border: Border.all(color: Colors.white10, width: 0.5),
+                                        ),
+                                        child: Text(
+                                          widget.badge!,
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.5
+                                          )
+                                        ),
                                       ),
                                     ),
+                                  if (widget.badgeOverlay != null)
+                                    Positioned(
+                                      bottom: (widget.progress != null && widget.progress! > 0) ? 3 : -1,
+                                      right: -1,
+                                      child: widget.badgeOverlay!
+                                    ),
+                                  if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
+                                    Positioned(
+                                      bottom: (widget.progress != null && widget.progress! > 0) ? 3 : -1,
+                                      left: -1,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: widget.subtitleColor ?? const Color(0xFF1E1E26).withOpacity(0.95),
+                                          borderRadius: const BorderRadius.only(topRight: Radius.circular(8)),
+                                          border: Border.all(color: Colors.white10, width: 0.5),
+                                        ),
+                                        child: Text(
+                                          widget.subtitle!,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  if (widget.progress != null && widget.progress! > 0)
+                                    Positioned(
+                                      bottom: 0, left: 0, right: 0,
+                                      child: Container(
+                                        height: 4,
+                                        color: Colors.black45,
+                                        child: FractionallySizedBox(
+                                          alignment: Alignment.centerLeft,
+                                          widthFactor: widget.progress!.clamp(0.0, 1.0),
+                                          child: Container(
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFFEF7A1E),
+                                              boxShadow: [BoxShadow(color: Color(0xFFEF7A1E), blurRadius: 4)],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+
+                            IgnorePointer(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isActive ? Colors.white : Colors.transparent,
+                                    width: isActive ? 3.0 : 0.0,
                                   ),
                                 ),
                               ),
+                            ),
                           ],
                         ),
                       ),
-
-                      // 3. EL BORDE (Capa Superior para sellar imperfecciones)
-                      IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _isActive ? Colors.white : Colors.transparent,
-                              width: _isActive ? 3.0 : 0.0,
-                            ),
+                    ),
+                  if (widget.showInfo) ...[
+                    SizedBox(height: isMobile ? ResponsiveUtils.sp(context, 8) : 8),
+                    SizedBox(
+                      height: isMobile ? ResponsiveUtils.sp(context, 22) : 28,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: MarqueeText(
+                          text: widget.title,
+                          animate: isMobile ? true : isActive,
+                          style: GoogleFonts.poppins(
+                            color: isActive ? Colors.white : Colors.white.withOpacity(0.95),
+                            fontSize: ResponsiveUtils.posterTitleFontSize(context),
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                            letterSpacing: 0.2,
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              if (widget.showInfo) ...[
-                SizedBox(height: isMobile ? ResponsiveUtils.sp(context, 8) : 8),
-                // Senior Fix: Solo mostramos el título debajo. Altura fija para una sola línea.
-                SizedBox(
-                  height: isMobile ? ResponsiveUtils.sp(context, 22) : 28,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: MarqueeText(
-                      text: widget.title,
-                      animate: isMobile ? true : _isActive,
-                      style: GoogleFonts.poppins(
-                        color: _isActive ? Colors.white : Colors.white.withOpacity(0.95),
-                        fontSize: ResponsiveUtils.posterTitleFontSize(context),
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                        letterSpacing: 0.2,
-                      ),
                     ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+                  ],
+                ],
+              ),
+            );
+          },
         ),
       ),
     );

@@ -9,9 +9,7 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
 
 // --- Galería Local Helpers ---
@@ -153,25 +151,7 @@ class _RatingSkeleton extends StatelessWidget {
   const _RatingSkeleton({required this.width, required this.height, this.mobile = false});
   @override
   Widget build(BuildContext context) {
-    final base = mobile ? 18.0 : 24.0;
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.35, end: 1.0),
-      duration: const Duration(milliseconds: 900),
-      curve: Curves.easeInOut,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: mobile ? value : value * 0.85,
-          child: Container(
-            width: width,
-            height: height,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(base / 2),
-            ),
-          ),
-        );
-      },
-    );
+    return DetailRatingSkeleton(width: width, height: height, mobile: mobile);
   }
 }
 
@@ -182,24 +162,7 @@ class _SkeletonBox extends StatelessWidget {
   const _SkeletonBox({required this.width, required this.height, this.borderRadius = 4});
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.35, end: 1.0),
-      duration: const Duration(milliseconds: 900),
-      curve: Curves.easeInOut,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Container(
-            width: width,
-            height: height,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(borderRadius),
-            ),
-          ),
-        );
-      },
-    );
+    return DetailSkeletonBox(width: width, height: height, borderRadius: borderRadius);
   }
 }
 
@@ -635,6 +598,12 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     );
     final heroTitle = widget.title;
 
+    final double width = MediaQuery.of(context).size.width;
+    final bool isWide = width > 600;
+
+    // Altura adaptativa: En móvil vertical es proporcional, en horizontal es fija contenida.
+    final double appBarHeight = isWide ? 420 : (width * 0.85);
+
     return MouseRegion(
       onHover: (_) => _handleInteraction(),
       child: Listener(
@@ -643,102 +612,155 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         onPointerHover: (_) => _handleInteraction(),
         child: Column(children: [
           Stack(clipBehavior: Clip.hardEdge, children: [
-            AspectRatio(aspectRatio: 16 / 12, child: LayoutBuilder(builder: (context, constraints) {
-              return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
-                Container(color: const Color(0xFF0B0B0D)),
-                if (b != null) Positioned.fill(child: ShaderMask(
-                  shaderCallback: (rect) => const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.black, Colors.transparent],
-                    stops: [0.4, 1.0],
-                  ).createShader(rect),
-                  blendMode: BlendMode.dstIn,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 1200),
-                    curve: Curves.easeInOut,
-                    opacity: _revealed ? 1.0 : 0.0,
-                    child: CachedNetworkImage(imageUrl: b, fit: BoxFit.cover, alignment: Alignment.topCenter, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
-                  ),
-                )),
+            SizedBox(
+              width: double.infinity,
+              height: appBarHeight,
+              child: LayoutBuilder(builder: (context, constraints) {
+                return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
+                  Container(color: const Color(0xFF0B0B0D)),
+                  if (b != null) Positioned.fill(child: ShaderMask(
+                    shaderCallback: (rect) => LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: const [Colors.black, Colors.black, Colors.black54, Colors.transparent],
+                      stops: isWide ? const [0.0, 0.5, 0.8, 1.0] : const [0.4, 0.6, 0.8, 1.0],
+                    ).createShader(rect),
+                    blendMode: BlendMode.dstIn,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 1200),
+                      curve: Curves.easeInOut,
+                      opacity: _revealed ? 1.0 : 0.0,
+                      child: CachedNetworkImage(
+                        imageUrl: b,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        fadeInDuration: const Duration(milliseconds: 300),
+                        errorWidget: (_, __, ___) => Container(color: Colors.black12)
+                      )
+                    ),
+                  )),
 
-                // Senior UI Strategy: Máscaras Pro unificadas (Mismo sistema que Hero)
+                  // 1. DIMMING: Opacado general para quitar brillo
+                  Container(color: Colors.black.withOpacity(0.2)),
 
-                // 1. DIMMING: Opacado general para quitar brillo
-                Container(color: Colors.black.withOpacity(0.2)),
-
-                // 2. PROTECCIÓN SUPERIOR: Para el botón de "Atrás" y barra de estado
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withOpacity(0.5),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.3],
+                  // 2. PROTECCIÓN SUPERIOR: Para el botón de "Atrás"
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.black.withOpacity(0.5), Colors.transparent],
+                          stops: const [0.0, 0.3],
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                if (_ytController != null)
-                  Positioned.fill(
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 800),
-                      opacity: _showPlayer ? 1.0 : 0.0,
-                      child: IgnorePointer(
-                        ignoring: !_showPlayer,
-                        child: PointerInterceptor(
-                          child: YoutubePlayer(
-                            controller: _ytController!,
+                  if (_ytController != null)
+                    Positioned.fill(
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 800),
+                        opacity: _showPlayer ? 1.0 : 0.0,
+                        child: IgnorePointer(
+                          ignoring: !_showPlayer,
+                          child: PointerInterceptor(
+                            child: YoutubePlayer(controller: _ytController!),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // LOGO / TÍTULO: Centrado y contenido en modo Wide
+                  Positioned(
+                    left: 0, bottom: 16, right: 0,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1000),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 1200),
+                            curve: Curves.easeInOut,
+                            opacity: _revealed ? 1.0 : 0.0,
+                            child: HeroTitle(
+                              title: heroTitle,
+                              logo: d?.logo,
+                              logoReady: logoReady,
+                              maxWidth: isWide ? 500 : double.infinity,
+                              maxHeight: isWide ? 120 : 80,
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)])
+                            )
                           ),
                         ),
                       ),
                     ),
                   ),
-                Positioned(left: 20, bottom: 16, right: 20, child: AnimatedOpacity(duration: const Duration(milliseconds: 1200), curve: Curves.easeInOut, opacity: _revealed ? 1.0 : 0.0, child: HeroTitle(title: heroTitle, logo: d?.logo, logoReady: logoReady, maxWidth: double.infinity, maxHeight: 80, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)])))),
-              ]);
-            })),
+                ]);
+              })),
             Positioned.fill(child: _buildUpperButtons(context)),
           ]),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const SizedBox(height: 8), _buildMetaRow(d, isMobile: true), 
-            const SizedBox(height: 20), _buildMainActionButton(context, isMobile: true), 
-            const SizedBox(height: 14), _buildCircularActions(context, isMobile: true),
-            const SizedBox(height: 14),
-            if (widget.totalSeasons > 1 || widget.currentSource != null) ...[
-              Row(
-                children: [
-                  if (widget.totalSeasons > 1) 
-                    Expanded(
-                      child: SeasonSelector(
-                        data: SeasonSelectorData(
-                          currentSeason: widget.currentSeason,
-                          totalSeasons: widget.totalSeasons,
-                          onSeasonSelected: widget.onSeasonSelected,
-                          compact: true,
-                        ),
+
+          // INFO PANEL: Centrado y contenido en modo Wide
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    _buildMetaRow(d, isMobile: true),
+                    const SizedBox(height: 20),
+                    if (isWide)
+                      Row(
+                        children: [
+                          SizedBox(width: 300, child: _buildMainActionButton(context, isMobile: true)),
+                          const SizedBox(width: 16),
+                          _buildCircularActions(context, isMobile: true),
+                        ],
+                      )
+                    else ...[
+                      _buildMainActionButton(context, isMobile: true),
+                      const SizedBox(height: 14),
+                      _buildCircularActions(context, isMobile: true),
+                    ],
+                    const SizedBox(height: 14),
+                    if (widget.totalSeasons > 1 || widget.currentSource != null) ...[
+                      Row(
+                        children: [
+                          if (widget.totalSeasons > 1)
+                            Expanded(
+                              child: SeasonSelector(
+                                data: SeasonSelectorData(
+                                  currentSeason: widget.currentSeason,
+                                  totalSeasons: widget.totalSeasons,
+                                  onSeasonSelected: widget.onSeasonSelected,
+                                  compact: true,
+                                ),
+                              ),
+                            ),
+                          if (widget.totalSeasons > 1 && widget.currentSource != null) const SizedBox(width: 12),
+                          if (widget.currentSource != null)
+                            Expanded(
+                              child: SourceChipsBar(
+                                sources: widget.sources,
+                                currentSource: widget.currentSource!,
+                                onSourceSelected: widget.onSourceSelected,
+                                unavailableSources: widget.unavailableSources,
+                                season: widget.season,
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
-                  if (widget.totalSeasons > 1 && widget.currentSource != null) const SizedBox(width: 12),
-                  if (widget.currentSource != null) 
-                    Expanded(
-                      child: SourceChipsBar(
-                        sources: widget.sources, 
-                        currentSource: widget.currentSource, 
-                        onSourceSelected: widget.onSourceSelected, 
-                        unavailableSources: widget.unavailableSources,
-                        season: widget.season,
-                      ),
-                    ),
-                ],
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-            ],
-          ])),
+            ),
+          ),
         ]),
       ),
     );
@@ -1649,193 +1671,105 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       }
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D), 
-      body: AnimatedOpacity(
-        key: const ValueKey('content'), 
-        opacity: 1.0, 
-        duration: const Duration(milliseconds: 400), 
-        child: CustomScrollView(
-          controller: _scrollController, 
-          physics: const ClampingScrollPhysics(), 
-          slivers: [
-            SliverToBoxAdapter(child: _ContentHeader(
-              title: widget.title, 
-              source: widget.source, 
-              url: widget.url, 
-              category: widget.category,
-              poster: ApiEndpoints.proxyImage(currentSource?.thumbnail),
-              banner: heroBanner, 
-              detailAsync: detailAsync, 
-              currentSource: currentSource, 
-              sources: activeSources, 
-              season: currentSeason,
-              sourceRating: currentSource?.score, 
-              showRatingSkeleton: currentSource?.score == null && detailLoading, 
-              isLoadingSources: detailAsync.isLoading && activeSources.isEmpty,
-              totalSeasons: totalSeasons, 
-              currentSeason: currentSeason,
-              onSourceSelected: (index) => ref.setSource(detailParams, activeSources[index]),
-              onSeasonSelected: (s) => ref.setSeason(detailParams, s),
-              inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, 
-              latestHistory: history.where((h) => h.contentId == widget.title).firstOrNull,
-              unavailableSources: null,
-              onPlay: () {
-                SearchResult? playSource = currentSource;
-                final effectiveSrc = playSource?.source ?? widget.source;
-                final playEpisodesUrl = playSource?.url ?? widget.url;
-
-                if (isMovieCategory) {
-                  final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Película', thumbnail: ApiEndpoints.proxyImage(playSource?.thumbnail));
-                  final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                  context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1)}&episode=1&serverName=${simplifySourceName(effectiveSrc)}&startPosition=&category=${widget.category}&totalEpisodes=1$posterParam');
-                  return;
-                }
-                final latest = history.where((h) => h.contentId == widget.title).firstOrNull;
-                int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
-                final epData = episodesAsync.valueOrNull?.response;
-                final epSource = episodesAsync.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
-                final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
-                
-                final episodeThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
-                final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(episodeThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}$posterParam');
-              }
-            )),
-            if (isMobile) SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _buildSynopsis(detailData),
-              const SizedBox(height: 12),
-              Container(padding: const EdgeInsets.symmetric(vertical: 12), decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white12), bottom: BorderSide(color: Colors.white12))), child: Row(children: [
-                Expanded(child: Column(children: [const Text('Lanzamientos', style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text((detailData is AnimeDetail ? detailData.firstAirDate : (detailData is MovieDetail ? detailData.releaseDate : null))?.split('-').first ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))])),
-                Expanded(child: Column(children: [Text(isMovieCategory ? 'Duración' : 'Temporadas', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 12)), const SizedBox(height: 4), Text(isMovieCategory ? _formatRuntime(_getRuntime(detailData)) : (detailData == null ? 'N/A' : '$totalSeasons'), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))]))
-              ])),
-              const SizedBox(height: 16),
-            ]))),
-            SliverMainAxisGroup(slivers: [
-              SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _buildTabBar(tabLabels, selectedTabIndex, hPadding, isMobile),
-                const SizedBox(height: 16),
-              ]))),
-              if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex) () {
-                final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
-
-                if (epBundle != null) {
-                  _lastEpisodes = epBundle;
-                  final epData = epBundle.response;
-
-                  if (!kIsWeb) {
-                    final int startEp = ref.read(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title)?.episode != null
-                        ? (int.tryParse(ref.read(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title)!.episode!) ?? 1)
-                        : 1;
-                    ref.listenManual(episodeImagePrefetchProvider((episodes: epData.episodes, startFrom: startEp - 1)), (_, __) {});
-                  }
-                  
-                  return SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverMainAxisGroup(slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.only(bottom: isMobile ? 6 : 32),
-                        child: Text(
-                          '${epData.total} episodios', 
-                          style: TextStyle(
-                            color: const Color(0xFFA5A5A5), 
-                            fontSize: isMobile ? 15 : 20,
-                            fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal,
-                          )
-                        )
-                      )
-                    ),
-                    if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
-                      final ep = index < epData.episodes.length ? epData.episodes[index] : null;
-                      final epNum = (ep?.number ?? index + 1).toString();
-                      final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                      final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                      final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
-                        final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                        final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                        final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
-                      });
-                    }, childCount: epData.total))
-                    else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
-                      final ep = index < epData.episodes.length ? epData.episodes[index] : null;
-                      final epNum = (ep?.number ?? index + 1).toString();
-                      final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                      final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                      final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
-                        final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                        final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                        final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
-                      });
-                    }, childCount: epData.total)),
-                      if (epData.specials.isNotEmpty) ...[
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.only(top: isMobile ? 28 : 40, bottom: isMobile ? 16 : 32),
-                          child: Text(
-                            'Temporada 0',
-                            style: TextStyle(
-                              color: const Color(0xFFA5A5A5),
-                              fontSize: isMobile ? 15 : 20,
-                              fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
-                        final sp = epData.specials[index];
-                        final spNum = sp.number;
-                        final spSource = currentSource;
-                        final spQuality = sp.quality ?? spSource?.quality ?? '';
-                        return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, isMobile: true, scrollController: _scrollController, onTap: () {
-                          final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                          final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=$spNum&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
-                        });
-                      }, childCount: epData.specials.length))
-                      else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
-                        final sp = epData.specials[index];
-                        final spSource = currentSource;
-                        final spQuality = sp.quality ?? spSource?.quality ?? '';
-                        return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: spQuality, episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, onTap: () {
-                          final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
-                          final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${spSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(sp, spSource?.url ?? currentSource?.url ?? widget.url, spSource?.source ?? currentSource?.source ?? widget.source, sp.number)}&episode=${sp.number}&season=0&serverName=${simplifySourceName(spSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=&category=${widget.category}&episodeTitle=${Uri.encodeComponent(sp.title ?? 'Especial')}&totalEpisodes=${epData.total}$posterParam');
-                        });
-                      }, childCount: epData.specials.length)),
-                    ],
-                    SliverToBoxAdapter(child: SizedBox(height: isMobile ? 32 : 150)),
-                  ]));
-                }
-
-                return episodesAsync.when(
-                  data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-                  loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: _EpisodesSkeleton(isMobile: isMobile)),
-                  error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))),
-                );
-              }(),
-              if (selectedTabIndex == relatedTabIndex) ..._buildRelatedTab(
-                hPadding, 
-                unifiedRelations: unifiedRelationsAsync.valueOrNull,
-                currentSource: currentSource,
-              ),
-              if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(detailData, hPadding),
-              if (selectedTabIndex == detailsTabIndex) ..._buildDetailsTab(detailData, hPadding, inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, sourceRating: currentSource?.score, showRatingSkeleton: currentSource?.score == null && detailLoading),
-              if (selectedTabIndex == galleryTabIndex) ..._buildGalleryTab(
-                hPadding,
-                isMovieCategory ? 'movie' : 'tv',
-                detailData?.title ?? widget.title,
-                detailData is AnimeDetail ? (detailData as AnimeDetail).year : widget.year,
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            ]),
-          ],
-        ),
+    return AdaptiveDetailLayout(
+      maxContentWidth: 1000,
+      topBar: Stack(children: [
+        Positioned(top: 45, left: 15, child: PointerInterceptor(child: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28), onPressed: () => Navigator.of(context).pop()))),
+        Positioned(top: 45, right: 15, child: PointerInterceptor(child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {}))),
+      ]),
+      backdrop: DetailBackdrop(
+        imageUrl: heroBanner,
+        revealed: _showContent,
+        showTrailer: _showPlayer,
+        ytController: _ytController,
       ),
+      logo: HeroTitle(
+        title: widget.title,
+        logo: detailData?.logo,
+        logoReady: detailAsync.hasValue,
+        maxWidth: isMobile ? double.infinity : 500,
+        maxHeight: isMobile ? 80 : 120,
+        style: TextStyle(color: Colors.white, fontSize: isMobile ? 14 : 18, fontWeight: FontWeight.bold, height: 1.1, letterSpacing: 4, shadows: const [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4), Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10)])
+      ),
+      meta: _buildMetaRow(detailData, isMobile: isMobile),
+      mainAction: _buildMainActionButton(context, isMobile: isMobile),
+      secondaryActions: _buildCircularActions(context, isMobile: isMobile),
+      synopsis: _buildSynopsis(detailData),
+      selectors: (widget.totalSeasons > 1 || currentSource != null) ? Row(
+        children: [
+          if (widget.totalSeasons > 1)
+            Expanded(
+              child: SeasonSelector(
+                data: SeasonSelectorData(
+                  currentSeason: currentSeason,
+                  totalSeasons: widget.totalSeasons,
+                  onSeasonSelected: (s) => ref.setSeason(detailParams, s),
+                  compact: true,
+                ),
+              ),
+            ),
+          if (widget.totalSeasons > 1 && currentSource != null) const SizedBox(width: 12),
+          if (currentSource != null)
+            Expanded(
+              child: SourceChipsBar(
+                sources: activeSources,
+                currentSource: currentSource,
+                onSourceSelected: (index) => ref.setSource(detailParams, activeSources[index]),
+                unavailableSources: null,
+                season: widget.year,
+              ),
+            ),
+        ],
+      ) : null,
+      content: SliverMainAxisGroup(slivers: [
+        SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _buildTabBar(tabLabels, selectedTabIndex, hPadding, isMobile),
+          const SizedBox(height: 16),
+        ])),
+        if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex) () {
+          final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
+          if (epBundle != null) {
+            _lastEpisodes = epBundle;
+            final epData = epBundle.response;
+            return SliverMainAxisGroup(slivers: [
+              SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(bottom: isMobile ? 6 : 32), child: Text('${epData.total} episodios', style: TextStyle(color: const Color(0xFFA5A5A5), fontSize: isMobile ? 15 : 20, fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal)))),
+              if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
+                final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                final epNum = (ep?.number ?? index + 1).toString();
+                final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
+                  final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                  final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                  final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                  final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                  context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                });
+              }, childCount: epData.total))
+              else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
+                final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                final epNum = (ep?.number ?? index + 1).toString();
+                final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                final epQuality = ep?.quality ?? epSource?.quality ?? '';
+                return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
+                  final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                  final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                  final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                  final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                  context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                });
+              }, childCount: epData.total)),
+            ]);
+          }
+          return episodesAsync.when(data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()), loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: _EpisodesSkeleton(isMobile: isMobile)), error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))));
+        }(),
+        if (selectedTabIndex == relatedTabIndex) ..._buildRelatedTab(hPadding, unifiedRelations: unifiedRelationsAsync.valueOrNull, currentSource: currentSource),
+        if (selectedTabIndex == extrasTabIndex) ..._buildExtrasTab(detailData, hPadding),
+        if (selectedTabIndex == detailsTabIndex) ..._buildDetailsTab(detailData, hPadding, inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, sourceRating: currentSource?.score, showRatingSkeleton: currentSource?.score == null && detailLoading),
+        if (selectedTabIndex == galleryTabIndex) ..._buildGalleryTab(hPadding, isMovieCategory ? 'movie' : 'tv', detailData?.title ?? widget.title, detailData is AnimeDetail ? (detailData as AnimeDetail).year : widget.year),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      ]),
     );
   }
 

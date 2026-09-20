@@ -592,8 +592,8 @@ class _AuthButtonState extends State<_AuthButton> {
         if (user != null) return const SizedBox.shrink();
 
         return MouseRegion(
-          onEnter: (_) => setState(() => _isHovered = true),
-          onExit: (_) => setState(() => _isHovered = false),
+          onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+          onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
@@ -735,8 +735,8 @@ class _PillNavItemState extends State<_PillNavItem> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }); },
+      onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }); },
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
@@ -779,8 +779,8 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
     return Focus(
       onFocusChange: (focused) => setState(() => _focused = focused),
       child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }); },
+        onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }); },
         child: InkWell(
           onTap: widget.onPressed,
           customBorder: const CircleBorder(),
@@ -863,8 +863,8 @@ class _LanguageButtonState extends State<_LanguageButton> {
     return Focus(
       onFocusChange: (f) => setState(() => _focused = f),
       child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+        onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = true); }); },
+        onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }); },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 12),

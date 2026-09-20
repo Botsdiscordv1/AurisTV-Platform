@@ -172,8 +172,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
 
   Widget _buildStandardRow(bool isMobile, double horizontalPadding) {
     return MouseRegion(
-      onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
-      onExit: (_) { if (mounted) setState(() => _isHovered = false); },
+      onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+      onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
       child: Stack(
         children: [
           SizedBox(
@@ -284,8 +284,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
           ],
           const SizedBox(height: 8),
           MouseRegion(
-            onEnter: (_) { if (mounted) setState(() => _isHovered = true); },
-            onExit: (_) { if (mounted) setState(() => _isHovered = false); },
+            onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
+            onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
             child: Stack(
               children: [
                 SizedBox(
@@ -390,7 +390,7 @@ class _SeeMoreButtonState extends State<_SeeMoreButton> {
   @override
   Widget build(BuildContext context) {
     return FocusableActionDetector(
-      onShowHoverHighlight: (show) => setState(() => _isHovered = show),
+      onShowHoverHighlight: (show) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = show); }); },
       child: MouseRegion(
         child: Row(
           mainAxisSize: MainAxisSize.min,

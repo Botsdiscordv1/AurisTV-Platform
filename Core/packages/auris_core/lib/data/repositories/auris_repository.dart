@@ -86,7 +86,7 @@ abstract class AurisRepository {
 
   Future<ScheduleResponse> getSchedule();
   Future<List<SourceInfo>> getSources();
-  Future<EditorialResponse> getEditorial({String? imgSize, String? category});
+  Future<EditorialResponse> getEditorial({String? imgSize, String? category, String? userId});
   Future<AnimeTitleInfo> getAnimeTitles(String query);
   Future<MovieTitleInfo> getMovieTitles(String query);
   Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken});
