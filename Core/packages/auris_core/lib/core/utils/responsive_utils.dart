@@ -106,7 +106,7 @@ class ResponsiveUtils {
     final width = MediaQuery.of(context).size.width;
     final b = getBreakpoint(context);
 
-    if (b < Breakpoint.md) return 12.0;
+    if (b < Breakpoint.md) return 24.0; // Senior Fix: 24px mínimo para evitar que plegables/tablets se peguen al borde
     if (width > 2200) return (width - 2000) / 2 + 32.0;
 
     final double percentage = b >= Breakpoint.xl ? 0.03 : 0.04;
@@ -153,8 +153,12 @@ class ResponsiveUtils {
       // Senior Tuning: Altura exacta del póster + margen para sombra/zoom
       return posterH + (b < Breakpoint.md ? 12.0 : 16.0);
     }
-    // Espacio para póster + Gap (8) + Texto (22-28) + Margen sombra
-    return posterH + (b < Breakpoint.md ? 42.0 : 55.0);
+    // Senior Fix: Usar sp() para que los factores de altura escalen igual que el texto y evitemos el overflow (0.5px errors)
+    final double gap = b < Breakpoint.md ? sp(context, 8) : 8;
+    final double textHeight = b < Breakpoint.md ? sp(context, 22) : 28;
+    final double shadowMargin = b < Breakpoint.md ? 16.0 : 20.0;
+    
+    return posterH + gap + textHeight + shadowMargin;
   }
 
   static double bannerWidth(BuildContext context) {
@@ -243,7 +247,7 @@ class ResponsiveUtils {
     }
     
     if (b == Breakpoint.lg) return 2.4;
-    return 2.8; 
+    return 3.2; // Pantallas grandes/Ultrawide: Más cinemático y menos "aire" vertical
   }
 
   /// Senior UI Strategy: Tamaños de fuente para el HeroBanner (Cinematic).

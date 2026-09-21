@@ -44,8 +44,16 @@ class SectionFilters {
     return SectionFilters(
       strategy: json['strategy'] as String?,
       category: json['category'] as String?,
-      year: json['year'] as int?,
-      years: (json['years'] as List<dynamic>?)?.map((e) => (e as num).toInt()).toList(),
+      year: switch (json['year']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s),
+        _ => null,
+      },
+      years: (json['years'] as List<dynamic>?)?.map((e) {
+        if (e is num) return e.toInt();
+        if (e is String) return int.tryParse(e) ?? 0;
+        return 0;
+      }).toList(),
       genres: (json['genres'] as List<dynamic>?)?.map((e) => e.toString()).toList(),
       genreSlug: json['genreSlug'] as String?,
       sources: (json['sources'] as List<dynamic>?)?.map((e) => e.toString()).toList(),

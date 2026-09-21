@@ -19,8 +19,16 @@ class ScheduleResponse {
         : json;
     return ScheduleResponse(
       season: data['season'] as String? ?? '',
-      year: data['year'] as int? ?? 0,
-      total: data['total'] as int? ?? 0,
+      year: switch (data['year']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s) ?? 0,
+        _ => 0,
+      },
+      total: switch (data['total']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s) ?? 0,
+        _ => 0,
+      },
       days: (data['days'] as List<dynamic>?)
               ?.map((e) => ScheduleDay.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -45,7 +53,11 @@ class ScheduleDay {
   factory ScheduleDay.fromJson(Map<String, dynamic> json) {
     return ScheduleDay(
       day: json['day'] as String? ?? '',
-      dayIndex: json['dayIndex'] as int? ?? 0,
+      dayIndex: switch (json['dayIndex']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s) ?? 0,
+        _ => 0,
+      },
       isToday: json['isToday'] as bool? ?? false,
       items: (json['items'] as List<dynamic>?)
               ?.map((e) => ScheduleItem.fromJson(e as Map<String, dynamic>))
@@ -137,7 +149,11 @@ class ScheduleItem {
     final firstSource = sources.isNotEmpty ? sources.first : null;
 
     return ScheduleItem(
-      id: json['id'] as int? ?? 0,
+      id: switch (json['id']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s) ?? 0,
+        _ => 0,
+      },
       title: json['title'] as String? ?? '',
       romaji: json['romaji'] as String?,
       english: json['english'] as String?,
@@ -165,16 +181,36 @@ class ScheduleItem {
               .toList() ??
           [],
       studio: json['studio'] as String?,
-      episodes: json['episodes'] as int?,
+      episodes: switch (json['episodes']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s),
+        _ => null,
+      },
       format: json['format'] as String?,
       status: json['status'] as String?,
       averageScore: (json['averageScore'] as num?)?.toDouble(),
-      nextEpisode: json['nextEpisode'] as int?,
-      airingAt: json['airingAt'] as int?,
-      episode: json['episode'] as int?,
+      nextEpisode: switch (json['nextEpisode']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s),
+        _ => null,
+      },
+      airingAt: switch (json['airingAt']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s),
+        _ => null,
+      },
+      episode: switch (json['episode']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s),
+        _ => null,
+      },
       aired: json['aired'] as bool? ?? false,
       sourceAvailable: json['sourceAvailable'] as bool? ?? true,
-      year: json['year'] as int?,
+      year: switch (json['year']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s),
+        _ => null,
+      },
       url: json['url'] as String? ?? firstSource?.url,
       slug: json['slug'] as String? ?? firstSource?.slug,
       quality: json['quality'] as String? ?? firstSource?.quality,
@@ -182,7 +218,11 @@ class ScheduleItem {
       source: json['source'] as String? ?? firstSource?.source,
       kind: json['kind'] as String? ?? json['categoria'] as String?,
       scrapedTitle: json['scrapedTitle'] as String?,
-      totalSeasons: json['totalSeasons'] as int?,
+      totalSeasons: switch (json['totalSeasons']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s),
+        _ => null,
+      },
       season: json['season']?.toString(),
       sources: sources,
       availableSources: (json['availableSources'] as List<dynamic>?)

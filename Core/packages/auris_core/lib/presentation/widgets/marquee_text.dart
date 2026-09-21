@@ -83,7 +83,13 @@ class MarqueeText extends StatelessWidget {
         final maxWidth = constraints.maxWidth;
 
         if (!animate || textWidth <= maxWidth) {
-          return Text(text, style: style, maxLines: 1, overflow: TextOverflow.ellipsis);
+          return SizedBox(
+            height: textPainter.height,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(text, style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          );
         }
 
         return _AnimatedMarquee(
@@ -158,6 +164,7 @@ class _AnimatedMarqueeState extends State<_AnimatedMarquee> {
                 offset: Offset(-offset, 0),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(widget.text, style: widget.style),
                     SizedBox(width: widget.blankSpace),

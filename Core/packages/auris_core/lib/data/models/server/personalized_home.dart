@@ -1,5 +1,6 @@
 import 'search_result.dart';
 import 'section_see_more.dart';
+import '../../../core/api/api_endpoints.dart';
 
 class HomeResponse {
   final String userId;
@@ -71,7 +72,11 @@ class HomeSection {
       subtitle: json['subtitle'] as String?,
       strategy: json['strategy'] as String? ?? '',
       type: json['type'] as String? ?? '',
-      priority: (json['priority'] as num?)?.toInt() ?? 0,
+      priority: switch (json['priority']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s) ?? 0,
+        _ => 0,
+      },
       format: json['format'] as String? ?? 
               json['layout'] as String? ?? 
               json['layoutType'] as String? ?? 

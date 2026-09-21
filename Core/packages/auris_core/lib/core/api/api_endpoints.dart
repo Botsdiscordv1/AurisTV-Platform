@@ -95,7 +95,7 @@ class ApiEndpoints {
     final s = source.toLowerCase();
     const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
     const animeHints = ['jkanime', 'animeav1', 'animed23', 'animejara', 'themes'];
-    const movieHints = ['gnulahd', 'onlypelis', 'pelispedia'];
+    const movieHints = ['gnulahd', 'onlypelis', 'pelispedia', 'lamovie'];
     if (kdramaHints.any(s.contains)) return kdramasBaseUrl;
     if (movieHints.any(s.contains)) return moviesSeriesBaseUrl;
     if (animeHints.any(s.contains)) return animeBaseUrl;
@@ -208,9 +208,9 @@ class ApiEndpoints {
       if (category != null && category.isNotEmpty) return baseUrlForCategory(category);
       if (source != null && source.isNotEmpty) return baseUrlForSource(source, category);
       // Auto-inferir desde la URL si no se pasó hint (gnulahd/onlypelis -> 3001, anime hosts -> 3000, doramas -> 3002)
-      if (lowerUrl.contains('gnulahd') || lowerUrl.contains('onlypelis') || lowerUrl.contains('pelispedia') || lowerUrl.contains('nu/') ) {
+      if (lowerUrl.contains('gnulahd') || lowerUrl.contains('onlypelis') || lowerUrl.contains('pelispedia') || lowerUrl.contains('lamovie') || lowerUrl.contains('nu/') ) {
         // wp.com/nu es ambiguo, pero si la URL original es gnulahd, ya se detectó vía source; fallback conservador a movies
-        if (lowerUrl.contains('gnulahd') || lowerUrl.contains('onlypelis')) return moviesSeriesBaseUrl;
+        if (lowerUrl.contains('gnulahd') || lowerUrl.contains('onlypelis') || lowerUrl.contains('lamovie')) return moviesSeriesBaseUrl;
       }
       if (lowerUrl.contains('jkanime') || lowerUrl.contains('animeav1') || lowerUrl.contains('animed23') || lowerUrl.contains('animejara')) return animeBaseUrl;
       if (lowerUrl.contains('tudorama') || lowerUrl.contains('doramas')) return kdramasBaseUrl;

@@ -311,7 +311,11 @@ class SearchResponse {
     return SearchResponse(
       query: json['query']?.toString() ?? '',
       category: json['category']?.toString() ?? '',
-      count: json['count'] as int? ?? 0,
+      count: switch (json['count']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s) ?? 0,
+        _ => 0,
+      },
       results: (json['results'] as List<dynamic>?)
               ?.map((e) => SearchResult.fromJson(e as Map))
               .toList() ??

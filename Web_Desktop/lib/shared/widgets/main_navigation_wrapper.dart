@@ -10,6 +10,7 @@ import '../../core/utils/url_utils.dart';
 import '../../features/player/presentation/player_screen.dart';
 import '../../features/remote_control/presentation/providers/remote_control_provider.dart';
 import '../../features/remote_control/data/models/remote_device.dart';
+import 'auris_bottom_bar.dart';
 
 class MainNavigationWrapper extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -110,19 +111,9 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
               ),
           ],
         ),
-        bottomNavigationBar: isFullScreen ? null : Container(
-          height: 60 + MediaQuery.of(context).padding.bottom,
-          decoration: const BoxDecoration(
-            color: Color(0xFF0B0B0D),
-          ),
-          child: Row(
-            children: [
-              _buildNavItem(0, Icons.home_outlined, Icons.home),
-              _buildNavItem(1, Icons.search, Icons.search),
-              _buildNavItem(2, Icons.explore_outlined, Icons.explore),
-              _buildNavItem(3, null, null, isProfile: true),
-            ],
-          ),
+        bottomNavigationBar: isFullScreen ? null : AurisBottomBar(
+          currentIndex: widget.navigationShell.currentIndex,
+          onTap: _onTap,
         ),
       ),
     );
