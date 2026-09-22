@@ -3791,7 +3791,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                       bottom: 4,
                     ),
                     itemCount: widget.items.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 16),
+                    separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 16),
                     itemBuilder: (context, index) {
                       final item = widget.items[index];
                       return SizedBox(
