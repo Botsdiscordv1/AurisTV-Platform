@@ -177,7 +177,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     if (isMobile) { _disposeController(); return; }
 
     final cat = widget.currentCategory.toLowerCase();
-    final bool allowAutoplay = cat == 'animes' || cat == 'películas' || cat == 'series' || cat == 'kdrama';
+    final bool allowAutoplay = cat == 'inicio' || cat == 'animes' || cat == 'películas' || cat == 'series' || cat == 'kdrama' || cat == 'kdramas';
     if (!allowAutoplay) { _disposeController(); return; }
     
     final key = _currentBackgroundItem.trailerKey;

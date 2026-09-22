@@ -933,6 +933,7 @@ class AurisRepositoryImpl implements AurisRepository {
     int? tmdbId,
     int? season,
     int? year,
+    bool fast = false,
   }) async {
     final params = <String, dynamic>{'url': url, 'source': source};
     
@@ -946,6 +947,7 @@ class AurisRepositoryImpl implements AurisRepository {
     if (tmdbId != null) params['tmdbId'] = tmdbId;
     if (effectiveSeason != null) params['season'] = effectiveSeason;
     if (year != null) params['year'] = year;
+    if (fast) params['fast'] = '1';
     
     // Senior Fix: Timeout reducido a 15s con retry automático (1 reintento)
     const maxRetries = 1;
@@ -975,6 +977,99 @@ class AurisRepositoryImpl implements AurisRepository {
       }
     }
     throw Exception('Unreachable');
+  }
+
+  @override
+  Future<List<CastInfo>> getCast(
+    String url, {
+    String? source,
+    String? category,
+    int? tmdbId,
+    String? mediaType,
+    String? title,
+    int? year,
+  }) async {
+    try {
+      final params = <String, dynamic>{};
+      if (tmdbId != null) {
+        params['tmdbId'] = tmdbId;
+        if (mediaType != null) params['mediaType'] = mediaType;
+      } else {
+        if (url.isNotEmpty) params['url'] = url;
+        // Fallback anime: /api/cast resuelve por título cuando no hay tmdbId.
+        // El servidor movies ignora estos params extra.
+        if (title != null && title.isNotEmpty) params['title'] = title;
+        if (year != null) params['year'] = year;
+      }
+
+      final response = await _client.get(
+        ApiEndpoints.cast,
+        queryParameters: params,
+        baseUrl: ApiEndpoints.baseUrlForSource(source ?? '', category),
+        options: Options(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
+      // Formatos según servidor:
+      //  - movies: envelope {success:true, data:{cast:[...]}}
+      //  - anime:  objeto {tmdbId, cast:[...]}
+      //  - legacy: lista directa [...]
+      final dynamic body = response.data;
+      final dynamic root = (body is Map<String, dynamic> &&
+              body['success'] == true &&
+              body['data'] is Map<String, dynamic>)
+          ? body['data']
+          : body;
+      List<dynamic> list;
+      if (root is List) {
+        list = root;
+      } else if (root is Map<String, dynamic>) {
+        list = (root['cast'] as List<dynamic>?) ?? [];
+      } else {
+        list = [];
+      }
+      return list.map((e) => CastInfo.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('[AurisRepo] getCast error: $e');
+      return [];
+    }
+  }
+
+  @override
+  Future<List<RelatedInfo>> getRelations(String url, {String? source, String? category}) async {
+    try {
+      final params = <String, dynamic>{'url': url};
+      if (source != null && source.isNotEmpty) {
+        params['source'] = source;
+      }
+
+      final response = await _client.get(
+        ApiEndpoints.relations,
+        queryParameters: params,
+        baseUrl: ApiEndpoints.baseUrlForSource(source ?? '', category),
+        options: Options(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      );
+      // Formatos según servidor:
+      //  - movies: envelope {success:true, data:{source, relations:[...]}}
+      //  - anime:  objeto {source, relations:[...]}
+      final dynamic body = response.data;
+      final Map<String, dynamic> map = (body is Map<String, dynamic> &&
+              body['success'] == true &&
+              body['data'] is Map<String, dynamic>)
+          ? Map<String, dynamic>.from(body['data'] as Map)
+          : (body is Map<String, dynamic>
+              ? body
+              : <String, dynamic>{});
+      final List<dynamic> list = (map['relations'] as List<dynamic>?) ?? [];
+      return list.map((e) => RelatedInfo.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('[AurisRepo] getRelations error: $e');
+      return [];
+    }
   }
 
   @override
@@ -1021,6 +1116,38 @@ class AurisRepositoryImpl implements AurisRepository {
     );
     if (response.statusCode == 404) return null;
     return OmdbEpisode.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<SearchResponse> getCastCredits({
+    String? url,
+    String? name,
+    String? profile,
+    int? personId,
+  }) async {
+    final params = <String, dynamic>{};
+    if (personId != null) {
+      params['personId'] = personId;
+    } else {
+      if (url != null && url.isNotEmpty) params['url'] = url;
+      if (name != null && name.isNotEmpty) params['name'] = name;
+      if (profile != null && profile.isNotEmpty) params['profile'] = profile;
+    }
+
+    final String targetBaseUrl = personId != null
+        ? ApiEndpoints.animeBaseUrl
+        : ApiEndpoints.moviesSeriesBaseUrl;
+
+    final response = await _client.get(
+      ApiEndpoints.castCredits,
+      queryParameters: params,
+      baseUrl: targetBaseUrl,
+      options: Options(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ),
+    );
+    return SearchResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   @override

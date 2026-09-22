@@ -20,24 +20,25 @@ final hoveredCardIdProvider = StateProvider<String?>((ref) => null);
 final heroBannerItemsProvider = FutureProvider.family<List<MediaItem>, String>((ref, category) async {
   final repo = ref.watch(aurisRepositoryProvider);
   
-  // --- LÓGICA ESPECIAL PARA INICIO (FUSIÓN DE CATEGORÍAS) ---
+  // --- LÓGICA ESPECIAL PARA INICIO (FUSIÓN DE CATEGORÍAS: ANIME, PELÍCULAS, SERIES, KDRAMAS) ---
   if (category == 'inicio') {
     try {
-      // Senior Strategy: Pedimos los 3 pilares en paralelo
+      // Senior Strategy: Pedimos los 4 pilares en paralelo
       // Optimizamos a 1080 (FHD) para el Home, reservando 'original' para detalles.
       final results = await Future.wait([
         repo.getHomeHero(category: 'anime', imgSize: '1080').timeout(const Duration(seconds: 8)).catchError((_) => <MediaItem>[]),
         repo.getHomeHero(category: 'peliculas', imgSize: '1080').timeout(const Duration(seconds: 8)).catchError((_) => <MediaItem>[]),
         repo.getHomeHero(category: 'series', imgSize: '1080').timeout(const Duration(seconds: 8)).catchError((_) => <MediaItem>[]),
+        repo.getHomeHero(category: 'kdrama', imgSize: '1080').timeout(const Duration(seconds: 8)).catchError((_) => <MediaItem>[]),
       ]);
 
       final animes = results[0];
       final movies = results[1];
       final series = results[2];
+      final kdramas = results[3];
 
       // Senior Strategy: Intercalado para ritmo + shuffle con semilla horaria (cada 8h hero distinto, tolera 1-2 repetidos)
-      // Tomamos los 30+ items, intercalamos a 25, luego shuffle con seed temporal y limitamos a 10
-      final categories = [animes, movies, series];
+      final categories = [animes, movies, series, kdramas];
 
       final List<MediaItem> mixedHero = [];
       int maxLen = categories.map((l) => l.length).fold(0, (prev, curr) => curr > prev ? curr : prev);
@@ -151,19 +152,22 @@ final recentlyAddedProvider = FutureProvider<List<MediaItem>>((ref) async {
   final results = await Future.wait([
     fetchRecent('animes'),
     fetchRecent('películas'),
+    fetchRecent('series'),
     fetchRecent('kdrama'),
   ]);
 
   final List<MediaItem> merged = [];
   final animes = results[0];
   final movies = results[1];
-  final kdramas = results[2];
+  final series = results[2];
+  final kdramas = results[3];
 
   int index = 0;
   while (merged.length < 15) {
     bool added = false;
     if (index < animes.length) { merged.add(animes[index]); added = true; }
     if (merged.length < 15 && index < movies.length) { merged.add(movies[index]); added = true; }
+    if (merged.length < 15 && index < series.length) { merged.add(series[index]); added = true; }
     if (merged.length < 15 && index < kdramas.length) { merged.add(kdramas[index]); added = true; }
     index++;
     if (!added) break;
@@ -190,18 +194,21 @@ final top10GlobalProvider = FutureProvider<List<MediaItem>>((ref) async {
   final results = await Future.wait([
     guardedTrending('animes'),
     guardedTrending('películas'),
+    guardedTrending('series'),
     guardedTrending('kdrama'),
   ]);
 
   final List<MediaItem> merged = [];
   final animes = results[0];
   final movies = results[1];
-  final kdramas = results[2];
+  final series = results[2];
+  final kdramas = results[3];
 
-  int maxLen = [animes.length, movies.length, kdramas.length].reduce((a, b) => a > b ? a : b);
+  int maxLen = [animes.length, movies.length, series.length, kdramas.length].reduce((a, b) => a > b ? a : b);
   for (int i = 0; i < maxLen; i++) {
     if (i < animes.length) merged.add(animes[i]);
     if (i < movies.length) merged.add(movies[i]);
+    if (i < series.length) merged.add(series[i]);
     if (i < kdramas.length) merged.add(kdramas[i]);
     if (merged.length >= 20) break;
   }
@@ -357,6 +364,7 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
       repo.getEditorial(imgSize: 'w780', category: 'películas', userId: userId).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
       repo.getEditorial(imgSize: 'w780', category: 'series', userId: userId).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
       repo.getEditorial(imgSize: 'w780', category: 'animes', userId: userId).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
+      repo.getEditorial(imgSize: 'w780', category: 'kdrama', userId: userId).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: [])),
     ] else
       repo.getEditorial(imgSize: 'w780', category: currentCategory, userId: userId).timeout(const Duration(seconds: 5)).catchError((_) => const EditorialResponse(generatedAt: '', locale: '', sections: []))
   ];
@@ -367,10 +375,24 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
   });
 
   final editorialResponses = await Future.wait(editorialFutures);
-  for (final ed in editorialResponses) {
-    if (ed.sections.isNotEmpty) {
-      final mapped = _mapEditorialResponseToLayout(ed, currentCategory);
-      addUniqueSections(mapped);
+  if (currentCategory == 'inicio') {
+    final List<List<HomeLayoutSection>> catSections = [];
+    final catNames = ['películas', 'series', 'animes', 'kdrama'];
+    for (int i = 0; i < editorialResponses.length; i++) {
+      final ed = editorialResponses[i];
+      if (ed.sections.isNotEmpty) {
+        final cat = i < catNames.length ? catNames[i] : 'inicio';
+        catSections.add(_mapEditorialResponseToLayout(ed, cat));
+      }
+    }
+    final interleaved = _interleaveInicioSections(catSections);
+    addUniqueSections(interleaved);
+  } else {
+    for (final ed in editorialResponses) {
+      if (ed.sections.isNotEmpty) {
+        final mapped = _mapEditorialResponseToLayout(ed, currentCategory);
+        addUniqueSections(mapped);
+      }
     }
   }
   
@@ -503,6 +525,65 @@ Future<void> _processPersonalizedHome(HomeResponse response, Ref ref) async {
   // Aquí se podrían disparar tareas de segundo plano o prefetch si fuera necesario.
 }
 
+/// Senior Helper: Intercala y aleatoriza secciones de las 4 categorías (anime, películas, series, kdramas)
+/// para la pestaña 'Inicio'. Produce un espejo equilibrado con semilla rotativa por tiempo.
+List<HomeLayoutSection> _interleaveInicioSections(
+  List<List<HomeLayoutSection>> categoryLists, {
+  int? seed,
+}) {
+  final int timeSeed = seed ?? (DateTime.now().millisecondsSinceEpoch ~/ const Duration(hours: 4).inMilliseconds);
+  final rnd = Random(timeSeed);
+
+  HomeLayoutSection? continueWatchingSection;
+  final List<List<HomeLayoutSection>> filteredLists = [];
+
+  for (final list in categoryLists) {
+    final List<HomeLayoutSection> cleaned = [];
+    for (final sec in list) {
+      if (sec.type == HomeSectionType.continueWatching) {
+        continueWatchingSection ??= sec;
+      } else {
+        cleaned.add(sec);
+      }
+    }
+    cleaned.shuffle(rnd);
+    filteredLists.add(cleaned);
+  }
+
+  final List<int> categoryIndices = List.generate(filteredLists.length, (i) => i);
+  categoryIndices.shuffle(rnd);
+
+  final List<HomeLayoutSection> result = [];
+  if (continueWatchingSection != null) {
+    result.add(continueWatchingSection);
+  }
+
+  int maxLen = 0;
+  for (final list in filteredLists) {
+    if (list.length > maxLen) maxLen = list.length;
+  }
+
+  final Set<String> seenTitles = {};
+  if (continueWatchingSection?.title != null) {
+    seenTitles.add(continueWatchingSection!.title!);
+  }
+
+  for (int i = 0; i < maxLen; i++) {
+    for (final catIdx in categoryIndices) {
+      final list = filteredLists[catIdx];
+      if (i < list.length) {
+        final section = list[i];
+        final title = section.title;
+        if (title == null || seenTitles.add(title)) {
+          result.add(section);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 Future<List<HomeLayoutSection>> _getEditorialFallback(Ref ref, String category) async {
   final List<HomeLayoutSection> layout = [];
   layout.add(HomeLayoutSection(
@@ -522,13 +603,40 @@ Future<List<HomeLayoutSection>> _getEditorialFallback(Ref ref, String category) 
   ));
 
   try {
-    final editorials = await ref.watch(editorialRowsProvider(category).future);
-    for (final row in editorials) {
-      layout.add(HomeLayoutSection(
-        type: HomeSectionType.editorial, 
-        data: row,
-        presentation: row.format,
-      ));
+    if (category == 'inicio') {
+      final results = await Future.wait([
+        ref.watch(editorialRowsProvider('animes').future).catchError((_) => <EditorialRow>[]),
+        ref.watch(editorialRowsProvider('películas').future).catchError((_) => <EditorialRow>[]),
+        ref.watch(editorialRowsProvider('series').future).catchError((_) => <EditorialRow>[]),
+        ref.watch(editorialRowsProvider('kdrama').future).catchError((_) => <EditorialRow>[]),
+      ]);
+
+      final List<List<HomeLayoutSection>> categorySectionLists = [];
+      for (final rows in results) {
+        final List<HomeLayoutSection> secList = rows.map((row) => HomeLayoutSection(
+          type: HomeSectionType.editorial,
+          title: row.title,
+          data: row,
+          presentation: row.format,
+        )).toList();
+        categorySectionLists.add(secList);
+      }
+
+      final interleaved = _interleaveInicioSections(categorySectionLists);
+      for (final s in interleaved) {
+        if (!layout.any((existing) => existing.title == s.title)) {
+          layout.add(s);
+        }
+      }
+    } else {
+      final editorials = await ref.watch(editorialRowsProvider(category).future);
+      for (final row in editorials) {
+        layout.add(HomeLayoutSection(
+          type: HomeSectionType.editorial, 
+          data: row,
+          presentation: row.format,
+        ));
+      }
     }
   } catch (e) {}
 

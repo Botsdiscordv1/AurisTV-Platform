@@ -32,7 +32,10 @@ class MockPersonalizedRepo implements AurisRepository {
   @override Future<MovieTitleInfo> getMovieTitles(String query) async => const MovieTitleInfo();
   @override Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken}) async => const ExtractResult(url: '', headers: {});
   @override Future<String> resolveEpisodeUrl(String url, String source, int episode, {String? category}) async => '';
-  @override Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year}) async => EpisodesResponse(episodes: const [], source: source, url: url, slug: '', total: 0);
+  @override Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year, bool fast = false}) async => EpisodesResponse(episodes: const [], source: source, url: url, slug: '', total: 0);
+  @override Future<List<CastInfo>> getCast(String url, {String? source, String? category, int? tmdbId, String? mediaType, String? title, int? year}) async => [];
+  @override Future<List<RelatedInfo>> getRelations(String url, {String? source, String? category}) async => [];
+  @override Future<SearchResponse> getCastCredits({String? url, String? name, String? profile, int? personId}) async => SearchResponse(results: [], query: '', category: '', count: 0);
   @override Future<List<OmdbEpisode>> getOmdbSeason({required String title, int season = 1, bool enrich = true}) async => [];
   @override Future<AnilistMedia?> getAnilistMedia(int id) async => null;
   @override Future<List<MediaItem>> getHomeRecent(int limit) async => [];
@@ -174,6 +177,26 @@ void main() {
     expect(top10Section.presentation, SectionPresentation.top10);
   });
 
+  test('homeLayoutProvider — Inicio mirrors and interleaves sections from all 4 categories', () async {
+    final multiRepo = MultiCategoryRepo();
+    final containerMulti = ProviderContainer(
+      overrides: [
+        aurisRepositoryProvider.overrideWithValue(multiRepo),
+        authProvider.overrideWith((ref) => MockAuthNotifier(UserAccount(id: 'multi_user', activeProfileId: 'multi_user'))),
+      ],
+    );
+
+    final layout = await containerMulti.read(homeLayoutProvider.stream).firstWhere(
+      (l) => l.any((s) => s.title.contains('películas') || s.title.contains('series') || s.title.contains('animes') || s.title.contains('kdrama')),
+    );
+
+    final titles = layout.map((s) => s.title).toList();
+    expect(titles.any((t) => t.contains('películas')), isTrue);
+    expect(titles.any((t) => t.contains('series')), isTrue);
+    expect(titles.any((t) => t.contains('animes')), isTrue);
+    expect(titles.any((t) => t.contains('kdrama')), isTrue);
+  });
+
   test('HomeSection.fromJson supports all SDUI format aliases', () {
     final aliases = ['layout', 'carousel', 'displayMode', 'carouselType'];
     
@@ -213,6 +236,28 @@ class ErrorRepo extends MockPersonalizedRepo {
           format: 'poster',
           items: [
             EditorialItem(id: 'item_1', title: 'Test Anime', posterUrl: 'url', badge: 'essential')
+          ],
+        )
+      ],
+    );
+  }
+}
+
+class MultiCategoryRepo extends MockPersonalizedRepo {
+  @override
+  Future<EditorialResponse> getEditorial({String? imgSize, String? category, String? userId}) async {
+    final cat = category ?? 'animes';
+    return EditorialResponse(
+      generatedAt: '2026-03-30T12:00:00Z',
+      locale: 'es-MX',
+      sections: [
+        EditorialSection(
+          id: 'sec_$cat',
+          title: 'Sección $cat',
+          badge: 'essential',
+          format: 'poster',
+          items: [
+            EditorialItem(id: 'item_$cat', title: 'Item $cat', posterUrl: 'url_$cat', badge: 'essential')
           ],
         )
       ],

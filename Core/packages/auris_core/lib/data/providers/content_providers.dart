@@ -34,6 +34,32 @@ class GalleryParams {
   @override int get hashCode => Object.hash(kind, title, year);
 }
 
+class CastCreditsParams {
+  final String url;
+  final String? name;
+  final String? profile;
+  final int? personId;
+
+  const CastCreditsParams({
+    this.url = '',
+    this.name,
+    this.profile,
+    this.personId,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CastCreditsParams &&
+          url == other.url &&
+          name == other.name &&
+          profile == other.profile &&
+          personId == other.personId;
+
+  @override
+  int get hashCode => Object.hash(url, name, profile, personId);
+}
+
 class FilterParams {
   final String? genre;
   final int? year;
@@ -182,6 +208,7 @@ class GroupedEpisodesParams {
   /// Nombre real de la fuente (p. ej. "AnimeAV1"). Antes se mandaba familyKey
   /// ("animeav1") como source y se dependía de que el server lo normalizara.
   final String? source;
+  final bool fast;
 
   const GroupedEpisodesParams({
     required this.title,
@@ -194,6 +221,7 @@ class GroupedEpisodesParams {
     required this.currentSourceUrl,
     required this.sourcesSignature,
     this.source,
+    this.fast = false,
   });
 
   @override
@@ -209,10 +237,11 @@ class GroupedEpisodesParams {
           familyKey == other.familyKey &&
           currentSourceUrl == other.currentSourceUrl &&
           sourcesSignature == other.sourcesSignature &&
-          source == other.source;
+          source == other.source &&
+          fast == other.fast;
 
   @override
-  int get hashCode => Object.hash(title, metadataTitle, category, year, season, tmdbId, familyKey, currentSourceUrl, sourcesSignature, source);
+  int get hashCode => Object.hash(title, metadataTitle, category, year, season, tmdbId, familyKey, currentSourceUrl, sourcesSignature, source, fast);
 }
 
 /// Firma de identidad para la carga de episodios: depende SOLO de la fuente
@@ -258,14 +287,16 @@ class EpisodesParams {
   final String url; final String source; final String? category;
   final String? title; final String? fullTitle; final String? altTitle;
   final int? tmdbId; final int? season; final int? year;
+  final bool fast;
 
   const EpisodesParams({
     required this.url, required this.source, this.category,
     this.title, this.fullTitle, this.altTitle, this.tmdbId, this.season, this.year,
+    this.fast = false,
   });
 
-  @override bool operator ==(Object other) => identical(this, other) || other is EpisodesParams && url == other.url && source == other.source && season == other.season;
-  @override int get hashCode => Object.hash(url, source, season);
+  @override bool operator ==(Object other) => identical(this, other) || other is EpisodesParams && url == other.url && source == other.source && season == other.season && fast == other.fast;
+  @override int get hashCode => Object.hash(url, source, season, fast);
 }
 
 // --- Smart Episode Cache ---
@@ -400,11 +431,11 @@ final omdbSeasonProvider = FutureProvider.family<List<OmdbEpisode>, OmdbSeasonPa
   return repo.getOmdbSeason(title: params.title, season: params.season ?? 1);
 });
 
-final episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, EpisodesParams>((ref, params) async {
+final AutoDisposeFutureProviderFamily<EpisodesResponse?, EpisodesParams> episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, EpisodesParams>((AutoDisposeFutureProviderRef<EpisodesResponse?> ref, EpisodesParams params) async {
   if (params.url.isEmpty) return null;
   
   final cache = ref.read(_sharedEpisodeCacheProvider);
-  final cacheKey = '${params.url}|${params.source}|${params.season ?? 1}';
+  final cacheKey = '${params.url}|${params.source}|${params.season ?? 1}${params.fast ? '|fast' : ''}';
   
   // 1. Intentar caché en memoria
   final entry = cache[cacheKey];
@@ -419,40 +450,70 @@ final episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, Ep
   
   // 3. Fetch fresco del servidor
   final repo = ref.read(aurisRepositoryProvider);
-  final response = await repo.getEpisodes(
-    params.url, params.source, category: params.category,
-    title: params.title, fullTitle: params.fullTitle, altTitle: params.altTitle,
-    tmdbId: params.tmdbId, season: params.season, year: params.year,
-  );
   
-  // 4. Guardar en caché con info del schedule
-  int? nextEp;
   try {
-    final schedule = await ref.read(scheduleProvider.future);
-    for (final day in schedule.days) {
-        for (final item in day.items) {
-          final itemTitle = item.title.toLowerCase();
-          final paramTitle = (params.title ?? '').toLowerCase();
-          if (itemTitle.contains(paramTitle) || paramTitle.contains(itemTitle)) {
-            nextEp = item.nextEpisode;
-            break;
+    final response = await repo.getEpisodes(
+      params.url, params.source, category: params.category,
+      title: params.title, fullTitle: params.fullTitle, altTitle: params.altTitle,
+      tmdbId: params.tmdbId, season: params.season, year: params.year,
+      fast: params.fast,
+    );
+
+    // 4. Guardar en caché con info del schedule
+    int? nextEp;
+    try {
+      final schedule = await ref.read(scheduleProvider.future);
+      for (final day in schedule.days) {
+          for (final item in day.items) {
+            final itemTitle = item.title.toLowerCase();
+            final paramTitle = (params.title ?? '').toLowerCase();
+            if (itemTitle.contains(paramTitle) || paramTitle.contains(itemTitle)) {
+              nextEp = item.nextEpisode;
+              break;
+            }
           }
+          if (nextEp != null) break;
         }
-        if (nextEp != null) break;
-      }
-    } catch (_) {}
+      } catch (_) {}
+      
+      ref.read(_sharedEpisodeCacheProvider.notifier).state = {
+        ...ref.read(_sharedEpisodeCacheProvider),
+        cacheKey: _EpisodeCacheEntry(response: response, cachedAt: DateTime.now(), nextEpisode: nextEp),
+      };
     
-    ref.read(_sharedEpisodeCacheProvider.notifier).state = {
-      ...ref.read(_sharedEpisodeCacheProvider),
-      cacheKey: _EpisodeCacheEntry(response: response, cachedAt: DateTime.now(), nextEpisode: nextEp),
-    };
-  
-  return response;
+    return response;
+  } catch (e) {
+    // Regla 5: Fallback si episodes?fast=1 falla, reintenta una vez sin fast
+    if (params.fast) {
+      debugPrint('[Episodes] Fast load failed, retrying without fast: $e');
+      // Fix circularity by using the future directly and being explicit
+      final fallbackParams = EpisodesParams(
+        url: params.url, source: params.source, category: params.category,
+        title: params.title, fullTitle: params.fullTitle, altTitle: params.altTitle,
+        tmdbId: params.tmdbId, season: params.season, year: params.year,
+        fast: false,
+      );
+      return await ref.read(episodesProvider(fallbackParams).future);
+    }
+    rethrow;
+  }
 });
 
-final groupedEpisodesProvider = FutureProvider.autoDispose.family<GroupedEpisodesResult?, GroupedEpisodesParams>((ref, arg) async {
+final castProvider = FutureProvider.autoDispose.family<List<CastInfo>, ({String url, String source, String? category})>((ref, arg) async {
+  if (arg.url.isEmpty) return [];
+  final repo = ref.read(aurisRepositoryProvider);
+  return await repo.getCast(arg.url, source: arg.source, category: arg.category);
+});
+
+final relationsProvider = FutureProvider.autoDispose.family<List<RelatedInfo>, ({String url, String source, String? category})>((ref, arg) async {
+  if (arg.url.isEmpty) return [];
+  final repo = ref.read(aurisRepositoryProvider);
+  return await repo.getRelations(arg.url, source: arg.source, category: arg.category);
+});
+
+final AutoDisposeFutureProviderFamily<GroupedEpisodesResult?, GroupedEpisodesParams> groupedEpisodesProvider = FutureProvider.autoDispose.family<GroupedEpisodesResult?, GroupedEpisodesParams>((AutoDisposeFutureProviderRef<GroupedEpisodesResult?> ref, GroupedEpisodesParams arg) async {
   // Usar el mismo episodesProvider subyacente para compartir caché
-  final episodesAsync = await ref.watch(episodesProvider(EpisodesParams(
+  final EpisodesResponse? episodesAsync = await ref.watch(episodesProvider(EpisodesParams(
     url: arg.currentSourceUrl,
     source: arg.source?.isNotEmpty == true ? arg.source! : arg.familyKey,
     category: arg.category,
@@ -461,6 +522,7 @@ final groupedEpisodesProvider = FutureProvider.autoDispose.family<GroupedEpisode
     tmdbId: arg.tmdbId,
     season: arg.season,
     year: arg.year,
+    fast: arg.fast,
   )).future);
 
   if (episodesAsync == null) return null;
@@ -474,6 +536,17 @@ final groupedEpisodesProvider = FutureProvider.autoDispose.family<GroupedEpisode
   });
 
   return GroupedEpisodesResult(response: episodesAsync, sources: List.filled(episodesAsync.episodes.length, null));
+});
+
+final castCreditsProvider = FutureProvider.autoDispose.family<SearchResponse?, CastCreditsParams>((ref, params) async {
+  if (params.url.isEmpty && params.personId == null) return null;
+  final repo = ref.read(aurisRepositoryProvider);
+  return await repo.getCastCredits(
+    url: params.url,
+    name: params.name,
+    profile: params.profile,
+    personId: params.personId,
+  );
 });
 
 // --- Player Consolidated Providers ---
@@ -501,8 +574,8 @@ class PlayerEpisodesState {
 }
 
 /// Provider consolidado: un solo watch en el player para todo lo relacionado con episodios.
-final playerEpisodesSelector = FutureProvider.autoDispose.family<PlayerEpisodesState, ({String url, String source, String? title, int? season, int? currentEpisode})>((ref, params) async {
-  final episodesAsync = await ref.watch(episodesProvider(EpisodesParams(
+final AutoDisposeFutureProviderFamily<PlayerEpisodesState, ({String url, String source, String? title, int? season, int? currentEpisode})> playerEpisodesSelector = FutureProvider.autoDispose.family<PlayerEpisodesState, ({String url, String source, String? title, int? season, int? currentEpisode})>((AutoDisposeFutureProviderRef<PlayerEpisodesState> ref, params) async {
+  final EpisodesResponse? episodesAsync = await ref.watch(episodesProvider(EpisodesParams(
     url: params.url,
     source: params.source,
     title: params.title,
@@ -540,7 +613,7 @@ class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<UnifiedRelation
     if (sources.isEmpty) { state = const AsyncValue.data({}); return; }
     int finished = 0;
     for (final src in sources) {
-      ref.read(episodesProvider(EpisodesParams(url: src.url, source: src.source, category: 'anime', season: src.season)).future).then((res) {
+      ref.read(episodesProvider(EpisodesParams(url: src.url, source: src.source, category: 'anime', season: src.season)).future).then((EpisodesResponse? res) {
         finished++; if (!mounted || res == null) return;
         if (res.relations.isNotEmpty) {
           final relationsWithSource = res.relations.map((r) => r.copyWith(source: src.source)).toList();

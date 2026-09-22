@@ -48,8 +48,8 @@ class AdaptiveDetailLayout extends StatelessWidget {
     final isWide = width > 600; 
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     
-    // Altura de cabecera adaptativa centralizada
-    final double appBarHeight = isWide ? 420 : (width * 0.85);
+    // Altura de cabecera adaptativa centralizada (Senior Fix: Formato cinematográfico 1.5:1 en móvil)
+    final double appBarHeight = isWide ? 420 : (width * 0.65);
     final double topPadding = ResponsiveUtils.isNative ? MediaQuery.of(context).padding.top : 0;
 
     return Scaffold(

@@ -1,52 +1,51 @@
-# Plan de Implementación: Automatización de Proxy de Imágenes en Modelos del Core
+# Refactor de Carga Paralela en Detalle (Ficha)
 
-Este plan detalla los cambios necesarios para automatizar la llamada a `ApiEndpoints.proxyImage()` en los factories `fromJson` de todos los modelos de datos del core. Esto asegurará que cualquier imagen consumida por los clientes (Mobile, Web, TV) pase por el proxy cuando sea necesario para evitar problemas de CORS y bloqueos de red.
+Optimizar la carga de la pantalla de detalle ("ficha") disparando las peticiones de episodios (fast), reparto (cast) y relacionados (relations) en paralelo en lugar de esperar a una respuesta única pesada.
 
-## Cambios Propuestos
+## User Review Required
 
-Se modificarán los modelos en `auris_core` para envolver todas las URLs de imágenes con `ApiEndpoints.proxyImage()`.
+> [!IMPORTANT]
+> Se han añadido nuevos endpoints `/api/cast` y `/api/relations` que deben estar soportados por el backend.
+> La lógica de `episodes?fast=1` asume que el backend ignora cast/relations en este modo para reducir latencia.
 
-### [Componente] auris_core / Models
+## Proposed Changes
 
-#### [MODIFY] [search_result.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/models/server/search_result.dart)
-- Agregar import de `api_endpoints.dart`.
-- Modificar `SearchResult.fromJson` para procesar `thumbnail`, `banner` y `logo`.
+### [Component Name] Core / API
 
-#### [MODIFY] [anime_detail.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/models/server/anime_detail.dart)
-- Agregar import de `api_endpoints.dart`.
-- Modificar `AnimeDetail.fromJson` para `poster`, `backdrop`, `banner` y `logo`.
-- Modificar `CharacterInfo.fromJson` para `image`.
-- Modificar `VoiceActorInfo.fromJson` para `image`.
-- Modificar `TrailerInfo.fromJson` para `thumbnail`.
-- Modificar `RelationInfo.fromJson` para `poster`.
-- Modificar `RecommendationInfo.fromJson` para `poster`.
-- Modificar `AnimeThemeInfo.fromJson` para `imageUrl`.
+#### [MODIFY] [api_endpoints.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/core/api/api_endpoints.dart)
+- Añadir constantes para `cast` y `relations`.
 
-#### [MODIFY] [movie_detail.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/models/server/movie_detail.dart)
-- Agregar import de `api_endpoints.dart`.
-- Modificar `MovieDetail.fromJson` para `poster`, `backdrop` y `logo`.
-- Modificar `SeasonInfo.fromJson` para `poster`.
-- Modificar `PlatformInfo.fromJson` para `logo`.
+### [Component Name] Data / Repository
 
-#### [MODIFY] [gallery.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/models/server/gallery.dart)
-- Agregar import de `api_endpoints.dart`.
-- Modificar `GalleryImage.fromJson` para `url`.
+#### [MODIFY] [auris_repository.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/repositories/auris_repository.dart)
+- Añadir métodos `getCast(String url)` y `getRelations(String url)`.
+- Actualizar `getEpisodes` para aceptar el parámetro `fast`.
 
-#### [MODIFY] [omdb_episode.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/models/server/omdb_episode.dart)
-- Agregar import de `api_endpoints.dart`.
-- Modificar `OmdbEpisode.fromJson` para `thumbnail`.
+#### [MODIFY] [auris_repository_impl.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/repositories/impl/auris_repository_impl.dart)
+- Implementar `getCast` y `getRelations`.
+- Actualizar `getEpisodes` para enviar `fast=1` si se solicita.
 
-#### [MODIFY] [schedule.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/models/server/schedule.dart)
-- Agregar import de `api_endpoints.dart`.
-- Modificar `ScheduleItem.fromJson` para `coverImage` y `banner`.
+### [Component Name] Data / Models
 
-#### [MODIFY] [editorial_section.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/models/server/editorial_section.dart)
-- Agregar import de `api_endpoints.dart`.
-- Modificar `EditorialItem.fromJson` para `posterUrl` y `bannerUrl`.
+#### [MODIFY] [unified_content_state.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/models/unified_content_state.dart)
+- Añadir `AsyncValue<List<CastInfo>> cast` al estado unificado.
 
-## Plan de Verificación
+### [Component Name] Data / Providers
 
-### Verificación Manual
-1. Abrir la aplicación en Web (si es posible) y verificar que las imágenes de búsqueda y detalle cargan correctamente a través del proxy.
-2. Inspeccionar el tráfico de red para confirmar que las URLs de imágenes ahora incluyen `/api/proxy/image?url=...`.
-3. Verificar en Android que los dominios bloqueados (como jkanime) ahora cargan imágenes gracias al proxy.
+#### [MODIFY] [content_providers.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/providers/content_providers.dart)
+- Actualizar `EpisodesParams` para incluir `fast`.
+- Añadir `castProvider` y `relationsProvider`.
+- Actualizar `episodesProvider` para manejar el reintento sin `fast` si falla con `fast: true`.
+
+#### [MODIFY] [unified_content_notifier.dart](file:///E:/AurisTV_plataformas/Core/packages/auris_core/lib/data/providers/unified_content_notifier.dart)
+- Orquestar las 3 llamadas en paralelo dentro de `unifiedContentProvider`.
+- Mapear los resultados al `UnifiedContentState`.
+
+## Verification Plan
+
+### Manual Verification
+- Abrir una ficha de serie/anime y verificar que el player y la lista de capítulos cargan rápidamente (vía `fast=1`).
+- Verificar que el carrusel de reparto (Cast) aparece poco después de forma independiente.
+- Verificar que la fila de relacionados aparece al final de forma independiente.
+- Probar con fuentes que no devuelven relacionados (ej. OnlyPelis) y verificar que la fila se oculta correctamente.
+- Verificar que al hacer click en un actor se dispara la búsqueda de créditos correctamente.

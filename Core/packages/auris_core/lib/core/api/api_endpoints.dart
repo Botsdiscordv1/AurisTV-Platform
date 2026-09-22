@@ -272,11 +272,14 @@ class ApiEndpoints {
   static const String catalogSources = '/api/catalog/sources';
   static const String extract = '/api/extract';
   static const String episodes = '/api/episodes';
+  static const String cast = '/api/cast';
+  static const String relations = '/api/relations';
   static const String resolveEpisode = '/api/resolve-episode';
   static const String omdbSeason = '/api/omdb/season';
   static const String omdbEpisode = '/api/omdb/episode';
   static const String health = '/api/health';
   static const String gallery = '/api/gallery';
+  static const String castCredits = '/api/cast-credits';
 
   static String galleryUrl({int? tmdbId, String kind = 'tv', String? title, int? year}) {
     final q = <String, String>{};

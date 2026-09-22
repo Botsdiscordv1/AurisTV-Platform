@@ -205,16 +205,27 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
   }
 }
 
-class _CastCard extends StatefulWidget {
+class _CastCard extends ConsumerStatefulWidget {
   final CastInfo person;
   const _CastCard({required this.person});
 
   @override
-  State<_CastCard> createState() => _CastCardState();
+  ConsumerState<_CastCard> createState() => _CastCardState();
 }
 
-class _CastCardState extends State<_CastCard> {
+class _CastCardState extends ConsumerState<_CastCard> {
   bool _isHovered = false;
+
+  void _showCastCredits() {
+    if (widget.person.url == null || widget.person.url!.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => _CastCreditsModal(
+        person: widget.person,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +236,7 @@ class _CastCardState extends State<_CastCard> {
       onEnter: (_) { if (isClickable) setState(() => _isHovered = true); },
       onExit: (_) { if (isClickable) setState(() => _isHovered = false); },
       child: GestureDetector(
-        onTap: isClickable ? () => launchUrlString(widget.person.url!) : null,
+        onTap: isClickable ? _showCastCredits : null,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1167,6 +1178,247 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
 class _DetailInfoCard extends StatelessWidget {
   final Widget child; const _DetailInfoCard({required this.child});
   @override Widget build(BuildContext context) => Container(width: double.infinity, padding: const EdgeInsets.all(28), decoration: BoxDecoration(color: const Color(0xFF121519), borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFF66696E), width: 1.0)), child: child);
+}
+
+class _CastCreditsModal extends ConsumerWidget {
+  final CastInfo person;
+  const _CastCreditsModal({required this.person});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = context.isMobile;
+
+    final creditsAsync = ref.watch(castCreditsProvider(CastCreditsParams(
+      url: person.url ?? '',
+      name: person.name,
+      profile: person.rawProfile, // Senior: Enviar URL original al backend para evitar doble proxy
+      personId: person.id,
+    )));
+
+    return Dialog(
+      backgroundColor: const Color(0xFF0B0B0D),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.white10)),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : width * 0.1,
+        vertical: isMobile ? 20 : 40,
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: Column(
+          children: [
+            // Header del Modal
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 16, 16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundImage: person.profile != null && person.profile!.isNotEmpty
+                        ? CachedNetworkImageProvider(person.profile!)
+                        : null,
+                    backgroundColor: Colors.white10,
+                    child: person.profile == null || person.profile!.isEmpty
+                        ? const Icon(Icons.person, color: Colors.white24)
+                        : null,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          person.name,
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Filmografía',
+                          style: GoogleFonts.poppins(
+                            color: const Color(0xFFEF7A1E),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white10, height: 1),
+
+            // Cuerpo - Metadata + Bio + Filmografía
+            Expanded(
+              child: creditsAsync.when(
+                data: (response) {
+                  if (response == null || (response.results.isEmpty && response.biography == null)) {
+                    return Center(
+                      child: Text(
+                        'No se encontró información disponible',
+                        style: GoogleFonts.poppins(color: Colors.white54, fontSize: 16),
+                      ),
+                    );
+                  }
+
+                  final results = response.results;
+                  final crossAxisCount = isMobile ? 2 : (width < 1000 ? 3 : (width < 1400 ? 4 : 5));
+
+                  return CustomScrollView(
+                    slivers: [
+                      // Bio y Metadata
+                      if (response.biography != null || response.birthday != null)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (response.birthday != null || response.placeOfBirth != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: Wrap(
+                                      spacing: 24,
+                                      runSpacing: 12,
+                                      children: [
+                                        if (response.birthday != null)
+                                          _buildInfoItem('Nacimiento', response.birthday!),
+                                        if (response.placeOfBirth != null)
+                                          _buildInfoItem('Lugar', response.placeOfBirth!),
+                                        if (response.gender != null)
+                                          _buildInfoItem('Género', response.gender!),
+                                      ],
+                                    ),
+                                  ),
+                                if (response.biography != null) ...[
+                                  Text(
+                                    'Biografía',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    response.biography!,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white.withOpacity(0.7),
+                                      fontSize: 15,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 32),
+                                ],
+                                Text(
+                                  'Conocido por',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      // Lista de Créditos
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                        sliver: SliverGrid(
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            // Senior Fix: Estandarización de tamaño. En Desktop forzamos 5-6 posters
+                            // para evitar que crezcan desproporcionadamente.
+                            crossAxisCount: isMobile ? 2 : (width < 1200 ? 4 : 6),
+                            mainAxisSpacing: 32,
+                            crossAxisSpacing: 20,
+                            // Senior Fix: Ratio 0.6 para dar suficiente espacio al texto
+                            childAspectRatio: 0.6,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final item = results[index];
+                              return FocusablePosterCard(
+                                title: item.title,
+                                posterUrl: item.thumbnail,
+                                subtitle: item.year?.toString(),
+                                rating: formatRating(item.score),
+                                showInfo: true,
+                                onTap: () {
+                                  Navigator.pop(context); // Cerrar modal antes de navegar
+
+                                  if (item.url.isNotEmpty && item.url.startsWith('http')) {
+                                    final String cat = item.kind?.isNotEmpty == true
+                                        ? item.kind!
+                                        : (item.totalSeasons != null && item.totalSeasons! > 0 ? 'series' : 'movie');
+
+                                    final shareableUri = UrlUtils.buildShareableUri(
+                                      title: item.title,
+                                      source: item.source,
+                                      url: item.url,
+                                      category: cat,
+                                      year: item.year,
+                                    );
+                                    context.go(shareableUri, extra: item);
+                                  } else {
+                                    // Anime: los items NO traen url de scraper -> click en filmografía = search normal por title
+                                    context.go('/busqueda?q=${Uri.encodeComponent(item.title)}');
+                                  }
+                                },
+                              );
+                            },
+                            childCount: results.length,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+                error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white54))),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: GoogleFonts.poppins(
+            color: const Color(0xFFEF7A1E),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            color: Colors.white.withOpacity(0.9),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 // --- MAIN WIDGETS ---
@@ -2299,6 +2551,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     required int episodesCrossAxisCount,
     required double episodesAspectRatio,
     required AsyncValue<GroupedEpisodesResult?> episodesAsync,
+    required AsyncValue<List<CastInfo>> castAsync,
     required double hPadding,
     required bool detailLoading,
     required AsyncValue<Map<String, List<RelatedInfo>>> unifiedRelationsAsync,
@@ -2427,11 +2680,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     }
 
     if (selectedTabIndex == relatedTabIndex) {
-      final relations = unifiedRelationsAsync.maybeWhen(data: (d) => d, orElse: () => null);
-      slivers.addAll(_buildRelatedTab(0, unifiedRelations: relations, currentSource: currentSource));
+      slivers.addAll(_buildRelatedTab(0, unifiedRelations: unifiedRelationsAsync, currentSource: currentSource));
     }
     if (selectedTabIndex == castTabIndex && castTabIndex != -1) {
-      slivers.addAll(_buildCastTab(detailData, epData, hPadding));
+      slivers.addAll(_buildCastTab(detailData, castAsync.valueOrNull ?? const [], 0));
     }
     if (selectedTabIndex == extrasTabIndex) {
       slivers.addAll(_buildExtrasTab(detailData, 0));
@@ -2513,17 +2765,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       }
 
       final hasEpisodesTab = !isMovieCategory;
-      int _ti = 0;
-      final episodesTabIndex = hasEpisodesTab ? _ti++ : -1;
-      final relatedTabIndex = _ti++;
 
-      final cast = epData?.cast ?? const [];
-      final movieCast = detailData is MovieDetail ? (detailData as MovieDetail).cast : const [];
-      final animeCharacters = detailData is AnimeDetail ? (detailData as AnimeDetail).characters : const [];
-      final hasCast = cast.isNotEmpty || movieCast.isNotEmpty || animeCharacters.isNotEmpty;
-      final castTabIndex = hasCast ? _ti++ : -1;
+      final castAsync = detailState.cast;
 
-      final detailsTabIndex = _ti++;
+      // Tabs visibles solo con datos recibidos del servidor: sin placeholders
+      // mientras carga y sin fallback de detalles. Si llega vacío [], se oculta.
+      final bool hasCast = castAsync.maybeWhen(
+        data: (d) => d.isNotEmpty,
+        orElse: () => false,
+      );
 
       final currentOpenings = detailData is AnimeDetail
           ? detailData.openings
@@ -2531,18 +2781,25 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       final currentEndings = detailData is AnimeDetail
           ? detailData.endings
           : (detailData is MovieDetail ? (detailData as MovieDetail).endings : const <AnimeThemeInfo>[]);
-      final extrasTabIndex = (currentOpenings.isNotEmpty || currentEndings.isNotEmpty) ? _ti++ : -1;
+      final extrasTabIndexRaw = (currentOpenings.isNotEmpty || currentEndings.isNotEmpty) ? 1 : -1;
 
-      final galleryTabIndex = _ti++;
-
+      final bool hasRelatedData = unifiedRelationsAsync.maybeWhen(data: (d) => d.isNotEmpty, orElse: () => false);
       final tabLabels = <String>[
         if (hasEpisodesTab) 'Episodios',
-        'Relacionado',
+        if (hasRelatedData) 'Relacionado',
         if (hasCast) 'Elenco',
         'Detalles',
-        if (extrasTabIndex != -1) 'Extras',
+        if (extrasTabIndexRaw != -1) 'Extras',
         'Galería',
       ];
+
+      final int episodesTabIndex = tabLabels.indexOf('Episodios');
+      final int relatedTabIndex = tabLabels.indexOf('Relacionado');
+      final int castTabIndex = tabLabels.indexOf('Elenco');
+      final int detailsTabIndex = tabLabels.indexOf('Detalles');
+      final int extrasTabIndexFinal = tabLabels.indexOf('Extras');
+      final int galleryTabIndex = tabLabels.indexOf('Galería');
+
       final selectedTabIndex = _selectedTabIndex.clamp(0, tabLabels.length - 1);
 
       final certification = detailData != null ? ((detailData is MovieDetail ? (detailData as MovieDetail).certification : (detailData is AnimeDetail ? (detailData as AnimeDetail).certification : null)) ?? 'NR') : 'NR';
@@ -2585,7 +2842,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         episodesTabIndex: episodesTabIndex,
         relatedTabIndex: relatedTabIndex,
         castTabIndex: castTabIndex,
-        extrasTabIndex: extrasTabIndex,
+        extrasTabIndex: extrasTabIndexFinal,
         detailsTabIndex: detailsTabIndex,
         galleryTabIndex: galleryTabIndex,
         hasEpisodesTab: hasEpisodesTab,
@@ -2601,6 +2858,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         episodesCrossAxisCount: episodesCrossAxisCount,
         episodesAspectRatio: episodesAspectRatio,
         episodesAsync: episodesAsync,
+        castAsync: castAsync,
         hPadding: context.isDesktop ? 0 : hPadding,
         detailLoading: detailLoading,
         unifiedRelationsAsync: unifiedRelationsAsync,
@@ -3178,89 +3436,63 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   List<Widget> _buildRelatedTab(
     double hPadding, {
-    Map<String, List<RelatedInfo>>? unifiedRelations,
+    required AsyncValue<Map<String, List<RelatedInfo>>> unifiedRelations,
     SearchResult? currentSource,
   }) {
-    if (unifiedRelations == null || unifiedRelations.isEmpty) {
-      return [const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 40), child: Center(child: CircularProgressIndicator(color: Colors.white24))))];
-    }
-    
-    final isMobile = context.isMobile; 
-    
-    // Extraemos las categorías unificadas de las fuentes
-    final List<RelatedInfo> franchiseSource = unifiedRelations['franchise'] ?? [];
-    final List<RelatedInfo> similarSource = unifiedRelations['similar'] ?? [];
-    final List<RelatedInfo> recommendedSource = unifiedRelations['recommended'] ?? [];
+    return unifiedRelations.when(
+      data: (relations) {
+        if (relations.isEmpty) {
+          return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay contenido relacionado disponible', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
+        }
 
-    // Solo se muestran los relacionados extraídos de los servidores (URLs
-    // directas). No se consulta AniList para esta sección.
-    if (franchiseSource.isEmpty && similarSource.isEmpty && recommendedSource.isEmpty) {
-      return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay contenido relacionado disponible', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
-    }
+        final List<RelatedInfo> franchiseSource = relations['franchise'] ?? [];
+        final List<RelatedInfo> similarSource = relations['similar'] ?? [];
+        final List<RelatedInfo> recommendedSource = relations['recommended'] ?? [];
 
-    return [
-      // 1. Carrusel: Franquicia y Secuelas (solo servidores)
-      if (franchiseSource.isNotEmpty)
-        SliverToBoxAdapter(
-          child: _RelatedCarouselRow(
-            title: 'Franquicia y Secuelas',
-            hPadding: context.isDesktop ? 0 : hPadding,
-            items: _unifyAndDeduplicate(
-              sourceItems: franchiseSource,
-              currentSource: currentSource,
+        if (franchiseSource.isEmpty && similarSource.isEmpty && recommendedSource.isEmpty) {
+          return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay contenido relacionado disponible', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
+        }
+
+        return [
+          if (franchiseSource.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _RelatedCarouselRow(
+                title: 'Franquicia y Secuelas',
+                hPadding: context.isDesktop ? 0 : hPadding,
+                items: _unifyAndDeduplicate(
+                  sourceItems: franchiseSource,
+                  currentSource: currentSource,
+                ),
+              ),
             ),
-          ),
-        ),
-
-      // 2. Carrusel: Te recomendamos (solo servidores)
-      if (recommendedSource.isNotEmpty)
-        SliverToBoxAdapter(
-          child: _RelatedCarouselRow(
-            title: 'Te recomendamos',
-            hPadding: context.isDesktop ? 0 : hPadding,
-            items: _unifyAndDeduplicate(
-              sourceItems: recommendedSource,
-              currentSource: currentSource,
-              isRecommendation: true,
+          if (recommendedSource.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _RelatedCarouselRow(
+                title: 'Te recomendamos',
+                hPadding: context.isDesktop ? 0 : hPadding,
+                items: _unifyAndDeduplicate(
+                  sourceItems: recommendedSource,
+                  currentSource: currentSource,
+                  isRecommendation: true,
+                ),
+              ),
             ),
-          ),
-        ),
-
-      // 3. Carrusel: Similares a [TITULO] (UNIFICADO)
-      if (similarSource.isNotEmpty)
-        SliverToBoxAdapter(
-          child: _RelatedCarouselRow(
-            title: 'Similares a ${cleanTitleForDisplay(stripSeasonSuffix(widget.title))}',
-            hPadding: context.isDesktop ? 0 : hPadding,
-            items: similarSource.map((r) => _RelatedCardData(
-              title: _cleanRelatedTitle(r.title), 
-              poster: r.cover, 
-              subtitle: r.relation,
-              onTap: () {
-              final sName = r.source ?? currentSource?.source ?? widget.source;
-              final result = SearchResult(
-                title: r.title,
-                url: r.url,
-                source: sName,
-                quality: 'HD',
-                thumbnail: r.cover,
-                slug: r.slug,
-                metadataTitle: r.title,
-                sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
-              );
-              final uri = UrlUtils.buildShareableUri(
-                title: r.title,
-                source: result.source,
-                url: result.url,
-                category: 'anime',
-                from: widget.from ?? '/inicio',
-              );
-              context.go(uri, extra: result);
-            },
-            )).toList(),
-          ),
-        ),
-    ];
+          if (similarSource.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _RelatedCarouselRow(
+                title: 'Similares a ${cleanTitleForDisplay(stripSeasonSuffix(widget.title))}',
+                hPadding: context.isDesktop ? 0 : hPadding,
+                items: _unifyAndDeduplicate(
+                  sourceItems: similarSource,
+                  currentSource: currentSource,
+                ),
+              ),
+            ),
+        ];
+      },
+      loading: () => [const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 40), child: Center(child: CircularProgressIndicator(color: Colors.white24))))],
+      error: (err, _) => [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('Error al cargar relacionados', style: TextStyle(color: Colors.redAccent)))))]
+    );
   }
 
   /// Senior Helper: Une datos de fuentes locales con metadatos globales y elimina duplicados
@@ -3301,7 +3533,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             title: r.title,
             source: result.source,
             url: result.url,
-            category: 'anime',
+            category: widget.category, // Senior: Mantener la categoría actual
             from: widget.from ?? '/inicio',
           );
           context.go(uri, extra: result);
@@ -3312,43 +3544,41 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     return unifiedMap.values.toList();
   }
 
-  List<Widget> _buildCastTab(dynamic detailData, dynamic epData, double hPadding) {
-    final Map<String, CastInfo> unified = {};
+  List<Widget> _buildCastTab(dynamic detailData, List<CastInfo> serverCast, double hPadding) {
+    final List<CastInfo> cast;
 
-    // 1. Cast del servidor 3001 (Prioridad por ser el más reciente/específico)
-    if (epData is EpisodesResponse) {
-      for (var c in epData.cast) {
-        unified[c.name] = c;
-      }
-    }
+    // Senior Strategy: Prioridad absoluta al cast del servidor (scraper) si existe.
+    // Si no ha llegado o está vacío, usamos el de detalles (TMDB/AniList) como placeholder.
+    if (serverCast.isNotEmpty) {
+      cast = serverCast;
+    } else {
+      final Map<String, CastInfo> detailCast = {};
 
-    // 2. Cast de Películas/Series (TMDB)
-    if (detailData is MovieDetail) {
-      for (var c in detailData.cast) {
-        if (!unified.containsKey(c.name)) {
-          unified[c.name] = CastInfo(
+      // 1. Cast de Películas/Series (TMDB)
+      if (detailData is MovieDetail) {
+        for (var c in detailData.cast) {
+          detailCast[c.name] = CastInfo(
             name: c.name,
             character: c.character,
             profile: c.profile,
           );
         }
       }
-    }
 
-    // 3. Personajes de Anime (AniList)
-    if (detailData is AnimeDetail) {
-      for (var c in detailData.characters) {
-        if (!unified.containsKey(c.name)) {
-          unified[c.name] = CastInfo(
-            name: c.name,
-            character: c.role,
-            profile: c.image,
-          );
+      // 2. Personajes de Anime (AniList)
+      if (detailData is AnimeDetail) {
+        for (var c in detailData.characters) {
+          if (!detailCast.containsKey(c.name)) {
+            detailCast[c.name] = CastInfo(
+              name: c.name,
+              character: c.role,
+              profile: c.image,
+            );
+          }
         }
       }
+      cast = detailCast.values.toList();
     }
-
-    final List<CastInfo> cast = unified.values.toList();
 
     if (cast.isEmpty) {
       return [
@@ -3373,7 +3603,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     return [
       SliverPadding(
-        padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 0, vertical: 32),
+        padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 32),
         sliver: SliverGrid(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
@@ -3437,8 +3667,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     if (ops.isEmpty && eds.isEmpty) return [const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.only(top: 40), child: Text('No hay temas musicales disponibles', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 18)))))];
     return [
-      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: 16), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: fallbackImg, animeTitle: animeTitle, logoUrl: logoUrl), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
-      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: 16), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: fallbackImg, animeTitle: animeTitle, logoUrl: logoUrl), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (ops.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Openings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: ops[index], isOP: true, fallbackImage: fallbackImg, animeTitle: animeTitle, logoUrl: logoUrl), childCount: ops.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
+      if (eds.isNotEmpty) ...[ SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: hPadding), child: Text('Endings', style: TextStyle(color: Colors.white, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)))), const SliverToBoxAdapter(child: SizedBox(height: 16)), SliverPadding(padding: EdgeInsets.symmetric(horizontal: hPadding), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: isMobile ? 2 : 4, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.6), delegate: SliverChildBuilderDelegate((context, index) => _ThemeCard(theme: eds[index], isOP: false, fallbackImage: fallbackImg, animeTitle: animeTitle, logoUrl: logoUrl), childCount: eds.length))), const SliverToBoxAdapter(child: SizedBox(height: 32)) ],
     ];
   }
 
@@ -3784,14 +4014,9 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                     controller: _scrollController,
                     scrollDirection: Axis.horizontal,
                     clipBehavior: Clip.none, 
-                    padding: EdgeInsets.only(
-                      left: widget.hPadding, 
-                      right: widget.hPadding,
-                      top: isMobile ? 6 : 10, 
-                      bottom: 4,
-                    ),
+                    padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
                     itemCount: widget.items.length,
-                    separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 16),
+                    separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 24),
                     itemBuilder: (context, index) {
                       final item = widget.items[index];
                       return SizedBox(

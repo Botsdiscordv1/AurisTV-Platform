@@ -4,6 +4,7 @@ import '../../../core/api/image_policy.dart';
 
 class SearchResult {
   final String title;
+  final String? originalTitle;
   final String url;
   final String quality;
   final String thumbnail;
@@ -27,6 +28,7 @@ class SearchResult {
   final String? status;
   final String? kind;
   final String? type;
+  final String? layout;
   final int? season;
   final int? totalSeasons;
   final List<String>? genres;
@@ -37,6 +39,7 @@ class SearchResult {
 
   const SearchResult({
     required this.title,
+    this.originalTitle,
     required this.url,
     required this.quality,
     required this.thumbnail,
@@ -60,6 +63,7 @@ class SearchResult {
     this.status,
     this.kind,
     this.type,
+    this.layout,
     this.season,
     this.totalSeasons,
     this.genres,
@@ -85,6 +89,7 @@ class SearchResult {
 
   SearchResult copyWith({
     String? title,
+    String? originalTitle,
     String? url,
     String? quality,
     String? thumbnail,
@@ -108,6 +113,7 @@ class SearchResult {
     String? status,
     String? kind,
     String? type,
+    String? layout,
     int? season,
     int? totalSeasons,
     List<String>? genres,
@@ -117,6 +123,7 @@ class SearchResult {
   }) {
     return SearchResult(
       title: title ?? this.title,
+      originalTitle: originalTitle ?? this.originalTitle,
       url: url ?? this.url,
       quality: quality ?? this.quality,
       thumbnail: thumbnail ?? this.thumbnail,
@@ -140,6 +147,7 @@ class SearchResult {
       status: status ?? this.status,
       kind: kind ?? this.kind,
       type: type ?? this.type,
+      layout: layout ?? this.layout,
       season: season ?? this.season,
       totalSeasons: totalSeasons ?? this.totalSeasons,
       genres: genres ?? this.genres,
@@ -152,6 +160,7 @@ class SearchResult {
   factory SearchResult.fromJson(Map<dynamic, dynamic> json) {
     return SearchResult(
       title: json['title']?.toString() ?? '',
+      originalTitle: json['originalTitle']?.toString(),
       url: json['url']?.toString() ?? '',
       quality: json['quality']?.toString() ?? '',
       thumbnail: ApiEndpoints.proxyImage(
@@ -166,7 +175,9 @@ class SearchResult {
       ),
       tmdbThumbnail: json['tmdbThumbnail']?.toString(),
       banner: ApiEndpoints.proxyImage(
-        json['banner']?.toString() ?? json['backdrop']?.toString(), 
+        json['banner']?.toString() ?? 
+        json['backdrop']?.toString() ??
+        json['backdropUrl']?.toString(), 
         policy: ImageSize.banner,
         fallbackUrl: json['tmdbBanner']?.toString() ?? json['tmdbBackdrop']?.toString(),
       ),
@@ -181,13 +192,14 @@ class SearchResult {
       metadataTitle: json['metadataTitle']?.toString(),
       forcedTitle: json['forcedTitle'] as bool?,
       fromDiscovery: json['fromDiscovery'] as bool?,
-      score: _parseDouble(json['score']),
+      score: _parseDouble(json['score'] ?? json['rating']), // Senior Fix: Soporte para 'rating' (Filmografía)
       fullDate: json['fullDate']?.toString(),
       trailerKey: json['trailerKey']?.toString() ?? json['trailer_key']?.toString(),
       synopsis: json['synopsis']?.toString(),
       status: json['status']?.toString(),
       kind: json['kind']?.toString(),
       type: json['type']?.toString(),
+      layout: json['layout']?.toString(),
       season: _parseInt(json['season']),
       totalSeasons: _parseInt(json['totalSeasons']),
       genres: (json['genres'] as List?)?.map((e) => e.toString()).toList(),
@@ -217,6 +229,7 @@ class SearchResult {
 
   Map<String, dynamic> toJson() => {
     'title': title,
+    'originalTitle': originalTitle,
     'url': url,
     'quality': quality,
     'thumbnail': thumbnail,
@@ -240,6 +253,7 @@ class SearchResult {
     'status': status,
     'kind': kind,
     'type': type,
+    'layout': layout,
     'season': season,
     'totalSeasons': totalSeasons,
     'genres': genres,
@@ -300,26 +314,65 @@ class SearchResponse {
   final int count;
   final List<SearchResult> results;
 
+  // Metadata para filmografía (Actor Detail)
+  final String? biography;
+  final String? birthday;
+  final String? deathday;
+  final String? placeOfBirth;
+  final String? gender;
+  final List<String> alsoKnownAs;
+  final String? knownFor;
+  final double? popularity;
+  final List<String> roleCharacters;
+
   const SearchResponse({
     required this.query,
     required this.category,
     required this.count,
     required this.results,
+    this.biography,
+    this.birthday,
+    this.deathday,
+    this.placeOfBirth,
+    this.gender,
+    this.alsoKnownAs = const [],
+    this.knownFor,
+    this.popularity,
+    this.roleCharacters = const [],
   });
 
   factory SearchResponse.fromJson(Map<dynamic, dynamic> json) {
+    // Senior Fix: Soporte para unwrapping de la llave 'data' del servidor
+    final Map<String, dynamic> root = (json.containsKey('data') && json['data'] is Map)
+        ? Map<String, dynamic>.from(json['data'] as Map)
+        : Map<String, dynamic>.from(json);
+
+    // Senior Fix: El servidor puede enviar la info del actor en la raíz o en un objeto 'actor'/'person'
+    final Map<String, dynamic> actorData = (root['actor'] is Map) 
+        ? Map<String, dynamic>.from(root['actor'] as Map)
+        : (root['person'] is Map ? Map<String, dynamic>.from(root['person'] as Map) : root);
+
     return SearchResponse(
-      query: json['query']?.toString() ?? '',
-      category: json['category']?.toString() ?? '',
-      count: switch (json['count']) {
+      query: root['query']?.toString() ?? '',
+      category: root['category']?.toString() ?? '',
+      count: switch (root['count']) {
         num n => n.toInt(),
         String s => int.tryParse(s) ?? 0,
         _ => 0,
       },
-      results: (json['results'] as List<dynamic>?)
+      results: (root['results'] as List<dynamic>? ?? root['items'] as List<dynamic>?)
               ?.map((e) => SearchResult.fromJson(e as Map))
               .toList() ??
           [],
+      biography: actorData['biography']?.toString() ?? actorData['bio']?.toString(),
+      birthday: actorData['birthday']?.toString() ?? actorData['birth_date']?.toString(),
+      deathday: actorData['deathday']?.toString() ?? actorData['death_date']?.toString(),
+      placeOfBirth: actorData['placeOfBirth']?.toString() ?? actorData['place_of_birth']?.toString(),
+      gender: actorData['gender']?.toString(),
+      alsoKnownAs: (actorData['alsoKnownAs'] as List? ?? actorData['also_known_as'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      knownFor: actorData['knownFor']?.toString() ?? actorData['known_for']?.toString(),
+      popularity: (actorData['popularity'] as num?)?.toDouble(),
+      roleCharacters: (actorData['characters'] as List?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 }

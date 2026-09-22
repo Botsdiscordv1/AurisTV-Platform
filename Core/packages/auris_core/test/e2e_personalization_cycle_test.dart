@@ -38,7 +38,10 @@ class AuditRepository implements AurisRepository {
   @override Future<MovieTitleInfo> getMovieTitles(String query) async => const MovieTitleInfo();
   @override Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken}) async => const ExtractResult(url: '', headers: {});
   @override Future<String> resolveEpisodeUrl(String url, String source, int episode, {String? category}) async => '';
-  @override Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year}) async => EpisodesResponse(episodes: const [], source: source, url: url, slug: '', total: 0);
+  @override Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year, bool fast = false}) async => EpisodesResponse(episodes: const [], source: source, url: url, slug: '', total: 0);
+  @override Future<List<CastInfo>> getCast(String url, {String? source, String? category, int? tmdbId, String? mediaType, String? title, int? year}) async => [];
+  @override Future<List<RelatedInfo>> getRelations(String url, {String? source, String? category}) async => [];
+  @override Future<SearchResponse> getCastCredits({String? url, String? name, String? profile, int? personId}) async => SearchResponse(results: [], query: '', category: '', count: 0);
   @override Future<List<OmdbEpisode>> getOmdbSeason({required String title, int season = 1, bool enrich = true}) async => [];
   @override Future<AnilistMedia?> getAnilistMedia(int id) async => null;
   @override Future<List<MediaItem>> getHomeRecent(int limit) async => [];

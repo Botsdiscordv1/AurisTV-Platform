@@ -91,13 +91,16 @@ abstract class AurisRepository {
   Future<MovieTitleInfo> getMovieTitles(String query);
   Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken});
   Future<String> resolveEpisodeUrl(String url, String source, int episode, {String? category});
-  Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year});
+  Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year, bool fast = false});
+  Future<List<CastInfo>> getCast(String url, {String? source, String? category, int? tmdbId, String? mediaType, String? title, int? year});
+  Future<List<RelatedInfo>> getRelations(String url, {String? source, String? category});
   Future<List<OmdbEpisode>> getOmdbSeason({required String title, int season = 1, bool enrich = true});
   Future<OmdbEpisode?> getOmdbEpisode({required String title, int season = 1, int episode = 1});
   Future<AnilistMedia?> getAnilistMedia(int id);
   Future<List<MediaItem>> getHomeRecent(int limit);
   Future<List<MediaItem>> getHomeTop(int limit);
   Future<GalleryResponse> getGallery({int? tmdbId, String kind = 'tv', String? title, int? year});
+  Future<SearchResponse> getCastCredits({String? url, String? name, String? profile, int? personId});
 
   /// Reporta fuentes encontradas al catálogo global.
   /// [season] (opcional): temporada de la tarjeta abierta. El server acumula

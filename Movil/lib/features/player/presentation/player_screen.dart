@@ -2853,7 +2853,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       season: widget.season,
     )));
 
-    episodesAsync.whenData((data) {
+    episodesAsync.whenData((EpisodesResponse? data) {
       if (data != null && data.episodes.isNotEmpty) {
         Future.microtask(() {
           if (mounted) {

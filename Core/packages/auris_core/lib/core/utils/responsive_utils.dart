@@ -41,8 +41,8 @@ extension BreakpointExtension on BuildContext {
 
   /// Senior Strategy: Define si debemos usar la UI de "Móvil/Táctil" (incluye tablets).
   /// Útil para Navbars, Paddings y comportamiento de gestos.
-  /// Incluye hasta el breakpoint LG (1024dp) para soportar iPad Pro/Mini.
-  bool get useMobileLayout => breakpoint <= Breakpoint.lg;
+  /// Se aplica a pantallas estrictamente inferiores al breakpoint LG (1024dp).
+  bool get useMobileLayout => breakpoint < Breakpoint.lg;
 
   /// Helpers de conveniencia para rangos
   bool atLeast(Breakpoint b) => breakpoint >= b;
@@ -65,10 +65,13 @@ class ResponsiveUtils {
 
   /// Devuelve true si el dispositivo debe usar interfaz táctil (Móvil nativo o Web en plataforma móvil).
   static bool isTactic(BuildContext context) {
+    // En pantallas de escritorio (≥ 1024dp), la interfaz siempre es de Escritorio (sin barra de navegación inferior)
+    if (context.isDesktop) return false;
+
     // Si la plataforma base es Android o iOS, forzamos UI táctica (Mobile/Tablet)
     if (isMobilePlatform) return true;
 
-    // En Web Desktop, es táctico si estamos en modo Mobile/Tablet Layout (hasta 1024dp)
+    // En Web Desktop, es táctico si estamos en modo Mobile/Tablet Layout (< 1024dp)
     return context.useMobileLayout;
   }
 

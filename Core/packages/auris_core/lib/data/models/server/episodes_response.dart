@@ -84,6 +84,7 @@ class RelatedInfo {
   final String relation;
   final String? category; // Senior Fix: Clasificación servida por el VPS (franquicia | relacionado)
   final String? source;
+  final String? kind; // movie | serie | anime | null
 
   const RelatedInfo({
     required this.title,
@@ -93,9 +94,10 @@ class RelatedInfo {
     required this.relation,
     this.category,
     this.source,
+    this.kind,
   });
 
-  RelatedInfo copyWith({String? source}) {
+  RelatedInfo copyWith({String? source, String? kind}) {
     return RelatedInfo(
       title: title,
       url: url,
@@ -104,6 +106,7 @@ class RelatedInfo {
       relation: relation,
       category: category,
       source: source ?? this.source,
+      kind: kind ?? this.kind,
     );
   }
 
@@ -122,33 +125,70 @@ class RelatedInfo {
       ),
       relation: json['relation'] as String? ?? 'Relacionado',
       category: json['category'] as String?,
+      kind: json['kind'] as String?,
       source: json['source'] as String?,
     );
   }
 }
 
 class CastInfo {
+  final int? id;
   final String name;
   final String? character;
   final String? profile;
+  final String? rawProfile;
   final String? url;
   final String? slug;
+  final String? biography;
+  final String? birthday;
+  final String? deathday;
+  final String? placeOfBirth;
+  final String? gender;
+  final List<String> alsoKnownAs;
+  final String? knownFor;
+  final double? popularity;
+  final List<String> roleCharacters;
 
   const CastInfo({
+    this.id,
     required this.name,
     this.character,
     this.profile,
+    this.rawProfile,
     this.url,
     this.slug,
+    this.biography,
+    this.birthday,
+    this.deathday,
+    this.placeOfBirth,
+    this.gender,
+    this.alsoKnownAs = const [],
+    this.knownFor,
+    this.popularity,
+    this.roleCharacters = const [],
   });
 
   factory CastInfo.fromJson(Map<String, dynamic> json) {
     return CastInfo(
+      id: (json['id'] ?? json['personId']) as int?,
       name: json['name'] as String? ?? '',
       character: json['character'] as String?,
-      profile: ApiEndpoints.proxyImage(json['profile'] as String?),
-      url: json['url'] as String?,
+      profile: ApiEndpoints.proxyImage(
+        json['profile'] as String? ?? 
+        json['image'] as String?
+      ),
+      rawProfile: json['profile'] as String? ?? json['image'] as String?,
+      url: json['urlLI'] as String? ?? json['url'] as String?,
       slug: json['slug'] as String?,
+      biography: json['biography'] as String?,
+      birthday: json['birthday'] as String?,
+      deathday: json['deathday'] as String?,
+      placeOfBirth: json['placeOfBirth'] as String?,
+      gender: json['gender'] as String?,
+      alsoKnownAs: (json['alsoKnownAs'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      knownFor: json['knownFor'] as String?,
+      popularity: (json['popularity'] as num?)?.toDouble(),
+      roleCharacters: (json['characters'] as List?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 }

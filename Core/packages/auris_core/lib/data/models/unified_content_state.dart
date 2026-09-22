@@ -30,6 +30,9 @@ class UnifiedContentState {
   /// La lista de episodios para la temporada y fuente actual.
   final AsyncValue<GroupedEpisodesResult?> episodes;
 
+  /// Reparto (Cast) del contenido.
+  final AsyncValue<List<CastInfo>> cast;
+
   /// Relacionados y recomendaciones.
   final AsyncValue<UnifiedRelationsMap> relations;
 
@@ -46,6 +49,7 @@ class UnifiedContentState {
     this.currentSeason = 1,
     this.totalSeasons = 1,
     this.episodes = const AsyncValue.loading(),
+    this.cast = const AsyncValue.loading(),
     this.relations = const AsyncValue.loading(),
     this.isMovieish = false,
     this.seasonTitle,
@@ -61,6 +65,7 @@ class UnifiedContentState {
           currentSeason == other.currentSeason &&
           totalSeasons == other.totalSeasons &&
           episodes == other.episodes &&
+          cast == other.cast &&
           relations == other.relations &&
           isMovieish == other.isMovieish &&
           seasonTitle == other.seasonTitle;
@@ -73,6 +78,7 @@ class UnifiedContentState {
         currentSeason,
         totalSeasons,
         episodes,
+        cast,
         relations,
         isMovieish,
         seasonTitle,
@@ -85,6 +91,7 @@ class UnifiedContentState {
     int? currentSeason,
     int? totalSeasons,
     AsyncValue<GroupedEpisodesResult?>? episodes,
+    AsyncValue<List<CastInfo>>? cast,
     AsyncValue<UnifiedRelationsMap>? relations,
     bool? isMovieish,
     String? seasonTitle,
@@ -96,6 +103,7 @@ class UnifiedContentState {
       currentSeason: currentSeason ?? this.currentSeason,
       totalSeasons: totalSeasons ?? this.totalSeasons,
       episodes: episodes ?? this.episodes,
+      cast: cast ?? this.cast,
       relations: relations ?? (this.relations as AsyncValue<UnifiedRelationsMap>),
       isMovieish: isMovieish ?? this.isMovieish,
       seasonTitle: seasonTitle ?? this.seasonTitle,
