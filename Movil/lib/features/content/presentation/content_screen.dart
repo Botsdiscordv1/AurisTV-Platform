@@ -2258,7 +2258,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                       scrollDirection: Axis.horizontal,
                       clipBehavior: Clip.none, // Senior Fix: Permite escalado sin recorte
                       padding: EdgeInsets.only(
-                        left: widget.hPadding, 
+                        left: 0, 
                         right: widget.hPadding,
                         top: isMobile ? 6 : 10, 
                         bottom: 4,
