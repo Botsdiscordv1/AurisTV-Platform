@@ -61,6 +61,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   Player? _nativePlayer;
   VideoController? _nativeVideoController;
   StreamSubscription? _nativeSubscription;
+  StreamSubscription? _nativePositionSubscription;
 
   Timer? _fadeTimer;
   Timer? _delayTimer;
@@ -281,8 +282,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         }
       });
 
-      // Monitoreo de posición para fade out al final
-      player.stream.position.listen((pos) {
+      // Monitoreo de posición para fade out al final (suscripción guardada para evitar fugas)
+      _nativePositionSubscription = player.stream.position.listen((pos) {
         if (!mounted) return;
         final duration = player.state.duration.inSeconds;
         final position = pos.inSeconds;
@@ -342,9 +343,11 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     _ytController?.close();
     _ytController = null;
 
-    // Limpieza de reproductor nativo
+    // Limpieza de reproductor nativo y sus suscripciones a streams
     _nativeSubscription?.cancel();
     _nativeSubscription = null;
+    _nativePositionSubscription?.cancel();
+    _nativePositionSubscription = null;
     _nativePlayer?.dispose();
     _nativePlayer = null;
     _nativeVideoController = null;

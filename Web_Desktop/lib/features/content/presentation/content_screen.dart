@@ -2119,10 +2119,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final double screenW = MediaQuery.sizeOf(context).width;
         final double fontSize = isMobile 
-            ? 14.5 
-            : (isTablet ? 16.5 : (isCompact ? 15 : 17));
-        final double lineHeight = isMobile ? 1.4 : 1.5;
+            ? 14.0 
+            : (isTablet ? 15.0 : (screenW * 0.0095).clamp(13.5, 16.0));
+        final double lineHeight = isMobile ? 1.35 : 1.45;
 
         final style = GoogleFonts.poppins(
           color: isMobile ? const Color(0xFFA5A5AA) : Colors.white.withOpacity(0.9),
@@ -2132,8 +2133,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         );
 
         if (isScrollable) {
+          final double maxH = (MediaQuery.sizeOf(context).height * 0.13).clamp(75.0, 105.0);
           return Container(
-            constraints: const BoxConstraints(maxHeight: 110), // Senior Fix: Altura flexible hasta un máximo de 110px
+            constraints: BoxConstraints(maxHeight: maxH),
             child: RawScrollbar(
               controller: _synopsisScrollController,
               thumbColor: const Color(0xFFEF7A1E).withOpacity(0.4),
@@ -2311,8 +2313,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       );
     }
 
+    final double width = MediaQuery.sizeOf(context).width;
+    final double btnHeight = isMobile ? 54.0 : (width * 0.032).clamp(46.0, 58.0);
+    final double fontSize = isMobile ? 18.0 : (width * 0.0098).clamp(13.5, 16.5);
+    final double iconSize = isMobile ? 36.0 : (width * 0.021).clamp(30.0, 38.0);
+
     return SizedBox(
-      height: isCompact ? 56 : 64,
+      height: btnHeight,
       child: ElevatedButton(
         onPressed: onPlay,
         style: ElevatedButton.styleFrom(
@@ -2320,25 +2327,25 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 8,
           shadowColor: Colors.black.withOpacity(0.2),
-          padding: const EdgeInsets.only(left: 8, right: 20),
+          padding: EdgeInsets.symmetric(horizontal: (width * 0.008).clamp(12.0, 20.0)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 42),
-            const SizedBox(width: 12),
+            Icon(Icons.play_arrow_rounded, color: Colors.black, size: iconSize),
+            const SizedBox(width: 8),
             Text(
               label.toUpperCase(),
               style: GoogleFonts.poppins(
                 color: Colors.black,
-                fontSize: isCompact ? 16 : 18,
+                fontSize: fontSize,
                 fontWeight: FontWeight.w600,
-                letterSpacing: 1.2,
+                letterSpacing: 1.1,
               ),
             ),
             if (progress != null && progress > 0.02) ...[
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               _buildButtonProgressBar(progress),
             ],
           ],
@@ -2378,9 +2385,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     final user = ref.watch(authProvider);
     final profileId = user?.activeProfileId ?? 'guest_profile';
 
-    final size = isMobile ? null : (isCompact ? 44.0 : 56.0);
-    final iconSize = isMobile ? null : (isCompact ? 22.0 : 28.0);
-    final spacing = isMobile ? 8.0 : 12.0;
+    final double width = MediaQuery.sizeOf(context).width;
+    final double? size = isMobile ? null : (width * 0.027).clamp(42.0, 52.0);
+    final double? iconSize = isMobile ? null : (width * 0.0135).clamp(20.0, 26.0);
+    final double spacing = isMobile ? 8.0 : (width * 0.007).clamp(8.0, 14.0);
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8, horizontal: isMobile ? 0 : 4),
@@ -3047,9 +3055,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
   }) {
     final isUltraCompact = context.breakpoint < Breakpoint.lg;
     final double aspectRatio = ResponsiveUtils.heroAspectRatio(context);
-    // Senior Fix: Altura de cabecera cinematográfica equilibrada (máx 580px) para evitar vacío vertical en monitores 1080p/4K.
-    final headerH = (width / 3.2).clamp(420.0, 580.0);
-    final titleSize = isUltraCompact ? 32.0 : 56.0;
+
+    // Senior Responsive Desktop Architecture: Dimensiones fluidas continuas para cualquier resolución de pantalla (Laptops -> 4K Ultrawide)
+    final double headerH = (width / 3.0).clamp(460.0, 620.0);
+    final double overlayLeftPadding = (width * 0.035).clamp(36.0, 80.0);
+    final double synopsisWidth = (width * 0.42).clamp(380.0, 750.0);
+    final double logoMaxWidth = (width * 0.32).clamp(320.0, 600.0);
+    final double logoMaxHeight = (headerH * 0.25).clamp(90.0, 145.0);
+    final double titleSize = (width * 0.028).clamp(30.0, 52.0);
 
     // Senior Dynamic Fusion: Cálculo exacto según el ancho real del reproductor en la pantalla
     final double trailerVideoW = headerH * (16.0 / 9.0);
@@ -3264,10 +3277,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                       Positioned.fill(
                         child: Padding(
                           padding: EdgeInsets.only(
-                            left: 60, 
-                            top: isUltraCompact ? 70 : 80, 
-                            bottom: 16, 
-                            right: 40,
+                            left: overlayLeftPadding, 
+                            top: (headerH * 0.08).clamp(30.0, 60.0), 
+                            bottom: 10, 
+                            right: 32,
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3282,8 +3295,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                   title: widget.title,
                                   logo: detailData?.logo,
                                   logoReady: detailAsync.hasValue,
-                                  maxWidth: isUltraCompact ? 420 : 600,
-                                  maxHeight: isUltraCompact ? 110 : 140, // Límite de escala adaptativo
+                                  maxWidth: logoMaxWidth,
+                                  maxHeight: logoMaxHeight, // Límite de escala adaptativo fluido
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: titleSize,
@@ -3297,16 +3310,19 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                   )
                                 ),
                               ),
-                              SizedBox(height: isUltraCompact ? 18.0 : 26.0), // Mayor espacio y aire visual entre logo y metadata
+                              SizedBox(height: isUltraCompact ? 14.0 : 20.0),
                               if (detailData != null) ...[
                                 _buildMetaRow(detailData, isCompact: isUltraCompact, kind: detailParams.kind),
-                                SizedBox(height: isUltraCompact ? 10.0 : 12.0),
-                                SizedBox(
-                                  width: 750,
-                                  child: _buildSynopsis(detailData, isCompact: isUltraCompact, isScrollable: true),
+                                SizedBox(height: isUltraCompact ? 8.0 : 10.0),
+                                Flexible(
+                                  fit: FlexFit.loose,
+                                  child: SizedBox(
+                                    width: synopsisWidth,
+                                    child: _buildSynopsis(detailData, isCompact: isUltraCompact, isScrollable: true),
+                                  ),
                                 ),
                               ],
-                              SizedBox(height: isUltraCompact ? 12.0 : 14.0),
+                              SizedBox(height: isUltraCompact ? 10.0 : 12.0),
                               // Botones de acción
                               Row(
                                 children: [

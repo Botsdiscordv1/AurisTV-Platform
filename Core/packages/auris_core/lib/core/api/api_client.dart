@@ -11,8 +11,8 @@ class ApiClient {
     _dio = Dio(
       BaseOptions(
         baseUrl: ApiEndpoints.baseUrl,
-        connectTimeout: const Duration(seconds: 35), // Senior Fix: Subido a 35s para resolvers lentos
-        receiveTimeout: const Duration(seconds: 90), // Senior Fix: Subido a 90s para streams de datos largos
+        connectTimeout: const Duration(seconds: 35), // Senior Fix: 35s para resolvers lentos
+        receiveTimeout: const Duration(seconds: 60), // Senior Fix: 60s max timeout para evitar cuelgues indefinidos
         headers: {
           'Accept': 'application/json',
           // Senior Web Fix: No definimos Content-Type global para evitar Preflight (OPTIONS) innecesarios en GET.

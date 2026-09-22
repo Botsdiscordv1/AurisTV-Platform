@@ -27,10 +27,41 @@ import '../auris_repository.dart';
 class AurisRepositoryImpl implements AurisRepository {
   final ApiClient _client;
   
-  // Senior Cache Layer: Guardamos los detalles en memoria para evitar skeletons
-  // al navegar hacia atrás o re-abrir contenidos.
+  // Senior LRU Cache Layer: Guardamos hasta 50 detalles en memoria con desalojo LRU
+  // para evitar fugas de memoria en sesiones largas de navegación.
+  static const int _maxCacheEntries = 50;
   final Map<String, AnimeDetail> _animeCache = {};
   final Map<String, MovieDetail> _movieCache = {};
+
+  AnimeDetail? _getAnimeFromCache(String key) {
+    final cached = _animeCache.remove(key);
+    if (cached != null) {
+      _animeCache[key] = cached; // Reinsertar para mover al final (más reciente)
+    }
+    return cached;
+  }
+
+  void _putInAnimeCache(String key, AnimeDetail detail) {
+    if (_animeCache.length >= _maxCacheEntries) {
+      _animeCache.remove(_animeCache.keys.first); // Eliminar el ítem menos usado (LRU)
+    }
+    _animeCache[key] = detail;
+  }
+
+  MovieDetail? _getMovieFromCache(String key) {
+    final cached = _movieCache.remove(key);
+    if (cached != null) {
+      _movieCache[key] = cached; // Reinsertar para mover al final
+    }
+    return cached;
+  }
+
+  void _putInMovieCache(String key, MovieDetail detail) {
+    if (_movieCache.length >= _maxCacheEntries) {
+      _movieCache.remove(_movieCache.keys.first); // Eliminar el ítem menos usado (LRU)
+    }
+    _movieCache[key] = detail;
+  }
 
   AurisRepositoryImpl(this._client);
 
@@ -440,9 +471,10 @@ class AurisRepositoryImpl implements AurisRepository {
     final normalizedTitle = cleanTitleForDisplay(stripSeasonSuffix(title)).toLowerCase().trim();
     final normalizedUrl = url?.split('?').first.split('#').first ?? '';
     final cacheKey = '$normalizedTitle|$year|$season|$normalizedUrl';
-    if (_animeCache.containsKey(cacheKey)) {
+    final cachedDetail = _getAnimeFromCache(cacheKey);
+    if (cachedDetail != null) {
       debugPrint('[AurisRepo] Cache HIT for Anime: $title');
-      return _animeCache[cacheKey];
+      return cachedDetail;
     }
 
     final params = <String, dynamic>{'title': title};
@@ -459,13 +491,13 @@ class AurisRepositoryImpl implements AurisRepository {
       queryParameters: params,
       baseUrl: server ?? ApiEndpoints.animeBaseUrl,
       options: Options(
-        connectTimeout: const Duration(seconds: 40),
-        receiveTimeout: const Duration(seconds: 90),
+        connectTimeout: const Duration(seconds: 35),
+        receiveTimeout: const Duration(seconds: 60),
       ),
     );
     if (response.statusCode == 404) return null;
     final detail = AnimeDetail.fromJson(response.data as Map<String, dynamic>);
-    _animeCache[cacheKey] = detail;
+    _putInAnimeCache(cacheKey, detail);
     return detail;
   }
 
@@ -498,9 +530,10 @@ class AurisRepositoryImpl implements AurisRepository {
     }
 
     final cacheKey = '$normalizedTitle|$year|$normalizedUrl|$technicalCategory';
-    if (_movieCache.containsKey(cacheKey)) {
+    final cachedMovie = _getMovieFromCache(cacheKey);
+    if (cachedMovie != null) {
       debugPrint('[AurisRepo] Cache HIT for Movie: $title');
-      return _movieCache[cacheKey];
+      return cachedMovie;
     }
 
     final params = <String, dynamic>{'title': title};
@@ -515,13 +548,13 @@ class AurisRepositoryImpl implements AurisRepository {
       queryParameters: params,
       baseUrl: server ?? ApiEndpoints.baseUrlForCategory(technicalCategory),
       options: Options(
-        connectTimeout: const Duration(seconds: 30),
+        connectTimeout: const Duration(seconds: 35),
         receiveTimeout: const Duration(seconds: 60),
       ),
     );
     if (response.statusCode == 404) return null;
     final detail = MovieDetail.fromJson(response.data as Map<String, dynamic>);
-    _movieCache[cacheKey] = detail;
+    _putInMovieCache(cacheKey, detail);
     return detail;
   }
 
