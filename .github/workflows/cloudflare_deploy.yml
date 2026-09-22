@@ -25,10 +25,8 @@ jobs:
           flutter pub get
           flutter build web --release --base-href /
 
-      - name: Publish to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: 'web'
-          directory: 'Web_Desktop/build/web'
+      - name: Deploy to Cloudflare Pages
+        run: npx wrangler pages deploy Web_Desktop/build/web --project-name=web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
