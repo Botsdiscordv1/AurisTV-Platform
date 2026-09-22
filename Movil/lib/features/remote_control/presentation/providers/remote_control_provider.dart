@@ -7,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import '../../data/models/remote_device.dart';
+import 'package:auristv_mobile/features/remote_control/data/models/remote_device.dart';
 import 'package:auris_core/auris_core.dart';
 
 final remoteControlProvider = StateNotifierProvider<RemoteControlNotifier, RemoteControlState>((ref) {

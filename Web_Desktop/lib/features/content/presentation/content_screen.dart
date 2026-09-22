@@ -13,6 +13,7 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:collection/collection.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 import 'package:auris_core/auris_core.dart';
 import 'package:auristv_web/core/utils/responsive_utils.dart';
@@ -200,6 +201,115 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
           )
         )
       )
+    );
+  }
+}
+
+class _CastCard extends StatefulWidget {
+  final CastInfo person;
+  const _CastCard({required this.person});
+
+  @override
+  State<_CastCard> createState() => _CastCardState();
+}
+
+class _CastCardState extends State<_CastCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isClickable = widget.person.url != null && widget.person.url!.isNotEmpty;
+
+    return MouseRegion(
+      cursor: isClickable ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) { if (isClickable) setState(() => _isHovered = true); },
+      onExit: (_) { if (isClickable) setState(() => _isHovered = false); },
+      child: GestureDetector(
+        onTap: isClickable ? () => launchUrlString(widget.person.url!) : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Senior Fix: Efecto de escala dinámico tipo Avatar
+            AnimatedScale(
+              scale: _isHovered ? 1.08 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              child: AspectRatio(
+                aspectRatio: 1.0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _isHovered
+                          ? const Color(0xFFEF7A1E).withOpacity(0.8)
+                          : Colors.white.withOpacity(0.1),
+                      width: 2.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _isHovered
+                            ? const Color(0xFFEF7A1E).withOpacity(0.3)
+                            : Colors.black.withOpacity(0.4),
+                        blurRadius: _isHovered ? 16 : 12,
+                        spreadRadius: _isHovered ? 2 : 1,
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: widget.person.profile ?? '',
+                      fit: BoxFit.cover,
+                      // Senior Fix: Ajuste de alineamiento vertical para centrar mejor los rostros
+                      alignment: const Alignment(0, -0.35),
+                      placeholder: (context, url) => Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.white10,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.white10,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.person, color: Colors.white24, size: 40),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              widget.person.name,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                color: _isHovered ? const Color(0xFFEF7A1E) : Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                letterSpacing: -0.2,
+              ),
+            ),
+            if (widget.person.character != null && widget.person.character!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                widget.person.character!,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1279,6 +1389,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   Timer? _revealTimeout;
   bool _isSynopsisExpanded = false;
   bool _isTrailerLoading = false;
+  bool _useHtmlIframeFallback = false;
+  Timer? _timeoutFallbackTimer;
 
   Widget _buildEpisodesSkeleton(BuildContext context, bool isMobile) {
     try {
@@ -1341,6 +1453,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   @override void dispose() {
     _loadTimer?.cancel();
     _revealTimeout?.cancel();
+    _timeoutFallbackTimer?.cancel();
     _disposeController();
     _scrollController.dispose();
     super.dispose();
@@ -1419,9 +1532,43 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         });
         return;
       }
-      final ctrl = YoutubePlayerController.fromVideoId(videoId: key, autoPlay: true, params: const YoutubePlayerParams(showControls: false, showFullscreenButton: false, mute: true, loop: false, showVideoAnnotations: false, playsInline: true, strictRelatedVideos: true, enableKeyboard: false));
+      _timeoutFallbackTimer?.cancel();
+      _useHtmlIframeFallback = false;
+      
+      // Temporizador de control Senior (4.5 segundos) para Error 153
+      if (kIsWeb) {
+        _timeoutFallbackTimer = Timer(const Duration(milliseconds: 4500), () {
+          if (mounted && !_showPlayer && _ytController != null) {
+            debugPrint('[Trailer Fallback] Detectado posible Error 153 / congelamiento. Activando Iframe HTML Puro.');
+            setState(() {
+              _useHtmlIframeFallback = true;
+              _showPlayer = true; // Forzamos visibilidad para el Iframe plano
+              _showTitle = true;
+            });
+            _startTitleHideTimer();
+          }
+        });
+      }
+
+      final ctrl = YoutubePlayerController.fromVideoId(
+        videoId: key,
+        autoPlay: true,
+        params: const YoutubePlayerParams(
+          showControls: false,
+          showFullscreenButton: false,
+          mute: true,
+          loop: false,
+          showVideoAnnotations: false,
+          playsInline: true,
+          strictRelatedVideos: true,
+          enableKeyboard: false,
+        ),
+      );
       _playerSubscription = ctrl.listen((state) {
         if (!mounted) return;
+        if (state.playerState == PlayerState.playing) {
+          _timeoutFallbackTimer?.cancel(); // Cancelamos fallback si reproduce bien
+        }
         if (state.playerState == PlayerState.cued) { ctrl.playVideo(); }
         if (state.playerState == PlayerState.playing && !_showPlayer) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1437,6 +1584,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       _ytSubscription = ctrl.videoStateStream.listen((state) {
         if (!mounted) return;
         final d = ctrl.value.metaData.duration.inSeconds; final p = state.position.inSeconds;
+        if (p > 0) {
+          _timeoutFallbackTimer?.cancel(); // Doble verificación: cancelamos fallback si se mueve la pista
+        }
         if (p > 0 && !_showPlayer && mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) { setState(() { _showPlayer = true; _showTitle = true; }); _startTitleHideTimer(); }
@@ -1509,6 +1659,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     _delayTimer?.cancel();
     _fadeTimer?.cancel();
     _titleHideTimer?.cancel();
+    _timeoutFallbackTimer?.cancel();
     _ytSubscription?.cancel();
     _playerSubscription?.cancel();
     _ytSubscription = null;
@@ -1517,6 +1668,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       _ytController!.pauseVideo();
       _ytController!.close();
       _ytController = null;
+    }
+    if (mounted) {
+      setState(() {
+        _useHtmlIframeFallback = false;
+      });
     }
   }
 
@@ -2126,6 +2282,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     required int selectedTabIndex,
     required int episodesTabIndex,
     required int relatedTabIndex,
+    required int castTabIndex,
     required int extrasTabIndex,
     required int detailsTabIndex,
     required int galleryTabIndex,
@@ -2273,6 +2430,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       final relations = unifiedRelationsAsync.maybeWhen(data: (d) => d, orElse: () => null);
       slivers.addAll(_buildRelatedTab(0, unifiedRelations: relations, currentSource: currentSource));
     }
+    if (selectedTabIndex == castTabIndex && castTabIndex != -1) {
+      slivers.addAll(_buildCastTab(detailData, epData, hPadding));
+    }
     if (selectedTabIndex == extrasTabIndex) {
       slivers.addAll(_buildExtrasTab(detailData, 0));
     }
@@ -2357,6 +2517,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       final episodesTabIndex = hasEpisodesTab ? _ti++ : -1;
       final relatedTabIndex = _ti++;
 
+      final cast = epData?.cast ?? const [];
+      final movieCast = detailData is MovieDetail ? (detailData as MovieDetail).cast : const [];
+      final animeCharacters = detailData is AnimeDetail ? (detailData as AnimeDetail).characters : const [];
+      final hasCast = cast.isNotEmpty || movieCast.isNotEmpty || animeCharacters.isNotEmpty;
+      final castTabIndex = hasCast ? _ti++ : -1;
+
+      final detailsTabIndex = _ti++;
+
       final currentOpenings = detailData is AnimeDetail
           ? detailData.openings
           : (detailData is MovieDetail ? (detailData as MovieDetail).openings : const <AnimeThemeInfo>[]);
@@ -2365,14 +2533,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           : (detailData is MovieDetail ? (detailData as MovieDetail).endings : const <AnimeThemeInfo>[]);
       final extrasTabIndex = (currentOpenings.isNotEmpty || currentEndings.isNotEmpty) ? _ti++ : -1;
 
-      final detailsTabIndex = _ti++;
       final galleryTabIndex = _ti++;
 
       final tabLabels = <String>[
         if (hasEpisodesTab) 'Episodios',
         'Relacionado',
-        if (extrasTabIndex != -1) 'Extras',
+        if (hasCast) 'Elenco',
         'Detalles',
+        if (extrasTabIndex != -1) 'Extras',
         'Galería',
       ];
       final selectedTabIndex = _selectedTabIndex.clamp(0, tabLabels.length - 1);
@@ -2416,6 +2584,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         selectedTabIndex: selectedTabIndex,
         episodesTabIndex: episodesTabIndex,
         relatedTabIndex: relatedTabIndex,
+        castTabIndex: castTabIndex,
         extrasTabIndex: extrasTabIndex,
         detailsTabIndex: detailsTabIndex,
         galleryTabIndex: galleryTabIndex,
@@ -2629,8 +2798,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                               ),
                             ),
 
-                            // TRÁILER (YouTube IFrame)
-                            if (_ytController != null)
+                            // TRÁILER (YouTube IFrame con Fallback HTML)
+                            if (_ytController != null || _useHtmlIframeFallback)
                               Positioned(
                                 top: 0, left: width * 0.35, right: 0, bottom: 0,
                                 child: AnimatedOpacity(
@@ -2639,11 +2808,25 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                                   child: PointerInterceptor(
                                     child: IgnorePointer(
                                       ignoring: true,
-                                      child: YoutubePlayer(
-                                        key: ValueKey(_lastTrailerKey),
-                                        controller: _ytController!,
-                                        aspectRatio: 16 / 9,
-                                      ),
+                                      child: _useHtmlIframeFallback
+                                          ? HtmlElementView.fromTagName(
+                                              key: ValueKey('html-iframe-$_lastTrailerKey'),
+                                              tagName: 'iframe',
+                                              onElementCreated: (Object element) {
+                                                // ignore: avoid_dynamic_calls
+                                                final dynamic el = element;
+                                                el.src = 'https://www.youtube-nocookie.com/embed/$_lastTrailerKey?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0';
+                                                el.style.border = 'none';
+                                                el.style.width = '100%';
+                                                el.style.height = '100%';
+                                                el.allow = 'autoplay; encrypted-media';
+                                              },
+                                            )
+                                          : YoutubePlayer(
+                                              key: ValueKey(_lastTrailerKey),
+                                              controller: _ytController!,
+                                              aspectRatio: 16 / 9,
+                                            ),
                                     ),
                                   ),
                                 ),
@@ -3129,6 +3312,84 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     return unifiedMap.values.toList();
   }
 
+  List<Widget> _buildCastTab(dynamic detailData, dynamic epData, double hPadding) {
+    final Map<String, CastInfo> unified = {};
+
+    // 1. Cast del servidor 3001 (Prioridad por ser el más reciente/específico)
+    if (epData is EpisodesResponse) {
+      for (var c in epData.cast) {
+        unified[c.name] = c;
+      }
+    }
+
+    // 2. Cast de Películas/Series (TMDB)
+    if (detailData is MovieDetail) {
+      for (var c in detailData.cast) {
+        if (!unified.containsKey(c.name)) {
+          unified[c.name] = CastInfo(
+            name: c.name,
+            character: c.character,
+            profile: c.profile,
+          );
+        }
+      }
+    }
+
+    // 3. Personajes de Anime (AniList)
+    if (detailData is AnimeDetail) {
+      for (var c in detailData.characters) {
+        if (!unified.containsKey(c.name)) {
+          unified[c.name] = CastInfo(
+            name: c.name,
+            character: c.role,
+            profile: c.image,
+          );
+        }
+      }
+    }
+
+    final List<CastInfo> cast = unified.values.toList();
+
+    if (cast.isEmpty) {
+      return [
+        const SliverToBoxAdapter(
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.only(top: 40),
+              child: Text(
+                'No hay información del elenco disponible',
+                style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 18),
+              ),
+            ),
+          ),
+        )
+      ];
+    }
+
+    final isMobile = context.isMobile;
+    final width = MediaQuery.of(context).size.width;
+    // Senior Fix: Diseño de Avatar requiere una rejilla más compacta y centrada
+    final crossAxisCount = isMobile ? 3 : (width < 1000 ? 4 : (width < 1400 ? 6 : (width < 1800 ? 8 : 10)));
+
+    return [
+      SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 0, vertical: 32),
+        sliver: SliverGrid(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 32,
+            crossAxisSpacing: 20,
+            childAspectRatio: 0.65, // Senior Fix: Ratio reducido para evitar overflow en vista móvil web
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _CastCard(person: cast[index]),
+            childCount: cast.length,
+          ),
+        ),
+      ),
+    ];
+  }
+
   String _galleryTypeLabel(String type) {
     switch (type) {
       case 'logo':
@@ -3249,11 +3510,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           const SizedBox(height: 24)
         ],
         if (dir.isNotEmpty) ...[const Text('Direcci\u00F3n', style: TextStyle(color: Colors.white, fontSize: 16)), Text(dir.join(', '), style: const TextStyle(color: Color(0xFFA5A5AA)))], 
-        if (cast.isNotEmpty && detail is! MovieDetail) ...[const SizedBox(height: 24), const Text('Elenco', style: TextStyle(color: Colors.white, fontSize: 16)), Text(cast.join(', '), style: const TextStyle(color: const Color(0xFFA5A5AA)))], 
-        if (std.isNotEmpty) ...[const SizedBox(height: 24), const Text('Estudio', style: TextStyle(color: Colors.white, fontSize: 16)), Text(std.join(', '), style: const TextStyle(color: const Color(0xFFA5A5AA)))] 
+        if (std.isNotEmpty) ...[const SizedBox(height: 24), const Text('Estudio', style: TextStyle(color: Colors.white, fontSize: 16)), Text(std.join(', '), style: const TextStyle(color: const Color(0xFFA5A5AA)))]
       ]))),
-      ..._buildCharacterSection(detail, hPadding),
-      ..._buildCastSection(detail, hPadding),
     ];
 
     return [ 
@@ -3299,8 +3557,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               }).join('  ');
             }()),
             if (dir.isNotEmpty) _buildPrimeRow('Direcci\u00F3n', dir.join(', ')), 
-            if (cast.isNotEmpty && detail is! MovieDetail) _buildPrimeRow('Elenco', cast.join(', ')), 
-            if (std.isNotEmpty) _buildPrimeRow('Estudio', std.join(', ')) 
+            if (std.isNotEmpty) _buildPrimeRow('Estudio', std.join(', '))
           ]))
         ])),
         const SizedBox(width: 24), Expanded(flex: 10, child: Column(
@@ -3317,8 +3574,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ],
         ))
       ]))),
-      ..._buildCharacterSection(detail, hPadding),
-      ..._buildCastSection(detail, hPadding),
     ];
   }
 

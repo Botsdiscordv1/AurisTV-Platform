@@ -8,8 +8,8 @@ import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../core/utils/url_utils.dart';
 import '../../features/player/presentation/player_screen.dart';
-import '../../features/remote_control/presentation/providers/remote_control_provider.dart';
-import '../../features/remote_control/data/models/remote_device.dart';
+import 'package:auristv_web/features/remote_control/presentation/providers/remote_control_provider.dart';
+import 'package:auristv_web/features/remote_control/data/models/remote_device.dart';
 import 'auris_bottom_bar.dart';
 
 class MainNavigationWrapper extends ConsumerStatefulWidget {

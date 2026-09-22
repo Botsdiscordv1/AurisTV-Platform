@@ -6,7 +6,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:collection/collection.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../features/remote_control/presentation/providers/remote_control_provider.dart';
+import 'package:auristv_mobile/features/remote_control/data/models/remote_device.dart';
+import 'package:auristv_mobile/features/remote_control/presentation/providers/remote_control_provider.dart';
 import 'auris_bottom_bar.dart';
 
 class MainNavigationWrapper extends ConsumerStatefulWidget {

@@ -14,6 +14,7 @@ class EpisodesResponse {
   final String? fullTitle;
   final int? season;
   final List<RelatedInfo> relations;
+  final List<CastInfo> cast;
 
   final String? seasonAirDate;
 
@@ -31,6 +32,7 @@ class EpisodesResponse {
     this.episodes = const [],
     this.specials = const [],
     this.relations = const [],
+    this.cast = const [],
     this.tmdbId,
     this.fullTitle,
     this.season,
@@ -59,6 +61,10 @@ class EpisodesResponse {
           [],
       relations: (json['relations'] as List<dynamic>?)
               ?.map((e) => RelatedInfo.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      cast: (json['cast'] as List<dynamic>?)
+              ?.map((e) => CastInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       tmdbId: json['tmdbId'] as int?,
@@ -117,6 +123,32 @@ class RelatedInfo {
       relation: json['relation'] as String? ?? 'Relacionado',
       category: json['category'] as String?,
       source: json['source'] as String?,
+    );
+  }
+}
+
+class CastInfo {
+  final String name;
+  final String? character;
+  final String? profile;
+  final String? url;
+  final String? slug;
+
+  const CastInfo({
+    required this.name,
+    this.character,
+    this.profile,
+    this.url,
+    this.slug,
+  });
+
+  factory CastInfo.fromJson(Map<String, dynamic> json) {
+    return CastInfo(
+      name: json['name'] as String? ?? '',
+      character: json['character'] as String?,
+      profile: ApiEndpoints.proxyImage(json['profile'] as String?),
+      url: json['url'] as String?,
+      slug: json['slug'] as String?,
     );
   }
 }
