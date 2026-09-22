@@ -197,6 +197,29 @@ void main() {
     expect(titles.any((t) => t.contains('kdrama')), isTrue);
   });
 
+  test('homeLayoutProvider — Format harmony prevents contiguous wide or top10 sections', () async {
+    final harmonyRepo = HarmonyRepo();
+    final containerHarmony = ProviderContainer(
+      overrides: [
+        aurisRepositoryProvider.overrideWithValue(harmonyRepo),
+        authProvider.overrideWith((ref) => MockAuthNotifier(UserAccount(id: 'harmony_user', activeProfileId: 'harmony_user'))),
+      ],
+    );
+
+    final layout = await containerHarmony.read(homeLayoutProvider.stream).firstWhere((l) => l.length >= 4);
+
+    for (int i = 0; i < layout.length - 1; i++) {
+      final current = layout[i].presentation;
+      final next = layout[i + 1].presentation;
+      if (current == SectionPresentation.top10) {
+        expect(next, isNot(SectionPresentation.top10), reason: 'Contiguous top10 at $i and ${i + 1}');
+      }
+      if (current == SectionPresentation.wide) {
+        expect(next, isNot(SectionPresentation.wide), reason: 'Contiguous wide at $i and ${i + 1}');
+      }
+    }
+  });
+
   test('HomeSection.fromJson supports all SDUI format aliases', () {
     final aliases = ['layout', 'carousel', 'displayMode', 'carouselType'];
     
@@ -260,6 +283,46 @@ class MultiCategoryRepo extends MockPersonalizedRepo {
             EditorialItem(id: 'item_$cat', title: 'Item $cat', posterUrl: 'url_$cat', badge: 'essential')
           ],
         )
+      ],
+    );
+  }
+}
+
+class HarmonyRepo extends MockPersonalizedRepo {
+  @override
+  Future<EditorialResponse> getEditorial({String? imgSize, String? category, String? userId}) async {
+    final cat = category ?? 'animes';
+    return EditorialResponse(
+      generatedAt: '2026-03-30T12:00:00Z',
+      locale: 'es-MX',
+      sections: [
+        EditorialSection(
+          id: 'sec_top10_$cat',
+          title: 'Top 10 $cat',
+          badge: 'essential',
+          format: 'top10',
+          items: [
+            EditorialItem(id: 'item_1_$cat', title: 'T1', posterUrl: 'u', badge: 'essential')
+          ],
+        ),
+        EditorialSection(
+          id: 'sec_wide_$cat',
+          title: 'Estrenos $cat',
+          badge: 'essential',
+          format: 'wide',
+          items: [
+            EditorialItem(id: 'item_2_$cat', title: 'T2', posterUrl: 'u', bannerUrl: 'b', badge: 'essential')
+          ],
+        ),
+        EditorialSection(
+          id: 'sec_poster_$cat',
+          title: 'Explora $cat',
+          badge: 'essential',
+          format: 'poster',
+          items: [
+            EditorialItem(id: 'item_3_$cat', title: 'T3', posterUrl: 'u', badge: 'essential')
+          ],
+        ),
       ],
     );
   }

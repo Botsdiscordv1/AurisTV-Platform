@@ -30,15 +30,11 @@ class YoutubeResolver {
         return muxedInfo.url.toString();
       }
 
-      // 3. Fallback Seguro: Si no hay muxed, buscamos la pista de video más ligera (360p/480p)
-      // para asegurar que al menos se vea algo sin disparar los bloqueos de 1080p.
-      final bestVideo = manifest.videoOnly.firstWhere(
-        (s) => s.videoQualityLabel.contains('480') || s.videoQualityLabel.contains('360'),
-        orElse: () => manifest.videoOnly.withHighestBitrate()!,
-      );
-
-      debugPrint('[YoutubeResolver] Fallback a Video-Only (${bestVideo.videoQualityLabel}) para $videoId');
-      return bestVideo.url.toString();
+      // 3. Fallback Seguro: Si no hay stream muxed (audio+video en un solo contenedor),
+      // NO devolvemos 'videoOnly' porque carece de pista de audio.
+      // Retornar null permite que los reproductores usen el player nativo/iframe de YouTube.
+      debugPrint('[YoutubeResolver] No se encontró Muxed Stream con audio para $videoId');
+      return null;
     } catch (e) {
       debugPrint('[YoutubeResolver] Error crítico resolviendo YouTube ($videoId): $e');
       return null;

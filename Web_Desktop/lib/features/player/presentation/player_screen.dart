@@ -18,7 +18,7 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart' as yt;
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
@@ -115,7 +115,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isExiting = false;
   bool _showEpisodesOverlay = false;
   bool _webNeedsInteraction = false; // Senior Web Fix: Autoplay blocker
-  YoutubePlayerController? _ytController;
+  yt.YoutubePlayerController? _ytController;
   PlayerOverlay _activeOverlay = PlayerOverlay.none;
   bool _isVolumePillHovered = false;
   Timer? _volumeExitTimer;
@@ -633,9 +633,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (kIsWeb && state == AppLifecycleState.resumed) {
-      // Senior Web Seamless Fix: Eliminamos el 'seek' para evitar el microcorte de audio.
-      // En su lugar, forzamos un rebuild de la UI de Flutter. Esto obliga al widget 'Video'
-      // a re-vincularse con la textura del Canvas de media_kit sin interrumpir el stream.
+      if (_ytController != null) {
+        _ytController!.playVideo();
+        _ytController!.unMute();
+        _ytController!.setVolume(100);
+      }
       if (_player != null && _player!.state.playing) {
         debugPrint('[player web] Tab resumed. Waking up renderer without audio interruption.');
         setState(() {
@@ -2481,16 +2483,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_player != null) {
       _player!.pause();
     }
-    _ytController = YoutubePlayerController.fromVideoId(
+    _ytController = yt.YoutubePlayerController.fromVideoId(
       videoId: videoId,
       autoPlay: true,
-      params: const YoutubePlayerParams(
+      params: const yt.YoutubePlayerParams(
         showControls: true,
         showFullscreenButton: true,
         mute: false,
         playsInline: true,
+        enableCaption: false,
+        captionLanguage: '',
       ),
     );
+    _ytController!.listen((state) {
+      if (!mounted) return;
+      if (state.playerState == yt.PlayerState.cued) {
+        _ytController!.playVideo();
+        _ytController!.unMute();
+        _ytController!.setVolume(100);
+      } else if (state.playerState == yt.PlayerState.playing) {
+        _ytController!.unMute();
+        _ytController!.setVolume(100);
+        try {
+          _ytController!.webViewController.runJavaScript("try { if(window.player){ window.player.unloadModule('captions'); window.player.unloadModule('cc'); } } catch(e){}");
+        } catch (_) {}
+      }
+    });
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -3466,7 +3484,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         children: [
           Container(color: Colors.black),
           Center(
-            child: YoutubePlayer(
+            child: yt.YoutubePlayer(
               controller: _ytController!,
               aspectRatio: 16 / 9,
             ),

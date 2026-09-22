@@ -404,16 +404,24 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
     final personalizedSections = _mapResponseToLayout(homeResponse, currentCategory);
     await box.put(cacheKey, homeResponse.toJson());
     
-    final List<HomeLayoutSection> finalSections = [];
-    final Set<String> finalTitles = {};
-    for (final s in personalizedSections) {
-      if (s.title != null && finalTitles.add(s.title!)) finalSections.add(s);
-      else if (s.type == HomeSectionType.continueWatching) finalSections.add(s);
+    if (currentCategory == 'inicio') {
+      final combinedInterleaved = _interleaveInicioSections([
+        personalizedSections,
+        rawSections,
+      ]);
+      yield SectionComposer.compose(combinedInterleaved);
+    } else {
+      final List<HomeLayoutSection> finalSections = [];
+      final Set<String> finalTitles = {};
+      for (final s in personalizedSections) {
+        if (s.title != null && finalTitles.add(s.title!)) finalSections.add(s);
+        else if (s.type == HomeSectionType.continueWatching) finalSections.add(s);
+      }
+      for (final s in rawSections) {
+        if (s.title != null && !finalTitles.contains(s.title)) finalSections.add(s);
+      }
+      yield SectionComposer.compose(finalSections);
     }
-    for (final s in rawSections) {
-      if (s.title != null && !finalTitles.contains(s.title)) finalSections.add(s);
-    }
-    yield SectionComposer.compose(finalSections);
   }
 });
 
@@ -526,7 +534,8 @@ Future<void> _processPersonalizedHome(HomeResponse response, Ref ref) async {
 }
 
 /// Senior Helper: Intercala y aleatoriza secciones de las 4 categorías (anime, películas, series, kdramas)
-/// para la pestaña 'Inicio'. Produce un espejo equilibrado con semilla rotativa por tiempo.
+/// para la pestaña 'Inicio', respetando estrictamente la jerarquía visual de la pantalla
+/// y la armonía de formatos (evita wide-wide o top10-top10 contiguos, y rompe la monotonía de posters).
 List<HomeLayoutSection> _interleaveInicioSections(
   List<List<HomeLayoutSection>> categoryLists, {
   int? seed,
@@ -534,50 +543,144 @@ List<HomeLayoutSection> _interleaveInicioSections(
   final int timeSeed = seed ?? (DateTime.now().millisecondsSinceEpoch ~/ const Duration(hours: 4).inMilliseconds);
   final rnd = Random(timeSeed);
 
-  HomeLayoutSection? continueWatchingSection;
-  final List<List<HomeLayoutSection>> filteredLists = [];
-
-  for (final list in categoryLists) {
-    final List<HomeLayoutSection> cleaned = [];
-    for (final sec in list) {
-      if (sec.type == HomeSectionType.continueWatching) {
-        continueWatchingSection ??= sec;
-      } else {
-        cleaned.add(sec);
-      }
-    }
-    cleaned.shuffle(rnd);
-    filteredLists.add(cleaned);
-  }
-
-  final List<int> categoryIndices = List.generate(filteredLists.length, (i) => i);
-  categoryIndices.shuffle(rnd);
-
-  final List<HomeLayoutSection> result = [];
-  if (continueWatchingSection != null) {
-    result.add(continueWatchingSection);
-  }
-
-  int maxLen = 0;
-  for (final list in filteredLists) {
-    if (list.length > maxLen) maxLen = list.length;
-  }
+  // 1. Clasificar jerárquicamente secciones estructurales fijas
+  HomeLayoutSection? continueWatchingSec;
+  HomeLayoutSection? primaryTop10Sec;
 
   final Set<String> seenTitles = {};
-  if (continueWatchingSection?.title != null) {
-    seenTitles.add(continueWatchingSection!.title!);
+  final List<List<HomeLayoutSection>> availablePools = [];
+
+  for (final list in categoryLists) {
+    final List<HomeLayoutSection> pool = [];
+    for (final sec in list) {
+      if (sec.type == HomeSectionType.continueWatching) {
+        continueWatchingSec ??= sec;
+      } else if (sec.presentation == SectionPresentation.top10 && primaryTop10Sec == null) {
+        primaryTop10Sec = sec;
+      } else {
+        pool.add(sec);
+      }
+    }
+    pool.shuffle(rnd);
+    availablePools.add(pool);
   }
 
-  for (int i = 0; i < maxLen; i++) {
-    for (final catIdx in categoryIndices) {
-      final list = filteredLists[catIdx];
-      if (i < list.length) {
-        final section = list[i];
-        final title = section.title;
-        if (title == null || seenTitles.add(title)) {
-          result.add(section);
-        }
+  final List<HomeLayoutSection> result = [];
+
+  // Jerarquía posición 0: Continuar Viendo (WIDE)
+  if (continueWatchingSec != null) {
+    result.add(continueWatchingSec);
+    if (continueWatchingSec.title != null) seenTitles.add(continueWatchingSec.title!);
+  }
+
+  // Jerarquía posición 1: Ranking / Top 10 Principal (TOP10)
+  if (primaryTop10Sec != null) {
+    if (primaryTop10Sec.title != null && seenTitles.add(primaryTop10Sec.title!)) {
+      result.add(primaryTop10Sec);
+    }
+  }
+
+  // Orden inicial de categorías para intercalado
+  final List<int> categoryOrder = List.generate(availablePools.length, (i) => i);
+  categoryOrder.shuffle(rnd);
+
+  int categoryPointer = 0;
+
+  // 2. Loop de armonía visual para intercalar las secciones restantes
+  while (availablePools.any((pool) => pool.isNotEmpty)) {
+    SectionPresentation? forbiddenFormat;
+    SectionPresentation? preferredFormat;
+
+    if (result.isNotEmpty) {
+      final lastFormat = result.last.presentation;
+      if (lastFormat == SectionPresentation.wide) {
+        forbiddenFormat = SectionPresentation.wide; // Evita wide contiguo
+      } else if (lastFormat == SectionPresentation.top10) {
+        forbiddenFormat = SectionPresentation.top10; // Evita top10 contiguo
+      } else if (result.length >= 2 &&
+          result[result.length - 1].presentation == SectionPresentation.poster &&
+          result[result.length - 2].presentation == SectionPresentation.poster) {
+        preferredFormat = SectionPresentation.wide; // Rompe monotonía de 2 posters
       }
+    }
+
+    HomeLayoutSection? bestCandidate;
+    int? chosenCategoryIndex;
+    int? chosenItemIndex;
+
+    // Intento 1: Buscar candidato con formato adecuado de una categoría distinta a la anterior
+    for (int step = 0; step < availablePools.length; step++) {
+      final catIdx = categoryOrder[(categoryPointer + step) % availablePools.length];
+      final pool = availablePools[catIdx];
+
+      for (int i = 0; i < pool.length; i++) {
+        final candidate = pool[i];
+        final title = candidate.title;
+
+        if (title != null && seenTitles.contains(title)) {
+          pool.removeAt(i);
+          i--;
+          continue;
+        }
+
+        final fmt = candidate.presentation;
+
+        if (forbiddenFormat != null && fmt == forbiddenFormat) {
+          continue; // Evita repetir el mismo formato especial consecutivamente
+        }
+
+        if (preferredFormat != null && fmt != preferredFormat) {
+          if (bestCandidate == null) {
+            bestCandidate = candidate;
+            chosenCategoryIndex = catIdx;
+            chosenItemIndex = i;
+          }
+          continue;
+        }
+
+        bestCandidate = candidate;
+        chosenCategoryIndex = catIdx;
+        chosenItemIndex = i;
+        break;
+      }
+
+      if (bestCandidate != null && (preferredFormat == null || bestCandidate.presentation == preferredFormat)) {
+        break;
+      }
+    }
+
+    // Intento 2: Fallback si no hubo candidato ideal en la rotación
+    if (bestCandidate == null) {
+      for (int step = 0; step < availablePools.length; step++) {
+        final catIdx = categoryOrder[(categoryPointer + step) % availablePools.length];
+        final pool = availablePools[catIdx];
+
+        for (int i = 0; i < pool.length; i++) {
+          final candidate = pool[i];
+          final title = candidate.title;
+
+          if (title != null && seenTitles.contains(title)) {
+            pool.removeAt(i);
+            i--;
+            continue;
+          }
+
+          bestCandidate = candidate;
+          chosenCategoryIndex = catIdx;
+          chosenItemIndex = i;
+          break;
+        }
+        if (bestCandidate != null) break;
+      }
+    }
+
+    if (bestCandidate != null && chosenCategoryIndex != null && chosenItemIndex != null) {
+      result.add(bestCandidate);
+      if (bestCandidate.title != null) seenTitles.add(bestCandidate.title!);
+      availablePools[chosenCategoryIndex].removeAt(chosenItemIndex);
+      categoryPointer = (chosenCategoryIndex + 1) % availablePools.length;
+    } else {
+      break;
     }
   }
 

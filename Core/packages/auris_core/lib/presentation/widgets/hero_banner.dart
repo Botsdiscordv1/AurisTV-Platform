@@ -213,6 +213,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         params: yt.YoutubePlayerParams(
           showControls: false, showFullscreenButton: false, mute: ref.read(heroBannerMutedProvider),
           loop: false, showVideoAnnotations: false, playsInline: true, strictRelatedVideos: true, enableKeyboard: false,
+          enableCaption: false,
+          captionLanguage: '',
           origin: 'https://www.youtube.com',
           userAgent: 'Mozilla/5.0 (Android 13; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0',
         ),
@@ -220,10 +222,15 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       ctrl.loadVideoById(videoId: key);
       ctrl.listen((state) {
         if (state.playerState == yt.PlayerState.cued && mounted) ctrl.playVideo();
-        if (state.playerState == yt.PlayerState.playing && mounted && !_videoReady) {
-          Future.delayed(const Duration(milliseconds: 400), () { 
-            if (mounted) setState(() => _videoReady = true); 
-          });
+        if (state.playerState == yt.PlayerState.playing && mounted) {
+          try {
+            ctrl.webViewController.runJavaScript("try { if(window.player){ window.player.unloadModule('captions'); window.player.unloadModule('cc'); } } catch(e){}");
+          } catch (_) {}
+          if (!_videoReady) {
+            Future.delayed(const Duration(milliseconds: 400), () { 
+              if (mounted) setState(() => _videoReady = true); 
+            });
+          }
         }
         if (state.playerState == yt.PlayerState.ended && mounted) { 
           setState(() { _showTrailerLayer = false; _videoReady = false; }); 

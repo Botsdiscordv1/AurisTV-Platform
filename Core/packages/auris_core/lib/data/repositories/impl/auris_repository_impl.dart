@@ -341,7 +341,7 @@ class AurisRepositoryImpl implements AurisRepository {
     }
 
     final futures = baseUrls.map(
-      (b) => guarded(() => _searchOn(b, 'all', query, year: year, phase: phase, imgSize: imgSize, cancelToken: cancelToken)),
+      (b) => guarded(() => _searchOn(b, filterCategory ?? 'all', query, year: year, phase: phase, imgSize: imgSize, cancelToken: cancelToken)),
     );
 
     final responses = await Future.wait(futures.map((f) => f.timeout(

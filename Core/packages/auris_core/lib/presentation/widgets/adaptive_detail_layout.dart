@@ -128,7 +128,7 @@ class AdaptiveDetailLayout extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 8),
+                        SizedBox(height: isWide ? 22.0 : 16.0),
                         if (meta != null) meta!,
                         const SizedBox(height: 20),
                         

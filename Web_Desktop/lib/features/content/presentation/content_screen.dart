@@ -1463,7 +1463,7 @@ class ContentScreen extends ConsumerStatefulWidget {
   ConsumerState<ContentScreen> createState() => _ContentScreenState();
 }
 
-class _ContentScreenState extends ConsumerState<ContentScreen> {
+class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindingObserver {
   int? _extractSeason(String? s) => extractSeason(s);
   String _stripSeasonSuffix(String? title) => stripSeasonSuffix(title ?? '');
   String _seasonTitleFor(String baseTitle, int season) => seasonTitleFor(baseTitle, season);
@@ -1622,6 +1622,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   int _selectedTabIndex = 0;
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _synopsisScrollController = ScrollController();
   bool _showContent = false;
   Timer? _loadTimer;
 
@@ -1694,6 +1695,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   @override void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () {
       if (mounted) setState(() => _showContent = true);
     });
@@ -1702,12 +1704,24 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_ytController != null && _showPlayer) {
+        _ytController!.playVideo();
+        _syncMute(_isMuted);
+      }
+    }
+  }
+
   @override void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _loadTimer?.cancel();
     _revealTimeout?.cancel();
     _timeoutFallbackTimer?.cancel();
     _disposeController();
     _scrollController.dispose();
+    _synopsisScrollController.dispose();
     super.dispose();
   }
 
@@ -1762,6 +1776,26 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     }
   }
 
+  void _disableYoutubeCaptions(YoutubePlayerController ctrl) {
+    try {
+      ctrl.webViewController.runJavaScript('''
+        try {
+          if (window.player) {
+            if (typeof window.player.unloadModule === 'function') {
+              window.player.unloadModule('captions');
+              window.player.unloadModule('cc');
+            }
+            if (typeof window.player.setOption === 'function') {
+              window.player.setOption('captions', 'track', {});
+              window.player.setOption('cc', 'track', {});
+              window.player.setOption('captions', 'reload', false);
+            }
+          }
+        } catch (e) {}
+      ''');
+    } catch (_) {}
+  }
+
   void _initTrailer(String key, {bool immediate = false}) {
     _delayTimer?.cancel();
     void start() {
@@ -1771,6 +1805,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         _fadeTimer?.cancel(); _ytController!.pauseVideo(); _ytController!.seekTo(seconds: 0);
         if (!_isMuted) { _ytController!.unMute(); _ytController!.setVolume(100); } else { _ytController!.mute(); }
         _ytController!.playVideo();
+        _disableYoutubeCaptions(_ytController!);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) setState(() { _showPlayer = false; _isPlayedOnce = false; _showTitle = true; });
         });
@@ -1814,14 +1849,22 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           playsInline: true,
           strictRelatedVideos: true,
           enableKeyboard: false,
+          captionLanguage: '',
+          enableCaption: false,
         ),
       );
       _playerSubscription = ctrl.listen((state) {
         if (!mounted) return;
         if (state.playerState == PlayerState.playing) {
           _timeoutFallbackTimer?.cancel(); // Cancelamos fallback si reproduce bien
+          _syncMute(_isMuted);
+          _disableYoutubeCaptions(ctrl);
         }
-        if (state.playerState == PlayerState.cued) { ctrl.playVideo(); }
+        if (state.playerState == PlayerState.cued) {
+          ctrl.playVideo();
+          _syncMute(_isMuted);
+          _disableYoutubeCaptions(ctrl);
+        }
         if (state.playerState == PlayerState.playing && !_showPlayer) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) { setState(() { _showPlayer = true; _showTitle = true; }); _startTitleHideTimer(); }
@@ -2092,11 +2135,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           return Container(
             constraints: const BoxConstraints(maxHeight: 110), // Senior Fix: Altura flexible hasta un máximo de 110px
             child: RawScrollbar(
+              controller: _synopsisScrollController,
               thumbColor: const Color(0xFFEF7A1E).withOpacity(0.4),
               radius: const Radius.circular(20),
               thickness: 3,
               thumbVisibility: true,
               child: SingleChildScrollView(
+                controller: _synopsisScrollController,
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.only(right: 14),
                 child: Text(
@@ -2387,6 +2432,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                   setState(() { _showPlayer = false; _isPlayedOnce = true; _showTitle = true; });
                   _titleHideTimer?.cancel();
                 } else {
+                  _isMuted = false;
                   _initTrailer(_lastTrailerKey!, immediate: true);
                 }
               }
@@ -3001,9 +3047,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   }) {
     final isUltraCompact = context.breakpoint < Breakpoint.lg;
     final double aspectRatio = ResponsiveUtils.heroAspectRatio(context);
-    // Senior Fix: Reducción de altura máxima (800px) para evitar aire vertical excesivo en monitores grandes.
-    final headerH = width / 2.8;
+    // Senior Fix: Altura de cabecera cinematográfica equilibrada (máx 580px) para evitar vacío vertical en monitores 1080p/4K.
+    final headerH = (width / 3.2).clamp(420.0, 580.0);
     final titleSize = isUltraCompact ? 32.0 : 56.0;
+
+    // Senior Dynamic Fusion: Cálculo exacto según el ancho real del reproductor en la pantalla
+    final double trailerVideoW = headerH * (16.0 / 9.0);
+    final double trailerStartFraction = (1.0 - (trailerVideoW / width)).clamp(0.10, 0.80);
+    final double trailerSolidEnd = (trailerStartFraction + 0.03).clamp(0.15, 0.85);
+    final double trailerFadeMid = (trailerSolidEnd + 0.10).clamp(0.25, 0.90);
+    final double trailerFadeEnd = (trailerSolidEnd + 0.22).clamp(0.35, 0.98);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
@@ -3024,67 +3077,60 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         child: Stack(
                           children: [
                             Container(color: const Color(0xFF0B0B0D)),
-                            // Imagen con desplazamiento lateral
+                            // Imagen con desplazamiento lateral (Backdrop estático con offset 18% para no invadir el área de texto)
                             Positioned(
                               top: 0, left: width * 0.18, right: 0, bottom: 0,
                               child: ClipRect(
-                                child: TweenAnimationBuilder<double>(
+                                child: AnimatedOpacity(
                                   duration: const Duration(milliseconds: 800),
-                                  tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0),
-                                  builder: (context, blur, child) => AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 1200),
-                                    curve: Curves.easeInOut,
-                                    opacity: _revealed ? 1.0 : 0.0,
-                                    child: ImageFiltered(
-                                      imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-                                      child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 800),
-                                        foregroundDecoration: BoxDecoration(
-                                          color: Colors.black.withOpacity(_showPlayer ? 0.45 : 0.0),
-                                        ),
-                                        child: CachedNetworkImage(
-                                          imageUrl: heroBanner,
-                                          fit: BoxFit.cover,
-                                          alignment: Alignment.topCenter,
-                                          fadeInDuration: const Duration(milliseconds: 300),
-                                          errorWidget: (_, __, ___) => Container(color: Colors.black12),
-                                        ),
-                                      ),
-                                    ),
+                                  curve: Curves.easeInOut,
+                                  opacity: (_revealed && !_showPlayer) ? 1.0 : 0.0,
+                                  child: CachedNetworkImage(
+                                    imageUrl: heroBanner,
+                                    fit: BoxFit.cover,
+                                    alignment: Alignment.topCenter,
+                                    fadeInDuration: const Duration(milliseconds: 300),
+                                    errorWidget: (_, __, ___) => Container(color: Colors.black12),
                                   ),
                                 ),
                               ),
                             ),
 
-                            // TRÁILER (YouTube IFrame con Fallback HTML)
+                            // TRÁILER (YouTube IFrame con Fallback HTML) - Alineado 100% al borde derecho sin espacio sobrante
                             if (_ytController != null || _useHtmlIframeFallback)
                               Positioned(
-                                top: 0, left: width * 0.35, right: 0, bottom: 0,
+                                top: 0, left: width * 0.25, right: 0, bottom: 0,
                                 child: AnimatedOpacity(
                                   duration: const Duration(milliseconds: 500),
                                   opacity: _showPlayer ? 1.0 : 0.0,
                                   child: PointerInterceptor(
                                     child: IgnorePointer(
                                       ignoring: true,
-                                      child: _useHtmlIframeFallback
-                                          ? HtmlElementView.fromTagName(
-                                              key: ValueKey('html-iframe-$_lastTrailerKey'),
-                                              tagName: 'iframe',
-                                              onElementCreated: (Object element) {
-                                                // ignore: avoid_dynamic_calls
-                                                final dynamic el = element;
-                                                el.src = 'https://www.youtube-nocookie.com/embed/$_lastTrailerKey?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0';
-                                                el.style.border = 'none';
-                                                el.style.width = '100%';
-                                                el.style.height = '100%';
-                                                el.allow = 'autoplay; encrypted-media';
-                                              },
-                                            )
-                                          : YoutubePlayer(
-                                              key: ValueKey(_lastTrailerKey),
-                                              controller: _ytController!,
-                                              aspectRatio: 16 / 9,
-                                            ),
+                                      child: Align(
+                                        alignment: Alignment.centerRight,
+                                        child: AspectRatio(
+                                          aspectRatio: 16 / 9,
+                                          child: _useHtmlIframeFallback
+                                              ? HtmlElementView.fromTagName(
+                                                  key: ValueKey('html-iframe-$_lastTrailerKey'),
+                                                  tagName: 'iframe',
+                                                  onElementCreated: (Object element) {
+                                                    // ignore: avoid_dynamic_calls
+                                                    final dynamic el = element;
+                                                    el.src = 'https://www.youtube-nocookie.com/embed/$_lastTrailerKey?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0&cc_load_policy=0&cc_lang_pref=none';
+                                                    el.style.border = 'none';
+                                                    el.style.width = '100%';
+                                                    el.style.height = '100%';
+                                                    el.allow = 'autoplay; encrypted-media';
+                                                  },
+                                                )
+                                              : YoutubePlayer(
+                                                  key: ValueKey(_lastTrailerKey),
+                                                  controller: _ytController!,
+                                                  aspectRatio: 16 / 9,
+                                                ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -3098,50 +3144,62 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                                   fit: StackFit.expand,
                                   children: [
                                     // Gradiente Lateral (Netflix Style)
-                                    DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight,
-                                          colors: [
-                                            const Color(0xFF0B0B0D),
-                                            const Color(0xFF0B0B0D).withOpacity(0.95),
-                                            const Color(0xFF0B0B0D).withOpacity(0.8),
-                                            const Color(0xFF0B0B0D).withOpacity(0.4),
-                                            Colors.transparent,
-                                          ],
-                                          stops: const [0.0, 0.25, 0.45, 0.65, 0.9],
-                                        ),
-                                      ),
-                                    ),
-                                    // Gradiente Superior (Suave)
-                                    DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            const Color(0xFF0B0B0D).withOpacity(0.6),
-                                            Colors.transparent,
-                                          ],
-                                          stops: const [0.0, 0.35],
-                                        ),
-                                      ),
-                                    ),
-                                    // Máscara Lateral Superior
+                                    // Gradientes Estáticos del Backdrop (Se ocultan cuando el tráiler está activo para no oscurecer el video)
                                     Positioned.fill(
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.centerLeft,
-                                            end: Alignment.centerRight,
-                                            colors: [
-                                              const Color(0xFF0B0B0D),
-                                              const Color(0xFF0B0B0D).withOpacity(0.8),
-                                              Colors.transparent,
-                                            ],
-                                            stops: const [0.0, 0.2, 0.45],
-                                          ),
+                                      child: AnimatedOpacity(
+                                        duration: const Duration(milliseconds: 600),
+                                        opacity: _showPlayer ? 0.0 : 1.0,
+                                        child: Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            // Gradiente Lateral Estático (Fusión perfecta cubriendo el borde del offset al 18%)
+                                            DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.centerLeft,
+                                                  end: Alignment.centerRight,
+                                                  colors: [
+                                                    const Color(0xFF0B0B0D),
+                                                    const Color(0xFF0B0B0D),
+                                                    const Color(0xFF0B0B0D).withOpacity(0.50),
+                                                    Colors.transparent,
+                                                  ],
+                                                  stops: const [0.0, 0.22, 0.45, 0.70],
+                                                ),
+                                              ),
+                                            ),
+                                            // Gradiente Superior (Suave)
+                                            DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topCenter,
+                                                  end: Alignment.bottomCenter,
+                                                  colors: [
+                                                    const Color(0xFF0B0B0D).withOpacity(0.6),
+                                                    Colors.transparent,
+                                                  ],
+                                                  stops: const [0.0, 0.35],
+                                                ),
+                                              ),
+                                            ),
+                                            // Máscara Lateral Superior
+                                            Positioned.fill(
+                                              child: DecoratedBox(
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    begin: Alignment.centerLeft,
+                                                    end: Alignment.centerRight,
+                                                    colors: [
+                                                      const Color(0xFF0B0B0D),
+                                                      const Color(0xFF0B0B0D).withOpacity(0.8),
+                                                      Colors.transparent,
+                                                    ],
+                                                    stops: const [0.0, 0.2, 0.45],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
@@ -3164,9 +3222,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                                         ),
                                       ),
                                     ),
-                                    // Máscara Cinematográfica Tráiler (condicional)
-                                    if (_showPlayer)
-                                      Positioned.fill(
+                                    // Máscara Cinematográfica Tráiler (Fusión Dinámica Calculada por Ancho Real)
+                                    Positioned.fill(
+                                      child: AnimatedOpacity(
+                                        duration: const Duration(milliseconds: 600),
+                                        opacity: _showPlayer ? 1.0 : 0.0,
                                         child: DecoratedBox(
                                           decoration: BoxDecoration(
                                             gradient: LinearGradient(
@@ -3175,14 +3235,20 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                                               colors: [
                                                 const Color(0xFF0B0B0D),
                                                 const Color(0xFF0B0B0D),
-                                                const Color(0xFF0B0B0D).withOpacity(0.6),
+                                                const Color(0xFF0B0B0D).withOpacity(0.50),
                                                 Colors.transparent,
                                               ],
-                                              stops: const [0.0, 0.35, 0.42, 0.6],
+                                              stops: [
+                                                0.0,
+                                                trailerSolidEnd,
+                                                trailerFadeMid,
+                                                trailerFadeEnd,
+                                              ],
                                             ),
                                           ),
                                         ),
                                       ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -3197,12 +3263,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                       // OVERLAY DE INFORMACIÓN (INTERACTIVO)
                       Positioned.fill(
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 60, bottom: 12),
+                          padding: EdgeInsets.only(
+                            left: 60, 
+                            top: isUltraCompact ? 70 : 80, 
+                            bottom: 16, 
+                            right: 40,
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              // ... logo ...
                               // Logo
                               AnimatedOpacity(
                                 duration: const Duration(milliseconds: 1200),
@@ -3212,8 +3282,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                                   title: widget.title,
                                   logo: detailData?.logo,
                                   logoReady: detailAsync.hasValue,
-                                  maxWidth: isUltraCompact ? 450 : 800, // Senior Fix: Más ancho para que logos apaisados crezcan
-                                  maxHeight: isUltraCompact ? titleSize * 2.5 : 240, // Senior Fix: Más altura para logos altos o para permitir escala
+                                  maxWidth: isUltraCompact ? 420 : 600,
+                                  maxHeight: isUltraCompact ? 110 : 140, // Límite de escala adaptativo
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: titleSize,
@@ -3227,16 +3297,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                                   )
                                 ),
                               ),
-                              const SizedBox(height: 8), // Senior Fix: Espaciado más ajustado
+                              SizedBox(height: isUltraCompact ? 18.0 : 26.0), // Mayor espacio y aire visual entre logo y metadata
                               if (detailData != null) ...[
                                 _buildMetaRow(detailData, isCompact: isUltraCompact, kind: detailParams.kind),
-                                const SizedBox(height: 8), // Senior Fix: Espaciado más ajustado
+                                SizedBox(height: isUltraCompact ? 10.0 : 12.0),
                                 SizedBox(
                                   width: 750,
                                   child: _buildSynopsis(detailData, isCompact: isUltraCompact, isScrollable: true),
                                 ),
                               ],
-                              const SizedBox(height: 12),
+                              SizedBox(height: isUltraCompact ? 12.0 : 14.0),
                               // Botones de acción
                               Row(
                                 children: [

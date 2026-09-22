@@ -88,7 +88,7 @@ class _HeroTitleState extends State<HeroTitle> {
           fit: BoxFit.contain,
           alignment: Alignment.bottomLeft,
           fadeInDuration: const Duration(milliseconds: 300),
-          placeholder: (_, __) => _buildPlaceholder(), 
+          placeholder: (_, __) => _buildPlaceholder(),
           errorWidget: (_, __, ___) => _buildTextFallback(forced: true),
         ),
       );
