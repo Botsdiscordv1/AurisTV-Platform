@@ -3067,13 +3067,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
               ),
           ],
         ) : null,
-        content: SliverMainAxisGroup(slivers: [
-          SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _buildTabBar(tabLabels, selectedTabIndex, 16, isMobile: isMobile, isCompact: !isMobile && width < 1200),
-            const SizedBox(height: 16),
-          ])),
-          contentSliver,
-        ]),
+        tabs: _buildTabBar(tabLabels, selectedTabIndex, 16, isMobile: isMobile, isCompact: !isMobile && width < 1200),
+        content: contentSliver,
       );
 
     } catch (e, stack) {

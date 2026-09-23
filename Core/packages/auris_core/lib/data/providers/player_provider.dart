@@ -95,6 +95,20 @@ final unifiedContentDetailProvider =
                              rawType == 'movie_anime' ||
                              rawType == 'movie';
 
+  // Senior Fix: Extraer año explícito desde los parámetros o inferirlo del título ("Movie (2009)") o URL si es nulo
+  int? effectiveYear = params.year;
+  if (effectiveYear == null) {
+    final titleMatch = RegExp(r'[\(\[]?((?:19|20)\d{2})[\)\]]?').firstMatch(params.title);
+    if (titleMatch != null) {
+      effectiveYear = int.tryParse(titleMatch.group(1)!);
+    } else if (params.url != null) {
+      final urlMatch = RegExp(r'-(19\d{2}|20\d{2})(?:/|$)').firstMatch(params.url!);
+      if (urlMatch != null) {
+        effectiveYear = int.tryParse(urlMatch.group(1)!);
+      }
+    }
+  }
+
   // Senior Decision: Si el formato es una película (incluyendo movie_anime), 
   // debemos usar obligatoriamente getMovieDetail para mapear la estructura cinematográfica 
   // (runtime, cast, plataformas) en lugar de la estructura capitulada de series de anime.
@@ -102,13 +116,13 @@ final unifiedContentDetailProvider =
     // Si el servidor efectivo es el de anime (para movie_anime) o se resolvió pelis/series
     movie = await repo.getMovieDetail(
       title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
-      year: params.year,
+      year: effectiveYear,
       metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle!)) : null,
       url: params.url,
-      type: params.type,
+      type: params.type ?? params.kind ?? 'movie',
       category: technicalCategory,
       server: effectiveBaseUrl,
-      kind: params.kind,
+      kind: params.kind ?? 'movie',
       imgSize: 'original',
     );
   } else if (isStrictAnime) {
@@ -116,24 +130,24 @@ final unifiedContentDetailProvider =
     anime = await repo.getAnimeDetail(
       title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
       metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle!)) : null,
-      year: params.year,
+      year: effectiveYear,
       season: params.season,
-      kind: params.kind,
+      kind: params.kind ?? 'anime',
       url: params.url,
-      type: params.type,
+      type: params.type ?? params.kind ?? 'anime',
       server: effectiveBaseUrl,
       imgSize: 'original',
     );
   } else {
     movie = await repo.getMovieDetail(
       title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
-      year: params.year,
+      year: effectiveYear,
       metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle!)) : null,
       url: params.url,
-      type: params.type,
+      type: params.type ?? params.kind ?? technicalCategory,
       category: technicalCategory,
       server: effectiveBaseUrl,
-      kind: params.kind,
+      kind: params.kind ?? (technicalCategory == 'movie' ? 'movie' : 'series'),
       imgSize: 'original',
     );
   }

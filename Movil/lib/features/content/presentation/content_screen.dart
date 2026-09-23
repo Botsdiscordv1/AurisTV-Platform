@@ -1915,11 +1915,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 ),
             ],
           ) : null,
+          tabs: _buildTabBar(tabLabels, selectedTabIndex, 0, isMobile: isMobile, isCompact: isCompact),
           content: SliverMainAxisGroup(slivers: [
-            SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _buildTabBar(tabLabels, selectedTabIndex, 16, isMobile: isMobile, isCompact: isCompact), 
-              const SizedBox(height: 16),
-            ])),
             if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex) () {
               final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
               if (epBundle != null) {
@@ -1931,7 +1928,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 return SliverMainAxisGroup(slivers: [
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.only(left: 16, right: 16, bottom: epCountBottomPadding), 
+                      padding: EdgeInsets.only(left: 0, right: 0, bottom: epCountBottomPadding),
                       child: Text(
                         '${epData.total} episodios', 
                         style: TextStyle(
@@ -1943,7 +1940,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                     )
                   ),
                   if (isMobile) SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.zero,
                     sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
                       final ep = index < epData.episodes.length ? epData.episodes[index] : null;
                       final epNum = (ep?.number ?? index + 1).toString();
@@ -1959,7 +1956,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                     }, childCount: epData.total)),
                   )
                   else SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.zero,
                     sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
                       final ep = index < epData.episodes.length ? epData.episodes[index] : null;
                       final epNum = (ep?.number ?? index + 1).toString();
@@ -1977,7 +1974,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                   ),
                 ]);
               }
-              return episodesAsync.when(data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()), loading: () => SliverPadding(padding: EdgeInsets.symmetric(horizontal: 16), sliver: _EpisodesSkeleton(isMobile: isMobile)), error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))));
+              return episodesAsync.when(data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()), loading: () => SliverPadding(padding: EdgeInsets.zero, sliver: _EpisodesSkeleton(isMobile: isMobile)), error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))));
             }(),
             if (selectedTabIndex == relatedTabIndex && relatedTabIndex != -1) ..._buildRelatedTab(0, unifiedRelations: unifiedRelationsAsync, currentSource: currentSource),
             if (selectedTabIndex == castTabIndex && castTabIndex != -1) ..._buildCastTab(detailData, castAsync.valueOrNull ?? const [], 0),

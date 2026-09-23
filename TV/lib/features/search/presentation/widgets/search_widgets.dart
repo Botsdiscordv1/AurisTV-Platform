@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
-import 'package:auris_core/auris_core.dart';
+import '../../../core/utils/tv_responsive_utils.dart';
 import '../../data/models/search_history.dart';
 import '../providers/search_provider.dart';
 
@@ -176,9 +176,10 @@ class _ChartRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final double posterHeight = isMobile ? (chart.isTop10 ? 160 : 180) : 220;
-    final double itemWidth = chart.isTop10 ? posterHeight * 1.1 : posterHeight * 0.7;
+    final isMobile = TVResponsiveUtils.isMobile(context);
+    final double posterHeight = TVResponsiveUtils.posterHeight(context);
+    final double posterWidth = TVResponsiveUtils.posterWidth(context);
+    final double itemWidth = posterWidth;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,9 +313,10 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
   @override
   Widget build(BuildContext context) {
     final trendingAsync = ref.watch(searchTrendingProvider);
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final double posterHeight = isMobile ? 160 : 220;
-    final double itemWidth = posterHeight * 1.1;
+    final isMobile = TVResponsiveUtils.isMobile(context);
+    final double posterHeight = TVResponsiveUtils.posterHeight(context);
+    final double posterWidth = TVResponsiveUtils.posterWidth(context);
+    final double itemWidth = posterWidth;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,9 +421,9 @@ class _TrendingPosterCard extends StatelessWidget {
     final bool isDoubleDigit = number >= 10;
     final bool isNumberOne = number == 1;
     
-    // ESCALADO UNIFICADO: El número mide el 90% del póster para que este sea más alto
+    // ESCALADO UNIFICADO: Usamos TVResponsiveUtils.posterWidth(context) igual que en Home
     final double dynamicNumberSize = isDoubleDigit ? height * 0.8 : height * 0.9;
-    final double posterWidth = height * 0.7; 
+    final double posterWidth = TVResponsiveUtils.posterWidth(context); 
     
     // SOLAPAMIENTO UNIFICADO AL 22% (Fiel al diseño de Home)
     double numberVisiblePart;

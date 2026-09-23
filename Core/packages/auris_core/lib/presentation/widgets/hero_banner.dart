@@ -936,7 +936,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
   Widget _buildCinematicContent(MediaItem item, double screenWidth) {
     final b = context.breakpoint;
-    final bool isIntermediate = b <= Breakpoint.xl; // iPad Pro (V/H) y Laptops
+    final bool isIntermediate = b <= Breakpoint.xl; 
+    final bool isTablet = b == Breakpoint.md || b == Breakpoint.lg;
+    final bool isCompactHeight = MediaQuery.sizeOf(context).height < 900;
+    // Senior Fix: Si la pantalla es estrecha (< 1200px) y baja (< 900px), ocultamos sinopsis
+    final bool showSynopsis = !isCompactHeight || b > Breakpoint.lg; 
+
     final titleFontSize = ResponsiveUtils.heroTitleFontSize(context);
     
     return Column(
@@ -949,7 +954,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           children: [
             SvgPicture.asset(
               'assets/icons/auris-tv-icon.svg', 
-              height: isIntermediate ? 16 : 18, 
+              height: isIntermediate ? 14 : 18, 
               colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn)
             ),
             const SizedBox(width: 10),
@@ -957,23 +962,22 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               item.type.name.toUpperCase(), 
               style: TextStyle(
                 color: Colors.white, 
-                fontSize: ResponsiveUtils.sp(context, isIntermediate ? 11 : 13), 
+                fontSize: ResponsiveUtils.sp(context, isIntermediate ? 10 : 13), 
                 fontWeight: FontWeight.w900, 
                 letterSpacing: 1.5
               )
             ),
           ],
         ),
-        SizedBox(height: isIntermediate ? 10 : 16),
+        SizedBox(height: isIntermediate ? 8 : 16),
 
         // 2. EL LOGO / TÍTULO
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
           Container(
             constraints: BoxConstraints(
-              // Senior Fix: Limitamos el ancho máximo del logo para evitar que títulos 
-              // panorámicos (ej: Spider-Man) dominen demasiado la pantalla.
-              maxWidth: screenWidth * (isIntermediate ? 0.35 : 0.38),
-              maxHeight: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.1 : 1.35),
+              // Senior Fix: En tablets reducimos el ancho para dejar aire a los lados
+              maxWidth: screenWidth * (isTablet ? 0.30 : (isIntermediate ? 0.35 : 0.38)),
+              maxHeight: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
             ),
             child: CachedNetworkImage(
               key: ValueKey('logo_${item.id}'),
@@ -987,7 +991,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           Text(
             item.title.toUpperCase(), 
             style: TextStyle(
-              fontSize: titleFontSize * (isIntermediate ? 1.0 : 1.2), 
+              fontSize: titleFontSize * (isIntermediate ? 0.9 : 1.2), 
               fontWeight: FontWeight.w900, 
               color: Colors.white, 
               height: 0.9,
@@ -1066,24 +1070,27 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           ],
         ),
         
-        SizedBox(height: isIntermediate ? 16 : 20),
+        SizedBox(height: isIntermediate ? 10 : 16),
 
         // 4. SINOPSIS
-        SizedBox(
-          width: screenWidth * (isIntermediate ? 0.55 : 0.44),
-          child: Text(
-            item.synopsis ?? '', 
-            maxLines: isIntermediate ? 2 : 3, 
-            overflow: TextOverflow.ellipsis, 
-            style: TextStyle(
-              color: Colors.white, 
-              fontSize: ResponsiveUtils.heroSynopsisFontSize(context), 
-              height: 1.4, 
-              fontWeight: FontWeight.w400
-            )
+        if (showSynopsis) ...[
+          SizedBox(
+            width: screenWidth * (isIntermediate ? 0.55 : 0.44),
+            child: Text(
+              item.synopsis ?? '', 
+              maxLines: isIntermediate ? 2 : 3, 
+              overflow: TextOverflow.ellipsis, 
+              style: TextStyle(
+                color: Colors.white, 
+                fontSize: ResponsiveUtils.heroSynopsisFontSize(context), 
+                height: 1.4, 
+                fontWeight: FontWeight.w400
+              )
+            ),
           ),
-        ),
-        SizedBox(height: isIntermediate ? 18 : 32),
+          SizedBox(height: isIntermediate ? 14 : 32),
+        ] else
+          const SizedBox(height: 14),
         
         // 5. ACCIONES
         Row(

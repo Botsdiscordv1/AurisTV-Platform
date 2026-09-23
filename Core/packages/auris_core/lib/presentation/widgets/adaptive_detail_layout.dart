@@ -18,6 +18,8 @@ class AdaptiveDetailLayout extends StatelessWidget {
   final Widget? synopsis;
   /// Selectores (Temporadas, Servidores)
   final Widget? selectors;
+  /// Pestañas (Tabs) con scroll horizontal edge-to-edge
+  final Widget? tabs;
   /// Contenido inferior (Slivers: Tabs, Episodios, Relacionados)
   final Widget content;
   /// Widget opcional para el botón de retroceso/cast
@@ -36,6 +38,7 @@ class AdaptiveDetailLayout extends StatelessWidget {
     this.secondaryActions,
     this.synopsis,
     this.selectors,
+    this.tabs,
     required this.content,
     this.topBar,
     this.bottomNavigationBar,
@@ -169,6 +172,13 @@ class AdaptiveDetailLayout extends StatelessWidget {
                         padding: EdgeInsets.symmetric(horizontal: isWide ? horizontalPadding : 24),
                         child: selectors!,
                       ),
+                      if (tabs != null) ...[
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: isWide ? horizontalPadding : 24),
+                          child: tabs!,
+                        ),
+                      ],
                       const SizedBox(height: 12),
                     ],
                   ),

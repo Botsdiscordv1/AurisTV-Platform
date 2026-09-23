@@ -1,5 +1,7 @@
 import '../../../core/api/api_endpoints.dart';
 import 'package:flutter/foundation.dart';
+import 'search_result.dart';
+import 'detail_params.dart';
 
 class EpisodesResponse {
   final String source;
@@ -114,10 +116,28 @@ class RelatedInfo {
   }
 
   factory RelatedInfo.fromJson(Map<String, dynamic> json) {
+    final rawTitle = json['title'] as String? ?? '';
+    final rawUrl = json['url'] as String? ?? '';
+    final rawSlug = json['slug'] as String? ?? '';
+
+    // Senior Fix: Parsear año de num/String, e inferirlo del título ("(2009)") o URL/slug ("-2009") si es nulo
+    int? parsedYear = int.tryParse(json['year']?.toString() ?? '');
+    if (parsedYear == null) {
+      final titleMatch = RegExp(r'[\(\[]?((?:19|20)\d{2})[\)\]]?').firstMatch(rawTitle);
+      if (titleMatch != null) {
+        parsedYear = int.tryParse(titleMatch.group(1)!);
+      } else {
+        final urlMatch = RegExp(r'-(19\d{2}|20\d{2})(?:/|$)').firstMatch(rawSlug.isNotEmpty ? rawSlug : rawUrl);
+        if (urlMatch != null) {
+          parsedYear = int.tryParse(urlMatch.group(1)!);
+        }
+      }
+    }
+
     return RelatedInfo(
-      title: json['title'] as String? ?? '',
-      url: json['url'] as String? ?? '',
-      slug: json['slug'] as String? ?? '',
+      title: rawTitle,
+      url: rawUrl,
+      slug: rawSlug,
       cover: ApiEndpoints.proxyImage(
         json['cover'] as String? ?? 
         json['coverImage'] as String? ?? 
@@ -130,7 +150,42 @@ class RelatedInfo {
       category: json['category'] as String?,
       kind: json['kind'] as String?,
       source: json['source'] as String?,
-      year: (json['year'] as num?)?.toInt(),
+      year: parsedYear,
+    );
+  }
+
+  SearchResult toSearchResult({String? fallbackSource, String? fallbackCategory}) {
+    final effectiveSource = (source != null && source!.isNotEmpty) ? source! : (fallbackSource ?? '');
+    final effectiveKind = kind ?? category;
+    return SearchResult(
+      title: title,
+      url: url,
+      quality: 'HD',
+      thumbnail: cover,
+      source: effectiveSource,
+      kind: effectiveKind,
+      type: effectiveKind,
+      year: year,
+      slug: slug,
+    );
+  }
+
+  UnifiedDetailParams toUnifiedDetailParams({
+    required String fallbackCategory,
+    String? fallbackSource,
+  }) {
+    final effectiveSource = (source != null && source!.isNotEmpty) ? source! : (fallbackSource ?? '');
+    final effectiveKind = kind ?? category;
+    final effectiveCategory = category ?? kind ?? fallbackCategory;
+    return UnifiedDetailParams(
+      title: title,
+      kind: effectiveKind,
+      type: effectiveKind,
+      year: year,
+      url: url,
+      category: effectiveCategory,
+      source: effectiveSource,
+      initialSources: [toSearchResult(fallbackSource: fallbackSource, fallbackCategory: fallbackCategory)],
     );
   }
 }
