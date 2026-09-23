@@ -758,8 +758,6 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                             if (!_isSpecial)
                               Text(
                                 '${widget.duration ?? ''}${widget.duration != null && widget.releaseDate != null ? ' ' : ''}${_ContentScreenState._formatDate(widget.releaseDate)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
                               ),
                             if (!_isSpecial) SizedBox(height: ResponsiveUtils.sp(context, 6)),
@@ -881,8 +879,6 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
                         '${widget.duration ?? ''}${widget.duration != null && widget.releaseDate != null ? ' ' : ''}${_ContentScreenState._formatDate(widget.releaseDate)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: const Color(0xFFA5A5AA),
                           fontSize: widget.isCompact ? 11.5 : 13.0,
@@ -912,8 +908,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                         _ContentScreenState._buildAgeBadge(context, _typeBadge!, small: true),
                         const SizedBox(width: 8),
                       ],
-                      if (!widget.isCompact)
-                        _ContentScreenState._buildAgeBadge(context, _languageBadge, small: true),
+                      _ContentScreenState._buildAgeBadge(context, _languageBadge, small: true),
                     ],
                   ),
                 ],
@@ -2826,7 +2821,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
       final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
       final episodesCrossAxisCount = isMobile ? 1 : (width < 700 ? 2 : (width < 1150 ? 3 : (width < 1550 ? 4 : (width < 2100 ? 5 : 6))));
-      final episodesAspectRatio = isMobile ? 1.15 : (width < 1150 ? 1.08 : 1.1);
+      final episodesAspectRatio = isMobile ? 1.15 : (width < 1150 ? 1.05 : 1.1);
 
       final detailParams = UnifiedDetailParams(
         title: widget.title,
@@ -3691,6 +3686,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
             thumbnail: r.cover,
             slug: r.slug,
             metadataTitle: r.title,
+            year: r.year,
             sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
           );
           final uri = UrlUtils.buildShareableUri(

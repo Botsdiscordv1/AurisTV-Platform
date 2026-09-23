@@ -85,6 +85,7 @@ class RelatedInfo {
   final String? category; // Senior Fix: Clasificación servida por el VPS (franquicia | relacionado)
   final String? source;
   final String? kind; // movie | serie | anime | null
+  final int? year;
 
   const RelatedInfo({
     required this.title,
@@ -95,9 +96,10 @@ class RelatedInfo {
     this.category,
     this.source,
     this.kind,
+    this.year,
   });
 
-  RelatedInfo copyWith({String? source, String? kind}) {
+  RelatedInfo copyWith({String? source, String? kind, int? year}) {
     return RelatedInfo(
       title: title,
       url: url,
@@ -107,6 +109,7 @@ class RelatedInfo {
       category: category,
       source: source ?? this.source,
       kind: kind ?? this.kind,
+      year: year ?? this.year,
     );
   }
 
@@ -127,6 +130,7 @@ class RelatedInfo {
       category: json['category'] as String?,
       kind: json['kind'] as String?,
       source: json['source'] as String?,
+      year: (json['year'] as num?)?.toInt(),
     );
   }
 }

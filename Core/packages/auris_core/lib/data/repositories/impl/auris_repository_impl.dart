@@ -401,7 +401,7 @@ class AurisRepositoryImpl implements AurisRepository {
       category: filterCategory ?? 'all',
       count: merged.length,
       page: page,
-      hasMore: responses.any((r) => r.hasMore) || merged.isNotEmpty,
+      hasMore: responses.any((r) => r.hasMore),
       results: merged,
     );
   }

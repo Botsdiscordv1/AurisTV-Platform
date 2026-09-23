@@ -125,11 +125,15 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
       );
       if (!mounted) return;
       _page = nextPage;
-      _hasMore = response.hasMore && response.results.isNotEmpty;
-      if (response.results.isNotEmpty) {
-        _processChunk(response);
-      } else {
+      if (response.results.isEmpty) {
         _hasMore = false;
+      } else {
+        // Fuentes sin paginación real devuelven siempre la página 1:
+        // si NINGÚN resultado es nuevo (tras fuse), cortamos el bucle.
+        final before = _accumulated.keys.toSet();
+        _processChunk(response);
+        final addedAny = _accumulated.keys.any((k) => !before.contains(k));
+        _hasMore = addedAny && response.hasMore;
       }
     } catch (_) {
       if (mounted) _hasMore = false;
