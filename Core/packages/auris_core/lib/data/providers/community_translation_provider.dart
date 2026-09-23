@@ -35,10 +35,93 @@ class CommunityTranslationManager {
     return 'en';
   }
 
-  /// Mayúscula en el primer carácter alfabético del título traducido
-  /// (Google devuelve "solá"; el título debe empezar en mayúscula → "Solá").
-  static String capitalizeTitle(String text) {
-    final t = text.trim();
+  /// Errores SIEMPRE incorrectos de Google en títulos ES (sin ambigüedad de
+  /// contexto). Monosílabos ambiguos (si/sí, el/él, esta/está) no van aquí.
+  static const Map<String, String> _titleAccentFixes = {
+    'solá': 'sola',
+    'sóla': 'sola',
+    'tambien': 'también',
+    'despues': 'después',
+    'aqui': 'aquí',
+    'asi': 'así',
+    'dia': 'día',
+    'dias': 'días',
+    'pagina': 'página',
+    'paginas': 'páginas',
+    'musica': 'música',
+    'telefono': 'teléfono',
+    'telefonos': 'teléfonos',
+    'corazon': 'corazón',
+    'razon': 'razón',
+    'razones': 'razones',
+    'pelicula': 'película',
+    'peliculas': 'películas',
+    'numero': 'número',
+    'numeros': 'números',
+    'ultimo': 'último',
+    'ultima': 'última',
+    'ultimos': 'últimos',
+    'ultimas': 'últimas',
+    'unico': 'único',
+    'unica': 'única',
+    'unicos': 'únicos',
+    'unicas': 'únicas',
+    'proxima': 'próxima',
+    'proximo': 'próximo',
+    'proximas': 'próximas',
+    'proximos': 'próximos',
+    'facil': 'fácil',
+    'faciles': 'fáciles',
+    'dificil': 'difícil',
+    'dificiles': 'difíciles',
+    'publico': 'público',
+    'publica': 'pública',
+    'medico': 'médico',
+    'medica': 'médica',
+    'manana': 'mañana',
+    'mananas': 'mañanas',
+    'espanol': 'español',
+    'espanola': 'española',
+    'mas': 'más',
+    'ademas': 'además',
+    'anio': 'año',
+    'cancion': 'canción',
+    'canciones': 'canciones',
+    'pasion': 'pasión',
+    'pasiones': 'pasiones',
+    'avion': 'avión',
+    'aviones': 'aviones',
+    'jardin': 'jardín',
+    'arbol': 'árbol',
+    'arboles': 'árboles',
+  };
+
+  static String _fixAccentsInWord(String word) {
+    if (word.isEmpty) return word;
+    final lower = word.toLowerCase();
+    final fixed = _titleAccentFixes[lower];
+    if (fixed == null || fixed == lower) return word;
+    final isAllUpper = word == word.toUpperCase() && word != word.toLowerCase();
+    if (isAllUpper) return fixed.toUpperCase();
+    final first = word[0];
+    final firstUpper = first == first.toUpperCase() && first != first.toLowerCase();
+    if (firstUpper) {
+      return fixed[0].toUpperCase() + fixed.substring(1);
+    }
+    return fixed;
+  }
+
+  static String _applyAccentFixes(String text) {
+    return text.replaceAllMapped(
+      RegExp(r'[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+'),
+      (m) => _fixAccentsInWord(m.group(0)!),
+    );
+  }
+
+  /// Título de episodio MT: corrige tildes seguras + mayúscula inicial
+  /// ("solá" → "Sola", "7. transparencia" → "7. Transparencia").
+  static String polishSpanishTitle(String text) {
+    var t = _applyAccentFixes(text.trim().replaceAll(RegExp(r'\s+'), ' '));
     if (t.isEmpty) return t;
     final runes = t.runes.toList();
     final letter = RegExp(r'\p{L}', unicode: true);
@@ -52,6 +135,9 @@ class CommunityTranslationManager {
     }
     return t;
   }
+
+  /// Alias legado: capitaliza y corrige tildes (mismo pipeline que polishSpanishTitle).
+  static String capitalizeTitle(String text) => polishSpanishTitle(text);
 
   /// UUID de instalación estable para cuota per-dispositivo (se genera una
   /// vez y persiste en Hive). Evita el bucket compartido de 'guest_user'.

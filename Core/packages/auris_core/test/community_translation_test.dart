@@ -66,26 +66,44 @@ void main() {
     });
   });
 
-  group('capitalizeTitle', () {
-    test('lowercase first letter → uppercase', () {
-      expect(CommunityTranslationManager.capitalizeTitle('solá'), 'Solá');
-      expect(CommunityTranslationManager.capitalizeTitle('sola'), 'Sola');
+  group('polishSpanishTitle / capitalizeTitle', () {
+    test('fixes wrong accent + capitalizes (solá → Sola)', () {
+      expect(CommunityTranslationManager.polishSpanishTitle('solá'), 'Sola');
+      expect(CommunityTranslationManager.capitalizeTitle('solá'), 'Sola');
+      expect(CommunityTranslationManager.polishSpanishTitle('sola'), 'Sola');
     });
-    test('already capitalized is unchanged', () {
-      expect(CommunityTranslationManager.capitalizeTitle('Solá'), 'Solá');
-      expect(CommunityTranslationManager.capitalizeTitle('Sola'), 'Sola');
+    test('missing accents on invariant words', () {
+      expect(CommunityTranslationManager.polishSpanishTitle('tambien'),
+          'También');
+      expect(CommunityTranslationManager.polishSpanishTitle('ultimo acto'),
+          'Último acto');
+      expect(CommunityTranslationManager.polishSpanishTitle('la musica'),
+          'La música');
+    });
+    test('already correct is unchanged', () {
+      expect(CommunityTranslationManager.polishSpanishTitle('Sola'), 'Sola');
+      expect(CommunityTranslationManager.polishSpanishTitle('También'), 'También');
+    });
+    test('preserves capitalization pattern of fixed word', () {
+      expect(CommunityTranslationManager.polishSpanishTitle('solá noche'),
+          'Sola noche');
+      expect(CommunityTranslationManager.polishSpanishTitle('Tambien'), 'También');
     });
     test('skips leading digits/symbols to first letter', () {
-      expect(CommunityTranslationManager.capitalizeTitle('7. transparencia'),
+      expect(CommunityTranslationManager.polishSpanishTitle('7. transparencia'),
           '7. Transparencia');
-      expect(CommunityTranslationManager.capitalizeTitle('...hola'), '...Hola');
+      expect(CommunityTranslationManager.polishSpanishTitle('...hola'), '...Hola');
     });
-    test('empty / whitespace', () {
-      expect(CommunityTranslationManager.capitalizeTitle(''), '');
-      expect(CommunityTranslationManager.capitalizeTitle('   '), '');
+    test('empty / whitespace / non-letters', () {
+      expect(CommunityTranslationManager.polishSpanishTitle(''), '');
+      expect(CommunityTranslationManager.polishSpanishTitle('   '), '');
+      expect(CommunityTranslationManager.polishSpanishTitle('123'), '123');
     });
-    test('only non-letters is unchanged', () {
-      expect(CommunityTranslationManager.capitalizeTitle('123'), '123');
+    test('does not touch ambiguous monosyllables', () {
+      expect(CommunityTranslationManager.polishSpanishTitle('si no vuelvo'),
+          'Si no vuelvo');
+      expect(CommunityTranslationManager.polishSpanishTitle('el lago'),
+          'El lago');
     });
   });
 }

@@ -464,33 +464,49 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
             for (final ep in fullRes.episodes) ep.number: ep
           };
 
-          // Paso 3 — Merge (por episodes[].number). Solo título/sinopsis pueden
-          // cambiar por traducción; thumbnail/fecha/duración quedan del full
-          // cuando existan. Si el paso 1 ya pintó ES, no se pisa con el full
-          // (aunque full también traiga ES): evita parpadeo y respeta lo ya
-          // mostrado. El full solo aporta cuando fast aún necesita traducción
-          // o cuando fast no trae texto.
+          // Paso 3 — Merge por número. Regla por campo:
+          // - Si fast ya tiene ese campo en ES → no se pisa (evita parpadeo).
+          // - Si fast no tiene título/sinopsis → tomar del full (gap-fill).
+          // - Si fast aún needsTranslation → preferir full cuando traiga texto.
+          // thumbnail/fechas: full manda si existe.
           final mergedEpisodes = currentBundle.response.episodes.map((fastEp) {
             final fullEp = fullMap[fastEp.number];
             if (fullEp == null) return fastEp;
 
-            final fastHasText = (fastEp.title?.trim().isNotEmpty ?? false) ||
-                (fastEp.description?.trim().isNotEmpty ?? false);
-            final fullHasText = (fullEp.title?.trim().isNotEmpty ?? false) ||
-                (fullEp.description?.trim().isNotEmpty ?? false);
+            final fastTitle = fastEp.title;
+            final fastDesc = fastEp.description;
+            final fullTitle = fullEp.title;
+            final fullDesc = fullEp.description;
+            final fastHasTitle = fastTitle?.trim().isNotEmpty ?? false;
+            final fastHasDesc = fastDesc?.trim().isNotEmpty ?? false;
+            final fullHasTitle = fullTitle?.trim().isNotEmpty ?? false;
+            final fullHasDesc = fullDesc?.trim().isNotEmpty ?? false;
+            final fastHasText = fastHasTitle || fastHasDesc;
+            // ES en fast solo cuenta si YA hay texto (no un campo vacío).
             final fastIsEs = !fastEp.needsTranslation && fastHasText;
-            // Solo tomar texto del full si fast NO está ya en ES.
-            final preferFull = !fastIsEs && fullHasText;
-            final mergedTitle = preferFull
-                ? ((fullEp.title != null && fullEp.title!.isNotEmpty)
-                    ? fullEp.title
-                    : fastEp.title)
-                : fastEp.title;
-            final mergedDesc = preferFull
-                ? (fullEp.description ?? fastEp.description)
-                : ((fastEp.description != null && fastEp.description!.trim().isNotEmpty)
-                    ? fastEp.description
-                    : fullEp.description);
+
+            // Título / sinopsis (por campo):
+            // - fast en ES y con texto → no pisar
+            // - fast sin ese campo → gap-fill desde full
+            // - fast needsTranslation → full manda si trae texto
+            String? mergedTitle;
+            if (fastHasTitle && fastIsEs) {
+              mergedTitle = fastTitle;
+            } else if (fullHasTitle) {
+              mergedTitle = (!fastHasTitle || !fastIsEs) ? fullTitle : fastTitle;
+            } else {
+              mergedTitle = fastTitle;
+            }
+
+            String? mergedDesc;
+            if (fastHasDesc && fastIsEs) {
+              mergedDesc = fastDesc;
+            } else if (fullHasDesc) {
+              mergedDesc = (!fastHasDesc || !fastIsEs) ? fullDesc : fastDesc;
+            } else {
+              mergedDesc = fastDesc;
+            }
+
             final mergedThumb = (fullEp.thumbnail != null && fullEp.thumbnail!.isNotEmpty)
                 ? fullEp.thumbnail
                 : fastEp.thumbnail;
