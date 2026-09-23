@@ -15,6 +15,7 @@ import '../providers/community_translation_provider.dart';
 import '../providers/player_provider.dart';
 import '../providers/auth_provider.dart';
 import '../../core/api/providers.dart';
+import '../../core/api/api_endpoints.dart';
 import '../../core/utils/content_logic.dart';
 import '../../core/utils/source_utils.dart';
 
@@ -333,6 +334,7 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
         _params.source,
         category: _params.category,
         season: _params.season,
+        tmdbId: _params.tmdbId,
         fast: true,
       );
     } catch (e) {
@@ -413,17 +415,11 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       episodes: AsyncValue.data(initialBundle),
     );
 
-    Future.microtask(() {
-      final ctManager = _ref.read(communityTranslationManagerProvider);
-      for (final ep in initialEpisodes) {
-        if (!ep.needsTranslation) continue;
-        unawaited(ctManager.processEpisodeTranslation(
-          tmdbId: initialResponse.tmdbId ?? _params.tmdbId,
-          season: _params.season,
-          episode: ep,
-        ));
-      }
-    });
+    Future.microtask(() => _queueCommunityTranslations(
+      episodes: initialEpisodes,
+      tmdbId: initialResponse.tmdbId ?? _params.tmdbId,
+      season: _params.season,
+    ));
 
     // Paso 2 — Solo DESPUÉS de pintar el paso 1, dispara en background (paralelo entre sí)
     final effectiveTmdbId = fastRes.tmdbId ?? _params.tmdbId;
@@ -501,6 +497,14 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
               sources: List.filled(mergedEpisodes.length, selected),
             )),
           );
+
+          // Crowdsource: el paso 1 (fast) casi nunca trae needsTranslation
+          // (sin TMDB); el merge del full sí. Re-intentar aquí y pintar al local.
+          Future.microtask(() => _queueCommunityTranslations(
+            episodes: mergedEpisodes,
+            tmdbId: fullRes.tmdbId ?? effectiveTmdbId,
+            season: _params.season,
+          ));
         }
       } catch (e) {
         debugPrint('[ProgressiveContent] Task A (Full Episodes) failed or timed out: $e');
@@ -595,6 +599,78 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
     }();
 
     await Future.wait([fullEpisodesTask, castTask, relationsTask]);
+  }
+
+  /// Encola traducciones comunitarias en background y, si el server las guarda,
+  /// pinta título/sinopsis en ES en el estado local sin esperar refresh.
+  void _queueCommunityTranslations({
+    required List<EpisodeInfo> episodes,
+    required int? tmdbId,
+    required int? season,
+  }) {
+    if (tmdbId == null || season == null) return;
+    final targets = episodes.where((e) => e.needsTranslation).toList();
+    if (targets.isEmpty) return;
+
+    final ctManager = _ref.read(communityTranslationManagerProvider);
+    final baseUrl = ApiEndpoints.baseUrlForSource(_params.source, _params.category);
+    for (final ep in targets) {
+      unawaited(() async {
+        final result = await ctManager.processEpisodeTranslation(
+          tmdbId: tmdbId,
+          season: season,
+          episode: ep,
+          baseUrl: baseUrl,
+        );
+        if (result == null || !mounted) return;
+        final newTitle = (result.title != null && result.title!.trim().isNotEmpty)
+            ? result.title
+            : ep.title;
+        final newDesc = (result.overview != null && result.overview!.trim().isNotEmpty)
+            ? result.overview
+            : ep.description;
+        if (newTitle == ep.title && newDesc == ep.description) return;
+
+        final current = state.episodes.valueOrNull;
+        if (current == null) return;
+        final updated = current.response.episodes.map((e) {
+          if (e.number != ep.number) return e;
+          return EpisodeInfo(
+            number: e.number,
+            id: e.id,
+            url: e.url,
+            title: newTitle ?? e.title,
+            thumbnail: e.thumbnail,
+            description: newDesc ?? e.description,
+            airDate: e.airDate,
+            duration: e.duration,
+            runtime: e.runtime,
+            quality: e.quality,
+            episodeType: e.episodeType,
+            tmdbSpecialNumber: e.tmdbSpecialNumber,
+            needsTranslation: false,
+          );
+        }).toList();
+        state = state.copyWith(
+          episodes: AsyncValue.data(GroupedEpisodesResult(
+            response: EpisodesResponse(
+              source: current.response.source,
+              url: current.response.url,
+              slug: current.response.slug,
+              total: current.response.total,
+              episodes: updated,
+              specials: current.response.specials,
+              relations: current.response.relations,
+              cast: current.response.cast,
+              tmdbId: current.response.tmdbId,
+              season: current.response.season,
+              seasonAirDate: current.response.seasonAirDate,
+            ),
+            sources: current.sources,
+          )),
+        );
+      }());
+    }
   }
 }
 

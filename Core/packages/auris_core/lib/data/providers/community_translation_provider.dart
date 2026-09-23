@@ -57,20 +57,22 @@ class CommunityTranslationManager {
   }
 
   /// Procesa la traducción silenciosa de un episodio en segundo plano si cumple con los triggers.
-  Future<void> processEpisodeTranslation({
+  /// Devuelve los textos traducidos si el server los guardó (para pintar la UI local sin refresh).
+  Future<({String? title, String? overview})?> processEpisodeTranslation({
     required int? tmdbId,
     required int? season,
     required EpisodeInfo episode,
+    String? baseUrl,
   }) async {
-    if (tmdbId == null || season == null) return;
-    if (!episode.needsTranslation) return;
+    if (tmdbId == null || season == null) return null;
+    if (!episode.needsTranslation) return null;
 
     final srcTitle = episode.title;
     final srcOverview = episode.description;
 
     // 1. Validar que exista texto fuente real
     if (!shouldAttempt(title: srcTitle, overview: srcOverview)) {
-      return;
+      return null;
     }
 
     try {
@@ -78,7 +80,7 @@ class CommunityTranslationManager {
       final box = await Hive.openBox('community_translations_cache');
       final cacheKey = 'sent_${tmdbId}_${season}_${episode.number}';
       if (box.get(cacheKey) == true) {
-        return;
+        return null;
       }
 
       // 3. Protección anti-spam local: Límite de 100 por día por usuario
@@ -87,7 +89,7 @@ class CommunityTranslationManager {
       final currentDayCount = box.get(dayCountKey, defaultValue: 0) as int;
       if (currentDayCount >= 100) {
         debugPrint('[CommunityTranslation] Límite local diario de 100 traducciones alcanzado.');
-        return;
+        return null;
       }
 
       // 4. Determinar idioma fuente (JA o EN)
@@ -122,8 +124,8 @@ class CommunityTranslationManager {
       }
 
       // 6. Validaciones post-traducción (Constraints)
-      if (translatedTitle == null && translatedOverview == null) return;
-      if (translatedTitle == srcTitle && translatedOverview == srcOverview) return;
+      if (translatedTitle == null && translatedOverview == null) return null;
+      if (translatedTitle == srcTitle && translatedOverview == srcOverview) return null;
 
       // Validar longitud máxima y ausencia de caracteres CJK en texto traducido
       if (translatedTitle != null) {
@@ -137,7 +139,7 @@ class CommunityTranslationManager {
         }
       }
 
-      if (translatedTitle == null && translatedOverview == null) return;
+      if (translatedTitle == null && translatedOverview == null) return null;
 
       // 7. userId: cuenta logueada o UUID de instalación estable (persistido).
       // Nunca 'guest_user' literal: el server lo trata como ausente y cae a
@@ -160,7 +162,7 @@ class CommunityTranslationManager {
       final response = await apiClient.post(
         '/api/translations/community',
         data: payload,
-        baseUrl: ApiEndpoints.animeBaseUrl,
+        baseUrl: baseUrl ?? ApiEndpoints.animeBaseUrl,
       );
 
       final data = response.data;
@@ -174,13 +176,19 @@ class CommunityTranslationManager {
         await box.put(cacheKey, true);
         await box.put(dayCountKey, currentDayCount + 1);
         debugPrint('[CommunityTranslation] Traducción enviada exitosamente para S${season}E${episode.number}');
+        return (
+          title: translatedTitle,
+          overview: translatedOverview,
+        );
       } else {
         final reason = (data is Map) ? (data['reason'] ?? (data['data'] is Map ? data['data']['reason'] : null) ?? 'Motivo desconocido') : 'Motivo desconocido';
         debugPrint('[CommunityTranslation] Servidor rechazó traducción: $reason');
+        return null;
       }
     } catch (e) {
       debugPrint('[CommunityTranslation] Error procesando traducción: $e');
       // No reintentar agresivamente, se intentará en la próxima oportunidad de apertura
+      return null;
     }
   }
 

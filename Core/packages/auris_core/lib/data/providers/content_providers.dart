@@ -527,11 +527,16 @@ final AutoDisposeFutureProviderFamily<GroupedEpisodesResult?, GroupedEpisodesPar
 
   if (episodesAsync == null) return null;
 
-  Future.microtask(() {
+  Future.microtask(() async {
     final ctManager = ref.read(communityTranslationManagerProvider);
     for (final ep in episodesAsync.episodes) {
       if (!ep.needsTranslation) continue;
-      unawaited(ctManager.processEpisodeTranslation(tmdbId: episodesAsync.tmdbId ?? arg.tmdbId, season: arg.season ?? episodesAsync.season, episode: ep));
+      await ctManager.processEpisodeTranslation(
+        tmdbId: episodesAsync.tmdbId ?? arg.tmdbId,
+        season: arg.season ?? episodesAsync.season,
+        episode: ep,
+        baseUrl: ApiEndpoints.baseUrlForSource(arg.source ?? '', arg.category),
+      );
     }
   });
 
