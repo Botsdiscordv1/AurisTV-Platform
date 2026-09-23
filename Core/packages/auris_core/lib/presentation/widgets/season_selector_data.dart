@@ -34,6 +34,9 @@ class SeasonSelectorData {
   /// Optional font size override
   final double? fontSize;
 
+  /// Optional total episodes count to display in selector
+  final int? totalEpisodes;
+
   const SeasonSelectorData({
     required this.currentSeason,
     required this.totalSeasons,
@@ -44,6 +47,7 @@ class SeasonSelectorData {
     this.scale,
     this.height,
     this.fontSize,
+    this.totalEpisodes,
   });
 
   /// Whether there are multiple seasons to choose from.

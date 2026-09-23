@@ -1058,7 +1058,9 @@ class _CastCreditsModal extends ConsumerWidget {
                   }
 
                   final results = response.results;
-                  final crossAxisCount = isMobile ? 2 : 4;
+                  final double posterWidth = ResponsiveUtils.posterWidth(context);
+                  final double availableWidth = isMobile ? (width - 32) : (width * 0.8 - 48);
+                  final int crossAxisCount = (availableWidth / (posterWidth + 12)).round().clamp(isMobile ? 2 : 3, 8);
 
                   return CustomScrollView(
                     slivers: [
@@ -1126,9 +1128,9 @@ class _CastCreditsModal extends ConsumerWidget {
                         sliver: SliverGrid(
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: crossAxisCount,
-                            mainAxisSpacing: 20,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 0.65,
+                            childAspectRatio: isMobile ? 0.54 : 0.58,
+                            crossAxisSpacing: isMobile ? 12 : 20,
+                            mainAxisSpacing: isMobile ? 12 : 16,
                           ),
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
@@ -1889,20 +1891,19 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ),
           secondaryActions: _buildCircularActions(context, isMobile: isMobile, poster: currentSource?.thumbnail, banner: heroBanner),
           synopsis: _buildSynopsis(detailData),
-          selectors: (displayTotalSeasons > 1 || currentSource != null) ? Row(
+          selectors: (!isMovieCategory || currentSource != null) ? Row(
             children: [
-              if (displayTotalSeasons > 1)
-                Expanded(
-                  child: SeasonSelector(
-                    data: SeasonSelectorData(
-                      currentSeason: currentSeason,
-                      totalSeasons: displayTotalSeasons,
-                      onSeasonSelected: (s) => ref.setSeason(detailParams, s),
-                      compact: true,
-                    ),
+              if (!isMovieCategory)
+                SeasonSelector(
+                  data: SeasonSelectorData(
+                    currentSeason: currentSeason,
+                    totalSeasons: displayTotalSeasons > 0 ? displayTotalSeasons : 1,
+                    onSeasonSelected: (s) => ref.setSeason(detailParams, s),
+                    compact: true,
+                    totalEpisodes: episodesAsync.valueOrNull?.response?.total ?? _lastEpisodes?.response?.total,
                   ),
                 ),
-              if (displayTotalSeasons > 1 && currentSource != null) const SizedBox(width: 12),
+              if (!isMovieCategory && currentSource != null) const SizedBox(width: 12),
               if (currentSource != null)
                 Expanded(
                   child: SourceChipsBar(
@@ -1922,23 +1923,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               if (epBundle != null) {
                 _lastEpisodes = epBundle;
                 final epData = epBundle.response;
-                final double epCountFontSize = isMobile ? 15.0 : (isCompact ? 16.0 : (width * 0.011).clamp(17.0, 21.0));
-                final double epCountBottomPadding = isMobile ? 6.0 : (isCompact ? 14.0 : 28.0);
 
                 return SliverMainAxisGroup(slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.only(left: 0, right: 0, bottom: epCountBottomPadding),
-                      child: Text(
-                        '${epData.total} episodios', 
-                        style: TextStyle(
-                          color: const Color(0xFFA5A5A5), 
-                          fontSize: epCountFontSize, 
-                          fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal
-                        )
-                      )
-                    )
-                  ),
                   if (isMobile) SliverPadding(
                     padding: EdgeInsets.zero,
                     sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {

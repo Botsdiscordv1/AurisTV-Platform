@@ -77,8 +77,9 @@ class _SourceChipsBarState extends ConsumerState<SourceChipsBar> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final i in indices) ...[
+            for (int idx = 0; idx < indices.length; idx++) ...[
               Builder(builder: (context) {
+                final i = indices[idx];
                 final name = simplifySourceName(widget.sources[i].source);
                 final bool isNew = !_seen.contains(name);
                 if (isNew) {
@@ -101,7 +102,7 @@ class _SourceChipsBarState extends ConsumerState<SourceChipsBar> {
                   onTap: () => widget.onSourceSelected(i),
                 );
               }),
-              const SizedBox(width: 8),
+              if (idx < indices.length - 1) const SizedBox(width: 8),
             ],
           ],
         ),

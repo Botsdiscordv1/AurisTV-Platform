@@ -1288,7 +1288,9 @@ class _CastCreditsModal extends ConsumerWidget {
                   }
 
                   final results = response.results;
-                  final crossAxisCount = isMobile ? 2 : (width < 1000 ? 3 : (width < 1400 ? 4 : 5));
+                  final double posterWidth = ResponsiveUtils.posterWidth(context);
+                  final double availableWidth = isMobile ? (width - 32) : (width < 1200 ? width * 0.8 : 1200 - 48);
+                  final int crossAxisCount = (availableWidth / (posterWidth + 20)).round().clamp(isMobile ? 2 : 3, 8);
 
                   return CustomScrollView(
                     slivers: [
@@ -1355,13 +1357,10 @@ class _CastCreditsModal extends ConsumerWidget {
                         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                         sliver: SliverGrid(
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            // Senior Fix: Estandarización de tamaño. En Desktop forzamos 5-6 posters
-                            // para evitar que crezcan desproporcionadamente.
-                            crossAxisCount: isMobile ? 2 : (width < 1200 ? 4 : 6),
-                            mainAxisSpacing: 32,
-                            crossAxisSpacing: 20,
-                            // Senior Fix: Ratio 0.6 para dar suficiente espacio al texto
-                            childAspectRatio: 0.6,
+                            crossAxisCount: crossAxisCount,
+                            childAspectRatio: isMobile ? 0.54 : 0.58,
+                            crossAxisSpacing: isMobile ? 12 : 20,
+                            mainAxisSpacing: isMobile ? 12 : 16,
                           ),
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
@@ -2662,19 +2661,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       if (epBundle != null && epData != null) {
         slivers.add(
           SliverMainAxisGroup(slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(left: 16, right: 16, bottom: epCountBottomPadding), 
-                child: Text(
-                  '${epData.total} episodios', 
-                  style: TextStyle(
-                    color: const Color(0xFFA5A5A5), 
-                    fontSize: epCountFontSize, 
-                    fontWeight: isCompact ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
-              ),
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
             if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
               final ep = index < epData.episodes.length ? epData.episodes[index] : null;
               final epNum = (ep?.number ?? index + 1).toString();
@@ -2821,7 +2808,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
       final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
       final episodesCrossAxisCount = isMobile ? 1 : (width < 700 ? 2 : (width < 1150 ? 3 : (width < 1550 ? 4 : (width < 2100 ? 5 : 6))));
-      final episodesAspectRatio = isMobile ? 1.15 : (width < 1150 ? 1.05 : 1.1);
+      final episodesAspectRatio = isMobile ? 1.15 : (width < 1150 ? 0.98 : 1.01);
 
       final detailParams = UnifiedDetailParams(
         title: widget.title,
@@ -3000,6 +2987,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
           selectedTabIndex: selectedTabIndex,
           contentSliver: contentSliver,
           isCompactHeader: isCompact,
+          epData: epData,
         );
       }
 
@@ -3051,6 +3039,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                   onSeasonSelected: (s) => ref.setSeason(detailParams, s),
                   compact: true,
                   width: 140,
+                  totalEpisodes: epData?.total,
                 ),
               ),
               const SizedBox(width: 12),
@@ -3111,6 +3100,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     required int selectedTabIndex,
     required Widget contentSliver,
     required bool isCompactHeader,
+    required dynamic epData,
   }) {
     // Senior Responsive Desktop Architecture: Dimensiones fluidas continuas para cualquier resolución de pantalla (Laptops -> 4K Ultrawide)
     final double headerH = (width / 3.0).clamp(460.0, 620.0);
@@ -3124,7 +3114,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     final double gapMetaToSynopsis = isCompactHeader ? 6.0 : 10.0;
     final double gapSynopsisToActions = isCompactHeader ? 6.0 : 12.0;
     final double gapActionsToSelectors = isCompactHeader ? 4.0 : 8.0;
-    final double selectorWidth = isCompactHeader ? 115.0 : 140.0;
+    final double selectorWidth = isCompactHeader ? 160.0 : 210.0;
     final double selectorH = isCompactHeader ? 36.0 : (width * 0.026).clamp(42.0, 48.0);
     final double selectorFontSize = isCompactHeader ? 13.5 : (width * 0.009).clamp(14.0, 16.0);
 
@@ -3410,6 +3400,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                           width: selectorWidth,
                                           height: selectorH,
                                           fontSize: selectorFontSize,
+                                          totalEpisodes: epData?.total,
                                         ),
                                       ),
                                       const SizedBox(width: 12),
