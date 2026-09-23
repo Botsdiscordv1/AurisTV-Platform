@@ -153,6 +153,8 @@ class MovieDetail {
           [],
       seasons: (root['seasons'] as List<dynamic>?)
               ?.map((e) => SeasonInfo.fromJson(e as Map<String, dynamic>))
+              // TMDB fantasma: episodeCount 0 / seasonNumber 0 no se muestra.
+              .where((s) => s.seasonNumber > 0 && (s.episodeCount ?? 0) > 0)
               .toList() ??
           [],
       totalSeasons: root['totalSeasons'] as int?,
