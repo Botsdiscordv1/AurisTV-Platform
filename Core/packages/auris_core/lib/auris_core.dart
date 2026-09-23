@@ -90,3 +90,4 @@ export 'presentation/widgets/adaptive_detail_layout.dart';
 export 'presentation/widgets/detail_backdrop.dart';
 export 'presentation/widgets/detail_header.dart';
 export 'presentation/widgets/detail_info.dart';
+export 'presentation/widgets/content_tab_bar.dart';

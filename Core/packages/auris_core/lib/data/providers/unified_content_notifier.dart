@@ -466,23 +466,31 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
 
           // Paso 3 — Merge (por episodes[].number). Solo título/sinopsis pueden
           // cambiar por traducción; thumbnail/fecha/duración quedan del full
-          // cuando existan. Si el paso 1 ya pintó ES (!needsTranslation),
-          // no se pisa con el EN de TMDB.
+          // cuando existan. Si el paso 1 ya pintó ES, no se pisa con el full
+          // (aunque full también traiga ES): evita parpadeo y respeta lo ya
+          // mostrado. El full solo aporta cuando fast aún necesita traducción
+          // o cuando fast no trae texto.
           final mergedEpisodes = currentBundle.response.episodes.map((fastEp) {
             final fullEp = fullMap[fastEp.number];
             if (fullEp == null) return fastEp;
 
             final fastHasText = (fastEp.title?.trim().isNotEmpty ?? false) ||
                 (fastEp.description?.trim().isNotEmpty ?? false);
-            final alreadyEs = !fastEp.needsTranslation && fastHasText;
-            final mergedTitle = alreadyEs
-                ? fastEp.title
-                : ((fullEp.title != null && fullEp.title!.isNotEmpty)
+            final fullHasText = (fullEp.title?.trim().isNotEmpty ?? false) ||
+                (fullEp.description?.trim().isNotEmpty ?? false);
+            final fastIsEs = !fastEp.needsTranslation && fastHasText;
+            // Solo tomar texto del full si fast NO está ya en ES.
+            final preferFull = !fastIsEs && fullHasText;
+            final mergedTitle = preferFull
+                ? ((fullEp.title != null && fullEp.title!.isNotEmpty)
                     ? fullEp.title
-                    : fastEp.title);
-            final mergedDesc = alreadyEs
-                ? fastEp.description
-                : (fullEp.description ?? fastEp.description);
+                    : fastEp.title)
+                : fastEp.title;
+            final mergedDesc = preferFull
+                ? (fullEp.description ?? fastEp.description)
+                : ((fastEp.description != null && fastEp.description!.trim().isNotEmpty)
+                    ? fastEp.description
+                    : fullEp.description);
             final mergedThumb = (fullEp.thumbnail != null && fullEp.thumbnail!.isNotEmpty)
                 ? fullEp.thumbnail
                 : fastEp.thumbnail;
@@ -500,7 +508,9 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
               quality: fullEp.quality ?? fastEp.quality,
               episodeType: fullEp.episodeType ?? fastEp.episodeType,
               tmdbSpecialNumber: fullEp.tmdbSpecialNumber ?? fastEp.tmdbSpecialNumber,
-              needsTranslation: alreadyEs ? false : fullEp.needsTranslation,
+              needsTranslation: fastIsEs
+                  ? false
+                  : fullEp.needsTranslation,
             );
           }).toList();
 
@@ -648,6 +658,13 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       final out = <EpisodeInfo>[];
       var changed = false;
       for (final e in episodes) {
+        // Solo rellenar lo que aún necesita ES. Si el episodio ya viene
+        // traducido del server/full, no pisar con el cache local del cliente
+        // (podría ser peor: "solá" vs "Solá").
+        if (!e.needsTranslation) {
+          out.add(e);
+          continue;
+        }
         final c = box.get('sent_${tmdbId}_${season}_${e.number}');
         if (c is! Map) {
           out.add(e);
@@ -659,9 +676,12 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
           out.add(e);
           continue;
         }
-        final nt = (t != null && t.trim().isNotEmpty) ? t : e.title;
+        // Título siempre con mayúscula inicial (cache viejo puede traer "solá").
+        final nt = (t != null && t.trim().isNotEmpty)
+            ? CommunityTranslationManager.capitalizeTitle(t)
+            : e.title;
         final no = (o != null && o.trim().isNotEmpty) ? o : e.description;
-        if (nt == e.title && no == e.description && !e.needsTranslation) {
+        if (nt == e.title && no == e.description) {
           out.add(e);
           continue;
         }
@@ -712,8 +732,11 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
           baseUrl: baseUrl,
         );
         if (result == null || !mounted) return;
-        final newTitle = (result.title != null && result.title!.trim().isNotEmpty)
-            ? result.title
+        final rawTitle = (result.title != null && result.title!.trim().isNotEmpty)
+            ? result.title!
+            : ep.title;
+        final newTitle = (rawTitle != null && rawTitle.trim().isNotEmpty)
+            ? CommunityTranslationManager.capitalizeTitle(rawTitle)
             : ep.title;
         final newDesc = (result.overview != null && result.overview!.trim().isNotEmpty)
             ? result.overview

@@ -35,6 +35,24 @@ class CommunityTranslationManager {
     return 'en';
   }
 
+  /// Mayúscula en el primer carácter alfabético del título traducido
+  /// (Google devuelve "solá"; el título debe empezar en mayúscula → "Solá").
+  static String capitalizeTitle(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return t;
+    final runes = t.runes.toList();
+    final letter = RegExp(r'\p{L}', unicode: true);
+    for (var i = 0; i < runes.length; i++) {
+      final ch = String.fromCharCode(runes[i]);
+      if (letter.hasMatch(ch)) {
+        final up = ch.toUpperCase();
+        runes.replaceRange(i, i + 1, up.runes);
+        return String.fromCharCodes(runes);
+      }
+    }
+    return t;
+  }
+
   /// UUID de instalación estable para cuota per-dispositivo (se genera una
   /// vez y persiste en Hive). Evita el bucket compartido de 'guest_user'.
   static Future<String> deviceUserId(Box box) async {
@@ -85,7 +103,10 @@ class CommunityTranslationManager {
         final ct = cached['title'] as String?;
         final co = cached['overview'] as String?;
         if (ct != null || co != null) {
-          return (title: ct, overview: co);
+          return (
+            title: ct != null ? capitalizeTitle(ct) : ct,
+            overview: co,
+          );
         }
       } else if (cached == true) {
         return null;
@@ -148,6 +169,11 @@ class CommunityTranslationManager {
       }
 
       if (translatedTitle == null && translatedOverview == null) return null;
+
+      // Título siempre con mayúscula inicial antes de pintar/POSTear.
+      if (translatedTitle != null && translatedTitle != srcTitle) {
+        translatedTitle = capitalizeTitle(translatedTitle);
+      }
 
       // 7. userId: cuenta logueada o UUID de instalación estable (persistido).
       // Nunca 'guest_user' literal: el server lo trata como ausente y cae a

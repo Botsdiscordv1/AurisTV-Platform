@@ -1653,44 +1653,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   );
 }
 
-  Widget _buildTabBar(List<String> labels, int selectedIndex, double hPadding, {bool isMobile = false, bool isCompact = false}) {
-    final double screenW = MediaQuery.sizeOf(context).width;
-    final double fontSize = isMobile 
-        ? 16.0 
-        : (isCompact ? 15.5 : (screenW * 0.011).clamp(16.0, 19.0));
-    final double itemHPadding = isMobile ? 16.0 : (isCompact ? 14.0 : 22.0);
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.symmetric(horizontal: hPadding),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: List.generate(labels.length, (i) {
-          final selected = i == selectedIndex;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _selectedTabIndex = i),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: itemHPadding, vertical: isCompact ? 6 : 8),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: selected ? const Color(0xFFEF7A1E) : Colors.transparent, width: isCompact ? 2.5 : 3)),
-              ),
-              child: Text(
-                labels[i], 
-                style: TextStyle(
-                  fontSize: fontSize, 
-                  fontWeight: FontWeight.bold, 
-                  color: selected ? Colors.white : const Color(0xFFA5A5AA),
-                  letterSpacing: -0.2
-                )
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
   @override Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final width = size.width;
@@ -1916,7 +1878,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 ),
             ],
           ) : null,
-          tabs: _buildTabBar(tabLabels, selectedTabIndex, 0, isMobile: isMobile, isCompact: isCompact),
+          tabs: ContentTabBar(
+            labels: tabLabels,
+            selectedIndex: selectedTabIndex,
+            onTabSelected: (i) => setState(() => _selectedTabIndex = i),
+            hPadding: 0,
+            isMobile: isMobile,
+            isCompact: isCompact,
+          ),
           content: SliverMainAxisGroup(slivers: [
             if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex) () {
               final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;

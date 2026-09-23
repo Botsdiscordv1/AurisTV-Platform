@@ -2597,36 +2597,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     );
   }
 
-  Widget _buildTabBar(List<String> labels, int selectedIndex, double hPadding, {bool isMobile = false, bool isCompact = false}) {
-    final double screenW = MediaQuery.sizeOf(context).width;
-    final double fontSize = isMobile 
-        ? 18.0 
-        : (isCompact ? 15.5 : (screenW * 0.011).clamp(16.0, 20.0));
-    final double itemHPadding = isMobile ? 16.0 : (isCompact ? 14.0 : 22.0);
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.symmetric(horizontal: hPadding),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: List.generate(labels.length, (i) {
-          final selected = i == selectedIndex;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _selectedTabIndex = i),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: itemHPadding, vertical: isCompact ? 6 : 8),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: selected ? const Color(0xFFEF7A1E) : Colors.transparent, width: isCompact ? 2.5 : 3)),
-              ),
-              child: Text(labels[i], style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600, color: selected ? Colors.white : const Color(0xFFA5A5AA))),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
   List<Widget> _buildContentSlivers({
     required BuildContext context,
     required bool isMobile,
@@ -2668,7 +2638,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       if (epBundle != null && epData != null) {
         slivers.add(
           SliverMainAxisGroup(slivers: [
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            if (!isMobile)
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
             if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
               final ep = index < epData.episodes.length ? epData.episodes[index] : null;
               final epNum = (ep?.number ?? index + 1).toString();
@@ -3063,7 +3034,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
               ),
           ],
         ) : null,
-        tabs: _buildTabBar(tabLabels, selectedTabIndex, 16, isMobile: isMobile, isCompact: !isMobile && width < 1200),
+        tabs: ContentTabBar(
+          labels: tabLabels,
+          selectedIndex: selectedTabIndex,
+          onTabSelected: (i) => setState(() => _selectedTabIndex = i),
+          hPadding: isMobile ? 0 : 16,
+          isMobile: isMobile,
+          isCompact: !isMobile && width < 1200,
+        ),
         content: contentSliver,
       );
 
@@ -3444,7 +3422,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 8),
-                          _buildTabBar(tabLabels, selectedTabIndex, 0, isCompact: isCompactHeader),
+                          ContentTabBar(
+                            labels: tabLabels,
+                            selectedIndex: selectedTabIndex,
+                            onTabSelected: (i) => setState(() => _selectedTabIndex = i),
+                            hPadding: 0,
+                            isCompact: isCompactHeader,
+                          ),
                           const SizedBox(height: 24),
                         ],
                       ),

@@ -65,4 +65,27 @@ void main() {
       expect(CommunityTranslationManager.detectSourceLanguage('Hello'), 'en');
     });
   });
+
+  group('capitalizeTitle', () {
+    test('lowercase first letter → uppercase', () {
+      expect(CommunityTranslationManager.capitalizeTitle('solá'), 'Solá');
+      expect(CommunityTranslationManager.capitalizeTitle('sola'), 'Sola');
+    });
+    test('already capitalized is unchanged', () {
+      expect(CommunityTranslationManager.capitalizeTitle('Solá'), 'Solá');
+      expect(CommunityTranslationManager.capitalizeTitle('Sola'), 'Sola');
+    });
+    test('skips leading digits/symbols to first letter', () {
+      expect(CommunityTranslationManager.capitalizeTitle('7. transparencia'),
+          '7. Transparencia');
+      expect(CommunityTranslationManager.capitalizeTitle('...hola'), '...Hola');
+    });
+    test('empty / whitespace', () {
+      expect(CommunityTranslationManager.capitalizeTitle(''), '');
+      expect(CommunityTranslationManager.capitalizeTitle('   '), '');
+    });
+    test('only non-letters is unchanged', () {
+      expect(CommunityTranslationManager.capitalizeTitle('123'), '123');
+    });
+  });
 }
