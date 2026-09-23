@@ -76,10 +76,18 @@ class CommunityTranslationManager {
     }
 
     try {
-      // 2. Dedup local: Ver si ya se envió antes para ahorrar red
+      // 2. Dedup local: si ya hay textos ES en cache, devolverlos para pintar
+      // en vivo (aunque el server ya los tenga). `true` legacy = enviado sin texto.
       final box = await Hive.openBox('community_translations_cache');
       final cacheKey = 'sent_${tmdbId}_${season}_${episode.number}';
-      if (box.get(cacheKey) == true) {
+      final cached = box.get(cacheKey);
+      if (cached is Map) {
+        final ct = cached['title'] as String?;
+        final co = cached['overview'] as String?;
+        if (ct != null || co != null) {
+          return (title: ct, overview: co);
+        }
+      } else if (cached == true) {
         return null;
       }
 
@@ -166,23 +174,37 @@ class CommunityTranslationManager {
       );
 
       final data = response.data;
-      // El server envuelve en {success, data:{saved}}; aceptar ambas formas.
+      // El server envuelve en {success, message, data:{success, saved, reason}}.
+      bool success = false;
       bool saved = false;
+      String? reason;
       if (data is Map) {
-        saved = data['saved'] == true || (data['data'] is Map && data['data']['saved'] == true);
+        final inner = data['data'] is Map ? data['data'] as Map : const {};
+        success = data['success'] == true || inner['success'] == true;
+        saved = data['saved'] == true || inner['saved'] == true;
+        reason = (data['reason'] ?? inner['reason'])?.toString();
       }
 
-      if (saved) {
-        await box.put(cacheKey, true);
-        await box.put(dayCountKey, currentDayCount + 1);
-        debugPrint('[CommunityTranslation] Traducción enviada exitosamente para S${season}E${episode.number}');
+      // saved o "exists": el texto local sirve para pintar la tarjeta ya.
+      if (success || saved || reason == 'exists') {
+        final cacheEntry = <String, dynamic>{
+          'title': translatedTitle,
+          'overview': translatedOverview,
+          'at': DateTime.now().millisecondsSinceEpoch,
+        };
+        if (box.get(cacheKey) == null || box.get(cacheKey) is bool) {
+          await box.put(cacheKey, cacheEntry);
+        }
+        if (saved) {
+          await box.put(dayCountKey, currentDayCount + 1);
+        }
+        debugPrint('[CommunityTranslation] Traducción lista para S${season}E${episode.number} (saved=$saved reason=$reason)');
         return (
           title: translatedTitle,
           overview: translatedOverview,
         );
       } else {
-        final reason = (data is Map) ? (data['reason'] ?? (data['data'] is Map ? data['data']['reason'] : null) ?? 'Motivo desconocido') : 'Motivo desconocido';
-        debugPrint('[CommunityTranslation] Servidor rechazó traducción: $reason');
+        debugPrint('[CommunityTranslation] Servidor rechazó traducción: ${reason ?? 'Motivo desconocido'}');
         return null;
       }
     } catch (e) {

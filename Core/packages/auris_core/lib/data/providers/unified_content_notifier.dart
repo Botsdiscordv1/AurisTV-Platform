@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../models/server/anime_detail.dart';
 import '../models/server/movie_detail.dart';
@@ -405,18 +406,34 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       seasonAirDate: fastRes.seasonAirDate,
     );
 
+    // EMITIR PASO 1 AL INSTANTE (overlay ES desde cache local si ya existe)
+    final initialForEmit = await _overlayCachedEs(
+      initialEpisodes,
+      initialResponse.tmdbId ?? _params.tmdbId,
+      _params.season,
+    );
     final initialBundle = GroupedEpisodesResult(
-      response: initialResponse,
-      sources: List.filled(initialEpisodes.length, selected),
+      response: EpisodesResponse(
+        source: initialResponse.source,
+        url: initialResponse.url,
+        slug: initialResponse.slug,
+        total: initialResponse.total > 0 ? initialResponse.total : initialForEmit.length,
+        episodes: initialForEmit,
+        specials: initialResponse.specials,
+        tmdbId: initialResponse.tmdbId,
+        season: initialResponse.season,
+        seasonAirDate: initialResponse.seasonAirDate,
+      ),
+      sources: List.filled(initialForEmit.length, selected),
     );
 
-    // EMITIR PASO 1 AL INSTANTE
+    if (!mounted) return;
     state = state.copyWith(
       episodes: AsyncValue.data(initialBundle),
     );
 
     Future.microtask(() => _queueCommunityTranslations(
-      episodes: initialEpisodes,
+      episodes: initialForEmit,
       tmdbId: initialResponse.tmdbId ?? _params.tmdbId,
       season: _params.season,
     ));
@@ -447,46 +464,63 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
             for (final ep in fullRes.episodes) ep.number: ep
           };
 
-          // Paso 3 — Merge (por episodes[].number, misma key, sin remontar)
+          // Paso 3 — Merge (por episodes[].number). Solo título/sinopsis pueden
+          // cambiar por traducción; thumbnail/fecha/duración quedan del full
+          // cuando existan. Si el paso 1 ya pintó ES (!needsTranslation),
+          // no se pisa con el EN de TMDB.
           final mergedEpisodes = currentBundle.response.episodes.map((fastEp) {
             final fullEp = fullMap[fastEp.number];
-            if (fullEp != null) {
-              final mergedTitle = (fullEp.title != null && fullEp.title!.isNotEmpty)
-                  ? fullEp.title
-                  : fastEp.title;
-              final mergedThumb = (fullEp.thumbnail != null && fullEp.thumbnail!.isNotEmpty)
-                  ? fullEp.thumbnail
-                  : fastEp.thumbnail;
+            if (fullEp == null) return fastEp;
 
-              return EpisodeInfo(
-                number: fastEp.number,
-                id: fastEp.id != 0 ? fastEp.id : fullEp.id,
-                url: fastEp.url.isNotEmpty ? fastEp.url : fullEp.url,
-                title: mergedTitle,
-                thumbnail: mergedThumb,
-                description: fullEp.description ?? fastEp.description,
-                airDate: fullEp.airDate ?? fastEp.airDate,
-                duration: fullEp.duration ?? fastEp.duration,
-                runtime: fullEp.runtime ?? fastEp.runtime,
-                quality: fullEp.quality ?? fastEp.quality,
-                episodeType: fullEp.episodeType ?? fastEp.episodeType,
-                tmdbSpecialNumber: fullEp.tmdbSpecialNumber ?? fastEp.tmdbSpecialNumber,
-                needsTranslation: fullEp.needsTranslation,
-              );
-            }
-            return fastEp;
+            final fastHasText = (fastEp.title?.trim().isNotEmpty ?? false) ||
+                (fastEp.description?.trim().isNotEmpty ?? false);
+            final alreadyEs = !fastEp.needsTranslation && fastHasText;
+            final mergedTitle = alreadyEs
+                ? fastEp.title
+                : ((fullEp.title != null && fullEp.title!.isNotEmpty)
+                    ? fullEp.title
+                    : fastEp.title);
+            final mergedDesc = alreadyEs
+                ? fastEp.description
+                : (fullEp.description ?? fastEp.description);
+            final mergedThumb = (fullEp.thumbnail != null && fullEp.thumbnail!.isNotEmpty)
+                ? fullEp.thumbnail
+                : fastEp.thumbnail;
+
+            return EpisodeInfo(
+              number: fastEp.number,
+              id: fastEp.id != 0 ? fastEp.id : fullEp.id,
+              url: fastEp.url.isNotEmpty ? fastEp.url : fullEp.url,
+              title: mergedTitle,
+              thumbnail: mergedThumb,
+              description: mergedDesc,
+              airDate: fullEp.airDate ?? fastEp.airDate,
+              duration: fullEp.duration ?? fastEp.duration,
+              runtime: fullEp.runtime ?? fastEp.runtime,
+              quality: fullEp.quality ?? fastEp.quality,
+              episodeType: fullEp.episodeType ?? fastEp.episodeType,
+              tmdbSpecialNumber: fullEp.tmdbSpecialNumber ?? fastEp.tmdbSpecialNumber,
+              needsTranslation: alreadyEs ? false : fullEp.needsTranslation,
+            );
           }).toList();
+
+          final mergeTmdbId = fullRes.tmdbId ?? currentBundle.response.tmdbId;
+          final mergedForEmit = await _overlayCachedEs(
+            mergedEpisodes,
+            mergeTmdbId,
+            _params.season,
+          );
 
           final mergedResponse = EpisodesResponse(
             source: currentBundle.response.source,
             url: currentBundle.response.url,
             slug: currentBundle.response.slug,
             total: currentBundle.response.total,
-            episodes: mergedEpisodes,
+            episodes: mergedForEmit,
             specials: fullRes.specials.isNotEmpty ? fullRes.specials : currentBundle.response.specials,
             relations: currentBundle.response.relations,
             cast: currentBundle.response.cast,
-            tmdbId: fullRes.tmdbId ?? currentBundle.response.tmdbId,
+            tmdbId: mergeTmdbId,
             season: currentBundle.response.season,
             seasonAirDate: fullRes.seasonAirDate ?? currentBundle.response.seasonAirDate,
           );
@@ -494,15 +528,15 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
           state = state.copyWith(
             episodes: AsyncValue.data(GroupedEpisodesResult(
               response: mergedResponse,
-              sources: List.filled(mergedEpisodes.length, selected),
+              sources: List.filled(mergedForEmit.length, selected),
             )),
           );
 
-          // Crowdsource: el paso 1 (fast) casi nunca trae needsTranslation
-          // (sin TMDB); el merge del full sí. Re-intentar aquí y pintar al local.
+          // Crowdsource: traducir en vivo lo que siga en EN/JA y pintar solo
+          // título/sinopsis en el estado local.
           Future.microtask(() => _queueCommunityTranslations(
-            episodes: mergedEpisodes,
-            tmdbId: fullRes.tmdbId ?? effectiveTmdbId,
+            episodes: mergedForEmit,
+            tmdbId: mergeTmdbId,
             season: _params.season,
           ));
         }
@@ -601,8 +635,63 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
     await Future.wait([fullEpisodesTask, castTask, relationsTask]);
   }
 
-  /// Encola traducciones comunitarias en background y, si el server las guarda,
-  /// pinta título/sinopsis en ES en el estado local sin esperar refresh.
+  /// Overlay solo de título/sinopsis desde el cache Hive local.
+  /// thumbnail, airDate, duration, quality, etc. no se tocan.
+  Future<List<EpisodeInfo>> _overlayCachedEs(
+    List<EpisodeInfo> episodes,
+    int? tmdbId,
+    int? season,
+  ) async {
+    if (tmdbId == null || season == null || episodes.isEmpty) return episodes;
+    try {
+      final box = await Hive.openBox('community_translations_cache');
+      final out = <EpisodeInfo>[];
+      var changed = false;
+      for (final e in episodes) {
+        final c = box.get('sent_${tmdbId}_${season}_${e.number}');
+        if (c is! Map) {
+          out.add(e);
+          continue;
+        }
+        final t = c['title'] as String?;
+        final o = c['overview'] as String?;
+        if (t == null && o == null) {
+          out.add(e);
+          continue;
+        }
+        final nt = (t != null && t.trim().isNotEmpty) ? t : e.title;
+        final no = (o != null && o.trim().isNotEmpty) ? o : e.description;
+        if (nt == e.title && no == e.description && !e.needsTranslation) {
+          out.add(e);
+          continue;
+        }
+        changed = true;
+        out.add(EpisodeInfo(
+          number: e.number,
+          id: e.id,
+          url: e.url,
+          title: nt,
+          thumbnail: e.thumbnail,
+          description: no,
+          airDate: e.airDate,
+          duration: e.duration,
+          runtime: e.runtime,
+          quality: e.quality,
+          episodeType: e.episodeType,
+          tmdbSpecialNumber: e.tmdbSpecialNumber,
+          needsTranslation: false,
+        ));
+      }
+      return changed ? out : episodes;
+    } catch (_) {
+      return episodes;
+    }
+  }
+
+  /// Encola traducciones comunitarias en background y, si el server las guarda
+  /// (o ya las tiene), pinta solo título/sinopsis en ES. El resto de campos de
+  /// la tarjeta (thumbnail, fecha, duración, certificación…) quedan intactos:
+  /// la certificación ni siquiera vive en EpisodeInfo (viene del detail).
   void _queueCommunityTranslations({
     required List<EpisodeInfo> episodes,
     required int? tmdbId,
@@ -635,6 +724,7 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
         if (current == null) return;
         final updated = current.response.episodes.map((e) {
           if (e.number != ep.number) return e;
+          // Solo texto + flag. thumbnail/airDate/duration/quality se copian de e.
           return EpisodeInfo(
             number: e.number,
             id: e.id,
