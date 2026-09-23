@@ -468,7 +468,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
     final Offset position = renderBox.localToGlobal(Offset.zero);
     final double screenWidth = MediaQuery.of(context).size.width;
 
-    final double popupWidth = cardSize.width + 48;
+    final double popupWidth = (cardSize.width + 48).clamp(285.0, 380.0);
     const double edgePadding = 24.0;
     
     double cardCenterX = position.dx + cardSize.width / 2;
@@ -515,6 +515,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     width: popupWidth,
+                    constraints: const BoxConstraints(maxHeight: 480),
                     decoration: BoxDecoration(
                       color: const Color(0xFF191E25),
                       borderRadius: BorderRadius.circular(12),
@@ -527,108 +528,114 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                         ),
                       ],
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                          child: Stack(
-                            children: [
-                              AspectRatio(
-                                aspectRatio: 16 / 9,
-                                  child: CachedNetworkImage(
-                                    imageUrl: widget.imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorWidget: (_, __, ___) => CachedNetworkImage(
-                                      imageUrl: widget.fallbackImageUrl,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
-                                    ),
-                                  ),
-                              ),
-                              if (widget.progress != null && widget.progress! > 0)
-                                Positioned(
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: Container(
-                                    height: 3,
-                                    color: Colors.black26,
-                                    child: FractionallySizedBox(
-                                      alignment: Alignment.centerLeft,
-                                      widthFactor: widget.progress,
-                                      child: Container(color: const Color(0xFFEF7A1E)),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.only(
-                            left: 24, 
-                            right: 24, 
-                            bottom: 24, 
-                            top: ResponsiveUtils.sp(context, 12)
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _displayTitle,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: ResponsiveUtils.sp(context, 16),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: ResponsiveUtils.sp(context, 6)),
-                               if (!_isSpecial || widget.description.isNotEmpty)
-                                 Text(
-                                   widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
-                                   maxLines: 8,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: const Color(0xFFA5A5AA),
-                                    fontSize: ResponsiveUtils.sp(context, 13),
-                                    height: 1.5,
-                                    fontWeight: FontWeight.normal,
-                                  ),
-                                ),
-                              SizedBox(height: ResponsiveUtils.sp(context, 8)),
-                              Row(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 380),
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                              child: Stack(
                                 children: [
-                                  if (widget.certification != null && widget.certification != 'NR') ...[
-                                    _ContentScreenState._buildAgeBadge(context, widget.certification!, small: true),
-                                    SizedBox(width: ResponsiveUtils.sp(context, 8)),
-                                  ],
-                                  if (_typeBadge != null) ...[
-                                    _ContentScreenState._buildAgeBadge(context, _typeBadge!, small: true),
-                                    SizedBox(width: ResponsiveUtils.sp(context, 8)),
-                                  ],
-                                  _ContentScreenState._buildAgeBadge(context, _languageBadge, small: true),
-                                  SizedBox(width: ResponsiveUtils.sp(context, 10)),
-                                  if (!_isSpecial && widget.duration != null) ...[
-                                    Text(
-                                      widget.duration!,
-                                      style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
-                                    ),
-                                    SizedBox(width: ResponsiveUtils.sp(context, 10)),
-                                  ],
-                                  if (!_isSpecial && widget.releaseDate != null)
-                                    Text(
-                                      _ContentScreenState._formatDate(widget.releaseDate),
-                                      style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
+                                  AspectRatio(
+                                    aspectRatio: 16 / 9,
+                                      child: CachedNetworkImage(
+                                        imageUrl: widget.imageUrl,
+                                        fit: BoxFit.cover,
+                                        errorWidget: (_, __, ___) => CachedNetworkImage(
+                                          imageUrl: widget.fallbackImageUrl,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
+                                        ),
+                                      ),
+                                  ),
+                                  if (widget.progress != null && widget.progress! > 0)
+                                    Positioned(
+                                      bottom: 0,
+                                      left: 0,
+                                      right: 0,
+                                      child: Container(
+                                        height: 3,
+                                        color: Colors.black26,
+                                        child: FractionallySizedBox(
+                                          alignment: Alignment.centerLeft,
+                                          widthFactor: widget.progress,
+                                          child: Container(color: const Color(0xFFEF7A1E)),
+                                        ),
+                                      ),
                                     ),
                                 ],
                               ),
-                            ],
-                          ),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.only(
+                                left: 24, 
+                                right: 24, 
+                                bottom: 24, 
+                                top: ResponsiveUtils.sp(context, 12)
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _displayTitle,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: ResponsiveUtils.sp(context, 16),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  SizedBox(height: ResponsiveUtils.sp(context, 6)),
+                                   if (!_isSpecial || widget.description.isNotEmpty)
+                                     Text(
+                                       widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
+                                       maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: const Color(0xFFA5A5AA),
+                                        fontSize: ResponsiveUtils.sp(context, 13),
+                                        height: 1.5,
+                                        fontWeight: FontWeight.normal,
+                                      ),
+                                    ),
+                                  SizedBox(height: ResponsiveUtils.sp(context, 8)),
+                                  Row(
+                                    children: [
+                                      if (widget.certification != null && widget.certification != 'NR') ...[
+                                        _ContentScreenState._buildAgeBadge(context, widget.certification!, small: true),
+                                        SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                                      ],
+                                      if (_typeBadge != null) ...[
+                                        _ContentScreenState._buildAgeBadge(context, _typeBadge!, small: true),
+                                        SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                                      ],
+                                      _ContentScreenState._buildAgeBadge(context, _languageBadge, small: true),
+                                      SizedBox(width: ResponsiveUtils.sp(context, 10)),
+                                      if (!_isSpecial && widget.duration != null) ...[
+                                        Text(
+                                          widget.duration!,
+                                          style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
+                                        ),
+                                        SizedBox(width: ResponsiveUtils.sp(context, 12)),
+                                      ],
+                                      if (!_isSpecial && widget.releaseDate != null)
+                                        Text(
+                                          _ContentScreenState._formatDate(widget.releaseDate),
+                                          style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

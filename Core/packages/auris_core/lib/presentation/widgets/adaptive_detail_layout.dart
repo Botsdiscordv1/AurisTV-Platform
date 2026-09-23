@@ -178,7 +178,10 @@ class AdaptiveDetailLayout extends StatelessWidget {
                       if (tabs != null) ...[
                         const SizedBox(height: 16),
                         Padding(
-                          padding: EdgeInsets.symmetric(horizontal: isWide ? horizontalPadding : 24),
+                          padding: EdgeInsets.only(
+                            left: isWide ? horizontalPadding : 24,
+                            right: 0,
+                          ),
                           child: tabs!,
                         ),
                       ],
