@@ -45,7 +45,10 @@ class _SeasonSelectorState extends State<SeasonSelector> {
     return widget.data.compact ? _sp(context, 160) : _sp(context, 220);
   }
 
-  double _getHeight(BuildContext context) => widget.data.compact ? _sp(context, 44) : _sp(context, 56);
+  double _getHeight(BuildContext context) {
+    if (widget.data.height != null) return widget.data.height!;
+    return widget.data.compact ? _sp(context, 44) : _sp(context, 56);
+  }
 
   bool get _isActive => _isHovered || (widget.data.enableFocus && _isFocused);
 
@@ -106,7 +109,7 @@ class _SeasonSelectorState extends State<SeasonSelector> {
                 ),
               ),
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: _sp(context, 20)),
+                padding: EdgeInsets.symmetric(horizontal: widget.data.compact ? _sp(context, 12) : _sp(context, 20)),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -114,12 +117,13 @@ class _SeasonSelectorState extends State<SeasonSelector> {
                       'T ${widget.data.currentSeason}',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: _sp(context, 20),
+                        fontSize: widget.data.fontSize ?? _sp(context, 20),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Icon(
                       Icons.keyboard_arrow_down,
+                      size: widget.data.compact ? 18 : 24,
                       color: _isActive ? Colors.white : const Color(0xFFA5A5AA),
                     ),
                   ],

@@ -24,7 +24,7 @@ class MockAurisRepository implements AurisRepository {
   }
 
   // Otros stubs
-  @override Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase, String? imgSize, CancelToken? cancelToken}) async => SearchResponse(results: [], query: query, category: category, count: 0);
+  @override Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase, String? imgSize, int page = 1, CancelToken? cancelToken}) async => SearchResponse(results: [], query: query, category: category, count: 0);
   @override Stream<SearchResponse> searchStream(String category, String query, {int? year, String? server, String? phase, String? imgSize, CancelToken? cancelToken}) async* {}
   @override Future<SearchResponse> searchAnimeVariants({required String q, String? display, String? english, String? native_, String? collapsed, List<String>? synonyms}) async => SearchResponse(results: [], query: q, category: 'anime', count: 0);
   @override Future<MovieDetail?> getMovieDetail({required String title, int? year, String? metadataTitle, String? url, String? type, String category = 'movie', String? server, String? kind, String? imgSize}) async => null;

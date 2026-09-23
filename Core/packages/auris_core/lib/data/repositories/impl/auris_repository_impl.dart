@@ -130,15 +130,16 @@ class AurisRepositoryImpl implements AurisRepository {
     String? server, 
     String? phase,
     String? imgSize,
+    int page = 1,
     CancelToken? cancelToken,
   }) async {
     final normalized = _normalizeSearchCategory(category);
     if (server != null) {
-      return _searchOn(server, normalized, query, year: year, phase: phase, imgSize: imgSize, cancelToken: cancelToken);
+      return _searchOn(server, normalized, query, year: year, phase: phase, imgSize: imgSize, page: page, cancelToken: cancelToken);
     }
     final targets = _searchTargetsFor(normalized);
     final filter = normalized.toLowerCase() == 'all' ? null : normalized;
-    return _searchFanout(targets, query, year, phase, filterCategory: filter, imgSize: imgSize, cancelToken: cancelToken);
+    return _searchFanout(targets, query, year, phase, filterCategory: filter, imgSize: imgSize, page: page, cancelToken: cancelToken);
   }
 
   @override
@@ -330,9 +331,10 @@ class AurisRepositoryImpl implements AurisRepository {
     int? year,
     String? phase,
     String? imgSize,
+    int page = 1,
     CancelToken? cancelToken,
   }) async {
-    final params = {'q': query};
+    final params = {'q': query, 'page': page.toString()};
     if (year != null) params['year'] = year.toString();
     if (phase != null) params['phase'] = phase;
     if (imgSize != null) params['img'] = imgSize;
@@ -360,6 +362,7 @@ class AurisRepositoryImpl implements AurisRepository {
     String? phase, {
     String? filterCategory,
     String? imgSize,
+    int page = 1,
     CancelToken? cancelToken,
   }) async {
     Future<SearchResponse> guarded(
@@ -372,7 +375,7 @@ class AurisRepositoryImpl implements AurisRepository {
     }
 
     final futures = baseUrls.map(
-      (b) => guarded(() => _searchOn(b, filterCategory ?? 'all', query, year: year, phase: phase, imgSize: imgSize, cancelToken: cancelToken)),
+      (b) => guarded(() => _searchOn(b, filterCategory ?? 'all', query, year: year, phase: phase, imgSize: imgSize, page: page, cancelToken: cancelToken)),
     );
 
     final responses = await Future.wait(futures.map((f) => f.timeout(
@@ -397,6 +400,8 @@ class AurisRepositoryImpl implements AurisRepository {
       query: query,
       category: filterCategory ?? 'all',
       count: merged.length,
+      page: page,
+      hasMore: responses.any((r) => r.hasMore) || merged.isNotEmpty,
       results: merged,
     );
   }

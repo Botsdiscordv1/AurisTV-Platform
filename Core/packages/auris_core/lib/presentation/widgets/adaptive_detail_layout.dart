@@ -123,17 +123,20 @@ class AdaptiveDetailLayout extends StatelessWidget {
                 constraints: BoxConstraints(maxWidth: maxContentWidth),
                 child: SizedBox(
                   width: double.infinity,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: isWide ? horizontalPadding : 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(height: isWide ? 22.0 : 16.0),
-                        if (meta != null) meta!,
-                        const SizedBox(height: 20),
-                        
-                        if (isWide)
-                          Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: isWide ? 22.0 : 16.0),
+                      if (meta != null) Padding(
+                        padding: EdgeInsets.symmetric(horizontal: isWide ? horizontalPadding : 24),
+                        child: meta!,
+                      ),
+                      const SizedBox(height: 20),
+
+                      if (isWide)
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                          child: Row(
                             children: [
                               if (mainAction != null) SizedBox(width: 300, child: mainAction!),
                               if (secondaryActions != null) ...[
@@ -141,22 +144,33 @@ class AdaptiveDetailLayout extends StatelessWidget {
                                 Expanded(child: secondaryActions!), // Senior Fix: Evitar overflow en plegables (Fold)
                               ],
                             ],
-                          )
-                        else ...[
-                          if (mainAction != null) mainAction!,
-                          if (secondaryActions != null) ...[
-                            const SizedBox(height: 16),
-                            secondaryActions!,
-                          ],
+                          ),
+                        )
+                      else ...[
+                        if (mainAction != null) Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: mainAction!,
+                        ),
+                        if (secondaryActions != null) ...[
+                          const SizedBox(height: 16),
+                          // Senior Fix: Las acciones secundarias suelen ser un scroll horizontal.
+                          // No les ponemos padding aquí para que puedan ser edge-to-edge con su propio padding interno.
+                          secondaryActions!,
                         ],
-                        
-                        const SizedBox(height: 16),
-                        if (synopsis != null) synopsis!,
-                        const SizedBox(height: 16),
-                        if (selectors != null) selectors!,
-                        const SizedBox(height: 12),
                       ],
-                    ),
+
+                      const SizedBox(height: 16),
+                      if (synopsis != null) Padding(
+                        padding: EdgeInsets.symmetric(horizontal: isWide ? horizontalPadding : 24),
+                        child: synopsis!,
+                      ),
+                      const SizedBox(height: 16),
+                      if (selectors != null) Padding(
+                        padding: EdgeInsets.symmetric(horizontal: isWide ? horizontalPadding : 24),
+                        child: selectors!,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                   ),
                 ),
               ),

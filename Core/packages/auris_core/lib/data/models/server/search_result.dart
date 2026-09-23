@@ -313,6 +313,8 @@ class SearchResponse {
   final String category;
   final int count;
   final List<SearchResult> results;
+  final int page;
+  final bool hasMore;
 
   // Metadata para filmografía (Actor Detail)
   final String? biography;
@@ -330,6 +332,8 @@ class SearchResponse {
     required this.category,
     required this.count,
     required this.results,
+    this.page = 1,
+    this.hasMore = false,
     this.biography,
     this.birthday,
     this.deathday,
@@ -360,6 +364,12 @@ class SearchResponse {
         String s => int.tryParse(s) ?? 0,
         _ => 0,
       },
+      page: switch (root['page']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s) ?? 1,
+        _ => 1,
+      },
+      hasMore: root['hasMore'] == true,
       results: (root['results'] as List<dynamic>? ?? root['items'] as List<dynamic>?)
               ?.map((e) => SearchResult.fromJson(e as Map))
               .toList() ??

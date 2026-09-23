@@ -22,6 +22,7 @@ abstract class AurisRepository {
     String? server, 
     String? phase,
     String? imgSize,
+    int page = 1,
     CancelToken? cancelToken,
   });
 

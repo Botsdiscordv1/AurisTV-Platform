@@ -469,15 +469,16 @@ class _SearchResultsGrid extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final resultsAsync = ref.watch(
-      searchResultsProvider(SearchParams(category: category, query: query)),
+    final notifierProvider = searchResultsProvider(
+      SearchParams(category: category, query: query),
     );
+    final resultsAsync = ref.watch(notifierProvider);
 
     return resultsAsync.when(
       data: (response) {
         final results = _deduplicate(response.results);
         if (results.isEmpty) return _buildNoResultsPlaceholder(context, query, onContentTap);
-        
+
         final isMobile = ResponsiveUtils.isMobile(context);
         final screenWidth = MediaQuery.sizeOf(context).width;
 
@@ -493,7 +494,9 @@ class _SearchResultsGrid extends ConsumerWidget {
             crossAxisCount = 5;
           }
         }
-        
+
+        final notifier = ref.read(notifierProvider.notifier);
+
         return RepaintBoundary(
           child: GridView.builder(
             key: const ValueKey('results_grid'),
@@ -501,11 +504,32 @@ class _SearchResultsGrid extends ConsumerWidget {
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
               childAspectRatio: isMobile ? 0.54 : 0.58,
-              crossAxisSpacing: isMobile ? 12 : 20, 
-              mainAxisSpacing: isMobile ? 12 : 16, 
+              crossAxisSpacing: isMobile ? 12 : 20,
+              mainAxisSpacing: isMobile ? 12 : 16,
             ),
-            itemCount: results.length,
+            // "Ver más": footer con spinner o disparo de la siguiente página.
+            itemCount: results.length + (response.hasMore ? 1 : 0),
             itemBuilder: (context, index) {
+              if (index >= results.length) {
+                // Disparo automático al montar el footer (patrón ver más).
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  notifier.loadNextPage();
+                });
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Color(0xFFEF7A1E),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
               final result = results[index];
               final meta = result.resolveMetadata(category);
 

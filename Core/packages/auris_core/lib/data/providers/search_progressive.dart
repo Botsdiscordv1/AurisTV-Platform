@@ -41,13 +41,20 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
   final SearchParams params;
   StreamSubscription? _subscription;
   CancelToken? _cancelToken;
-  
+
   final Map<String, SearchResult> _accumulated = {};
+  int _page = 1;
+  bool _hasMore = false;
+  bool _isLoadingMore = false;
 
   _SearchResultsNotifier(this.ref, this.params)
       : super(const AsyncValue.loading()) {
     _load();
   }
+
+  bool get isLoadingMore => _isLoadingMore;
+  bool get hasMore => _hasMore;
+  int get page => _page;
 
   void _load() {
     if (params.query.isEmpty) {
@@ -59,6 +66,10 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
       ));
       return;
     }
+
+    _page = 1;
+    _hasMore = false;
+    _isLoadingMore = false;
 
     // Senior Hybrid Logic: Carga inmediata de resultados locales (Favoritos e Historial)
     _loadLocalResults();
@@ -88,9 +99,58 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
         }
       },
       onDone: () {
-        // Opcional: Marcar como finalizado si la UI lo requiere
+        // Stream = página 1. Si hay resultados remotos, el usuario puede
+        // pedir la siguiente (mismo criterio que el "ver más" del servidor).
+        final hasRemote = _accumulated.values.any(
+          (r) => r.quality != 'Local' && r.quality != 'Historial',
+        );
+        _hasMore = hasRemote;
+        _emit();
       },
     );
+  }
+
+  /// Pide la siguiente página al servidor y la fusiona (patrón "ver más").
+  Future<void> loadNextPage() async {
+    if (_isLoadingMore || !_hasMore || params.query.isEmpty) return;
+    _isLoadingMore = true;
+    _emit();
+    try {
+      final repo = ref.read(aurisRepositoryProvider);
+      final nextPage = _page + 1;
+      final response = await repo.search(
+        params.category,
+        params.query,
+        page: nextPage,
+      );
+      if (!mounted) return;
+      _page = nextPage;
+      _hasMore = response.hasMore && response.results.isNotEmpty;
+      if (response.results.isNotEmpty) {
+        _processChunk(response);
+      } else {
+        _hasMore = false;
+      }
+    } catch (_) {
+      if (mounted) _hasMore = false;
+    } finally {
+      if (mounted) {
+        _isLoadingMore = false;
+        _emit();
+      }
+    }
+  }
+
+  void _emit() {
+    if (!mounted) return;
+    state = AsyncValue.data(SearchResponse(
+      query: params.query,
+      category: params.category,
+      count: _accumulated.length,
+      page: _page,
+      hasMore: _hasMore,
+      results: _accumulated.values.toList(),
+    ));
   }
 
   void _loadLocalResults() {
@@ -141,6 +201,8 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
         query: params.query,
         category: params.category,
         count: _accumulated.length,
+        page: _page,
+        hasMore: _hasMore,
         results: _accumulated.values.toList(),
       ));
     }
@@ -192,6 +254,8 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
         query: params.query,
         category: params.category,
         count: _accumulated.length,
+        page: _page,
+        hasMore: _hasMore,
         results: _accumulated.values.toList(),
       ));
     }

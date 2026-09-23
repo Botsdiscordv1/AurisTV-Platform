@@ -87,8 +87,8 @@ class _SkeletonBox extends StatelessWidget {
 // _SeasonSelector removed - using SeasonSelector from auris_core
 
 class _ServerSelector extends ConsumerStatefulWidget {
-  final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season; final double? width;
-  const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources, this.season, this.width});
+  final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season; final double? width; final double? height; final double? fontSize;
+  const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources, this.season, this.width, this.height, this.fontSize});
   @override ConsumerState<_ServerSelector> createState() => _ServerSelectorState();
 }
 
@@ -176,14 +176,14 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200), 
             width: widget.width ?? (widget.compact ? 160 : 220), 
-            height: widget.compact ? 44 : 56, 
+            height: widget.height ?? (widget.compact ? 44 : 56), 
             decoration: BoxDecoration(
               color: _isHovered ? const Color(0xFF454652) : const Color(0xFF32333E), 
               borderRadius: BorderRadius.circular(8), 
               border: Border.all(color: _isHovered ? const Color(0xFFA5A5AA) : Colors.transparent, width: 1.5)
             ), 
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20), 
+              padding: EdgeInsets.symmetric(horizontal: widget.compact ? 12 : 20), 
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween, 
                 children: [
@@ -191,10 +191,10 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
                     child: Text(
                       simplifySourceName(widget.currentSource.source), 
                       overflow: TextOverflow.ellipsis, 
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+                      style: TextStyle(color: Colors.white, fontSize: widget.fontSize ?? 18, fontWeight: FontWeight.bold)
                     )
                   ), 
-                  Icon(Icons.dns_rounded, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))
+                  Icon(Icons.dns_rounded, size: widget.compact ? 18 : 24, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))
                 ]
               )
             )
@@ -326,19 +326,34 @@ class _CastCardState extends ConsumerState<_CastCard> {
 }
 
 class _EpisodeCard extends ConsumerStatefulWidget {
-  final int episodeNumber; final String title; final String description; final String imageUrl; final String fallbackImageUrl; final String? releaseDate; final String? duration; final String quality; final String? certification; final bool isMobile; final double? progress; final VoidCallback onTap;
+  final int episodeNumber; final String title; final String description; final String imageUrl; final String fallbackImageUrl; final String? releaseDate; final String? duration; final String quality; final String? certification;  final bool isMobile; final double? progress; final VoidCallback onTap;
   final ScrollController? scrollController;
-
-  /// URL y source del episodio, usados para resolver el idioma REAL (DUB/SUB)
-  /// de forma perezosa por episodio cuando el listado no expone el idioma.
   final String? episodeUrl;
   final String? source;
   final String? category;
-
-  /// Tipo de contenido especial ('movie'|'ova'|'special'). Cuando no es null,
-  /// la tarjeta muestra el tipo como badge y no antepone el número al título.
   final String? episodeType;
-  const _EpisodeCard({required this.episodeNumber, required this.title, required this.description, required this.imageUrl, required this.fallbackImageUrl, this.releaseDate, this.duration, required this.quality, this.certification, this.isMobile = false, this.progress, required this.onTap, this.scrollController, this.episodeUrl, this.source, this.category, this.episodeType});
+  final bool isCompact;
+
+  const _EpisodeCard({
+    required this.episodeNumber, 
+    required this.title, 
+    required this.description, 
+    required this.imageUrl, 
+    required this.fallbackImageUrl, 
+    this.releaseDate, 
+    this.duration, 
+    required this.quality, 
+    this.certification, 
+    this.isMobile = false, 
+    this.progress, 
+    required this.onTap, 
+    this.scrollController, 
+    this.episodeUrl, 
+    this.source, 
+    this.category, 
+    this.episodeType,
+    this.isCompact = false,
+  });
   @override ConsumerState<_EpisodeCard> createState() => _EpisodeCardState();
 }
 
@@ -743,6 +758,8 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                             if (!_isSpecial)
                               Text(
                                 '${widget.duration ?? ''}${widget.duration != null && widget.releaseDate != null ? ' ' : ''}${_ContentScreenState._formatDate(widget.releaseDate)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
                               ),
                             if (!_isSpecial) SizedBox(height: ResponsiveUtils.sp(context, 6)),
@@ -780,6 +797,11 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
         ),
       );
     }
+    final double screenW = MediaQuery.sizeOf(context).width;
+    final double titleFontSize = widget.isCompact ? 14.5 : (screenW * 0.009).clamp(16.0, 19.0);
+    final double descFontSize = widget.isCompact ? 12.0 : (screenW * 0.008).clamp(13.0, 15.0);
+    final double gapImageToText = widget.isCompact ? 8.0 : 12.0;
+
     return CompositedTransformTarget(
       link: _layerLink,
       child: MouseRegion(
@@ -799,9 +821,9 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
           child: InkWell(
             onTap: widget.onTap,
             borderRadius: BorderRadius.circular(12),
-            hoverColor: Colors.transparent, // Elimina el brillo de hover default
-            splashColor: Colors.transparent, // Elimina el efecto de clic default
-            highlightColor: Colors.transparent, // Elimina el resaltado de presión
+            hoverColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.transparent,
@@ -842,55 +864,56 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                         ),
                       ),
                   ]),
-                  SizedBox(height: ResponsiveUtils.sp(context, 12)),
+                  SizedBox(height: gapImageToText),
                   Text(
                     _displayTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: ResponsiveUtils.sp(context, 16),
+                      fontSize: titleFontSize,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: ResponsiveUtils.sp(context, 6)),
-                                  if (!_isSpecial || widget.description.isNotEmpty)
-                                    Text(
-                                      widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
+                  const SizedBox(height: 4),
+                  if (!_isSpecial && (widget.duration != null || widget.releaseDate != null))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '${widget.duration ?? ''}${widget.duration != null && widget.releaseDate != null ? ' ' : ''}${_ContentScreenState._formatDate(widget.releaseDate)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: const Color(0xFFA5A5AA),
+                          fontSize: widget.isCompact ? 11.5 : 13.0,
+                        ),
+                      ),
+                    ),
+                  if (!widget.isCompact && (!_isSpecial || widget.description.isNotEmpty))
+                    Text(
+                      widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: const Color(0xFFA5A5AA),
-                        fontSize: ResponsiveUtils.sp(context, 13),
-                        height: 1.5,
+                        fontSize: descFontSize,
+                        height: 1.4,
                         fontWeight: FontWeight.normal,
                       ),
                     ),
-                  if (!_isSpecial) SizedBox(height: ResponsiveUtils.sp(context, 8)),
+                  if (!widget.isCompact && !_isSpecial) const SizedBox(height: 6),
                   Row(
                     children: [
                       if (widget.certification != null && widget.certification != 'NR') ...[
                         _ContentScreenState._buildAgeBadge(context, widget.certification!, small: true),
-                        SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                        const SizedBox(width: 8),
                       ],
                       if (_typeBadge != null) ...[
                         _ContentScreenState._buildAgeBadge(context, _typeBadge!, small: true),
-                        SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                        const SizedBox(width: 8),
                       ],
-                      _ContentScreenState._buildAgeBadge(context, _languageBadge, small: true),
-                      SizedBox(width: ResponsiveUtils.sp(context, 10)),
-                      if (!_isSpecial && widget.duration != null) ...[
-                        Text(
-                          widget.duration!,
-                          style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
-                        ),
-                        SizedBox(width: ResponsiveUtils.sp(context, 10)),
-                      ],
-                      if (!_isSpecial && widget.releaseDate != null)
-                        Text(
-                          _ContentScreenState._formatDate(widget.releaseDate),
-                          style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
-                        ),
+                      if (!widget.isCompact)
+                        _ContentScreenState._buildAgeBadge(context, _languageBadge, small: true),
                     ],
                   ),
                 ],
@@ -1984,22 +2007,27 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row of badges (Certification FIRST, then genres)
+          // Row of badges (Certification FIRST, then genres) - FORZADO A 1 SOLA LÍNEA
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Wrap( // Senior Fix: Usar Wrap para evitar overflow en modo mobile/plegable
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (cert != 'NR')
-                  _ContentScreenState._buildAgeBadge(context, cert, small: false),
-                if (g != null && g.isNotEmpty)
-                  ...g.map<Widget>((genre) => Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: _buildBadge(context, genre.toString().toUpperCase())
-                  )).toList(),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              clipBehavior: Clip.none,
+              child: Row(
+                children: [
+                  if (cert != 'NR')
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _ContentScreenState._buildAgeBadge(context, cert, small: false),
+                    ),
+                  if (g != null && g.isNotEmpty)
+                    ...g.map<Widget>((genre) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _buildBadge(context, genre.toString().toUpperCase())
+                    )).toList(),
+                ],
+              ),
             ),
           ),
           Row(
@@ -2133,9 +2161,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         );
 
         if (isScrollable) {
-          final double maxH = (MediaQuery.sizeOf(context).height * 0.13).clamp(75.0, 105.0);
+          final double screenH = MediaQuery.sizeOf(context).height;
+          final double maxH = (screenH * 0.18).clamp(100.0, 160.0);
+          // Garantizamos un mínimo de ~3-4 líneas visibles (aprox 80-90px)
+          final double minH = isCompact ? 72.0 : 92.0; 
+          
           return Container(
-            constraints: BoxConstraints(maxHeight: maxH),
+            constraints: BoxConstraints(minHeight: minH, maxHeight: maxH),
             child: RawScrollbar(
               controller: _synopsisScrollController,
               thumbColor: const Color(0xFFEF7A1E).withOpacity(0.4),
@@ -2314,9 +2346,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     }
 
     final double width = MediaQuery.sizeOf(context).width;
-    final double btnHeight = isMobile ? 54.0 : (width * 0.032).clamp(46.0, 58.0);
-    final double fontSize = isMobile ? 18.0 : (width * 0.0098).clamp(13.5, 16.5);
-    final double iconSize = isMobile ? 36.0 : (width * 0.021).clamp(30.0, 38.0);
+    final double height = MediaQuery.sizeOf(context).height;
+    final bool isCompactScreen = isCompact || width < 1200 || height < 850;
+    final double btnHeight = isMobile ? 54.0 : (isCompactScreen ? 42.0 : (width * 0.032).clamp(46.0, 56.0));
+    final double fontSize = isMobile ? 18.0 : (isCompactScreen ? 13.5 : (width * 0.0098).clamp(14.0, 16.5));
+    final double iconSize = isMobile ? 36.0 : (isCompactScreen ? 28.0 : (width * 0.021).clamp(32.0, 38.0));
 
     return SizedBox(
       height: btnHeight,
@@ -2386,9 +2420,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     final profileId = user?.activeProfileId ?? 'guest_profile';
 
     final double width = MediaQuery.sizeOf(context).width;
-    final double? size = isMobile ? null : (width * 0.027).clamp(42.0, 52.0);
-    final double? iconSize = isMobile ? null : (width * 0.0135).clamp(20.0, 26.0);
-    final double spacing = isMobile ? 8.0 : (width * 0.007).clamp(8.0, 14.0);
+    final double height = MediaQuery.sizeOf(context).height;
+    final bool isCompactScreen = isCompact || width < 1200 || height < 850;
+    final double? size = isMobile ? null : (isCompactScreen ? 38.0 : (width * 0.027).clamp(42.0, 52.0));
+    final double? iconSize = isMobile ? null : (isCompactScreen ? 20.0 : (width * 0.0135).clamp(22.0, 26.0));
+    final double spacing = isMobile ? 8.0 : (isCompactScreen ? 8.0 : (width * 0.007).clamp(8.0, 14.0));
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8, horizontal: isMobile ? 0 : 4),
@@ -2396,6 +2432,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         ? SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
+            clipBehavior: Clip.none, // Senior Fix: Permitir que los botones respiren fuera del contenedor
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: _buildActionRow(context, isFav, currentId, profileId, isMobile, size, iconSize, spacing),
           )
         : _buildActionRow(context, isFav, currentId, profileId, isMobile, size, iconSize, spacing),
@@ -2558,7 +2596,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     );
   }
 
-  Widget _buildTabBar(List<String> labels, int selectedIndex, double hPadding, bool isMobile) {
+  Widget _buildTabBar(List<String> labels, int selectedIndex, double hPadding, {bool isMobile = false, bool isCompact = false}) {
+    final double screenW = MediaQuery.sizeOf(context).width;
+    final double fontSize = isMobile 
+        ? 18.0 
+        : (isCompact ? 15.5 : (screenW * 0.011).clamp(16.0, 20.0));
+    final double itemHPadding = isMobile ? 16.0 : (isCompact ? 14.0 : 22.0);
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: EdgeInsets.symmetric(horizontal: hPadding),
@@ -2570,11 +2614,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
             behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _selectedTabIndex = i),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: itemHPadding, vertical: isCompact ? 6 : 8),
               decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: selected ? const Color(0xFFEF7A1E) : Colors.transparent, width: 3)),
+                border: Border(bottom: BorderSide(color: selected ? const Color(0xFFEF7A1E) : Colors.transparent, width: isCompact ? 2.5 : 3)),
               ),
-              child: Text(labels[i], style: TextStyle(fontSize: isMobile ? 18 : 20, fontWeight: FontWeight.w600, color: selected ? Colors.white : const Color(0xFFA5A5AA))),
+              child: Text(labels[i], style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w600, color: selected ? Colors.white : const Color(0xFFA5A5AA))),
             ),
           );
         }),
@@ -2610,20 +2654,38 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     required bool detailLoading,
     required AsyncValue<Map<String, List<RelatedInfo>>> unifiedRelationsAsync,
     required bool isMovieCategory,
+    bool isCompact = false,
   }) {
     final List<Widget> slivers = [];
+    final double screenW = MediaQuery.sizeOf(context).width;
+    final double epCountFontSize = isMobile 
+        ? 15.0 
+        : (isCompact ? 14.5 : (screenW * 0.011).clamp(16.5, 20.5));
+    final double epCountBottomPadding = isMobile ? 6.0 : (isCompact ? 12.0 : 26.0);
 
     if (selectedTabIndex == episodesTabIndex && hasEpisodesTab) {
       if (epBundle != null && epData != null) {
         slivers.add(
           SliverMainAxisGroup(slivers: [
-            SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(left: 16, right: 16, bottom: isMobile ? 6 : 32), child: Text('${epData.total} episodios', style: TextStyle(color: const Color(0xFFA5A5A5), fontSize: isMobile ? 15 : 20, fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal)))),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(left: 16, right: 16, bottom: epCountBottomPadding), 
+                child: Text(
+                  '${epData.total} episodios', 
+                  style: TextStyle(
+                    color: const Color(0xFFA5A5A5), 
+                    fontSize: epCountFontSize, 
+                    fontWeight: isCompact ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
             if (isMobile) SliverList(delegate: SliverChildBuilderDelegate((context, index) {
               final ep = index < epData.episodes.length ? epData.episodes[index] : null;
               final epNum = (ep?.number ?? index + 1).toString();
               final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
               final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-              return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
+              return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
                 final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
                 final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                 final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
@@ -2650,7 +2712,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
               final epNum = (ep?.number ?? index + 1).toString();
               final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
               final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-              return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
+              return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
                 final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
                 final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                 final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
@@ -2678,7 +2740,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                 final sp = epData.specials[index];
                 final spNum = sp.number;
                 final spSource = currentSource;
-                return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: sp.quality ?? spSource?.quality ?? '', episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, isMobile: true, scrollController: _scrollController, onTap: () {
+                return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: sp.quality ?? spSource?.quality ?? '', episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, isMobile: true, scrollController: _scrollController, isCompact: isCompact, onTap: () {
                   final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
                   final player = PlayerScreen(
                     contentId: widget.title,
@@ -2700,7 +2762,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
               else SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
                 final sp = epData.specials[index];
                 final spSource = currentSource;
-                return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: sp.quality ?? spSource?.quality ?? '', episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, onTap: () {
+                return _EpisodeCard(episodeNumber: sp.number, title: sp.title ?? 'Especial', description: sp.description ?? '', imageUrl: ApiEndpoints.proxyImage(sp.thumbnail ?? spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(spSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: sp.airDate, duration: sp.duration ?? (sp.runtime != null ? '${sp.runtime} min' : null), quality: sp.quality ?? spSource?.quality ?? '', episodeUrl: sp.url, source: spSource?.source ?? currentSource?.source, category: widget.category, certification: certification, episodeType: sp.episodeType, scrollController: _scrollController, isCompact: isCompact, onTap: () {
                   final epThumb = sp.thumbnail ?? spSource?.thumbnail ?? '';
                   final player = PlayerScreen(
                     contentId: widget.title,
@@ -2756,11 +2818,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
   @override Widget build(BuildContext context) {
     try {
       final width = MediaQuery.of(context).size.width;
+      final height = MediaQuery.of(context).size.height;
       final isMobile = context.isMobile;
+      final isUltraCompact = context.breakpoint < Breakpoint.lg;
+      final isCompact = isUltraCompact || height < 900;
+
       final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
       final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
-      final episodesCrossAxisCount = isMobile ? 1 : (width < 1000 ? 2 : (width < 1400 ? 3 : (width < 2100 ? 4 : (width < 2800 ? 5 : 6))));
-      final episodesAspectRatio = isMobile ? 1.15 : (width < 1000 ? 1.25 : 1.1);
+      final episodesCrossAxisCount = isMobile ? 1 : (width < 700 ? 2 : (width < 1150 ? 3 : (width < 1550 ? 4 : (width < 2100 ? 5 : 6))));
+      final episodesAspectRatio = isMobile ? 1.15 : (width < 1150 ? 1.08 : 1.1);
 
       final detailParams = UnifiedDetailParams(
         title: widget.title,
@@ -2917,6 +2983,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         detailLoading: detailLoading,
         unifiedRelationsAsync: unifiedRelationsAsync,
         isMovieCategory: isMovieCategory,
+        isCompact: isCompact,
       );
 
       final Widget contentSliver = SliverMainAxisGroup(slivers: contentSlivers);
@@ -2937,6 +3004,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
           tabLabels: tabLabels,
           selectedTabIndex: selectedTabIndex,
           contentSliver: contentSliver,
+          isCompactHeader: isCompact,
         );
       }
 
@@ -3006,7 +3074,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         ) : null,
         content: SliverMainAxisGroup(slivers: [
           SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _buildTabBar(tabLabels, selectedTabIndex, 16, isMobile),
+            _buildTabBar(tabLabels, selectedTabIndex, 16, isMobile: isMobile, isCompact: !isMobile && width < 1200),
             const SizedBox(height: 16),
           ])),
           contentSliver,
@@ -3052,17 +3120,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     required List<String> tabLabels,
     required int selectedTabIndex,
     required Widget contentSliver,
+    required bool isCompactHeader,
   }) {
-    final isUltraCompact = context.breakpoint < Breakpoint.lg;
-    final double aspectRatio = ResponsiveUtils.heroAspectRatio(context);
-
     // Senior Responsive Desktop Architecture: Dimensiones fluidas continuas para cualquier resolución de pantalla (Laptops -> 4K Ultrawide)
     final double headerH = (width / 3.0).clamp(460.0, 620.0);
-    final double overlayLeftPadding = (width * 0.035).clamp(36.0, 80.0);
+    final double overlayLeftPadding = (width * 0.025 + 40.0).clamp(68.0, 96.0); // Sangría segura para no chocar jamás con el botón 'back'
     final double synopsisWidth = (width * 0.42).clamp(380.0, 750.0);
     final double logoMaxWidth = (width * 0.32).clamp(320.0, 600.0);
-    final double logoMaxHeight = (headerH * 0.25).clamp(90.0, 145.0);
+    final double logoMaxHeight = (headerH * (isCompactHeader ? 0.20 : 0.25)).clamp(80.0, 140.0);
     final double titleSize = (width * 0.028).clamp(30.0, 52.0);
+    final double topPadding = (headerH * (isCompactHeader ? 0.14 : 0.20)).clamp(64.0, 110.0);
+    final double gapLogoToMeta = isCompactHeader ? 10.0 : 18.0;
+    final double gapMetaToSynopsis = isCompactHeader ? 6.0 : 10.0;
+    final double gapSynopsisToActions = isCompactHeader ? 6.0 : 12.0;
+    final double gapActionsToSelectors = isCompactHeader ? 4.0 : 8.0;
+    final double selectorWidth = isCompactHeader ? 115.0 : 140.0;
+    final double selectorH = isCompactHeader ? 36.0 : (width * 0.026).clamp(42.0, 48.0);
+    final double selectorFontSize = isCompactHeader ? 13.5 : (width * 0.009).clamp(14.0, 16.0);
 
     // Senior Dynamic Fusion: Cálculo exacto según el ancho real del reproductor en la pantalla
     final double trailerVideoW = headerH * (16.0 / 9.0);
@@ -3278,7 +3352,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                         child: Padding(
                           padding: EdgeInsets.only(
                             left: overlayLeftPadding, 
-                            top: (headerH * 0.08).clamp(30.0, 60.0), 
+                            top: topPadding, 
                             bottom: 10, 
                             right: 32,
                           ),
@@ -3310,28 +3384,28 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                   )
                                 ),
                               ),
-                              SizedBox(height: isUltraCompact ? 14.0 : 20.0),
+                              SizedBox(height: gapLogoToMeta),
                               if (detailData != null) ...[
-                                _buildMetaRow(detailData, isCompact: isUltraCompact, kind: detailParams.kind),
-                                SizedBox(height: isUltraCompact ? 8.0 : 10.0),
+                                _buildMetaRow(detailData, isCompact: isCompactHeader, kind: detailParams.kind),
+                                SizedBox(height: gapMetaToSynopsis),
                                 Flexible(
                                   fit: FlexFit.loose,
                                   child: SizedBox(
                                     width: synopsisWidth,
-                                    child: _buildSynopsis(detailData, isCompact: isUltraCompact, isScrollable: true),
+                                    child: _buildSynopsis(detailData, isCompact: isCompactHeader, isScrollable: true),
                                   ),
                                 ),
                               ],
-                              SizedBox(height: isUltraCompact ? 10.0 : 12.0),
+                              SizedBox(height: gapSynopsisToActions),
                               // Botones de acción
                               Row(
                                 children: [
-                                  _buildMainActionButton(context, isCompact: isUltraCompact),
-                                  const SizedBox(width: 16),
-                                  _buildCircularActions(context, isCompact: isUltraCompact),
+                                  _buildMainActionButton(context, isCompact: isCompactHeader),
+                                  const SizedBox(width: 12),
+                                  _buildCircularActions(context, isCompact: isCompactHeader),
                                 ],
                               ),
-                              const SizedBox(height: 8),
+                              SizedBox(height: gapActionsToSelectors),
                               // Selectores
                               if (totalSeasons > 1 || currentSource != null)
                                 Row(
@@ -3342,8 +3416,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                           currentSeason: currentSeason,
                                           totalSeasons: totalSeasons,
                                           onSeasonSelected: (s) => ref.setSeason(detailParams, s),
-                                          compact: true,
-                                          width: 140,
+                                          compact: isCompactHeader,
+                                          width: selectorWidth,
+                                          height: selectorH,
+                                          fontSize: selectorFontSize,
                                         ),
                                       ),
                                       const SizedBox(width: 12),
@@ -3353,8 +3429,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                         currentSource: currentSource,
                                         sources: activeSources,
                                         onSourceSelected: (index) => ref.setSource(detailParams, activeSources[index]),
-                                        compact: true,
-                                        width: 140,
+                                        compact: isCompactHeader,
+                                        width: selectorWidth,
+                                        height: selectorH,
+                                        fontSize: selectorFontSize,
                                         season: widget.year,
                                       ),
                                   ],
@@ -3378,7 +3456,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 8),
-                          _buildTabBar(tabLabels, selectedTabIndex, 0, false),
+                          _buildTabBar(tabLabels, selectedTabIndex, 0, isCompact: isCompactHeader),
                           const SizedBox(height: 24),
                         ],
                       ),

@@ -28,6 +28,12 @@ class SeasonSelectorData {
   /// Signature: double Function(BuildContext context, double value)
   final double Function(BuildContext, double)? scale;
 
+  /// Optional fixed height override for precise fluid layout
+  final double? height;
+
+  /// Optional font size override
+  final double? fontSize;
+
   const SeasonSelectorData({
     required this.currentSeason,
     required this.totalSeasons,
@@ -36,6 +42,8 @@ class SeasonSelectorData {
     this.width,
     this.enableFocus = false,
     this.scale,
+    this.height,
+    this.fontSize,
   });
 
   /// Whether there are multiple seasons to choose from.

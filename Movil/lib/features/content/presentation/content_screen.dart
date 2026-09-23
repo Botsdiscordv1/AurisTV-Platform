@@ -302,17 +302,32 @@ Widget _episodePlaceholder(int episodeNumber) => Container(
 class _EpisodeCard extends ConsumerStatefulWidget {
   final int episodeNumber; final String title; final String description; final String imageUrl; final String fallbackImageUrl; final String? releaseDate; final String? duration; final String quality; final String? certification; final bool isMobile; final double? progress; final VoidCallback onTap;
   final ScrollController? scrollController;
-
-  /// URL y source del episodio, usados para resolver el idioma REAL (DUB/SUB)
-  /// de forma perezosa por episodio cuando el listado no expone el idioma.
   final String? episodeUrl;
   final String? source;
   final String? category;
-
-  /// Tipo de contenido especial ('movie'|'ova'|'special'). Cuando no es null,
-  /// la tarjeta muestra el tipo como badge y no antepone el número al título.
   final String? episodeType;
-  const _EpisodeCard({required this.episodeNumber, required this.title, required this.description, required this.imageUrl, required this.fallbackImageUrl, this.releaseDate, this.duration, required this.quality, this.certification, this.isMobile = false, this.progress, required this.onTap, this.scrollController, this.episodeUrl, this.source, this.category, this.episodeType});
+  final bool isCompact;
+
+  const _EpisodeCard({
+    required this.episodeNumber, 
+    required this.title, 
+    required this.description, 
+    required this.imageUrl, 
+    required this.fallbackImageUrl, 
+    this.releaseDate, 
+    this.duration, 
+    required this.quality, 
+    this.certification, 
+    this.isMobile = false, 
+    this.progress, 
+    required this.onTap, 
+    this.scrollController, 
+    this.episodeUrl, 
+    this.source, 
+    this.category, 
+    this.episodeType,
+    this.isCompact = false,
+  });
   @override ConsumerState<_EpisodeCard> createState() => _EpisodeCardState();
 }
 
@@ -397,103 +412,215 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
   }
 
   @override Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: ResponsiveUtils.sp(context, 16)),
-      child: InkWell(
-        onTap: widget.onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, 8)),
-                  child: SizedBox(
-                    width: ResponsiveUtils.sp(context, 160),
-                    child: Stack(
-                      children: [
-                        AspectRatio(
-                          aspectRatio: 16 / 9,
-                          child: CachedNetworkImage(
-                            imageUrl: widget.imageUrl,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => CachedNetworkImage(
-                              imageUrl: widget.fallbackImageUrl,
+    if (widget.isMobile) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: ResponsiveUtils.sp(context, 16)),
+        child: InkWell(
+          onTap: widget.onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(ResponsiveUtils.sp(context, 8)),
+                    child: SizedBox(
+                      width: ResponsiveUtils.sp(context, 160),
+                      child: Stack(
+                        children: [
+                          AspectRatio(
+                            aspectRatio: 16 / 9,
+                            child: CachedNetworkImage(
+                              imageUrl: widget.imageUrl,
                               fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => _episodePlaceholder(widget.episodeNumber),
-                            ),
-                          ),
-                        ),
-                        if (widget.progress != null && widget.progress! > 0)
-                          Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              height: 3,
-                              color: Colors.black26,
-                              child: FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor: widget.progress,
-                                child: Container(color: const Color(0xFFEF7A1E)),
+                              errorWidget: (_, __, ___) => CachedNetworkImage(
+                                imageUrl: widget.fallbackImageUrl,
+                                fit: BoxFit.cover,
+                                errorWidget: (_, __, ___) => _episodePlaceholder(widget.episodeNumber),
                               ),
                             ),
                           ),
+                          if (widget.progress != null && widget.progress! > 0)
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 3,
+                                color: Colors.black26,
+                                child: FractionallySizedBox(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: widget.progress,
+                                  child: Container(color: const Color(0xFFEF7A1E)),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: ResponsiveUtils.sp(context, 16)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _displayTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 15), fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: ResponsiveUtils.sp(context, 6)),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!_isSpecial)
+                              Text(
+                                '${widget.duration ?? ''}${widget.duration != null && widget.releaseDate != null ? ' ' : ''}${_formatDate(widget.releaseDate)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
+                              ),
+                            if (!_isSpecial) SizedBox(height: ResponsiveUtils.sp(context, 6)),
+                            Row(
+                              children: [
+                                if (widget.certification != null && widget.certification != 'NR') ...[
+                                  _buildAgeBadge(context, widget.certification!, small: true),
+                                  SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                                ],
+                                if (_typeBadge != null) ...[
+                                  _buildAgeBadge(context, _typeBadge!, small: true),
+                                  SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                                ],
+                                _buildAgeBadge(context, _languageBadge, small: true),
+                              ],
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                ),
-                SizedBox(width: ResponsiveUtils.sp(context, 16)),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _displayTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 15), fontWeight: FontWeight.bold),
-                      ),
-                      SizedBox(height: ResponsiveUtils.sp(context, 6)),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!_isSpecial)
-                            Text(
-                              '${widget.duration ?? ''}${widget.duration != null && widget.releaseDate != null ? ' ' : ''}${_formatDate(widget.releaseDate)}',
-                              style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
-                            ),
-                          if (!_isSpecial) SizedBox(height: ResponsiveUtils.sp(context, 6)),
-                          Row(
-                            children: [
-                              if (widget.certification != null && widget.certification != 'NR') ...[
-                                _buildAgeBadge(context, widget.certification!, small: true),
-                                SizedBox(width: ResponsiveUtils.sp(context, 8)),
-                              ],
-                              if (_typeBadge != null) ...[
-                                _buildAgeBadge(context, _typeBadge!, small: true),
-                                SizedBox(width: ResponsiveUtils.sp(context, 8)),
-                              ],
-                              _buildAgeBadge(context, _languageBadge, small: true),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                ],
+              ),
+              if (widget.description.isNotEmpty) ...[
+                SizedBox(height: ResponsiveUtils.sp(context, 12)),
+                Text(
+                  widget.description,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 13), height: 1.3),
                 ),
               ],
-            ),
-            if (!_isSpecial && widget.description.isNotEmpty) ...[
-              SizedBox(height: ResponsiveUtils.sp(context, 12)),
-              Text(
-                widget.description,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 13), height: 1.3),
-              ),
             ],
+          ),
+        ),
+      );
+    }
+
+    // Tablet / Desktop Grid Layout
+    final double screenW = MediaQuery.sizeOf(context).width;
+    final double titleFontSize = widget.isCompact ? 14.5 : (screenW * 0.009).clamp(16.0, 19.0);
+    final double descFontSize = widget.isCompact ? 12.0 : (screenW * 0.008).clamp(13.0, 15.0);
+    final double gapImageToText = widget.isCompact ? 8.0 : 12.0;
+
+    return InkWell(
+      onTap: widget.onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: CachedNetworkImage(
+                    imageUrl: widget.imageUrl,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => CachedNetworkImage(
+                      imageUrl: widget.fallbackImageUrl,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => _episodePlaceholder(widget.episodeNumber),
+                    ),
+                  ),
+                ),
+              ),
+              if (widget.progress != null && widget.progress! > 0)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 3,
+                    color: Colors.black26,
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: widget.progress,
+                      child: Container(color: const Color(0xFFEF7A1E)),
+                    ),
+                  ),
+                ),
+            ]),
+            SizedBox(height: gapImageToText),
+            Text(
+              _displayTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: titleFontSize,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Fecha y duración en Grid (con elipsis)
+            if (!_isSpecial && (widget.duration != null || widget.releaseDate != null))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '${widget.duration ?? ''}${widget.duration != null && widget.releaseDate != null ? ' ' : ''}${_formatDate(widget.releaseDate)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: const Color(0xFFA5A5AA),
+                    fontSize: widget.isCompact ? 11.5 : 13.0,
+                  ),
+                ),
+              ),
+            if (!widget.isCompact && (!_isSpecial || widget.description.isNotEmpty))
+              Text(
+                widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: const Color(0xFFA5A5AA),
+                  fontSize: descFontSize,
+                  height: 1.4,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            if (!widget.isCompact && !_isSpecial) const SizedBox(height: 6),
+            Row(
+              children: [
+                if (widget.certification != null && widget.certification != 'NR') ...[
+                  _buildAgeBadge(context, widget.certification!, small: true),
+                  const SizedBox(width: 8),
+                ],
+                if (_typeBadge != null) ...[
+                  _buildAgeBadge(context, _typeBadge!, small: true),
+                  const SizedBox(width: 8),
+                ],
+                // Ocultar idioma en modo compacto
+                if (!widget.isCompact)
+                  _buildAgeBadge(context, _languageBadge, small: true),
+              ],
+            ),
           ],
         ),
       ),
@@ -1333,19 +1460,27 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Row of badges (Certification FIRST, then genres)
+        // Row of badges (Certification FIRST, then genres) - FORZADO A 1 SOLA LÍNEA
         if ((cert != null && cert.isNotEmpty && cert != 'NR') || (genres.isNotEmpty && _revealed))
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Wrap( // Senior Fix: Usar Wrap en lugar de ScrollView para evitar errores en plegables/tablets
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (cert != null && cert.isNotEmpty && cert != 'NR')
-                  _buildAgeBadge(context, cert.toUpperCase(), small: false),
-                ...genres.take(6).map((g) => _buildBadge(context, g.toUpperCase(), small: false)),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              clipBehavior: Clip.none, // Permitir que las etiquetas respiren
+              child: Row(
+                children: [
+                  if (cert != null && cert.isNotEmpty && cert != 'NR')
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _buildAgeBadge(context, cert.toUpperCase(), small: false),
+                    ),
+                  ...genres.map((g) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _buildBadge(context, g.toUpperCase(), small: false),
+                  )),
+                ],
+              ),
             ),
           )
         else if (!_revealed) ...[
@@ -1515,15 +1650,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     child: SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
+      clipBehavior: Clip.none, // Senior Fix: Permitir que los botones respiren fuera del contenedor sin recortes
+      padding: EdgeInsets.symmetric(horizontal: ResponsiveUtils.isMobile(context) ? 24 : 0),
       child: actionRow,
     ),
   );
 }
 
-  Widget _buildTabBar(List<String> labels, int selectedIndex, double hPadding, bool isMobile) {
+  Widget _buildTabBar(List<String> labels, int selectedIndex, double hPadding, {bool isMobile = false, bool isCompact = false}) {
+    final double screenW = MediaQuery.sizeOf(context).width;
+    final double fontSize = isMobile 
+        ? 16.0 
+        : (isCompact ? 15.5 : (screenW * 0.011).clamp(16.0, 19.0));
+    final double itemHPadding = isMobile ? 16.0 : (isCompact ? 14.0 : 22.0);
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.symmetric(horizontal: hPadding), // USAR EL PADDING AQUÍ
+      padding: EdgeInsets.symmetric(horizontal: hPadding),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: List.generate(labels.length, (i) {
@@ -1532,14 +1675,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _selectedTabIndex = i),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: itemHPadding, vertical: isCompact ? 6 : 8),
               decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: selected ? const Color(0xFFEF7A1E) : Colors.transparent, width: 3)),
+                border: Border(bottom: BorderSide(color: selected ? const Color(0xFFEF7A1E) : Colors.transparent, width: isCompact ? 2.5 : 3)),
               ),
               child: Text(
                 labels[i], 
                 style: TextStyle(
-                  fontSize: isMobile ? 16 : 18, 
+                  fontSize: fontSize, 
                   fontWeight: FontWeight.bold, 
                   color: selected ? Colors.white : const Color(0xFFA5A5AA),
                   letterSpacing: -0.2
@@ -1553,12 +1696,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   }
 
   @override Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+    final size = MediaQuery.sizeOf(context);
+    final width = size.width;
+    final height = size.height;
     final isMobile = ResponsiveUtils.isMobile(context);
+    final isCompact = width < 1200 || height < 900;
+    
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
-    final episodesCrossAxisCount = isMobile ? 1 : (width < 1000 ? 2 : (width < 1400 ? 3 : (width < 2100 ? 4 : (width < 2800 ? 5 : 6))));
-    final episodesAspectRatio = isMobile ? 1.15 : (width < 1000 ? 1.25 : 1.1);
+    final episodesCrossAxisCount = isMobile ? 1 : (width < 700 ? 2 : (width < 1150 ? 3 : (width < 1550 ? 4 : (width < 2100 ? 5 : 6))));
+    final episodesAspectRatio = isMobile ? 1.15 : (width < 1150 ? 1.08 : 1.1);
 
     final detailParams = UnifiedDetailParams(
       title: widget.title,
@@ -1776,7 +1923,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ) : null,
           content: SliverMainAxisGroup(slivers: [
             SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _buildTabBar(tabLabels, selectedTabIndex, 0, isMobile), // USAR 16 PADDING PARA ALINEAR CON TEXTO
+              _buildTabBar(tabLabels, selectedTabIndex, 16, isMobile: isMobile, isCompact: isCompact), 
               const SizedBox(height: 16),
             ])),
             if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex) () {
@@ -1784,8 +1931,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               if (epBundle != null) {
                 _lastEpisodes = epBundle;
                 final epData = epBundle.response;
+                final double epCountFontSize = isMobile ? 15.0 : (isCompact ? 16.0 : (width * 0.011).clamp(17.0, 21.0));
+                final double epCountBottomPadding = isMobile ? 6.0 : (isCompact ? 14.0 : 28.0);
+
                 return SliverMainAxisGroup(slivers: [
-                  SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(left: 16, right: 16, bottom: isMobile ? 6 : 32), child: Text('${epData.total} episodios', style: TextStyle(color: const Color(0xFFA5A5A5), fontSize: isMobile ? 15 : 20, fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal)))),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.only(left: 16, right: 16, bottom: epCountBottomPadding), 
+                      child: Text(
+                        '${epData.total} episodios', 
+                        style: TextStyle(
+                          color: const Color(0xFFA5A5A5), 
+                          fontSize: epCountFontSize, 
+                          fontWeight: isMobile ? FontWeight.w600 : FontWeight.normal
+                        )
+                      )
+                    )
+                  ),
                   if (isMobile) SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
@@ -1793,7 +1955,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                       final epNum = (ep?.number ?? index + 1).toString();
                       final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
                       final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
+                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
                         final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
                         final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
@@ -1810,7 +1972,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                       final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
                       final epSource = epBundle.sourceForIndex(index) ?? currentSource;
                       final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, onTap: () {
+                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
                         final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
                         final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                         final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';

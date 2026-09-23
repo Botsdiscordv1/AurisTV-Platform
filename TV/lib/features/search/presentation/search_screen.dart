@@ -419,7 +419,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           else if (screenWidth > 1000) crossAxisCount = 6;
           else crossAxisCount = 5;
         }
-        
+
+        final notifier = ref.read(
+          searchResultsProvider(
+            SearchParams(category: _selectedCategory, query: _currentQuery),
+          ).notifier,
+        );
+
         return GridView.builder(
           key: const ValueKey('results_grid'),
           padding: EdgeInsets.fromLTRB(
@@ -431,8 +437,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             crossAxisSpacing: isMobile ? 12 : 16, 
             mainAxisSpacing: isMobile ? 12 : 24, 
           ),
-          itemCount: results.length,
+          itemCount: results.length + (response.hasMore ? 1 : 0),
           itemBuilder: (context, index) {
+            if (index >= results.length) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                notifier.loadNextPage();
+              });
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Color(0xFFEF7A1E),
+                    ),
+                  ),
+                ),
+              );
+            }
+
             final result = results[index];
             final meta = result.resolveMetadata(_selectedCategory);
             return FocusablePosterCard(

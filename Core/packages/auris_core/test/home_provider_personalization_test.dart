@@ -19,7 +19,7 @@ class MockPersonalizedRepo implements AurisRepository {
   // Stubs
   @override Future<int> getHomeVersion({String? category}) async => 0;
   @override Future<void> sendUserEvent({required String userId, required String animeId, required String event, String? sectionId}) async {}
-  @override Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase, String? imgSize, CancelToken? cancelToken}) async => SearchResponse(results: [], query: query, category: category, count: 0);
+  @override Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase, String? imgSize, int page = 1, CancelToken? cancelToken}) async => SearchResponse(results: [], query: query, category: category, count: 0);
   @override Stream<SearchResponse> searchStream(String category, String query, {int? year, String? server, String? phase, String? imgSize, CancelToken? cancelToken}) async* {}
   @override Future<SearchResponse> searchAnimeVariants({required String q, String? display, String? english, String? native_, String? collapsed, List<String>? synonyms}) async => SearchResponse(results: [], query: q, category: 'anime', count: 0);
   @override Future<AnimeDetail?> getAnimeDetail({required String title, int? malId, String? metadataTitle, int? year, int? season, String? kind, String? url, String? type, String? server, String? imgSize}) async => null;
