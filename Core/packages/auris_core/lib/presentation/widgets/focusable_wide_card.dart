@@ -89,14 +89,13 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                CachedNetworkImage(
+                                CuredNetworkImage(
                                   imageUrl: widget.imageUrl,
                                   fit: BoxFit.cover,
                                   filterQuality: FilterQuality.medium,
                                   placeholder: (context, url) => Container(color: Colors.white10),
                                   errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
-                                ),
-                                Positioned.fill(
+                                ),                                Positioned.fill(
                                   child: IgnorePointer(
                                     child: DecoratedBox(
                                       decoration: BoxDecoration(

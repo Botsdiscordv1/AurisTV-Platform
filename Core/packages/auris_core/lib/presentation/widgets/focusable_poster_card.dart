@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../core/utils/responsive_utils.dart';
@@ -152,7 +151,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                                   builder: (context) {
                                     final dpr = MediaQuery.of(context).devicePixelRatio;
                                     final targetWidth = (normalWidth * dpr).round();
-                                    return CachedNetworkImage(
+                                    return CuredNetworkImage(
                                       imageUrl: ApiEndpoints.proxyImage(
                                         widget.posterUrl,
                                         policy: ImageSize.poster,

@@ -83,6 +83,7 @@ export 'presentation/widgets/season_badge.dart';
 export 'presentation/widgets/mini_player_bar.dart';
 export 'presentation/widgets/focusable_poster_card.dart';
 export 'presentation/widgets/focusable_wide_card.dart';
+export 'presentation/widgets/cured_network_image.dart';
 export 'presentation/widgets/marquee_text.dart';
 export 'presentation/widgets/section_grid_explorer.dart';
 export 'presentation/widgets/detail_layout_components.dart';

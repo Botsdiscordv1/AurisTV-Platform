@@ -93,7 +93,7 @@ class ApiEndpoints {
 
   static String baseUrlForSource(String source, [String? category]) {
     final s = source.toLowerCase();
-    const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
+    const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama', 'doramaslatinox'];
     const animeHints = ['jkanime', 'animeav1', 'animed23', 'animejara', 'themes'];
     const movieHints = ['gnulahd', 'onlypelis', 'pelispedia', 'lamovie'];
     if (kdramaHints.any(s.contains)) return kdramasBaseUrl;
@@ -221,6 +221,15 @@ class ApiEndpoints {
     if (sensitiveCDNs.any((k) => lowerUrl.contains(k))) {
       if (kIsWeb) return '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
       return workingUrl;
+    }
+
+    // Hosts que bloquean a images.weserv.nl (responde 302 a errorredirect y
+    // la app no sigue ese redirect): ir directo al proxy del VPS, que sí los
+    // sirve (doramasyt responde 200 al server). Sin este bypass, esas
+    // imágenes nunca cargan en la app aunque existan.
+    const weservBlockedHosts = ['doramasyt.com'];
+    if (weservBlockedHosts.any((k) => lowerUrl.contains(k))) {
+      return '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
     }
 
     if (workingUrl.startsWith('http')) {
