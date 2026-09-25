@@ -23,6 +23,12 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.8'
+
       - name: Fix Gradle Java Home for CI
         run: |
           sed -i '/org.gradle.java.home/d' Movil/android/gradle.properties
