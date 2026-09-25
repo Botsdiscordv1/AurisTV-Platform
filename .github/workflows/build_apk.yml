@@ -7,10 +7,10 @@ on:
 
 jobs:
   build:
-    name: Build APK
+    name: Build Android APKs (Split by ABI)
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Necesario para crear la Release y subir el APK
+      contents: write # Necesario para crear la Release y subir los APKs
 
     steps:
       - name: Checkout repository
@@ -28,16 +28,20 @@ jobs:
           channel: 'stable'
           flutter-version: '3.44.8'
 
-      - name: Build APK Release
+      - name: Build Split APKs Release
         run: |
           cd Movil
           flutter pub get
-          flutter build apk --release
+          flutter build apk --release --split-per-abi
 
-      - name: Upload APK to GitHub Release
+      - name: Upload APKs to GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: Movil/build/app/outputs/flutter-apk/app-release.apk
+          files: |
+            Movil/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            Movil/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            Movil/build/app/outputs/flutter-apk/app-x86_64-release.apk
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
