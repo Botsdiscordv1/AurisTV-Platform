@@ -544,7 +544,12 @@ final AutoDisposeFutureProviderFamily<GroupedEpisodesResult?, GroupedEpisodesPar
 });
 
 final castCreditsProvider = FutureProvider.autoDispose.family<SearchResponse?, CastCreditsParams>((ref, params) async {
-  if (params.url.isEmpty && params.personId == null) return null;
+  final String? personName = params.name;
+  if (params.url.isEmpty &&
+      params.personId == null &&
+      (personName == null || personName.isEmpty)) {
+    return null;
+  }
   final repo = ref.read(aurisRepositoryProvider);
   return await repo.getCastCredits(
     url: params.url,

@@ -1087,16 +1087,15 @@ class AurisRepositoryImpl implements AurisRepository {
   }) async {
     try {
       final params = <String, dynamic>{};
+      // Fuente con cast scrapeable (url) + fallback TMDB (tmdbId/mediaType o
+      // title/year): cada servidor usa lo que soporte e ignora el resto.
+      if (url.isNotEmpty) params['url'] = url;
       if (tmdbId != null) {
         params['tmdbId'] = tmdbId;
         if (mediaType != null) params['mediaType'] = mediaType;
-      } else {
-        if (url.isNotEmpty) params['url'] = url;
-        // Fallback anime: /api/cast resuelve por título cuando no hay tmdbId.
-        // El servidor movies ignora estos params extra.
-        if (title != null && title.isNotEmpty) params['title'] = title;
-        if (year != null) params['year'] = year;
       }
+      if (title != null && title.isNotEmpty) params['title'] = title;
+      if (year != null) params['year'] = year;
 
       final response = await _client.get(
         ApiEndpoints.cast,
@@ -1221,18 +1220,23 @@ class AurisRepositoryImpl implements AurisRepository {
     String? profile,
     int? personId,
   }) async {
+    // Fuente con ficha (GnulaHD/LaMovie) → servidor movies con url.
+    // Sin url → TMDB vía servidor anime: personId del cast de /api/cast;
+    // name como fallback (search/person en vivo) cuando no llega el id.
+    final bool hasUrl = url != null && url.isNotEmpty;
     final params = <String, dynamic>{};
-    if (personId != null) {
-      params['personId'] = personId;
+    if (hasUrl) {
+      params['url'] = url;
+      if (name != null && name.isNotEmpty) params['name'] = name;
+      if (profile != null && profile.isNotEmpty) params['profile'] = profile;
     } else {
-      if (url != null && url.isNotEmpty) params['url'] = url;
+      if (personId != null) params['personId'] = personId;
       if (name != null && name.isNotEmpty) params['name'] = name;
       if (profile != null && profile.isNotEmpty) params['profile'] = profile;
     }
 
-    final String targetBaseUrl = personId != null
-        ? ApiEndpoints.animeBaseUrl
-        : ApiEndpoints.moviesSeriesBaseUrl;
+    final String targetBaseUrl =
+        hasUrl ? ApiEndpoints.moviesSeriesBaseUrl : ApiEndpoints.animeBaseUrl;
 
     final response = await _client.get(
       ApiEndpoints.castCredits,

@@ -645,28 +645,19 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       }
     }();
 
-    // B) Cast → movies: GET /api/cast?url={U} | anime: GET /api/cast?tmdbId={id}&mediaType={tv|movie}
+    // B) Cast → /api/cast: url (scrape de fuente) + tmdbId/mediaType/title/year
+    //    (fallback TMDB cuando la fuente no trae cast; ambos servidores).
     final castTask = () async {
       try {
-        List<CastInfo> castList;
-        if (isAnimeCategory && effectiveTmdbId != null) {
-          final mediaType = _params.isMovieish ? 'movie' : 'tv';
-          castList = await repo.getCast(
-            _params.url,
-            source: _params.source,
-            category: _params.category,
-            tmdbId: effectiveTmdbId,
-            mediaType: mediaType,
-          ).timeout(const Duration(seconds: 10));
-        } else {
-          castList = await repo.getCast(
-            _params.url,
-            source: _params.source,
-            category: _params.category,
-            title: _params.title,
-            year: _params.year,
-          ).timeout(const Duration(seconds: 10));
-        }
+        final castList = await repo.getCast(
+          _params.url,
+          source: _params.source,
+          category: _params.category,
+          tmdbId: effectiveTmdbId,
+          mediaType: _params.isMovieish ? 'movie' : 'tv',
+          title: _params.title,
+          year: _params.year,
+        ).timeout(const Duration(seconds: 10));
 
         if (!mounted) return;
         state = state.copyWith(cast: AsyncValue.data(castList));

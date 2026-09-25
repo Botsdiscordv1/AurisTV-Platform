@@ -193,14 +193,20 @@ class MovieDetail {
 }
 
 class CastMember {
+  final int? id;
   final String name;
   final String? character;
   final String? profile;
 
-  const CastMember({required this.name, this.character, this.profile});
+  const CastMember({this.id, required this.name, this.character, this.profile});
 
   factory CastMember.fromJson(Map<String, dynamic> json) {
     return CastMember(
+      id: switch (json['id']) {
+        final int n => n,
+        final String s => int.tryParse(s),
+        _ => null,
+      },
       name: json['name'] as String? ?? '',
       character: json['character'] as String?,
       profile: json['profile'] as String?,

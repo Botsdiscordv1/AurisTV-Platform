@@ -1979,6 +1979,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       if (detailData is MovieDetail) {
         for (var c in detailData.cast) {
           detailCast[c.name] = CastInfo(
+            id: c.id,
             name: c.name,
             character: c.character,
             profile: c.profile,
@@ -1986,10 +1987,21 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         }
       }
 
-      // 2. Personajes de Anime (AniList)
+      // 2. Anime (AniList): los actores de voz son las personas del cast;
+      // con su nombre se resuelve la filmografía en vivo vía TMDB. Si no hay
+      // seiyuu, se muestra el personaje (best-effort por nombre).
       if (detailData is AnimeDetail) {
         for (var c in detailData.characters) {
-          if (!detailCast.containsKey(c.name)) {
+          if (c.voiceActors.isNotEmpty) {
+            for (final va in c.voiceActors) {
+              if (va.name.isEmpty || detailCast.containsKey(va.name)) continue;
+              detailCast[va.name] = CastInfo(
+                name: va.name,
+                character: c.name,
+                profile: va.image ?? c.image,
+              );
+            }
+          } else if (!detailCast.containsKey(c.name)) {
             detailCast[c.name] = CastInfo(
               name: c.name,
               character: c.role,
@@ -2721,8 +2733,15 @@ class _CastCard extends ConsumerStatefulWidget {
 class _CastCardState extends ConsumerState<_CastCard> {
   bool _isHovered = false;
 
+  // Filmografía disponible: fuente (url), TMDB (id) o búsqueda en vivo por
+  // nombre (fallback AniList / sin id). El modal resuelve según lo que haya.
+  bool get _hasCredits =>
+      (widget.person.url != null && widget.person.url!.isNotEmpty) ||
+      widget.person.id != null ||
+      widget.person.name.isNotEmpty;
+
   void _showCastCredits() {
-    if (widget.person.url == null || widget.person.url!.isEmpty) return;
+    if (!_hasCredits) return;
 
     showDialog(
       context: context,
@@ -2734,7 +2753,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isClickable = widget.person.url != null && widget.person.url!.isNotEmpty;
+    final bool isClickable = _hasCredits;
 
     return MouseRegion(
       cursor: isClickable ? SystemMouseCursors.click : SystemMouseCursors.basic,
@@ -2833,6 +2852,23 @@ class _GalleryTabContent extends ConsumerStatefulWidget {
 class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
   String _selectedFilter = "all";
 
+  bool _matchesFilter(String type, String filter) {
+    final t = type.toLowerCase().trim();
+    if (filter == "poster") {
+      return t == "poster" || t == "posters";
+    }
+    if (filter == "backdrop") {
+      return t == "backdrop" || t == "backdrops" || t == "fondo" || t == "fondos" || t == "banner" || t == "banners";
+    }
+    if (filter == "logo") {
+      return t == "logo" || t == "logos";
+    }
+    if (filter == "banner") {
+      return t == "banner" || t == "banners";
+    }
+    return t == filter;
+  }
+
   @override
   Widget build(BuildContext context) {
     final params = GalleryParams(kind: widget.kind, title: _stripSeasonSuffix(widget.title), year: widget.year);
@@ -2877,62 +2913,61 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
 
         final filtered = _selectedFilter == "all"
             ? g.gallery
-            : g.gallery.where((img) => img.type == _selectedFilter).toList();
+            : g.gallery.where((img) => _matchesFilter(img.type, _selectedFilter)).toList();
 
-        final hasPosters = g.gallery.any((img) => img.type == "poster");
-        final hasBackdrops = g.gallery.any((img) => img.type == "backdrop");
-        final hasLogos = g.gallery.any((img) => img.type == "logo");
-        final hasBanners = g.gallery.any((img) => img.type == "banner");
+        final hasPosters = g.gallery.any((img) => _matchesFilter(img.type, "poster"));
+        final hasBackdrops = g.gallery.any((img) => _matchesFilter(img.type, "backdrop") || _matchesFilter(img.type, "banner"));
+        final hasLogos = g.gallery.any((img) => _matchesFilter(img.type, "logo"));
+        final hasBanners = g.gallery.any((img) => _matchesFilter(img.type, "banner"));
+
+        final screenW = MediaQuery.sizeOf(context).width;
+        final chipSpacing = screenW < 380 ? 4.0 : 8.0;
 
         return SliverMainAxisGroup(
           slivers: [
             SliverToBoxAdapter(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.fromLTRB(isMobile ? 24 : widget.hPadding, isMobile ? 0 : 8, isMobile ? 24 : widget.hPadding, 16),
-                child: Row(
-                  children: [
-                    _GalleryFilterChip(
-                      label: "Todos",
-                      selected: _selectedFilter == "all",
-                      onSelected: () => setState(() => _selectedFilter = "all"),
-                    ),
-                      if (hasPosters) ...[
-                        const SizedBox(width: 8),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(0, isMobile ? 0 : 8, 0, 16),
+                child: Center(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _GalleryFilterChip(
+                        label: "Todos",
+                        selected: _selectedFilter == "all",
+                        onSelected: () => setState(() => _selectedFilter = "all"),
+                      ),
+                      if (hasPosters)
                         _GalleryFilterChip(
                           label: "Pósters",
                           selected: _selectedFilter == "poster",
                           onSelected: () => setState(() => _selectedFilter = "poster"),
                         ),
-                      ],
-                      if (hasBackdrops) ...[
-                        const SizedBox(width: 8),
+                      if (hasBackdrops)
                         _GalleryFilterChip(
                           label: "Fondos",
                           selected: _selectedFilter == "backdrop",
-                          onSelected: () => setState(() => _selectedFilter = "backdrop"),
+                          onSelected: () => setState(() => _selectedFilter == "backdrop"),
                         ),
-                      ],
-                      if (hasLogos) ...[
-                        const SizedBox(width: 8),
+                      if (hasLogos)
                         _GalleryFilterChip(
                           label: "Logos",
                           selected: _selectedFilter == "logo",
-                          onSelected: () => setState(() => _selectedFilter = "logo"),
+                          onSelected: () => setState(() => _selectedFilter == "logo"),
                         ),
-                      ],
-                      if (hasBanners) ...[
-                        const SizedBox(width: 8),
+                      if (hasBanners)
                         _GalleryFilterChip(
                           label: "Banners",
                           selected: _selectedFilter == "banner",
                           onSelected: () => setState(() => _selectedFilter = "banner"),
                         ),
-                      ],
                     ],
                   ),
                 ),
               ),
+            ),
             if (filtered.isEmpty)
               const SliverToBoxAdapter(
                 child: Center(
@@ -3002,11 +3037,15 @@ class _GalleryFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.sizeOf(context).width;
+    final hPad = screenW < 380 ? 3.0 : (screenW < 420 ? 5.0 : 10.0);
+    final fSize = screenW < 380 ? 10.5 : (screenW < 420 ? 11.5 : 13.0);
+
     return GestureDetector(
       onTap: onSelected,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 6),
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFEF7A1E) : Colors.white10,
           borderRadius: BorderRadius.circular(20),
@@ -3015,12 +3054,15 @@ class _GalleryFilterChip extends StatelessWidget {
             width: 1,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.black : Colors.white,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-            fontSize: 14,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.black : Colors.white,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              fontSize: fSize,
+            ),
           ),
         ),
       ),

@@ -217,8 +217,15 @@ class _CastCard extends ConsumerStatefulWidget {
 class _CastCardState extends ConsumerState<_CastCard> {
   bool _isHovered = false;
 
+  // Filmografía disponible: fuente (url), TMDB (id) o búsqueda en vivo por
+  // nombre (fallback AniList / sin id). El modal resuelve según lo que haya.
+  bool get _hasCredits =>
+      (widget.person.url != null && widget.person.url!.isNotEmpty) ||
+      widget.person.id != null ||
+      widget.person.name.isNotEmpty;
+
   void _showCastCredits() {
-    if (widget.person.url == null || widget.person.url!.isEmpty) return;
+    if (!_hasCredits) return;
 
     showDialog(
       context: context,
@@ -230,7 +237,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isClickable = widget.person.url != null && widget.person.url!.isNotEmpty;
+    final bool isClickable = _hasCredits;
 
     return MouseRegion(
       cursor: isClickable ? SystemMouseCursors.click : SystemMouseCursors.basic,
@@ -3933,6 +3940,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       if (detailData is MovieDetail) {
         for (var c in detailData.cast) {
           detailCast[c.name] = CastInfo(
+            id: c.id,
             name: c.name,
             character: c.character,
             profile: c.profile,
@@ -3940,10 +3948,21 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         }
       }
 
-      // 2. Personajes de Anime (AniList)
+      // 2. Anime (AniList): los actores de voz son las personas del cast;
+      // con su nombre se resuelve la filmografía en vivo vía TMDB. Si no hay
+      // seiyuu, se muestra el personaje (best-effort por nombre).
       if (detailData is AnimeDetail) {
         for (var c in detailData.characters) {
-          if (!detailCast.containsKey(c.name)) {
+          if (c.voiceActors.isNotEmpty) {
+            for (final va in c.voiceActors) {
+              if (va.name.isEmpty || detailCast.containsKey(va.name)) continue;
+              detailCast[va.name] = CastInfo(
+                name: va.name,
+                character: c.name,
+                profile: va.image ?? c.image,
+              );
+            }
+          } else if (!detailCast.containsKey(c.name)) {
             detailCast[c.name] = CastInfo(
               name: c.name,
               character: c.role,
