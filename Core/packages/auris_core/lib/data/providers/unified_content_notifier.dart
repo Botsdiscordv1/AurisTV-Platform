@@ -15,6 +15,7 @@ import '../providers/content_providers.dart';
 import '../providers/community_translation_provider.dart';
 import '../providers/player_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/playback_history_provider.dart';
 import '../../core/api/providers.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../core/utils/content_logic.dart';
@@ -219,6 +220,24 @@ final detailViewTrackerProvider = Provider.autoDispose.family<void, UnifiedDetai
         sectionId: params.sectionId,
       );
     }
+
+    // Sincronizar el póster vertical real del detalle con el historial local
+    final detailData = next.detail.valueOrNull;
+    if (detailData != null) {
+      final poster = detailData.anime?.poster ?? detailData.movie?.poster;
+      final banner = detailData.anime?.backdrop ?? detailData.movie?.backdrop;
+      final logo = detailData.anime?.logo ?? detailData.movie?.logo;
+      final title = detailData.anime?.title ?? detailData.movie?.title ?? params.title;
+      if (poster != null && poster.isNotEmpty) {
+        ref.read(playbackHistoryStateProvider.notifier).updatePosterForContent(
+          contentId: params.url ?? params.title,
+          title: title,
+          posterUrl: poster,
+          bannerUrl: banner,
+          logoUrl: logo,
+        );
+      }
+    }
   }, fireImmediately: true);
 });
 
@@ -331,14 +350,20 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
     final repo = _ref.read(aurisRepositoryProvider);
 
     // Paso 1 — Carga instantánea (bloqueante, solo esto)
-    // GET /api/episodes?url={fichaUrl}&source={S}&season={N}&fast=1
+    // GET /api/episodes?url={fichaUrl}&source={S}&title={T}&fullTitle={FT}&season={N}&fast=1
+    // title/fullTitle van también en el fast: sin ellos el server no puede
+    // resolver la URL de la temporada pedida cuando la ficha quedó en otra
+    // (p. ej. cambiar a S1 con la URL de S2 en el selector de temporadas).
     EpisodesResponse? fastRes;
     try {
       fastRes = await repo.getEpisodes(
         _params.url,
         _params.source,
         category: _params.category,
+        title: _params.title,
+        fullTitle: _params.metadataTitle,
         season: _params.season,
+        year: _params.year,
         tmdbId: _params.tmdbId,
         fast: true,
       );
