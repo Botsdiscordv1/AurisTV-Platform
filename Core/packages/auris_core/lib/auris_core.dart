@@ -65,6 +65,7 @@ export 'data/providers/notification_provider.dart';
 export 'firebase_options.dart';
 export 'data/providers/favorites_provider.dart';
 export 'data/providers/home_provider.dart' hide SectionComposer, ComposedHomeSection, CompositionPreferences;
+export 'data/providers/schedule_ping.dart';
 export 'data/providers/community_translation_provider.dart';
 export 'data/datasources/mock_data.dart';
 export 'presentation/widgets/loading_more_indicator.dart';

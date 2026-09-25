@@ -274,6 +274,7 @@ class ApiEndpoints {
   static String homeRecent(int limit) => '/api/home/recent?limit=$limit';
   static String homeTop(int limit) => '/api/home/top?limit=$limit';
   static const String schedule = '/api/schedule';
+  static const String schedulePremierePing = '/api/schedule/premiere-ping';
   static const String sources = '/api/sources';
   static String subscriptions(String userId) => '/api/subscriptions/$userId';
   static const String titlesAnime = '/api/titles/anime';

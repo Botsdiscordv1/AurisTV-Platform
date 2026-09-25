@@ -22,6 +22,29 @@ class ScheduleScreen extends ConsumerStatefulWidget {
 }
 
 class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
+  Timer? _pingTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _pingPremieres());
+    _pingTimer = Timer.periodic(
+        const Duration(minutes: 10), (_) => _pingPremieres());
+  }
+
+  @override
+  void dispose() {
+    _pingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _pingPremieres() async {
+    final changed = await SchedulePing.check(ref);
+    if (changed && mounted) {
+      ref.invalidate(_scheduleProvider);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheduleAsync = ref.watch(_scheduleProvider);
@@ -328,7 +351,12 @@ class _ScheduleRowState extends State<ScheduleRow> {
                             title: item.title,
                             posterUrl: ApiEndpoints.proxyImage(item.coverImage),
                             airingOverlay: item.airingAt != null
-                                ? AiringCountdownBadge(airingAt: item.airingAt!, aired: item.aired)
+                                ? AiringCountdownBadge(
+                                    airingAt: item.airingAt!,
+                                    aired: item.aired,
+                                    premiereStatus: item.premiereStatus,
+                                    premiereDeltaMin: item.premiereDeltaMin,
+                                  )
                                 : null,
                             subtitle: _buildSubtitle(item),
                             rating: formatRating(item.averageScore),

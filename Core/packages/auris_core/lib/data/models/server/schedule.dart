@@ -35,6 +35,74 @@ class ScheduleResponse {
           [],
     );
   }
+
+  static const List<String> _canonicalDayNames = [
+    'lunes',
+    'martes',
+    'miércoles',
+    'jueves',
+    'viernes',
+    'sábado',
+    'domingo',
+  ];
+
+  static int _localDayIndex(DateTime date) => (date.weekday + 6) % 7;
+
+  /// Reagrupa el calendario usando la zona horaria local del dispositivo.
+  ///
+  /// El servidor etiqueta columnas e `isToday` en UTC, lo que desalinea el
+  /// calendario con la realidad del usuario (y con AnimeAV1) fuera de UTC.
+  /// Aquí cada item se coloca en el día local de su `airingAt` (instante
+  /// absoluto, ya correcto) y `isToday` se calcula con la fecha local.
+  /// Los items sin `airingAt` conservan su columna original.
+  ScheduleResponse localize({DateTime? now}) {
+    if (days.isEmpty) return this;
+
+    final localNow = now ?? DateTime.now();
+    final todayIndex = _localDayIndex(localNow);
+    final buckets = List.generate(7, (_) => <ScheduleItem>[]);
+    final names = List.filled(7, '');
+
+    for (final day in days) {
+      final originalIndex =
+          day.dayIndex >= 0 && day.dayIndex <= 6 ? day.dayIndex : 0;
+      if (names[originalIndex].isEmpty) names[originalIndex] = day.day;
+      for (final item in day.items) {
+        final airingAt = item.airingAt;
+        if (airingAt != null && airingAt > 0) {
+          final localAiring =
+              DateTime.fromMillisecondsSinceEpoch(airingAt * 1000);
+          buckets[_localDayIndex(localAiring)].add(item);
+        } else {
+          buckets[originalIndex].add(item);
+        }
+      }
+    }
+
+    int compareByAiringAt(ScheduleItem a, ScheduleItem b) {
+      final x = a.airingAt;
+      final y = b.airingAt;
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return x.compareTo(y);
+    }
+
+    return ScheduleResponse(
+      season: season,
+      year: year,
+      total: total,
+      days: [
+        for (var i = 0; i < 7; i++)
+          ScheduleDay(
+            day: names[i].isNotEmpty ? names[i] : _canonicalDayNames[i],
+            dayIndex: i,
+            isToday: i == todayIndex,
+            items: [...buckets[i]]..sort(compareByAiringAt),
+          ),
+      ],
+    );
+  }
 }
 
 class ScheduleDay {
@@ -90,6 +158,11 @@ class ScheduleItem {
   final bool sourceAvailable;
   final int? year;
 
+  // Etiqueta de estreno (premiere-ping AV1): 'delayed'/'advanced' con el
+  // desvío en minutos respecto a la hora mostrada ("Retrasado +37m").
+  final String? premiereStatus;
+  final int? premiereDeltaMin;
+
   // Campos directos de fuente
   final String? url;
   final String? slug;
@@ -125,6 +198,8 @@ class ScheduleItem {
     this.aired = false,
     this.sourceAvailable = true,
     this.year,
+    this.premiereStatus,
+    this.premiereDeltaMin,
     this.url,
     this.slug,
     this.quality,
@@ -206,6 +281,12 @@ class ScheduleItem {
       },
       aired: json['aired'] as bool? ?? false,
       sourceAvailable: json['sourceAvailable'] as bool? ?? true,
+      premiereStatus: json['premiereStatus'] as String?,
+      premiereDeltaMin: switch (json['premiereDeltaMin']) {
+        num n => n.toInt(),
+        String s => int.tryParse(s),
+        _ => null,
+      },
       year: switch (json['year']) {
         num n => n.toInt(),
         String s => int.tryParse(s),

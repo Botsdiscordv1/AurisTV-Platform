@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/tv_responsive_utils.dart';
+import '../../../../core/utils/tv_responsive_utils.dart';
 import '../../data/models/search_history.dart';
 import '../providers/search_provider.dart';
 

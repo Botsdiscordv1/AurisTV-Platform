@@ -86,6 +86,10 @@ abstract class AurisRepository {
   Future<void> sendUserEvent({required String userId, required String animeId, required String event, String? sectionId});
 
   Future<ScheduleResponse> getSchedule();
+
+  /// Ping reactivo de estrenos (Tanda 2). Devuelve `{changed, lastUpdateAt,
+  /// updates, checked}` o `null` si el server no responde (nunca lanza).
+  Future<Map<String, dynamic>?> pingSchedulePremieres(int since);
   Future<List<SourceInfo>> getSources();
   Future<EditorialResponse> getEditorial({String? imgSize, String? category, String? userId});
   Future<AnimeTitleInfo> getAnimeTitles(String query);

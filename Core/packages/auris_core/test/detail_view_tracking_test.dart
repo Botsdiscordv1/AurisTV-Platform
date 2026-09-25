@@ -31,6 +31,7 @@ class MockAurisRepository implements AurisRepository {
   @override Future<List<MediaItem>> getHomeHero({String category = 'anime', String? imgSize}) async => [];
   @override Future<HomeResponse> getUserHome({required String userId, String? category}) async => HomeResponse(userId: userId, maturityLevel: 'cold', sections: [], generatedAt: '');
   @override Future<ScheduleResponse> getSchedule() async => const ScheduleResponse(days: [], season: '1', year: 2026, total: 0);
+  @override Future<Map<String, dynamic>?> pingSchedulePremieres(int since) async => null;
   @override Future<List<SourceInfo>> getSources() async => [];
   @override Future<EditorialResponse> getEditorial({String? imgSize, String? category, String? userId}) async => const EditorialResponse(generatedAt: '', locale: '', sections: []);
   @override Future<SearchResponse> filter({String? genre, int? year, String? category, String? status, String? idioma, int page = 1, String? source}) async => SearchResponse(results: [], query: '', category: category ?? '', count: 0);

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../schedule/presentation/schedule_screen.dart';

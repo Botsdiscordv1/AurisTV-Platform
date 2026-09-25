@@ -760,7 +760,26 @@ class AurisRepositoryImpl implements AurisRepository {
       ApiEndpoints.schedule,
       baseUrl: ApiEndpoints.animeBaseUrl,
     );
-    return ScheduleResponse.fromJson(response.data as Map<String, dynamic>);
+    return ScheduleResponse.fromJson(response.data as Map<String, dynamic>)
+        .localize();
+  }
+
+  @override
+  Future<Map<String, dynamic>?> pingSchedulePremieres(int since) async {
+    try {
+      final response = await _client.get(
+        ApiEndpoints.schedulePremierePing,
+        queryParameters: {'since': since},
+        baseUrl: ApiEndpoints.animeBaseUrl,
+      );
+      final data = response.data;
+      if (data is! Map<String, dynamic>) return null;
+      final inner = data['data'];
+      return inner is Map<String, dynamic> ? inner : data;
+    } catch (e) {
+      debugPrint('[AurisRepo] schedule premiere ping failed (ignored): $e');
+      return null;
+    }
   }
 
   @override

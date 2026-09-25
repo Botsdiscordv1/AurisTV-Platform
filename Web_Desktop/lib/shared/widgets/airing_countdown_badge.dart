@@ -15,7 +15,18 @@ class AiringCountdownBadge extends StatefulWidget {
   final int airingAt;
   final bool aired;
 
-  const AiringCountdownBadge({super.key, required this.airingAt, required this.aired});
+  // Etiqueta de estreno (premiere-ping): 'delayed' + min de retraso o
+  // 'advanced' + min de adelanto → chip "Retrasado +37m" / "Adelantado -12m".
+  final String? premiereStatus;
+  final int? premiereDeltaMin;
+
+  const AiringCountdownBadge({
+    super.key,
+    required this.airingAt,
+    required this.aired,
+    this.premiereStatus,
+    this.premiereDeltaMin,
+  });
 
   @override
   State<AiringCountdownBadge> createState() => _AiringCountdownBadgeState();
@@ -52,6 +63,20 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  /// "Retrasado +37m" / "Adelantado -12m" (o la sola palabra si no hay delta).
+  String? get _premiereLabel {
+    switch (widget.premiereStatus) {
+      case 'delayed':
+        final d = widget.premiereDeltaMin;
+        return (d != null && d > 0) ? 'Retrasado +${d}m' : 'Retrasado';
+      case 'advanced':
+        final d = widget.premiereDeltaMin;
+        return (d != null && d != 0) ? 'Adelantado -${d.abs()}m' : 'Adelantado';
+      default:
+        return null;
+    }
   }
 
   @override
@@ -100,7 +125,7 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
       }
     }
 
-    return AnimatedContainer(
+    final badge = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -132,6 +157,48 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
           ),
         ],
       ),
+    );
+
+    final premiereLabel = _premiereLabel;
+    if (premiereLabel == null) return badge;
+
+    // Chip de desvío de estreno (estilo AV1): "Retrasado +37m" / "Adelantado -12m".
+    final delayed = widget.premiereStatus == 'delayed';
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        badge,
+        Container(
+          margin: const EdgeInsets.only(top: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: (delayed ? const Color(0xFFC62828) : const Color(0xFF2E7D32))
+                .withOpacity(0.95),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                delayed ? Icons.schedule : Icons.fast_forward,
+                size: 9,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                premiereLabel,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

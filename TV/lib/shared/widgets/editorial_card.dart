@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_core/auris_core.dart' hide MarqueeText;
 import '../../core/theme/editorial_themes.dart';
 import 'marquee_text.dart';
 import 'package:cached_network_image/cached_network_image.dart';
