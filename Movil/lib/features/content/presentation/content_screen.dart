@@ -1887,50 +1887,67 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             isCompact: isCompact,
           ),
           content: SliverMainAxisGroup(slivers: [
-            if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex) () {
-              final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
-              if (epBundle != null) {
-                _lastEpisodes = epBundle;
-                final epData = epBundle.response;
+            if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex)
+              SliverToBoxAdapter(
+                child: AdaptiveEpisodesOrCountdown(
+                  params: detailParams,
+                  episodesBuilder: (episodes) {
+                    final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
+                    if (epBundle != null) {
+                      _lastEpisodes = epBundle;
+                      final epData = epBundle.response;
+                      final total = epData.total;
 
-                return SliverMainAxisGroup(slivers: [
-                  if (isMobile) SliverPadding(
-                    padding: EdgeInsets.zero,
-                    sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
-                      final ep = index < epData.episodes.length ? epData.episodes[index] : null;
-                      final epNum = (ep?.number ?? index + 1).toString();
-                      final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                      final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
-                        final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                        final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                        final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
-                      });
-                    }, childCount: epData.total)),
-                  )
-                  else SliverPadding(
-                    padding: EdgeInsets.zero,
-                    sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio), delegate: SliverChildBuilderDelegate((context, index) {
-                      final ep = index < epData.episodes.length ? epData.episodes[index] : null;
-                      final epNum = (ep?.number ?? index + 1).toString();
-                      final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                      final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                      final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                      return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
-                        final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                        final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                        final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                        final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                        context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
-                      });
-                    }, childCount: epData.total)),
-                  ),
-                ]);
-              }
-              return episodesAsync.when(data: (_) => const SliverToBoxAdapter(child: SizedBox.shrink()), loading: () => SliverPadding(padding: EdgeInsets.zero, sliver: _EpisodesSkeleton(isMobile: isMobile)), error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: const Color(0xFFA5A5AA))))));
-            }(),
+                      if (isMobile) {
+                        return ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: total,
+                          itemBuilder: (context, index) {
+                            final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                            final epNum = (ep?.number ?? index + 1).toString();
+                            final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                            final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                            return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
+                              final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                              final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                              final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                              final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                              context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                            });
+                          },
+                        );
+                      } else {
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio),
+                          itemCount: total,
+                          itemBuilder: (context, index) {
+                            final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                            final epNum = (ep?.number ?? index + 1).toString();
+                            final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                            final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                            final epQuality = ep?.quality ?? epSource?.quality ?? '';
+                            return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
+                              final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                              final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                              final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                              final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                              context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                            });
+                          },
+                        );
+                      }
+                    }
+                    return episodesAsync.when(
+                      data: (_) => const SizedBox.shrink(),
+                      loading: () => const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
+                      error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Color(0xFFA5A5AA)))),
+                    );
+                  },
+                ),
+              ),
             if (selectedTabIndex == relatedTabIndex && relatedTabIndex != -1) ..._buildRelatedTab(0, unifiedRelations: unifiedRelationsAsync, currentSource: currentSource),
             if (selectedTabIndex == castTabIndex && castTabIndex != -1) ..._buildCastTab(detailData, castAsync.valueOrNull ?? const [], 0),
             if (selectedTabIndex == extrasTabIndexFinal && extrasTabIndexFinal != -1) ..._buildExtrasTab(detailData, 0),
