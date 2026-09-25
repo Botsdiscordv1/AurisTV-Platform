@@ -115,6 +115,17 @@ class MovieDetail {
         .map((e) => AnimeThemeInfo.fromJson(Map<String, dynamic>.from(e)))
         .toList();
 
+    final seasons = (root['seasons'] as List<dynamic>?)
+            ?.map((e) => SeasonInfo.fromJson(e as Map<String, dynamic>))
+            // TMDB fantasma: episodeCount 0 / seasonNumber 0 no se muestra.
+            .where((s) => s.seasonNumber > 0 && (s.episodeCount ?? 0) > 0)
+            .toList() ??
+        [];
+
+    final inferredReleaseDate = root['releaseDate'] as String? ?? 
+                                root['airDate'] as String? ?? 
+                                (seasons.isNotEmpty ? seasons.first.airDate : null);
+
     return MovieDetail(
       tmdbId: (root['tmdbId'] ?? '').toString(),
       mediaType: root['mediaType'] as String?,
@@ -128,7 +139,7 @@ class MovieDetail {
       rating: (root['rating'] as num? ?? root['score'] as num?)?.toDouble(),
       score: (root['score'] as num? ?? root['rating'] as num?)?.toDouble(),
       voteCount: root['voteCount'] as int?,
-      releaseDate: root['releaseDate'] as String?,
+      releaseDate: inferredReleaseDate,
       runtime: root['runtime'] as int?,
       episodeRuntime: root['episodeRuntime'] as int?,
       genres: (root['genresTranslated'] as List<dynamic>?)

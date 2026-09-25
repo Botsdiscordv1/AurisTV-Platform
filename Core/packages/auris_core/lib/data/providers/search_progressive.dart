@@ -208,7 +208,7 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
         source: fav.source,
         quality: 'Local',
         thumbnail: fav.posterUrl,
-        banner: fav.bannerUrl,
+        banner: fav.bannerUrl ?? '',
         year: null,
       );
       _accumulated[_fuseKey(res)] = res;
@@ -219,12 +219,18 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
     for (final h in history) {
       if (!_matchesLocal(h.title ?? '', h.category ?? '', query, cat)) continue;
       
+      final bool hasValidPoster = h.posterUrl != null && 
+          h.posterUrl!.isNotEmpty && 
+          !h.posterUrl!.contains('original') && 
+          !h.posterUrl!.contains('backdrop') && 
+          !h.posterUrl!.contains('banner');
+
       final res = SearchResult(
         title: h.title ?? '',
         url: h.url ?? h.contentId,
         source: h.source ?? '',
         quality: 'Historial', // Senior Fix: Identificador para el resolver de metadatos
-        thumbnail: h.posterUrl ?? '',
+        thumbnail: hasValidPoster ? h.posterUrl! : '',
         banner: h.bannerUrl ?? '',
         year: null,
         kind: h.category, // Mapeo de metadatos para que el label sea correcto

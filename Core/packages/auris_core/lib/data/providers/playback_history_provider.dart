@@ -122,6 +122,19 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       if (diff < threshold && !completed) return;
     }
 
+    // Asegurar que posterUrl sea vertical y no un banner/backdrop horizontal
+    String? validPoster = posterUrl;
+    if (validPoster != null && (validPoster.contains('original') || validPoster.contains('backdrop') || validPoster.contains('banner'))) {
+      bannerUrl ??= validPoster;
+      validPoster = null;
+    }
+
+    final resolvedPoster = (validPoster != null && validPoster.isNotEmpty)
+        ? validPoster
+        : existingHistory?.posterUrl;
+
+    final resolvedBanner = bannerUrl ?? existingHistory?.bannerUrl;
+
     final history = PlaybackHistory(
       contentId: contentId,
       season: season,
@@ -132,8 +145,8 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       progress: finalProgress,
       isCompleted: completed,
       title: title ?? existingHistory?.title,
-      posterUrl: posterUrl ?? existingHistory?.posterUrl,
-      bannerUrl: bannerUrl ?? existingHistory?.bannerUrl,
+      posterUrl: resolvedPoster,
+      bannerUrl: resolvedBanner,
       logoUrl: logoUrl ?? existingHistory?.logoUrl,
       category: category ?? existingHistory?.category,
       source: source ?? existingHistory?.source,
@@ -157,6 +170,46 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       _throttleTimer = Timer(const Duration(seconds: 2), () {
         if (_pendingSave != null) _savePending();
       });
+    }
+  }
+
+  void updatePosterForContent({required String contentId, required String title, required String posterUrl, String? bannerUrl, String? logoUrl}) {
+    if (posterUrl.isEmpty) return;
+    bool updatedAny = false;
+
+    String normalize(String s) => s.toLowerCase()
+        .replaceAll('ü', 'u').replaceAll('ä', 'a').replaceAll('ö', 'o')
+        .replaceAll('é', 'e').replaceAll('á', 'a').replaceAll('í', 'i')
+        .replaceAll('ó', 'o').replaceAll('ú', 'u')
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    final cleanTitle = normalize(title);
+    final cleanContentId = contentId.toLowerCase().trim();
+
+    for (int i = 0; i < _memoryCache.length; i++) {
+      final h = _memoryCache[i];
+      final hTitle = normalize(h.title ?? '');
+      final hContentId = h.contentId.toLowerCase().trim();
+      final hUrl = (h.url ?? '').toLowerCase().trim();
+
+      if (hContentId == cleanContentId || 
+          hUrl == cleanContentId || 
+          (cleanTitle.isNotEmpty && (hTitle == cleanTitle || hTitle.contains(cleanTitle) || cleanTitle.contains(hTitle)))) {
+          
+        if (h.posterUrl != posterUrl) {
+          _memoryCache[i] = h.copyWith(
+            posterUrl: posterUrl,
+            bannerUrl: bannerUrl ?? h.bannerUrl,
+            logoUrl: logoUrl ?? h.logoUrl,
+          );
+          updatedAny = true;
+          _pendingSave = _memoryCache[i];
+        }
+      }
+    }
+    if (updatedAny) {
+      state = AsyncData(List.from(_memoryCache));
+      _savePending(notify: false);
     }
   }
 

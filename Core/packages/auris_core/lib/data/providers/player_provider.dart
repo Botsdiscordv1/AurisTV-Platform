@@ -187,6 +187,10 @@ class ContentDetailResponse {
 
   /// Devuelve el detalle "principal" basándose en la clasificación.
   dynamic get main => isMovieish ? (movie ?? anime) : (anime ?? movie);
+
+  String? get releaseStatus => anime?.releaseStatus ?? movie?.releaseStatus;
+  String? get releaseDate => anime?.releaseDate ?? movie?.releaseDate;
+  String? get releaseTimestamp => anime?.releaseTimestamp ?? movie?.releaseTimestamp;
 }
 
 final activeContentSourcesProvider = StateProvider<List<SearchResult>>((ref) => []);

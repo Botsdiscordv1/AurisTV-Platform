@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 import '../../core/utils/release_countdown_logic.dart';
@@ -21,6 +22,39 @@ class UpcomingReleaseCountdown extends StatefulWidget {
     this.episodes = const [],
     this.onCountdownZero,
   });
+
+  factory UpcomingReleaseCountdown.fromState({
+    Key? key,
+    required UnifiedContentState state,
+    VoidCallback? onCountdownZero,
+  }) {
+    final detail = state.detail.valueOrNull;
+    final main = detail?.main;
+    
+    // Verificación 1: Extraer fecha de estreno del Detail (AnimeDetail o MovieDetail)
+    final releaseDate = detail?.releaseDate ?? 
+        (main is MovieDetail ? main.releaseDate : null) ?? 
+        (main is AnimeDetail ? (main.year != null ? '${main.year}-01-01' : null) : null);
+        
+    final releaseTimestamp = detail?.releaseTimestamp ?? 
+        (main is MovieDetail ? main.releaseTimestamp : null);
+        
+    final releaseStatus = detail?.releaseStatus ?? 
+        (main is MovieDetail ? main.releaseStatus : null) ?? 
+        (main is AnimeDetail ? main.status : null);
+
+    // Verificación 2: Extraer la lista de episodios para confirmar si están vacíos
+    final episodes = state.episodes.valueOrNull?.response.episodes ?? [];
+
+    return UpcomingReleaseCountdown(
+      key: key,
+      releaseStatus: releaseStatus,
+      releaseDate: releaseDate,
+      releaseTimestamp: releaseTimestamp,
+      episodes: episodes,
+      onCountdownZero: onCountdownZero,
+    );
+  }
 
   @override
   State<UpcomingReleaseCountdown> createState() => _UpcomingReleaseCountdownState();

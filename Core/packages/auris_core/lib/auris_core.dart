@@ -91,6 +91,7 @@ export 'presentation/widgets/section_grid_explorer.dart';
 export 'presentation/widgets/detail_layout_components.dart';
 export 'presentation/widgets/adaptive_detail_layout.dart';
 export 'presentation/widgets/upcoming_release_countdown.dart';
+export 'presentation/widgets/adaptive_episodes_or_countdown.dart';
 export 'presentation/widgets/detail_backdrop.dart';
 export 'presentation/widgets/detail_header.dart';
 export 'presentation/widgets/detail_info.dart';
