@@ -4,7 +4,7 @@ on:
   push:
     branches: []
     tags:
-      - 'win-v*' # Se activa EXCLUSIVAMENTE al crear un tag como win-v1.0.0
+      - 'win-v*' # Se activa al crear un tag como win-v1.0.0
 
 jobs:
   build:
@@ -16,6 +16,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Delete existing release/tag if updating win-v1.0.0
+        uses: dev-drprasad/delete-tag-and-release@v1.2.1
+        with:
+          tag_name: ${{ github.ref_name }}
+          delete_release: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -38,5 +47,6 @@ jobs:
         with:
           files: auristv-windows-x64.zip
           generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

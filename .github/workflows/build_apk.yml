@@ -4,18 +4,27 @@ on:
   push:
     branches: []
     tags:
-      - 'v*' # Se activa EXCLUSIVAMENTE al crear un tag como v1.0.0
+      - 'v*' # Se activa al crear un tag como v1.0.0
 
 jobs:
   build:
     name: Build Android APKs (Split by ABI)
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Necesario para crear la Release y subir los APKs
+      contents: write # Necesario para borrar y recrear la Release
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Delete existing release/tag if updating v1.0.0
+        uses: dev-drprasad/delete-tag-and-release@v1.2.1
+        with:
+          tag_name: ${{ github.ref_name }}
+          delete_release: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -23,15 +32,15 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Fix Gradle Java Home for CI
+        run: |
+          sed -i '/org.gradle.java.home/d' Movil/android/gradle.properties
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           flutter-version: '3.44.8'
-
-      - name: Fix Gradle Java Home for CI
-        run: |
-          sed -i '/org.gradle.java.home/d' Movil/android/gradle.properties
 
       - name: Build Split APKs Release
         run: |
@@ -44,5 +53,6 @@ jobs:
         with:
           files: Movil/build/app/outputs/flutter-apk/*release.apk
           generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
