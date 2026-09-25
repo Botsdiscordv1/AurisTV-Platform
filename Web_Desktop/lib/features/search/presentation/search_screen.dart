@@ -212,6 +212,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isDesktop = width >= 1200;
+    final hPadding = isDesktop ? 24.0 : 16.0;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
       appBar: AppBar(
@@ -219,93 +223,109 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: 80,
-        title: Row(
-          children: [
-            Expanded(
-              child: RepaintBoundary(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.08),
-                      width: _isFocused ? 1.8 : 1.5,
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        title: Padding(
+          padding: EdgeInsets.symmetric(horizontal: hPadding),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/inicio');
+                  }
+                },
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: RepaintBoundary(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.08),
+                        width: _isFocused ? 1.8 : 1.5,
+                      ),
+                      boxShadow: _isFocused ? [
+                        BoxShadow(
+                          color: const Color(0xFFEF7A1E).withValues(alpha: 0.12),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                        )
+                      ] : [],
                     ),
-                    boxShadow: _isFocused ? [
-                      BoxShadow(
-                        color: const Color(0xFFEF7A1E).withValues(alpha: 0.12),
-                        blurRadius: 15,
-                        spreadRadius: 2,
-                      )
-                    ] : [],
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    focusNode: _focusNode,
-                    textAlign: TextAlign.left,
-                    textAlignVertical: TextAlignVertical.center,
-                    style: const TextStyle(fontSize: 15, color: Colors.white),
-                    textCapitalization: TextCapitalization.sentences,
-                    inputFormatters: [CapitalizeFirstLetterFormatter()],
-                    decoration: InputDecoration(
-                      hintText: _dynamicPlaceholder,
-                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontSize: 14),
-                      prefixIcon: Icon(Icons.search_rounded, 
-                          color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
-                          size: 20),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 16), // Centrado perfecto para Container de 52px
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
-                              onPressed: _clearSearch,
-                            )
-                          : null,
+                    child: TextField(
+                      controller: _searchController,
+                      focusNode: _focusNode,
+                      textAlign: TextAlign.left,
+                      textAlignVertical: TextAlignVertical.center,
+                      style: const TextStyle(fontSize: 15, color: Colors.white),
+                      textCapitalization: TextCapitalization.sentences,
+                      inputFormatters: [CapitalizeFirstLetterFormatter()],
+                      decoration: InputDecoration(
+                        hintText: _dynamicPlaceholder,
+                        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontSize: 14),
+                        prefixIcon: Icon(Icons.search_rounded, 
+                            color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
+                            size: 20),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 16), // Centrado perfecto para Container de 52px
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+                                onPressed: _clearSearch,
+                              )
+                            : null,
+                      ),
+                      onChanged: _onSearchChanged,
+                      onSubmitted: _onSearchSubmitted,
                     ),
-                    onChanged: _onSearchChanged,
-                    onSubmitted: _onSearchSubmitted,
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              height: 52,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedCategory,
-                  dropdownColor: const Color(0xFF1A1A1A),
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38, size: 20),
-                  borderRadius: BorderRadius.circular(12),
-                  style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Todo')),
-                    DropdownMenuItem(value: 'peliculas', child: Text('Películas')),
-                    DropdownMenuItem(value: 'series', child: Text('Series')),
-                    DropdownMenuItem(value: 'anime', child: Text('Anime')),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) {
-                      if (mounted) setState(() => _selectedCategory = v);
-                      _updateUrl();
-                    }
-                  },
+              const SizedBox(width: 12),
+              Container(
+                height: 52,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedCategory,
+                    dropdownColor: const Color(0xFF1A1A1A),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38, size: 20),
+                    borderRadius: BorderRadius.circular(12),
+                    style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('Todo')),
+                      DropdownMenuItem(value: 'peliculas', child: Text('Películas')),
+                      DropdownMenuItem(value: 'series', child: Text('Series')),
+                      DropdownMenuItem(value: 'anime', child: Text('Anime')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) {
+                        if (mounted) setState(() => _selectedCategory = v);
+                        _updateUrl();
+                      }
+                    },
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       body: AnimatedSwitcher(
@@ -334,6 +354,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  RepaintBoundary(child: _TrendingChipsRow(onChipTap: _performSearch)),
                   const _ContinueWatchingSection(),
                   RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
                   const SizedBox(height: 8),
@@ -362,7 +383,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
     return SingleChildScrollView(
       padding: const EdgeInsets.only(bottom: 40),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          RepaintBoundary(child: _TrendingChipsRow(onChipTap: _performSearch)),
           const _ContinueWatchingSection(),
           RepaintBoundary(child: SearchHistorySection(onQueryTap: _performSearch)),
           RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
@@ -374,6 +397,46 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TrendingChipsRow extends StatelessWidget {
+  final Function(String) onChipTap;
+  const _TrendingChipsRow({required this.onChipTap});
+
+  static const List<Map<String, dynamic>> chips = [
+    {'label': '🔥 Tendencias', 'query': 'trending'},
+    {'label': '⭐ Estrenos 2025', 'query': '2025'},
+    {'label': '🎬 Películas', 'query': 'pelicula'},
+    {'label': '🎌 Anime', 'query': 'anime'},
+    {'label': '🍿 Series', 'query': 'serie'},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 1200;
+    final hPadding = isDesktop ? 24.0 : 16.0;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: chips.map((chip) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                backgroundColor: const Color(0xFF1A1A1A),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                label: Text(chip['label'] as String, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+                onPressed: () => onChipTap(chip['query'] as String),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

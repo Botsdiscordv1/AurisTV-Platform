@@ -26,7 +26,12 @@ class AdaptiveEpisodesOrCountdown extends ConsumerWidget {
       return episodesBuilder(episodes);
     }
 
-    // Verificación 1 & 2: Si no hay episodios, mostramos el componente de cuenta regresiva / próximo estreno
+    // Mientras carga, delegamos a episodesBuilder
+    if (state.episodes is AsyncLoading || state.detail is AsyncLoading) {
+      return episodesBuilder([]);
+    }
+
+    // Si no hay episodios, devolvemos directamente el widget Box de cuenta regresiva
     return UpcomingReleaseCountdown.fromState(
       state: state,
       onCountdownZero: () {

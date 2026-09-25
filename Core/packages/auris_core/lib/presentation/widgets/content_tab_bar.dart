@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 /// A shared content tab bar widget for all platforms (Mobile, TV, Web/Desktop).
 ///
-/// Supports responsive sizing, horizontal scrolling, and active tab indicator styling.
-class ContentTabBar extends StatelessWidget {
+/// Uses Flutter's native [TabBar] with safe post-frame animation updates
+/// to guarantee butter-smooth animated indicator transitions across Web, Mobile, and Desktop
+/// without any framework assertion conflicts.
+class ContentTabBar extends StatefulWidget {
   final List<String> labels;
   final int selectedIndex;
   final void Function(int index) onTabSelected;
@@ -22,45 +24,89 @@ class ContentTabBar extends StatelessWidget {
   });
 
   @override
+  State<ContentTabBar> createState() => _ContentTabBarState();
+}
+
+class _ContentTabBarState extends State<ContentTabBar> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: widget.labels.length,
+      vsync: this,
+      initialIndex: widget.selectedIndex.clamp(0, widget.labels.length - 1),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant ContentTabBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.labels.length != widget.labels.length) {
+      _tabController.dispose();
+      _tabController = TabController(
+        length: widget.labels.length,
+        vsync: this,
+        initialIndex: widget.selectedIndex.clamp(0, widget.labels.length - 1),
+      );
+    } else if (widget.selectedIndex != _tabController.index) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _tabController.index != widget.selectedIndex) {
+          _tabController.animateTo(widget.selectedIndex.clamp(0, widget.labels.length - 1));
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final double screenW = MediaQuery.sizeOf(context).width;
-    final double fontSize = isMobile 
+    final double fontSize = widget.isMobile 
         ? 16.0 
-        : (isCompact ? 15.5 : (screenW * 0.011).clamp(16.0, 19.0));
-    final double itemHPadding = isMobile ? 16.0 : (isCompact ? 14.0 : 22.0);
+        : (widget.isCompact ? 15.5 : (screenW * 0.011).clamp(16.0, 19.0));
+    final double itemHPadding = widget.isMobile ? 16.0 : (widget.isCompact ? 14.0 : 22.0);
+    final double indicatorHeight = widget.isCompact ? 2.5 : 3.0;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.symmetric(horizontal: hPadding),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: List.generate(labels.length, (i) {
-          final selected = i == selectedIndex;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => onTabSelected(i),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: itemHPadding, vertical: isCompact ? 6 : 8),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: selected ? const Color(0xFFEF7A1E) : Colors.transparent,
-                    width: isCompact ? 2.5 : 3,
-                  ),
-                ),
-              ),
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
+      child: TabBar(
+        controller: _tabController,
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        dividerColor: Colors.transparent,
+        indicatorColor: const Color(0xFFEF7A1E),
+        indicatorWeight: indicatorHeight,
+        indicatorSize: TabBarIndicatorSize.label,
+        labelPadding: EdgeInsets.symmetric(horizontal: itemHPadding),
+        labelColor: Colors.white,
+        unselectedLabelColor: const Color(0xFFA5A5AA),
+        onTap: (i) {
+          if (widget.selectedIndex != i) {
+            widget.onTabSelected(i);
+          }
+        },
+        tabs: widget.labels.map((label) {
+          return Tab(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: widget.isCompact ? 6 : 8),
               child: Text(
-                labels[i],
+                label,
                 style: TextStyle(
                   fontSize: fontSize,
                   fontWeight: FontWeight.bold,
-                  color: selected ? Colors.white : const Color(0xFFA5A5AA),
                   letterSpacing: -0.2,
                 ),
               ),
             ),
           );
-        }),
+        }).toList(),
       ),
     );
   }

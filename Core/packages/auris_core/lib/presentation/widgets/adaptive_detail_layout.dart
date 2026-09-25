@@ -185,7 +185,7 @@ class AdaptiveDetailLayout extends StatelessWidget {
                           child: tabs!,
                         ),
                       ],
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 12), // Espacio original para el resto de pestañas
                     ],
                   ),
                 ),

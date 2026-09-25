@@ -2855,16 +2855,16 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
   bool _matchesFilter(String type, String filter) {
     final t = type.toLowerCase().trim();
     if (filter == "poster") {
-      return t == "poster" || t == "posters";
+      return t.contains("poster");
     }
     if (filter == "backdrop") {
-      return t == "backdrop" || t == "backdrops" || t == "fondo" || t == "fondos" || t == "banner" || t == "banners";
+      return t.contains("backdrop") || t.contains("fondo") || t.contains("banner") || t.contains("fanart") || t.contains("background");
     }
     if (filter == "logo") {
-      return t == "logo" || t == "logos";
+      return t.contains("logo") || t.contains("art");
     }
     if (filter == "banner") {
-      return t == "banner" || t == "banners";
+      return t.contains("banner");
     }
     return t == filter;
   }
@@ -2918,7 +2918,6 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
         final hasPosters = g.gallery.any((img) => _matchesFilter(img.type, "poster"));
         final hasBackdrops = g.gallery.any((img) => _matchesFilter(img.type, "backdrop") || _matchesFilter(img.type, "banner"));
         final hasLogos = g.gallery.any((img) => _matchesFilter(img.type, "logo"));
-        final hasBanners = g.gallery.any((img) => _matchesFilter(img.type, "banner"));
 
         final screenW = MediaQuery.sizeOf(context).width;
         final chipSpacing = screenW < 380 ? 4.0 : 8.0;
@@ -2949,19 +2948,13 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
                         _GalleryFilterChip(
                           label: "Fondos",
                           selected: _selectedFilter == "backdrop",
-                          onSelected: () => setState(() => _selectedFilter == "backdrop"),
+                          onSelected: () => setState(() => _selectedFilter = "backdrop"),
                         ),
                       if (hasLogos)
                         _GalleryFilterChip(
                           label: "Logos",
                           selected: _selectedFilter == "logo",
-                          onSelected: () => setState(() => _selectedFilter == "logo"),
-                        ),
-                      if (hasBanners)
-                        _GalleryFilterChip(
-                          label: "Banners",
-                          selected: _selectedFilter == "banner",
-                          onSelected: () => setState(() => _selectedFilter = "banner"),
+                          onSelected: () => setState(() => _selectedFilter = "logo"),
                         ),
                     ],
                   ),
@@ -3037,15 +3030,11 @@ class _GalleryFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenW = MediaQuery.sizeOf(context).width;
-    final hPad = screenW < 380 ? 3.0 : (screenW < 420 ? 5.0 : 10.0);
-    final fSize = screenW < 380 ? 10.5 : (screenW < 420 ? 11.5 : 13.0);
-
     return GestureDetector(
       onTap: onSelected,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFEF7A1E) : Colors.white10,
           borderRadius: BorderRadius.circular(20),
@@ -3054,15 +3043,12 @@ class _GalleryFilterChip extends StatelessWidget {
             width: 1,
           ),
         ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.black : Colors.white,
-              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-              fontSize: fSize,
-            ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.black : Colors.white,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 13,
           ),
         ),
       ),

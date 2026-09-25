@@ -4694,6 +4694,20 @@ class _GalleryTabContent extends ConsumerStatefulWidget {
 class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
   String _selectedFilter = "all";
 
+  bool _matchesFilter(String type, String filter) {
+    final t = type.toLowerCase().trim();
+    if (filter == "poster") {
+      return t.contains("poster");
+    }
+    if (filter == "backdrop") {
+      return t.contains("backdrop") || t.contains("fondo") || t.contains("banner") || t.contains("fanart") || t.contains("background");
+    }
+    if (filter == "logo") {
+      return t.contains("logo") || t.contains("art");
+    }
+    return t == filter;
+  }
+
   @override
   Widget build(BuildContext context) {
     final params = GalleryParams(kind: widget.kind, title: stripSeasonSuffix(widget.title ?? ''), year: widget.year);
@@ -4734,64 +4748,46 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
 
         final filtered = _selectedFilter == "all"
             ? g.gallery
-            : g.gallery.where((img) => img.type == _selectedFilter).toList();
+            : g.gallery.where((img) => _matchesFilter(img.type, _selectedFilter)).toList();
 
-        final hasPosters = g.gallery.any((img) => img.type == "poster");
-        final hasBackdrops = g.gallery.any((img) => img.type == "backdrop");
-        final hasLogos = g.gallery.any((img) => img.type == "logo");
-        final hasBanners = g.gallery.any((img) => img.type == "banner");
+        final hasPosters = g.gallery.any((img) => _matchesFilter(img.type, "poster"));
+        final hasBackdrops = g.gallery.any((img) => _matchesFilter(img.type, "backdrop") || _matchesFilter(img.type, "banner"));
+        final hasLogos = g.gallery.any((img) => _matchesFilter(img.type, "logo"));
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: EdgeInsets.only(
-                left: widget.hPadding, 
-                right: widget.hPadding, 
-                top: isMobile ? 0 : 8, 
-                bottom: 16
-              ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+              padding: EdgeInsets.fromLTRB(0, isMobile ? 0 : 8, 0, 16),
+              child: Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     _GalleryFilterChip(
                       label: "Todos",
                       selected: _selectedFilter == "all",
                       onSelected: () => setState(() => _selectedFilter = "all"),
                     ),
-                    if (hasPosters) ...[
-                      const SizedBox(width: 8),
+                    if (hasPosters)
                       _GalleryFilterChip(
                         label: "Pósters",
                         selected: _selectedFilter == "poster",
                         onSelected: () => setState(() => _selectedFilter = "poster"),
                       ),
-                    ],
-                    if (hasBackdrops) ...[
-                      const SizedBox(width: 8),
+                    if (hasBackdrops)
                       _GalleryFilterChip(
                         label: "Fondos",
                         selected: _selectedFilter == "backdrop",
                         onSelected: () => setState(() => _selectedFilter = "backdrop"),
                       ),
-                    ],
-                    if (hasLogos) ...[
-                      const SizedBox(width: 8),
+                    if (hasLogos)
                       _GalleryFilterChip(
                         label: "Logos",
                         selected: _selectedFilter == "logo",
                         onSelected: () => setState(() => _selectedFilter = "logo"),
                       ),
-                    ],
-                    if (hasBanners) ...[
-                      const SizedBox(width: 8),
-                      _GalleryFilterChip(
-                        label: "Banners",
-                        selected: _selectedFilter == "banner",
-                        onSelected: () => setState(() => _selectedFilter = "banner"),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -4811,8 +4807,8 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: isMobile 
-                        ? (_selectedFilter == "backdrop" || _selectedFilter == "banner" ? 2 : 3)
-                        : (_selectedFilter == "backdrop" || _selectedFilter == "banner" ? 4 : 6),
+                        ? (_selectedFilter == "backdrop" ? 2 : 3)
+                        : (_selectedFilter == "backdrop" ? 4 : 6),
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
                     childAspectRatio: _selectedFilter == "backdrop" 
