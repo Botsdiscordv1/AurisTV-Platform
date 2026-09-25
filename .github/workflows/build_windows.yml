@@ -2,8 +2,9 @@ name: Build Windows Desktop
 
 on:
   push:
+    branches: []
     tags:
-      - 'win-v*' # Se activa al crear un tag como win-v1.0.0
+      - 'win-v*' # Se activa EXCLUSIVAMENTE al crear un tag como win-v1.0.0
 
 jobs:
   build:
@@ -34,7 +35,6 @@ jobs:
 
       - name: Upload Windows App to GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: auristv-windows-x64.zip
           generate_release_notes: true
