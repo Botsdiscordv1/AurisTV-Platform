@@ -27,6 +27,7 @@ class DeviceSelectorDialog extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.all(24),
         width: 400,
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

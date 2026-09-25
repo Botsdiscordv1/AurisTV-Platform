@@ -166,8 +166,12 @@ final unifiedContentProvider = Provider.autoDispose
       url: selected.url,
       source: selected.source,
       category: params.category,
-      title: input.season > 1 ? seasonTitleFor(stripSeasonSuffix(params.title), input.season) : params.title,
-      metadataTitle: params.metadataTitle ?? params.title,
+      title: input.season > 1 
+          ? seasonTitleFor(stripSeasonSuffix(params.title), input.season) 
+          : stripSeasonSuffix(params.title),
+      metadataTitle: params.metadataTitle != null 
+          ? (input.season > 1 ? seasonTitleFor(stripSeasonSuffix(params.metadataTitle!), input.season) : stripSeasonSuffix(params.metadataTitle!))
+          : stripSeasonSuffix(params.title),
       season: input.season,
       year: params.year,
       tmdbId: detailData?.anime?.tmdbId ?? int.tryParse(detailData?.movie?.tmdbId ?? ''),

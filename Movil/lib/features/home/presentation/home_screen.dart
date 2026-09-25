@@ -22,7 +22,9 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
+  final ValueNotifier<bool> _showTopBarNotifier = ValueNotifier<bool>(true);
   bool _isScrolled = false;
+  double _lastOffset = 0;
 
   @override
   void initState() {
@@ -32,14 +34,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _showTopBarNotifier.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
 
   void _onScroll() {
+    final currentOffset = _scrollController.offset;
+    
+    // Si estamos en el inicio o over-scroll, siempre mostrar la barra superior
+    if (currentOffset <= 15) {
+      if (!_showTopBarNotifier.value) {
+        _showTopBarNotifier.value = true;
+      }
+      _lastOffset = currentOffset;
+      if (_isScrolled) setState(() => _isScrolled = false);
+      return;
+    }
+
+    final delta = currentOffset - _lastOffset;
+
+    // Senior Tuning: Umbral de 6px para evitar parpadeos y asegurar suavidad
+    if (delta > 6 && _showTopBarNotifier.value) {
+      _showTopBarNotifier.value = false;
+    } else if (delta < -6 && !_showTopBarNotifier.value) {
+      _showTopBarNotifier.value = true;
+    }
+
+    _lastOffset = currentOffset;
+
     // Senior Fix: Bajamos el umbral a 5px para una respuesta inmediata al tacto (Estilo iOS)
-    final scrolled = _scrollController.offset > 5;
+    final scrolled = currentOffset > 5;
     if (scrolled != _isScrolled) {
       setState(() => _isScrolled = scrolled);
     }
@@ -66,7 +92,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final source = item.source.isNotEmpty ? item.source : category;
     final metaTitle = item.romaji ?? item.english ?? item.title;
     final effectiveUrl = item.detailUrl ?? item.id;
-    final String? kind = item.card?.kind;
+    final String? typeVal = item.card?.type ?? item.card?.kind;
 
     final uri = '/content/${Uri.encodeComponent(item.title)}'
         '?source=${Uri.encodeComponent(source)}'
@@ -75,7 +101,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
         '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
         '&year=${item.year ?? ''}'
-        '${kind != null ? '&type=${Uri.encodeComponent(kind)}' : ''}'
+        '${typeVal != null ? '&type=${Uri.encodeComponent(typeVal)}' : ''}'
         '&sectionId=${Uri.encodeComponent(item.sectionId ?? '')}';
         
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -488,9 +514,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
           
-          // La navegación flota sobre el contenido (Fija en la parte superior)
-          Positioned(
-            top: 0, left: 0, right: 0,
+          // La navegación flota sobre el contenido (Fija en la parte superior con ValueListenableBuilder para evitar re-renders de HomeScreen)
+          ValueListenableBuilder<bool>(
+            valueListenable: _showTopBarNotifier,
+            builder: (context, showTopBar, child) {
+              return AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                top: showTopBar ? 0 : -100,
+                left: 0,
+                right: 0,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: showTopBar ? 1.0 : 0.0,
+                  child: child,
+                ),
+              );
+            },
             child: _buildTopNavContent(context, ref, currentCategory, isMobile),
           ),
         ],

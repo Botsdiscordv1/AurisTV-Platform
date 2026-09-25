@@ -912,7 +912,7 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
                   sub.contains('anime') || 
                   s.contains('jkanime') || s.contains('animejara') || s.contains('animed23');
                   
-  final isKdrama = s.contains('tudorama') || s.contains('dorama') || s.contains('pandrama') || sub.contains('drama');
+  final isKdrama = s.contains('tudorama') || s.contains('dorama') || s.contains('pandrama') || s.contains('doramaslatinox') || sub.contains('drama');
   
   final isMovie = result.badge.toLowerCase().contains('movie') || 
                   sub.contains('película') ||
@@ -936,6 +936,7 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
     if (result.id.contains('jkanime.net')) effectiveSource = 'JKAnime';
     else if (result.id.contains('animejara.com')) effectiveSource = 'AnimeJara';
     else if (result.id.contains('tudorama.net')) effectiveSource = 'TuDorama';
+    else if (result.id.contains('doramaslatinox')) effectiveSource = 'DoramasLatinox';
   }
 
   // Senior Fix: Fallback de imagen horizontal para secciones WIDE editoriales
@@ -1022,6 +1023,7 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
     if (result.url.contains('jkanime.net')) effectiveSource = 'JKAnime';
     else if (result.url.contains('animejara.com')) effectiveSource = 'AnimeJara';
     else if (result.url.contains('tudorama.net')) effectiveSource = 'TuDorama';
+    else if (result.url.contains('doramaslatinox')) effectiveSource = 'DoramasLatinox';
   }
 
   // Senior Fix: Eliminamos el año como subtítulo por petición UX

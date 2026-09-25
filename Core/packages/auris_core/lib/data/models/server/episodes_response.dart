@@ -19,6 +19,9 @@ class EpisodesResponse {
   final List<CastInfo> cast;
 
   final String? seasonAirDate;
+  final String? releaseStatus;
+  final String? releaseDate;
+  final String? releaseTimestamp;
 
   /// Indica que la temporada pedida no existe en esta fuente (p.ej. AnimeD23
   /// solo tiene S3 y se pidió S1/S2). Lo usa el core para no listar la fuente
@@ -39,6 +42,9 @@ class EpisodesResponse {
     this.fullTitle,
     this.season,
     this.seasonAirDate,
+    this.releaseStatus,
+    this.releaseDate,
+    this.releaseTimestamp,
     this.seasonNotAvailable,
     this.error,
   });
@@ -72,6 +78,9 @@ class EpisodesResponse {
       tmdbId: json['tmdbId'] as int?,
       season: json['season'] as int?,
       seasonAirDate: json['seasonAirDate'] as String?,
+      releaseStatus: json['releaseStatus'] as String? ?? json['release_status'] as String?,
+      releaseDate: json['releaseDate'] as String? ?? json['release_date'] as String?,
+      releaseTimestamp: json['releaseTimestamp'] as String? ?? json['release_timestamp'] as String?,
       seasonNotAvailable: json['seasonNotAvailable'] as bool?,
       error: json['error'] as String?,
     );
@@ -88,6 +97,7 @@ class RelatedInfo {
   final String? source;
   final String? kind; // movie | serie | anime | null
   final int? year;
+  final String? type;
 
   const RelatedInfo({
     required this.title,
@@ -98,10 +108,11 @@ class RelatedInfo {
     this.category,
     this.source,
     this.kind,
+    this.type,
     this.year,
   });
 
-  RelatedInfo copyWith({String? source, String? kind, int? year}) {
+  RelatedInfo copyWith({String? source, String? kind, String? type, int? year}) {
     return RelatedInfo(
       title: title,
       url: url,
@@ -111,6 +122,7 @@ class RelatedInfo {
       category: category,
       source: source ?? this.source,
       kind: kind ?? this.kind,
+      type: type ?? this.type,
       year: year ?? this.year,
     );
   }
@@ -149,6 +161,7 @@ class RelatedInfo {
       relation: json['relation'] as String? ?? 'Relacionado',
       category: json['category'] as String?,
       kind: json['kind'] as String?,
+      type: json['type']?.toString(),
       source: json['source'] as String?,
       year: parsedYear,
     );
@@ -164,7 +177,7 @@ class RelatedInfo {
       thumbnail: cover,
       source: effectiveSource,
       kind: effectiveKind,
-      type: effectiveKind,
+      type: type,
       year: year,
       slug: slug,
     );
@@ -180,7 +193,7 @@ class RelatedInfo {
     return UnifiedDetailParams(
       title: title,
       kind: effectiveKind,
-      type: effectiveKind,
+      type: type,
       year: year,
       url: url,
       category: effectiveCategory,

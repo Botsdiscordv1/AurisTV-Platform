@@ -46,6 +46,7 @@ String simplifySourceName(String name) {
   if (l.contains('pelispedia')) return 'PPA';
   if (l.contains('gnulahd')) return 'GHD';
   if (l.contains('lamovie')) return 'LMV';
+  if (l.contains('doramaslatinox')) return 'DLX';
   return name.toUpperCase();
 }
 
@@ -54,6 +55,7 @@ const Map<String, int> _sourceDisplayOrder = {
   'AJR': 3,
   'A23': 4,
   'JKA': 5,
+  'DLX': 6,
   'LMV': 8,
   'OPS': 9,
   'PPA': 10,
@@ -154,8 +156,12 @@ String cleanTitleForDisplay(String title) {
   // Evitamos \b para prevenir problemas con caracteres unicode adyacentes.
   final yearPattern = RegExp(r'[\s\(\[]+(?:19|20)\d{2}[\)\]]?\s*$', caseSensitive: false);
 
+  // 3. Limpieza de etiquetas de idioma/audio al final (ej. "Latino", "Castellano", "Sub Español", "Audio Latino", etc.)
+  final languagePattern = RegExp(r'\s*[\-–—:\(\[]+\s*(?:audio\s+latino|latino|espa[nñ]ol|castellano|sub\s+espa[nñ]ol|subbed|vose|doblado)\s*[\)\]]?\s*$|\s+(?:audio\s+latino|latino|espa[nñ]ol|castellano|sub\s+espa[nñ]ol|subbed|vose|doblado)\s*$', caseSensitive: false);
+
   String cleaned = title.replaceAll(statusPattern, '');
   cleaned = cleaned.replaceAll(yearPattern, '');
+  cleaned = cleaned.replaceAll(languagePattern, '');
   
   cleaned = cleaned.trim();
 

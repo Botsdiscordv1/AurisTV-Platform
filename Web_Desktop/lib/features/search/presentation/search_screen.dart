@@ -198,7 +198,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
       url: result.url,
       category: openCategory,
       year: result.year,
-      type: result.kind,
+      type: result.type ?? result.kind,
       from: '/catalogo',
     );
 

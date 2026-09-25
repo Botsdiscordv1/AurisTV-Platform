@@ -185,19 +185,30 @@ class SearchHistorySection extends ConsumerWidget {
   }
 }
 
-class SearchGenresGrid extends StatelessWidget {
+class SearchGenresGrid extends StatefulWidget {
   final Function(String) onGenreTap;
   const SearchGenresGrid({super.key, required this.onGenreTap});
 
-  static final List<Map<String, dynamic>> genres = [
-    {'name': 'Acción', 'color': const Color(0xFFEF7A1E), 'icon': Icons.flash_on_rounded},
-    {'name': 'Comedia', 'color': const Color(0xFF1A1A1A), 'icon': Icons.sentiment_satisfied_alt_rounded},
-    {'name': 'Drama', 'color': const Color(0xFF262626), 'icon': Icons.theater_comedy_rounded},
-    {'name': 'Fantasía', 'color': const Color(0xFFEF7A1E), 'icon': Icons.auto_fix_high_rounded},
-    {'name': 'Romance', 'color': const Color(0xFF1A1A1A), 'icon': Icons.favorite_rounded},
-    {'name': 'Sci-Fi', 'color': const Color(0xFF262626), 'icon': Icons.rocket_launch_rounded},
-    {'name': 'Terror', 'color': const Color(0xFFEF7A1E), 'icon': Icons.psychology_alt_rounded},
-    {'name': 'Aventura', 'color': const Color(0xFF1A1A1A), 'icon': Icons.explore_rounded},
+  @override
+  State<SearchGenresGrid> createState() => _SearchGenresGridState();
+}
+
+class _SearchGenresGridState extends State<SearchGenresGrid> {
+  bool _expanded = false;
+
+  final List<String> genres = [
+    'Acción y aventura',
+    'Anime',
+    'Comedia',
+    'Documentales',
+    'Drama',
+    'Fantasía',
+    'Horror',
+    'Infantil',
+    'Misterio y suspenso',
+    'Romance',
+    'Ciencia ficción',
+    'Adultos jóvenes',
   ];
 
   @override
@@ -206,14 +217,17 @@ class SearchGenresGrid extends StatelessWidget {
     final isDesktop = MediaQuery.sizeOf(context).width >= 1200;
 
     int crossAxisCount = isMobile ? 2 : (isDesktop ? 4 : 3);
+    final displayedGenres = _expanded ? genres : genres.take(6).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Text('Explorar géneros',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+          padding: EdgeInsets.fromLTRB(24, 16, 24, 16),
+          child: Text(
+            'Géneros',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: -0.5),
+          ),
         ),
         GridView.builder(
           shrinkWrap: true,
@@ -221,45 +235,65 @@ class SearchGenresGrid extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: isDesktop ? 2.8 : 2.5,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: isDesktop ? 3.0 : 2.8,
           ),
-          itemCount: genres.length,
+          itemCount: displayedGenres.length,
           itemBuilder: (context, index) {
-            final genre = genres[index];
+            final genreName = displayedGenres[index];
             return InkWell(
-              onTap: () => onGenreTap(genre['name'] as String),
-              borderRadius: BorderRadius.circular(10),
+              onTap: () => widget.onGenreTap(genreName),
+              borderRadius: BorderRadius.circular(6),
               child: Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
-                  color: genre['color'] as Color,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  color: const Color(0xFF16161A),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
                 ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      right: -5,
-                      bottom: -5,
-                      child: Icon(genre['icon'] as IconData, size: 48, color: Colors.white.withOpacity(0.12)),
-                    ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 16.0),
-                        child: Text(
-                          genre['name'] as String,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  genreName,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             );
           },
         ),
+        if (!_expanded && genres.length > 6) ...[
+          const SizedBox(height: 20),
+          Center(
+            child: InkWell(
+              onTap: () => setState(() => _expanded = true),
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C22),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: const Text(
+                  'Ver más',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 24),
       ],
     );
   }

@@ -46,7 +46,7 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
     url: effectiveUrl,
     category: category,
     year: item.year,
-    type: item.card?.kind,
+    type: item.card?.type ?? item.card?.kind,
     sectionId: item.sectionId,
     from: '/inicio',
   );

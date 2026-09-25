@@ -262,7 +262,7 @@ class ExploreScreen extends ConsumerWidget {
                           progress: progress,
                           onTap: () {
                             final metaTitle = item.romaji ?? item.english ?? item.title;
-                            final kind = item.card?.kind ?? item.type.name;
+                            final typeVal = item.card?.type ?? item.card?.kind ?? item.type.name;
                             context.push(
                               '/content/${Uri.encodeComponent(item.title)}'
                               '?source=${Uri.encodeComponent(item.source)}'
@@ -271,7 +271,7 @@ class ExploreScreen extends ConsumerWidget {
                               '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
                               '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
                               '&year=${item.year ?? ''}'
-                              '&type=${Uri.encodeComponent(kind)}',
+                              '&type=${Uri.encodeComponent(typeVal)}',
                               extra: item.toContentSeed(),
                             );
                           },

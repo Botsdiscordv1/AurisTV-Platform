@@ -56,6 +56,8 @@ class MovieDetail {
   final String? kind;
   final List<AnimeThemeInfo> openings;
   final List<AnimeThemeInfo> endings;
+  final String? releaseStatus;
+  final String? releaseTimestamp;
 
   const MovieDetail({
     required this.tmdbId,
@@ -91,6 +93,8 @@ class MovieDetail {
     this.kind,
     this.openings = const [],
     this.endings = const [],
+    this.releaseStatus,
+    this.releaseTimestamp,
   });
 
   factory MovieDetail.fromJson(Map<String, dynamic> json) {
@@ -171,6 +175,8 @@ class MovieDetail {
       kind: root['kind'] as String?,
       openings: openings,
       endings: endings,
+      releaseStatus: (root['releaseStatus'] ?? root['release_status']) as String?,
+      releaseTimestamp: (root['releaseTimestamp'] ?? root['release_timestamp'] ?? root['airDate']) as String?,
     );
   }
 }

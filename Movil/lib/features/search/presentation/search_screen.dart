@@ -22,6 +22,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String _selectedCategory = 'all';
   Timer? _debounce;
   String _currentQuery = '';
+  String? _selectedGenre;
   bool _isFocused = false;
 
   @override
@@ -58,11 +59,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void _onSearchChanged(String value) {
     _debounce?.cancel();
     if (value.trim().isEmpty) {
-      setState(() => _currentQuery = '');
+      setState(() {
+        _currentQuery = '';
+        _selectedGenre = null;
+      });
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _currentQuery = value.trim());
+      if (mounted) {
+        setState(() {
+          _currentQuery = value.trim();
+          _selectedGenre = null;
+        });
+      }
     });
   }
 
@@ -70,19 +79,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _debounce?.cancel();
     final query = value.trim();
     if (query.isNotEmpty) {
-      setState(() => _currentQuery = query);
+      setState(() {
+        _currentQuery = query;
+        _selectedGenre = null;
+      });
       ref.read(searchHistoryProvider.notifier).addQuery(query);
     }
   }
 
   void _clearSearch() {
     _searchController.clear();
-    setState(() => _currentQuery = '');
+    setState(() {
+      _currentQuery = '';
+      _selectedGenre = null;
+    });
   }
 
   void _performSearch(String query) {
     _searchController.text = query;
     _onSearchSubmitted(query);
+  }
+
+  void _performGenreSearch(String genreName) {
+    _searchController.text = genreName;
+    setState(() {
+      _currentQuery = '';
+      _selectedGenre = genreName;
+    });
   }
 
   void _onContentTap(SearchResult result) {
@@ -92,6 +115,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
     final openCategory = inferOpenCategory(result, _selectedCategory);
 
+    final contentType = result.type ?? result.kind;
+
     final uri = '/content/${Uri.encodeComponent(displayTitle)}'
         '?source=${Uri.encodeComponent(result.source)}'
         '&url=${Uri.encodeComponent(result.url)}'
@@ -100,7 +125,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         '&category=${Uri.encodeComponent(openCategory)}'
         '&year=${result.year ?? ''}'
         '&totalSeasons=${result.totalSeasons ?? ''}'
-        '${result.kind != null ? '&type=${Uri.encodeComponent(result.kind!)}' : ''}';
+        '${contentType != null ? '&type=${Uri.encodeComponent(contentType)}' : ''}';
 
     context.push(uri, extra: result);
   }
@@ -110,21 +135,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final isMobile = ResponsiveUtils.isMobile(context);
     final resultsAsync = ref.watch(
       searchResultsProvider(
-        SearchParams(category: _selectedCategory, query: _currentQuery),
+        SearchParams(
+          category: _selectedCategory, 
+          query: _currentQuery,
+          genre: _selectedGenre,
+        ),
       ),
     );
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.pop(),
-        ),
+        automaticallyImplyLeading: false,
         backgroundColor: const Color(0xFF0B0B0D),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: isMobile ? 116 : 132,
+        titleSpacing: 16,
         title: Column(
           children: [
             // BARRA DE BÚSQUEDA (ANCHO COMPLETO)
@@ -150,16 +177,29 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 decoration: InputDecoration(
                   hintText: _dynamicPlaceholder,
                   hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
-                  prefixIcon: Icon(Icons.search_rounded, 
-                      color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
-                      size: 20),
+                  prefixIcon: _isFocused
+                      ? IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+                          onPressed: () {
+                            if (_currentQuery.isNotEmpty || _selectedGenre != null) {
+                              _clearSearch();
+                            } else if (_focusNode.hasFocus) {
+                              _focusNode.unfocus();
+                            } else {
+                              context.pop();
+                            }
+                          },
+                        )
+                      : Icon(Icons.search_rounded, 
+                          color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
+                          size: 20),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   filled: false,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
-                  suffixIcon: _searchController.text.isNotEmpty
+                  suffixIcon: (_searchController.text.isNotEmpty)
                       ? IconButton(
                           icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
                           onPressed: _clearSearch,
@@ -185,7 +225,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
-        child: _currentQuery.isEmpty 
+        child: (_currentQuery.isEmpty && _selectedGenre == null)
             ? _buildPreSearchState() 
             : _buildResultsState(resultsAsync),
       ),
@@ -196,14 +236,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.only(top: 0, bottom: 40),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SearchHistorySection(onQueryTap: _performSearch),
-          SearchGenresGrid(onGenreTap: _performSearch),
-          const SizedBox(height: 8),
-          SearchDiscoveryFeed(
-            category: _selectedCategory,
-            onContentTap: _onContentTap,
-          ),
+          SearchGenresGrid(onGenreTap: _performGenreSearch),
         ],
       ),
     );
@@ -211,7 +246,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Widget _buildResultsState(AsyncValue<SearchResponse> resultsAsync) {
     final notifierProvider = searchResultsProvider(
-      SearchParams(category: _selectedCategory, query: _currentQuery),
+      SearchParams(
+        category: _selectedCategory, 
+        query: _currentQuery,
+        genre: _selectedGenre,
+      ),
     );
     return resultsAsync.when(
       data: (response) {

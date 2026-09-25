@@ -1669,12 +1669,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       title: widget.title,
       metadataTitle: widget.metadataTitle,
       category: widget.category,
-      kind: widget.result?.kind ?? widget.type,
+      kind: widget.result?.kind,
       year: widget.year,
       season: widget.result?.season,
       source: widget.source,
       url: widget.url,
-      type: widget.type,
+      type: widget.result?.type ?? widget.type,
       sectionId: widget.sectionId,
       initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
     );
@@ -1799,7 +1799,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       }
     }
 
-    final int displayTotalSeasons = (widget.totalSeasons ?? totalSeasons);
+    final int displayTotalSeasons = [totalSeasons, widget.totalSeasons ?? 0].reduce((a, b) => a > b ? a : b);
 
     return MouseRegion(
       onHover: (_) => _handleInteraction(),
@@ -1853,9 +1853,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ),
           secondaryActions: _buildCircularActions(context, isMobile: isMobile, poster: currentSource?.thumbnail, banner: heroBanner),
           synopsis: _buildSynopsis(detailData),
-          selectors: (!isMovieCategory || currentSource != null) ? Row(
+          selectors: (!isMovieCategory && (displayTotalSeasons > 0 || currentSource != null)) ? Row(
             children: [
-              if (!isMovieCategory)
+              if (!isMovieCategory && displayTotalSeasons > 0)
                 SeasonSelector(
                   data: SeasonSelectorData(
                     currentSeason: currentSeason,
@@ -1865,7 +1865,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                     totalEpisodes: episodesAsync.valueOrNull?.response?.total ?? _lastEpisodes?.response?.total,
                   ),
                 ),
-              if (!isMovieCategory && currentSource != null) const SizedBox(width: 12),
+              if (!isMovieCategory && displayTotalSeasons > 0 && currentSource != null) const SizedBox(width: 12),
               if (currentSource != null)
                 Expanded(
                   child: SourceChipsBar(

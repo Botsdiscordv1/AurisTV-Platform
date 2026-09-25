@@ -13,18 +13,20 @@ import '../../core/utils/category_utils.dart';
 class SearchParams {
   final String category;
   final String query;
+  final String? genre;
 
-  const SearchParams({required this.category, required this.query});
+  const SearchParams({required this.category, required this.query, this.genre});
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is SearchParams &&
           category == other.category &&
-          query == other.query;
+          query == other.query &&
+          genre == other.genre;
 
   @override
-  int get hashCode => category.hashCode ^ query.hashCode;
+  int get hashCode => category.hashCode ^ query.hashCode ^ (genre?.hashCode ?? 0);
 }
 
 /// Motor de Búsqueda Progresiva (Streaming):
@@ -57,7 +59,7 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
   int get page => _page;
 
   void _load() {
-    if (params.query.isEmpty) {
+    if (params.query.isEmpty && params.genre == null) {
       state = AsyncValue.data(SearchResponse(
         query: params.query, 
         category: params.category, 
@@ -71,10 +73,13 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
     _hasMore = false;
     _isLoadingMore = false;
 
-    // Senior Hybrid Logic: Carga inmediata de resultados locales (Favoritos e Historial)
-    _loadLocalResults();
+    // Senior Hybrid Logic: Carga inmediata de resultados locales (Favoritos e Historial) si hay query
+    if (params.query.isNotEmpty) {
+      _loadLocalResults();
+    }
 
     final repo = ref.read(aurisRepositoryProvider);
+    final String? apiCategory = params.category == 'all' ? null : params.category;
     
     // Senior Active Cancellation: Abortamos el token anterior para que Dio
     // cierre el socket en el servidor inmediatamente.
@@ -82,47 +87,78 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
     _subscription?.cancel();
     
     _cancelToken = CancelToken();
-    _subscription = repo.searchStream(
-      params.category, 
-      params.query, 
-      cancelToken: _cancelToken
-    ).listen(
-      (responseChunk) {
-        _processChunk(responseChunk);
-      },
-      onError: (e, st) {
-        // Ignorar errores de cancelación normal
+
+    if (params.genre != null) {
+      repo.filter(
+        category: apiCategory,
+        genre: params.genre,
+        page: _page,
+      ).then((response) {
+        if (!mounted) return;
+        _processChunk(response);
+        _hasMore = response.hasMore;
+        _emit();
+      }).catchError((e, st) {
         if (e is DioException && e.type == DioExceptionType.cancel) return;
-        
         if (mounted && _accumulated.isEmpty) {
           state = AsyncValue.error(e, st);
         }
-      },
-      onDone: () {
-        // Stream = página 1. Si hay resultados remotos, el usuario puede
-        // pedir la siguiente (mismo criterio que el "ver más" del servidor).
-        final hasRemote = _accumulated.values.any(
-          (r) => r.quality != 'Local' && r.quality != 'Historial',
-        );
-        _hasMore = hasRemote;
-        _emit();
-      },
-    );
+      });
+    } else {
+      _subscription = repo.searchStream(
+        params.category, 
+        params.query, 
+        cancelToken: _cancelToken
+      ).listen(
+        (responseChunk) {
+          _processChunk(responseChunk);
+        },
+        onError: (e, st) {
+          // Ignorar errores de cancelación normal
+          if (e is DioException && e.type == DioExceptionType.cancel) return;
+          
+          if (mounted && _accumulated.isEmpty) {
+            state = AsyncValue.error(e, st);
+          }
+        },
+        onDone: () {
+          // Stream = página 1. Si hay resultados remotos, el usuario puede
+          // pedir la siguiente (mismo criterio que el "ver más" del servidor).
+          final hasRemote = _accumulated.values.any(
+            (r) => r.quality != 'Local' && r.quality != 'Historial',
+          );
+          _hasMore = hasRemote;
+          _emit();
+        },
+      );
+    }
   }
 
   /// Pide la siguiente página al servidor y la fusiona (patrón "ver más").
   Future<void> loadNextPage() async {
-    if (_isLoadingMore || !_hasMore || params.query.isEmpty) return;
+    if (_isLoadingMore || !_hasMore || (params.query.isEmpty && params.genre == null)) return;
     _isLoadingMore = true;
     _emit();
     try {
       final repo = ref.read(aurisRepositoryProvider);
       final nextPage = _page + 1;
-      final response = await repo.search(
-        params.category,
-        params.query,
-        page: nextPage,
-      );
+      final String? apiCategory = params.category == 'all' ? null : params.category;
+      
+      final SearchResponse response;
+      if (params.genre != null) {
+        response = await repo.filter(
+          category: apiCategory,
+          genre: params.genre,
+          page: nextPage,
+        );
+      } else {
+        response = await repo.search(
+          params.category,
+          params.query,
+          page: nextPage,
+        );
+      }
+
       if (!mounted) return;
       _page = nextPage;
       if (response.results.isEmpty) {

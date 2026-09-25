@@ -41,7 +41,7 @@ class _HeroTitleState extends State<HeroTitle> {
   void didUpdateWidget(HeroTitle oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Si llega el logo o el título cambia, reseteamos el timer de seguridad
-    if (widget.logo != oldWidget.logo || widget.title != oldWidget.title) {
+    if (widget.logo != oldWidget.logo || widget.title != oldWidget.title || widget.logoReady != oldWidget.logoReady) {
       _fallbackTimer?.cancel();
       _showTextFallback = false;
       _startFallbackTimer();
@@ -50,7 +50,12 @@ class _HeroTitleState extends State<HeroTitle> {
 
   void _startFallbackTimer() {
     if (widget.logo != null && widget.logo!.isNotEmpty) return;
-    
+
+    if (widget.logoReady) {
+      setState(() => _showTextFallback = true);
+      return;
+    }
+
     _fallbackTimer = Timer(Duration(seconds: widget.timeoutSeconds), () {
       if (mounted && (widget.logo == null || widget.logo!.isEmpty)) {
         setState(() => _showTextFallback = true);
@@ -104,10 +109,11 @@ class _HeroTitleState extends State<HeroTitle> {
   }
 
   Widget _buildPlaceholder() {
+    final bool isTextOnly = widget.logo == null || widget.logo!.isEmpty;
     return SizedBox(
       key: const ValueKey('identity_placeholder'),
       width: widget.maxWidth,
-      height: widget.maxHeight,
+      height: isTextOnly ? (widget.maxHeight * 0.6) : widget.maxHeight,
     );
   }
 

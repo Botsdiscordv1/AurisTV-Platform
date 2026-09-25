@@ -101,6 +101,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
     final openCategory = inferOpenCategory(result, _selectedCategory);
 
+    final contentType = result.type ?? result.kind;
+
     final uri = '/content/${Uri.encodeComponent(displayTitle)}'
         '?source=${Uri.encodeComponent(result.source)}'
         '&url=${Uri.encodeComponent(result.url)}'
@@ -109,7 +111,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         '&category=${Uri.encodeComponent(openCategory)}'
         '&year=${result.year ?? ''}'
         '&totalSeasons=${result.totalSeasons ?? ''}'
-        '${result.kind != null ? '&type=${Uri.encodeComponent(result.kind!)}' : ''}';
+        '${contentType != null ? '&type=${Uri.encodeComponent(contentType)}' : ''}';
 
     context.push(uri, extra: result);
   }

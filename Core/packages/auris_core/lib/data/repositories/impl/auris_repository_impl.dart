@@ -973,11 +973,21 @@ class AurisRepositoryImpl implements AurisRepository {
     int? year,
     bool fast = false,
   }) async {
-    final params = <String, dynamic>{'url': url, 'source': source};
-    
     // Senior Fix: Si el cliente no pasó season, intentamos inferirlo de la URL 
     // antes de enviar la petición al servidor para ayudar al IdentityResolver.
     final int? effectiveSeason = season ?? extractSeason(url);
+    
+    String effectiveUrl = url;
+    if (effectiveSeason != null && effectiveSeason <= 1) {
+      effectiveUrl = effectiveUrl
+          .replaceAll(RegExp(r'-(?:2nd|3rd|4th|\d+th)-season', caseSensitive: false), '')
+          .replaceAll(RegExp(r'-season-\d+', caseSensitive: false), '')
+          .replaceAll(RegExp(r'-temporada-\d+', caseSensitive: false), '')
+          .replaceAll(RegExp(r'-\d+da-temporada', caseSensitive: false), '')
+          .replaceAll(RegExp(r'-s\d+', caseSensitive: false), '');
+    }
+
+    final params = <String, dynamic>{'url': effectiveUrl, 'source': source};
     
     if (title != null) params['title'] = title;
     if (fullTitle != null) params['fullTitle'] = fullTitle;

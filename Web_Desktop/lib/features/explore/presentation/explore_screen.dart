@@ -288,7 +288,7 @@ class ExploreScreen extends ConsumerWidget {
                               url: item.id,
                               category: item.type.name,
                               year: item.year,
-                              type: item.card?.kind ?? item.type.name,
+                              type: item.card?.type ?? item.card?.kind ?? item.type.name,
                               from: '/explore',
                             );
                             context.push(uri, extra: item.toContentSeed());

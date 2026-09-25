@@ -365,6 +365,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
   bool _isOverlayShown = false;
   bool _isMouseInside = false;
   final LayerLink _layerLink = LayerLink();
+  final ScrollController _synopsisScrollController = ScrollController();
 
   Timer? _showTimer;
   Timer? _hideTimer;
@@ -430,6 +431,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
   }
 
   void _showOverlay(BuildContext context) {
+    if (widget.isMobile) return;
     _hideTimer?.cancel();
     if (_isOverlayShown || _overlayEntry != null) return;
     
@@ -468,7 +470,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
     final Offset position = renderBox.localToGlobal(Offset.zero);
     final double screenWidth = MediaQuery.of(context).size.width;
 
-    final double popupWidth = (cardSize.width + 48).clamp(285.0, 380.0);
+    final double popupWidth = (cardSize.width + 48).clamp(320.0, 380.0);
     const double edgePadding = 24.0;
     
     double cardCenterX = position.dx + cardSize.width / 2;
@@ -491,10 +493,8 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
         targetAnchor: Alignment.topCenter,
         followerAnchor: Alignment.topCenter,
         offset: Offset(offsetX, offsetY),
-        child: TweenAnimationBuilder<double>(
-          duration: const Duration(milliseconds: 150),
-          tween: Tween(begin: 0.0, end: 1.0),
-          builder: (context, opacity, child) => Opacity(opacity: opacity, child: child),
+        child: UnconstrainedBox(
+          alignment: Alignment.topCenter,
           child: Material(
             color: Colors.transparent,
             child: MouseRegion(
@@ -513,23 +513,15 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                 child: InkWell(
                   onTap: widget.onTap,
                   borderRadius: BorderRadius.circular(12),
-                  child: Container(
+                  child: SizedBox(
                     width: popupWidth,
-                    constraints: const BoxConstraints(maxHeight: 480),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF191E25),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.6),
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 380),
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 420),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF191E25),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12, width: 1),
+                      ),
                       child: SingleChildScrollView(
                         physics: const ClampingScrollPhysics(),
                         child: Column(
@@ -542,15 +534,15 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                                 children: [
                                   AspectRatio(
                                     aspectRatio: 16 / 9,
-                                      child: CachedNetworkImage(
-                                        imageUrl: widget.imageUrl,
+                                    child: CachedNetworkImage(
+                                      imageUrl: widget.imageUrl,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (_, __, ___) => CachedNetworkImage(
+                                        imageUrl: widget.fallbackImageUrl,
                                         fit: BoxFit.cover,
-                                        errorWidget: (_, __, ___) => CachedNetworkImage(
-                                          imageUrl: widget.fallbackImageUrl,
-                                          fit: BoxFit.cover,
-                                          errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
-                                        ),
+                                        errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
                                       ),
+                                    ),
                                   ),
                                   if (widget.progress != null && widget.progress! > 0)
                                     Positioned(
@@ -571,12 +563,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                               ),
                             ),
                             Padding(
-                              padding: EdgeInsets.only(
-                                left: 24, 
-                                right: 24, 
-                                bottom: 24, 
-                                top: ResponsiveUtils.sp(context, 12)
-                              ),
+                              padding: const EdgeInsets.all(16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -586,47 +573,68 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: ResponsiveUtils.sp(context, 16),
+                                      fontSize: ResponsiveUtils.sp(context, 15),
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(height: ResponsiveUtils.sp(context, 6)),
-                                   if (!_isSpecial || widget.description.isNotEmpty)
-                                     Text(
-                                       widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
-                                       maxLines: 3,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: const Color(0xFFA5A5AA),
-                                        fontSize: ResponsiveUtils.sp(context, 13),
-                                        height: 1.5,
-                                        fontWeight: FontWeight.normal,
+                                  if (!_isSpecial && widget.description.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      constraints: const BoxConstraints(minHeight: 60, maxHeight: 110),
+                                      child: NotificationListener<ScrollNotification>(
+                                        onNotification: (notification) => true,
+                                        child: Listener(
+                                          behavior: HitTestBehavior.opaque,
+                                          onPointerSignal: (pointerSignal) {
+                                            if (pointerSignal is PointerScrollEvent) {
+                                              if (_synopsisScrollController.hasClients) {
+                                                final offset = (_synopsisScrollController.offset + pointerSignal.scrollDelta.dy)
+                                                    .clamp(0.0, _synopsisScrollController.position.maxScrollExtent);
+                                                _synopsisScrollController.jumpTo(offset);
+                                              }
+                                            }
+                                          },
+                                          child: RawScrollbar(
+                                            controller: _synopsisScrollController,
+                                            thumbColor: const Color(0xFFEF7A1E).withOpacity(0.4),
+                                            radius: const Radius.circular(20),
+                                            thickness: 3,
+                                            thumbVisibility: true,
+                                            child: SingleChildScrollView(
+                                              controller: _synopsisScrollController,
+                                              physics: const ClampingScrollPhysics(),
+                                              padding: const EdgeInsets.only(right: 14),
+                                              child: Text(
+                                                widget.description,
+                                                style: TextStyle(
+                                                  color: const Color(0xFFA5A5AA),
+                                                  fontSize: ResponsiveUtils.sp(context, 12),
+                                                  height: 1.4,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  SizedBox(height: ResponsiveUtils.sp(context, 8)),
+                                  ],
+                                  const SizedBox(height: 12),
                                   Row(
                                     children: [
                                       if (widget.certification != null && widget.certification != 'NR') ...[
                                         _ContentScreenState._buildAgeBadge(context, widget.certification!, small: true),
-                                        SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                                        const SizedBox(width: 8),
                                       ],
                                       if (_typeBadge != null) ...[
                                         _ContentScreenState._buildAgeBadge(context, _typeBadge!, small: true),
-                                        SizedBox(width: ResponsiveUtils.sp(context, 8)),
+                                        const SizedBox(width: 8),
                                       ],
                                       _ContentScreenState._buildAgeBadge(context, _languageBadge, small: true),
-                                      SizedBox(width: ResponsiveUtils.sp(context, 10)),
-                                      if (!_isSpecial && widget.duration != null) ...[
+                                      const Spacer(),
+                                      if (!_isSpecial && widget.duration != null)
                                         Text(
                                           widget.duration!,
-                                          style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
-                                        ),
-                                        SizedBox(width: ResponsiveUtils.sp(context, 12)),
-                                      ],
-                                      if (!_isSpecial && widget.releaseDate != null)
-                                        Text(
-                                          _ContentScreenState._formatDate(widget.releaseDate),
-                                          style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 12)),
+                                          style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 12),
                                         ),
                                     ],
                                   ),
@@ -693,6 +701,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
   void dispose() {
     _showTimer?.cancel();
     _hideTimer?.cancel();
+    _synopsisScrollController.dispose();
     if (_activeState == this) _activeState = null;
     _overlayEntry?.remove();
     super.dispose();
@@ -1225,12 +1234,16 @@ class _CastCreditsModal extends ConsumerWidget {
       backgroundColor: const Color(0xFF0B0B0D),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.white10)),
       insetPadding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 12 : width * 0.1,
-        vertical: isMobile ? 20 : 40,
+        horizontal: isMobile ? 16 : width * 0.15,
+        vertical: isMobile ? 24 : 60,
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1200),
+        constraints: BoxConstraints(
+          maxWidth: 1000,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Header del Modal
             Padding(
@@ -1282,7 +1295,7 @@ class _CastCreditsModal extends ConsumerWidget {
             const Divider(color: Colors.white10, height: 1),
 
             // Cuerpo - Metadata + Bio + Filmografía
-            Expanded(
+            Flexible(
               child: creditsAsync.when(
                 data: (response) {
                   if (response == null || (response.results.isEmpty && response.biography == null)) {
@@ -2054,79 +2067,150 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       );
     }
 
+    final double screenW = MediaQuery.sizeOf(context).width;
+    final double maxPossibleW = screenW - 100.0;
+    final double metaWidth = (screenW * 0.52).clamp(300.0, maxPossibleW > 300.0 ? maxPossibleW : 300.0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DefaultTextStyle(
-          style: GoogleFonts.poppins(
-            color: const Color(0xFFD1D1D6),
-            fontSize: isCompact ? 15 : 17,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.5,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (d.length >= 4) ...[
-                Text(d.substring(0, 4)),
-                _buildDotSeparator(),
-              ],
-              if (g != null && g.isNotEmpty) ...[
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: Container(
-                    height: isCompact ? 28 : 34,
-                    child: ClipRect(
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 20,
-                        children: g.map((genre) => _buildBadge(context, genre.toString().toUpperCase(), small: isCompact)).toList(),
-                      ),
-                    ),
-                  ),
-                ),
-                _buildDotSeparator(),
-              ],
-              if (isMovie) ...[
-                if (runtime != null) ...[
-                  Text(_formatRuntime(runtime)),
-                  _buildDotSeparator(),
-                ],
-              ] else if ((widget.totalSeasons ?? 0) > 1) ...[
-                Text('${widget.totalSeasons} temporadas'),
-                _buildDotSeparator(),
-              ],
-              if (r > 0) ...[
-                const Icon(Icons.star_rounded, color: Color(0xFFFACC15), size: 22),
-                const SizedBox(width: 4),
-                Text(
-                  formatRating(r) ?? 'N/A',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 8), // Senior Fix: Espaciado interno más compacto en metadata
-        Row(
-          children: [
-            if (cert != 'NR') ...[
-              _buildAgeBadge(context, cert, small: isCompact),
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              child: Text(
-                _getWarningText(cert),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        LayoutBuilder(
+          builder: (context, parentConstraints) {
+            final String leftText = [
+              if (d.length >= 4) d.substring(0, 4),
+              if (isMovie && runtime != null) _formatRuntime(runtime),
+              if (!isMovie && (widget.totalSeasons ?? 0) > 1) '${widget.totalSeasons} temporadas',
+            ].join(' · ');
+
+            final leftPainter = TextPainter(
+              text: TextSpan(
+                text: leftText,
                 style: GoogleFonts.poppins(
-                  color: const Color(0xFFA5A5AA),
-                  fontSize: isCompact ? 14 : 16,
+                  fontSize: isCompact ? 15 : 17,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-            ),
-          ],
+              textDirection: TextDirection.ltr,
+            )..layout();
+
+            final double leftW = leftPainter.width;
+            final double rightW = r > 0 ? 65.0 : 0.0;
+            const double separatorsAndPadding = 48.0;
+
+            final double genresMaxW = (metaWidth - leftW - rightW - separatorsAndPadding).clamp(60.0, 600.0);
+
+            final List<String> visibleGenres = [];
+            double totalW = 0.0;
+            const double badgePadding = 24.0;
+            const double badgeSpacing = 8.0;
+
+            if (g != null) {
+              for (final genre in g) {
+                final textSpan = TextSpan(
+                  text: genre.toString().toUpperCase(),
+                  style: GoogleFonts.poppins(
+                    fontSize: isCompact ? 13 : 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+                final textPainter = TextPainter(
+                  text: textSpan,
+                  textDirection: TextDirection.ltr,
+                )..layout();
+                
+                final double badgeW = textPainter.width + badgePadding;
+                final double requiredW = visibleGenres.isEmpty ? badgeW : (badgeW + badgeSpacing);
+
+                if (totalW + requiredW <= genresMaxW) {
+                  totalW += requiredW;
+                  visibleGenres.add(genre.toString().toUpperCase());
+                } else {
+                  break;
+                }
+              }
+            }
+
+            return SizedBox(
+              width: metaWidth,
+              child: DefaultTextStyle(
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFFD1D1D6),
+                  fontSize: isCompact ? 15 : 17,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.5,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (d.length >= 4) ...[
+                      Text(d.substring(0, 4)),
+                    ],
+                    if (isMovie) ...[
+                      if (runtime != null) ...[
+                        if (d.length >= 4) _buildDotSeparator(),
+                        Text(_formatRuntime(runtime)),
+                      ],
+                    ] else if ((widget.totalSeasons ?? 0) > 1) ...[
+                      if (d.length >= 4) _buildDotSeparator(),
+                      Text('${widget.totalSeasons} temporadas'),
+                    ],
+                    if (visibleGenres.isNotEmpty) ...[
+                      if (d.length >= 4 || isMovie || (widget.totalSeasons ?? 0) > 1)
+                        _buildDotSeparator(),
+                      SizedBox(
+                        height: isCompact ? 28 : 34,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: visibleGenres.map((genre) => Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _buildBadge(context, genre, small: isCompact),
+                          )).toList(),
+                        ),
+                      ),
+                    ],
+                    if (r > 0) ...[
+                      _buildDotSeparator(),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star_rounded, color: Color(0xFFFACC15), size: 22),
+                          const SizedBox(width: 4),
+                          Text(
+                            formatRating(r) ?? 'N/A',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 8), // Senior Fix: Espaciado interno más compacto en metadata
+        SizedBox(
+          width: metaWidth,
+          child: Row(
+            children: [
+              if (cert != 'NR') ...[
+                _buildAgeBadge(context, cert, small: isCompact),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Text(
+                  _getWarningText(cert),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    color: const Color(0xFFA5A5AA),
+                    fontSize: isCompact ? 14 : 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -2162,10 +2246,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         );
 
         if (isScrollable) {
-          final double screenH = MediaQuery.sizeOf(context).height;
-          final double maxH = (screenH * 0.18).clamp(100.0, 160.0);
-          // Garantizamos un mínimo de ~3-4 líneas visibles (aprox 80-90px)
-          final double minH = isCompact ? 72.0 : 92.0; 
+          final double linePixelHeight = fontSize * lineHeight;
+          final double minH = (linePixelHeight * 3.0).ceilToDouble();
+          final double maxH = (linePixelHeight * 3.8).ceilToDouble();
           
           return Container(
             constraints: BoxConstraints(minHeight: minH, maxHeight: maxH),
@@ -2177,8 +2260,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
               thumbVisibility: true,
               child: SingleChildScrollView(
                 controller: _synopsisScrollController,
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.only(right: 14),
+                physics: const ClampingScrollPhysics(),
+                clipBehavior: Clip.hardEdge,
+                padding: const EdgeInsets.only(right: 14, top: 0, bottom: 2),
                 child: Text(
                   text,
                   style: style,
@@ -2248,12 +2332,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       title: widget.title,
       metadataTitle: widget.metadataTitle,
       category: widget.category,
-      kind: widget.result?.kind ?? widget.type,
+      kind: widget.result?.kind,
       year: widget.year,
       season: widget.result?.season,
       source: widget.source,
       url: widget.url,
-      type: widget.type,
+      type: widget.result?.type ?? widget.type,
       sectionId: widget.sectionId,
       initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
     );
@@ -2792,12 +2876,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         title: widget.title,
         metadataTitle: widget.metadataTitle,
         category: widget.category,
-        kind: widget.result?.kind ?? widget.type,
+        kind: widget.result?.kind,
         year: widget.year,
         season: widget.result?.season,
         source: widget.source,
         url: widget.url,
-        type: widget.type,
+        type: widget.result?.type ?? widget.type,
         sectionId: widget.sectionId,
         initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
       );
@@ -2823,6 +2907,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       final isMovieCategory = detailState.isMovieish;
       final currentSeason = detailState.currentSeason;
       final totalSeasons = detailState.totalSeasons;
+      final int resolvedTotalSeasons = [totalSeasons, widget.totalSeasons ?? 0].reduce((a, b) => a > b ? a : b);
       final activeSources = detailState.allSources;
       final currentSource = detailState.selectedSource;
       final episodesAsync = detailState.episodes;
@@ -2960,12 +3045,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
           activeSources: activeSources,
           currentSource: currentSource,
           currentSeason: currentSeason,
-          totalSeasons: totalSeasons,
+          totalSeasons: resolvedTotalSeasons,
           tabLabels: tabLabels,
           selectedTabIndex: selectedTabIndex,
           contentSliver: contentSliver,
           isCompactHeader: isCompact,
           epData: epData,
+          isMovieCategory: isMovieCategory,
         );
       }
 
@@ -3007,16 +3093,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         mainAction: _buildMainActionButton(context, isMobile: isMobile),
         secondaryActions: _buildCircularActions(context, isMobile: isMobile),
         synopsis: _buildSynopsis(detailData, isCompact: !isMobile && width < 1200),
-        selectors: ((widget.totalSeasons ?? 0) > 1 || currentSource != null) ? Row(
+        selectors: (!isMovieCategory && (resolvedTotalSeasons > 0 || currentSource != null)) ? Row(
           children: [
-            if ((widget.totalSeasons ?? 0) > 1) ...[
+            if (!isMovieCategory && resolvedTotalSeasons > 0) ...[
               SeasonSelector(
                 data: SeasonSelectorData(
                   currentSeason: currentSeason,
-                  totalSeasons: widget.totalSeasons ?? 0,
+                  totalSeasons: resolvedTotalSeasons > 0 ? resolvedTotalSeasons : 1,
                   onSeasonSelected: (s) => ref.setSeason(detailParams, s),
                   compact: true,
-                  width: 140,
                   totalEpisodes: epData?.total,
                 ),
               ),
@@ -3086,19 +3171,21 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     required Widget contentSliver,
     required bool isCompactHeader,
     required dynamic epData,
+    required bool isMovieCategory,
   }) {
     // Senior Responsive Desktop Architecture: Dimensiones fluidas continuas para cualquier resolución de pantalla (Laptops -> 4K Ultrawide)
-    final double headerH = (width / 3.0).clamp(460.0, 620.0);
+    final double headerH = (width / 3.2).clamp(420.0, 560.0);
     final double overlayLeftPadding = (width * 0.025 + 40.0).clamp(68.0, 96.0); // Sangría segura para no chocar jamás con el botón 'back'
-    final double synopsisWidth = (width * 0.42).clamp(380.0, 750.0);
+    final double synopsisWidth = (width * 0.46).clamp(400.0, 760.0);
     final double logoMaxWidth = (width * 0.32).clamp(320.0, 600.0);
     final double logoMaxHeight = (headerH * (isCompactHeader ? 0.20 : 0.25)).clamp(80.0, 140.0);
     final double titleSize = (width * 0.028).clamp(30.0, 52.0);
-    final double topPadding = (headerH * (isCompactHeader ? 0.14 : 0.20)).clamp(64.0, 110.0);
-    final double gapLogoToMeta = isCompactHeader ? 10.0 : 18.0;
-    final double gapMetaToSynopsis = isCompactHeader ? 6.0 : 10.0;
-    final double gapSynopsisToActions = isCompactHeader ? 6.0 : 12.0;
-    final double gapActionsToSelectors = isCompactHeader ? 4.0 : 8.0;
+    final double topPadding = (headerH * (isCompactHeader ? 0.08 : 0.15)).clamp(36.0, 90.0);
+    final bool hasLogo = detailData?.logo != null && detailData!.logo!.isNotEmpty;
+    final double gapLogoToMeta = isCompactHeader ? 4.0 : (hasLogo ? 18.0 : 8.0);
+    final double gapMetaToSynopsis = isCompactHeader ? 2.0 : (hasLogo ? 10.0 : 6.0);
+    final double gapSynopsisToActions = isCompactHeader ? 2.0 : 12.0;
+    final double gapActionsToSelectors = isCompactHeader ? 0.0 : 8.0;
     final double selectorWidth = isCompactHeader ? 160.0 : 210.0;
     final double selectorH = isCompactHeader ? 36.0 : (width * 0.026).clamp(42.0, 48.0);
     final double selectorFontSize = isCompactHeader ? 13.5 : (width * 0.009).clamp(14.0, 16.0);
@@ -3318,13 +3405,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                           padding: EdgeInsets.only(
                             left: overlayLeftPadding, 
                             top: topPadding, 
-                            bottom: 10, 
+                            bottom: 0, 
                             right: 32,
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
+                          child: SingleChildScrollView(
+                            physics: const ClampingScrollPhysics(),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                               // Logo
                               AnimatedOpacity(
                                 duration: const Duration(milliseconds: 1200),
@@ -3335,7 +3424,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                   logo: detailData?.logo,
                                   logoReady: detailAsync.hasValue,
                                   maxWidth: logoMaxWidth,
-                                  maxHeight: logoMaxHeight, // Límite de escala adaptativo fluido
+                                  maxHeight: (detailData?.logo != null && detailData!.logo!.isNotEmpty) ? logoMaxHeight : (titleSize * 2.2),
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: titleSize,
@@ -3353,12 +3442,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                               if (detailData != null) ...[
                                 _buildMetaRow(detailData, isCompact: isCompactHeader, kind: detailParams.kind),
                                 SizedBox(height: gapMetaToSynopsis),
-                                Flexible(
-                                  fit: FlexFit.loose,
-                                  child: SizedBox(
-                                    width: synopsisWidth,
-                                    child: _buildSynopsis(detailData, isCompact: isCompactHeader, isScrollable: true),
-                                  ),
+                                SizedBox(
+                                  width: synopsisWidth,
+                                  child: _buildSynopsis(detailData, isCompact: isCompactHeader, isScrollable: true),
                                 ),
                               ],
                               SizedBox(height: gapSynopsisToActions),
@@ -3372,14 +3458,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                               ),
                               SizedBox(height: gapActionsToSelectors),
                               // Selectores
-                              if (totalSeasons > 1 || currentSource != null)
+                              if (!isMovieCategory && (totalSeasons > 0 || currentSource != null))
                                 Row(
                                   children: [
-                                    if (totalSeasons > 1) ...[
+                                    if (!isMovieCategory && totalSeasons > 0) ...[
                                       SeasonSelector(
                                         data: SeasonSelectorData(
                                           currentSeason: currentSeason,
-                                          totalSeasons: totalSeasons,
+                                          totalSeasons: totalSeasons > 0 ? totalSeasons : 1,
                                           onSeasonSelected: (s) => ref.setSeason(detailParams, s),
                                           compact: isCompactHeader,
                                           width: selectorWidth,
@@ -3403,7 +3489,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                       ),
                                   ],
                                 ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),

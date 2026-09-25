@@ -40,7 +40,7 @@ void openTVDetails(BuildContext context, MediaItem item, String uiCategory) {
 
   final metaTitle = item.romaji ?? item.english ?? item.title;
   final effectiveUrl = item.detailUrl ?? item.id;
-  final String? kind = isAnimeMovie ? 'movie_anime' : item.card?.kind;
+  final String? typeVal = item.card?.type ?? item.card?.kind ?? (isAnimeMovie ? 'movie_anime' : null);
 
   final uri = '/content/${Uri.encodeComponent(item.title)}'
       '?source=${Uri.encodeComponent(source)}'
@@ -49,7 +49,7 @@ void openTVDetails(BuildContext context, MediaItem item, String uiCategory) {
       '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
       '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
       '&year=${item.year ?? ''}'
-      '${kind != null ? '&type=${Uri.encodeComponent(kind)}' : ''}'
+      '${typeVal != null ? '&type=${Uri.encodeComponent(typeVal)}' : ''}'
       '&sectionId=${Uri.encodeComponent(item.sectionId ?? '')}';
 
   WidgetsBinding.instance.addPostFrameCallback((_) {

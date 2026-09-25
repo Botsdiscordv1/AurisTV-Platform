@@ -37,6 +37,9 @@ class AnimeDetail {
   final List<PlatformInfo> platforms;
   final String? kind;
   final Map<int, String> backdropsBySeason;
+  final String? releaseStatus;
+  final String? releaseDate;
+  final String? releaseTimestamp;
 
   const AnimeDetail({
     required this.id,
@@ -72,6 +75,9 @@ class AnimeDetail {
     this.platforms = const [],
     this.kind,
     this.backdropsBySeason = const {},
+    this.releaseStatus,
+    this.releaseDate,
+    this.releaseTimestamp,
   });
 
   String? get trailerKey => trailer?.videoId;
@@ -227,6 +233,9 @@ class AnimeDetail {
               .toList() ??
           [],
       backdropsBySeason: backdropsBySeason,
+      releaseStatus: (root['releaseStatus'] ?? anime['releaseStatus'] ?? root['release_status'] ?? anime['release_status']) as String?,
+      releaseDate: (root['releaseDate'] ?? anime['releaseDate'] ?? root['release_date'] ?? anime['release_date'] ?? visuals?['releaseDate']) as String?,
+      releaseTimestamp: (root['releaseTimestamp'] ?? anime['releaseTimestamp'] ?? root['release_timestamp'] ?? anime['release_timestamp'] ?? root['airDate'] ?? anime['airDate']) as String?,
     );
   }
 }
