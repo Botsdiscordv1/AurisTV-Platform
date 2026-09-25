@@ -1,0 +1,41 @@
+name: Build Windows Desktop
+
+on:
+  push:
+    tags:
+      - 'win-v*' # Se activa al crear un tag como win-v1.0.0
+
+jobs:
+  build:
+    name: Build Windows App
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.8'
+
+      - name: Build Windows Release
+        working-directory: ./Web_Desktop
+        run: |
+          flutter pub get
+          flutter build windows --release
+
+      - name: Compress Windows Build
+        run: |
+          Compress-Archive -Path "Web_Desktop/build/windows/x64/runner/Release/*" -DestinationPath "auristv-windows-x64.zip"
+
+      - name: Upload Windows App to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: auristv-windows-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
