@@ -4,27 +4,18 @@ on:
   push:
     branches: []
     tags:
-      - 'v*' # Se activa al crear un tag como v1.0.0
+      - 'v*' # Se activa EXCLUSIVAMENTE al crear un tag como v1.0.0
 
 jobs:
   build:
     name: Build Android APKs (Split by ABI)
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Necesario para borrar y recrear la Release
+      contents: write # Necesario para crear/actualizar la Release
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Delete existing release/tag if updating v1.0.0
-        uses: dev-drprasad/delete-tag-and-release@v1.2.1
-        with:
-          tag_name: ${{ github.ref_name }}
-          delete_release: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
       - name: Set up Java
         uses: actions/setup-java@v4
