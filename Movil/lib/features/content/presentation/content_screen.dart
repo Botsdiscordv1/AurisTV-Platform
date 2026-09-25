@@ -414,7 +414,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
   @override Widget build(BuildContext context) {
     if (widget.isMobile) {
       return Padding(
-        padding: EdgeInsets.symmetric(vertical: ResponsiveUtils.sp(context, 16)),
+        padding: EdgeInsets.only(bottom: ResponsiveUtils.sp(context, 16), top: 0),
         child: InkWell(
           onTap: widget.onTap,
           child: Column(
@@ -1732,12 +1732,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       orElse: () => false,
     );
 
-    final currentOpenings = detailData is AnimeDetail 
-        ? detailData.openings 
-        : (detailData is MovieDetail ? (detailData as MovieDetail).openings : const []);
-    final currentEndings = detailData is AnimeDetail 
-        ? detailData.endings 
-        : (detailData is MovieDetail ? (detailData as MovieDetail).endings : const []);
+    // OP/ED desde /api/themes (fuera del detail: no lo bloquean). Movies
+    // siguen leyéndolos de su detail (si el server los envía).
+    final themesData = detailState.themes.valueOrNull;
+    final currentOpenings = detailData is AnimeDetail
+        ? (themesData?.openings ?? const <AnimeThemeInfo>[])
+        : (detailData is MovieDetail ? (detailData as MovieDetail).openings : const <AnimeThemeInfo>[]);
+    final currentEndings = detailData is AnimeDetail
+        ? (themesData?.endings ?? const <AnimeThemeInfo>[])
+        : (detailData is MovieDetail ? (detailData as MovieDetail).endings : const <AnimeThemeInfo>[]);
     final extrasTabIndexRaw = (currentOpenings.isNotEmpty || currentEndings.isNotEmpty) ? 1 : -1;
     
     final bool hasRelatedData = unifiedRelationsAsync.maybeWhen(data: (d) => d.isNotEmpty, orElse: () => false);
@@ -1889,68 +1892,71 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           content: SliverMainAxisGroup(slivers: [
             if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex)
               SliverToBoxAdapter(
-                child: AdaptiveEpisodesOrCountdown(
-                  params: detailParams,
-                  episodesBuilder: (episodes) {
-                    final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
-                    if (epBundle != null) {
-                      _lastEpisodes = epBundle;
-                      final epData = epBundle.response;
-                      final total = epData.total;
+                child: Transform.translate(
+                  offset: const Offset(0, -14),
+                  child: AdaptiveEpisodesOrCountdown(
+                    params: detailParams,
+                    episodesBuilder: (episodes) {
+                      final epBundle = episodesAsync.valueOrNull ?? _lastEpisodes;
+                      if (epBundle != null) {
+                        _lastEpisodes = epBundle;
+                        final epData = epBundle.response;
+                        final total = epData.total;
 
-                      if (isMobile) {
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: total,
-                          itemBuilder: (context, index) {
-                            final ep = index < epData.episodes.length ? epData.episodes[index] : null;
-                            final epNum = (ep?.number ?? index + 1).toString();
-                            final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                            final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                            return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
-                              final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                              final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                              final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                              final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                              context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
-                            });
-                          },
-                        );
-                      } else {
-                        return GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio),
-                          itemCount: total,
-                          itemBuilder: (context, index) {
-                            final ep = index < epData.episodes.length ? epData.episodes[index] : null;
-                            final epNum = (ep?.number ?? index + 1).toString();
-                            final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                            final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                            final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                            return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
-                              final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                              final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                              final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                              final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                              context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
-                            });
-                          },
-                        );
+                        if (isMobile) {
+                          return ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: total,
+                            itemBuilder: (context, index) {
+                              final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                              final epNum = (ep?.number ?? index + 1).toString();
+                              final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                              final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                              return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
+                                final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                                final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                                final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                                final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                                context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                              });
+                            },
+                          );
+                        } else {
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio),
+                            itemCount: total,
+                            itemBuilder: (context, index) {
+                              final ep = index < epData.episodes.length ? epData.episodes[index] : null;
+                              final epNum = (ep?.number ?? index + 1).toString();
+                              final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                              final epSource = epBundle.sourceForIndex(index) ?? currentSource;
+                              final epQuality = ep?.quality ?? epSource?.quality ?? '';
+                              return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
+                                final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
+                                final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
+                                final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                                final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                                context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}$posterParam');
+                              });
+                            },
+                          );
+                        }
                       }
-                    }
-                    return episodesAsync.when(
-                      data: (_) => const SizedBox.shrink(),
-                      loading: () => const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
-                      error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Color(0xFFA5A5AA)))),
-                    );
-                  },
+                      return episodesAsync.when(
+                        data: (_) => const SizedBox.shrink(),
+                        loading: () => const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
+                        error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Color(0xFFA5A5AA)))),
+                      );
+                    },
+                  ),
                 ),
               ),
             if (selectedTabIndex == relatedTabIndex && relatedTabIndex != -1) ..._buildRelatedTab(0, unifiedRelations: unifiedRelationsAsync, currentSource: currentSource),
             if (selectedTabIndex == castTabIndex && castTabIndex != -1) ..._buildCastTab(detailData, castAsync.valueOrNull ?? const [], 0),
-            if (selectedTabIndex == extrasTabIndexFinal && extrasTabIndexFinal != -1) ..._buildExtrasTab(detailData, 0),
+            if (selectedTabIndex == extrasTabIndexFinal && extrasTabIndexFinal != -1) ..._buildExtrasTab(detailData, 0, openings: currentOpenings, endings: currentEndings),
             if (selectedTabIndex == detailsTabIndex && detailsTabIndex != -1) ..._buildDetailsTab(detailData, 0, inferredSeasonAirDate: episodesAsync.valueOrNull?.response.seasonAirDate, sourceRating: currentSource?.score, showRatingSkeleton: currentSource?.score == null && detailLoading),
             if (selectedTabIndex == galleryTabIndex && galleryTabIndex != -1) ..._buildGalleryTab(0, isMovieCategory ? 'movie' : 'tv', detailData?.title ?? widget.title, detailData is AnimeDetail ? (detailData as AnimeDetail).year : widget.year),
           ]),
@@ -2018,7 +2024,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     return [
       SliverPadding(
-        padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 24),
+        padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 8, bottom: 24),
         sliver: SliverGrid(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
@@ -2329,14 +2335,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     ];
   }
 
-  List<Widget> _buildExtrasTab(dynamic detail, double hPadding) {
+  List<Widget> _buildExtrasTab(dynamic detail, double hPadding,
+      {List<AnimeThemeInfo> openings = const [], List<AnimeThemeInfo> endings = const []}) {
     if (detail == null) return [const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 40), child: Center(child: CircularProgressIndicator(color: Colors.white24))))];
     final isMobile = ResponsiveUtils.isMobile(context);
-    final List<AnimeThemeInfo> ops = detail is AnimeDetail 
-        ? detail.openings 
+    // Los OP/ED del anime llegan de /api/themes (detail ya no los incluye).
+    final List<AnimeThemeInfo> ops = detail is AnimeDetail
+        ? openings
         : (detail is MovieDetail ? (detail as MovieDetail).openings : const []);
-    final List<AnimeThemeInfo> eds = detail is AnimeDetail 
-        ? detail.endings 
+    final List<AnimeThemeInfo> eds = detail is AnimeDetail
+        ? endings
         : (detail is MovieDetail ? (detail as MovieDetail).endings : const []);
     final String? fallbackImg = detail is AnimeDetail 
         ? (detail.banner ?? detail.backdrop) 
@@ -2400,9 +2408,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         const SizedBox(height: 8), 
         Text(_getWarningText(cert), style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 14)), 
         const SizedBox(height: 24), 
-        if (status != null) ...[const Text('Estado', style: TextStyle(color: Colors.white, fontSize: 16)), Text(status, style: const TextStyle(color: const Color(0xFFA5A5AA))), const SizedBox(height: 24)],
+        if (status != null) ...[
+          const Text('Estado', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(status, style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 14)),
+          const SizedBox(height: 24),
+        ],
         if (languages.isNotEmpty) ...[
-          const Text('Pa\u00EDs', style: TextStyle(color: Colors.white, fontSize: 16)),
+          const Text('Pa\u00EDs', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
           Text(() {
               return languages.map((l) {
                 final country = l.toLowerCase();
@@ -2420,11 +2434,20 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
                 return emoji.isNotEmpty ? '$emoji $l' : l;
               }).join('  ');
-          }(), style: const TextStyle(color: const Color(0xFFA5A5AA))),
-          const SizedBox(height: 24)
+          }(), style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 14)),
+          const SizedBox(height: 24),
         ],
-        if (dir.isNotEmpty) ...[const Text('Direcci\u00F3n', style: TextStyle(color: Colors.white, fontSize: 16)), Text(dir.join(', '), style: const TextStyle(color: Color(0xFFA5A5AA)))], 
-        if (std.isNotEmpty) ...[const SizedBox(height: 24), const Text('Estudio', style: TextStyle(color: Colors.white, fontSize: 16)), Text(std.join(', '), style: const TextStyle(color: const Color(0xFFA5A5AA)))] 
+        if (dir.isNotEmpty) ...[
+          const Text('Direcci\u00F3n', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(dir.join(', '), style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 14)),
+          const SizedBox(height: 24),
+        ], 
+        if (std.isNotEmpty) ...[
+          const Text('Estudio', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(std.join(', '), style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 14)),
+        ] 
       ]))),
     ];
 
@@ -2864,22 +2887,16 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
         return SliverMainAxisGroup(
           slivers: [
             SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: widget.hPadding, 
-                  right: widget.hPadding, 
-                  top: isMobile ? 0 : 8, 
-                  bottom: 16
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _GalleryFilterChip(
-                        label: "Todos",
-                        selected: _selectedFilter == "all",
-                        onSelected: () => setState(() => _selectedFilter = "all"),
-                      ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.fromLTRB(isMobile ? 24 : widget.hPadding, isMobile ? 0 : 8, isMobile ? 24 : widget.hPadding, 16),
+                child: Row(
+                  children: [
+                    _GalleryFilterChip(
+                      label: "Todos",
+                      selected: _selectedFilter == "all",
+                      onSelected: () => setState(() => _selectedFilter = "all"),
+                    ),
                       if (hasPosters) ...[
                         const SizedBox(width: 8),
                         _GalleryFilterChip(
@@ -2916,7 +2933,6 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
                   ),
                 ),
               ),
-            ),
             if (filtered.isEmpty)
               const SliverToBoxAdapter(
                 child: Center(

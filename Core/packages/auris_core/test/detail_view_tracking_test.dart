@@ -23,6 +23,8 @@ class MockAurisRepository implements AurisRepository {
     return mockDetail;
   }
 
+  @override Future<AnimeThemesData> getAnimeThemes({required String title, String? english, String? native_, String? server}) async => const AnimeThemesData();
+
   // Otros stubs
   @override Future<SearchResponse> search(String category, String query, {int? year, String? server, String? phase, String? imgSize, int page = 1, CancelToken? cancelToken}) async => SearchResponse(results: [], query: query, category: category, count: 0);
   @override Stream<SearchResponse> searchStream(String category, String query, {int? year, String? server, String? phase, String? imgSize, CancelToken? cancelToken}) async* {}

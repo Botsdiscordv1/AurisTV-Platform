@@ -36,6 +36,9 @@ class UnifiedContentState {
   /// Relacionados y recomendaciones.
   final AsyncValue<UnifiedRelationsMap> relations;
 
+  /// OP/ED (opening/ending): se piden aparte del detail (no bloquean la ficha).
+  final AsyncValue<AnimeThemesData> themes;
+
   /// Indica si es una película o similar (sin capítulos reales).
   final bool isMovieish;
   
@@ -51,6 +54,7 @@ class UnifiedContentState {
     this.episodes = const AsyncValue.loading(),
     this.cast = const AsyncValue.loading(),
     this.relations = const AsyncValue.loading(),
+    this.themes = const AsyncValue.loading(),
     this.isMovieish = false,
     this.seasonTitle,
   });
@@ -67,6 +71,7 @@ class UnifiedContentState {
           episodes == other.episodes &&
           cast == other.cast &&
           relations == other.relations &&
+          themes == other.themes &&
           isMovieish == other.isMovieish &&
           seasonTitle == other.seasonTitle;
 
@@ -80,6 +85,7 @@ class UnifiedContentState {
         episodes,
         cast,
         relations,
+        themes,
         isMovieish,
         seasonTitle,
       );
@@ -93,6 +99,7 @@ class UnifiedContentState {
     AsyncValue<GroupedEpisodesResult?>? episodes,
     AsyncValue<List<CastInfo>>? cast,
     AsyncValue<UnifiedRelationsMap>? relations,
+    AsyncValue<AnimeThemesData>? themes,
     bool? isMovieish,
     String? seasonTitle,
   }) {
@@ -105,6 +112,7 @@ class UnifiedContentState {
       episodes: episodes ?? this.episodes,
       cast: cast ?? this.cast,
       relations: relations ?? (this.relations as AsyncValue<UnifiedRelationsMap>),
+      themes: themes ?? this.themes,
       isMovieish: isMovieish ?? this.isMovieish,
       seasonTitle: seasonTitle ?? this.seasonTitle,
     );

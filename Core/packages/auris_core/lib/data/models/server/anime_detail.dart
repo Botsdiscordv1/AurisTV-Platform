@@ -427,3 +427,31 @@ class AnimeThemeInfo {
     );
   }
 }
+
+/// Resultado de /api/themes: OP/ED pedidos aparte del detail para no
+/// bloquear la ficha (AnimeThemes podía colgar 5-6s en el frío).
+class AnimeThemesData {
+  final List<AnimeThemeInfo> openings;
+  final List<AnimeThemeInfo> endings;
+
+  const AnimeThemesData({
+    this.openings = const [],
+    this.endings = const [],
+  });
+
+  factory AnimeThemesData.fromJson(Map<String, dynamic> json) {
+    final openings = <AnimeThemeInfo>[];
+    final endings = <AnimeThemeInfo>[];
+    for (final t in (json['themes'] as List<dynamic>? ?? const [])) {
+      if (t is Map) {
+        final theme = AnimeThemeInfo.fromJson(Map<String, dynamic>.from(t));
+        if (theme.type == 'OPENING') {
+          openings.add(theme);
+        } else if (theme.type == 'ENDING') {
+          endings.add(theme);
+        }
+      }
+    }
+    return AnimeThemesData(openings: openings, endings: endings);
+  }
+}

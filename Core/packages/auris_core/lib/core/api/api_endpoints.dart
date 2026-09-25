@@ -266,6 +266,7 @@ class ApiEndpoints {
   }
   static const String searchAnimeVariants = '/api/search/anime/variants';
   static const String detailAnime = '/api/detail/anime';
+  static const String animeThemes = '/api/themes'; // OP/ED aparte del detail (no bloquean la ficha)
   static const String detailMovie = '/api/detail/movie';
   static const String filter = '/api/filter';
   static const String homeHero = '/api/home/hero'; // Senior Fix: Nuevo endpoint dedicado para HeroBanner

@@ -2710,6 +2710,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     required bool detailLoading,
     required AsyncValue<Map<String, List<RelatedInfo>>> unifiedRelationsAsync,
     required bool isMovieCategory,
+    List<AnimeThemeInfo> openings = const [],
+    List<AnimeThemeInfo> endings = const [],
     bool isCompact = false,
   }) {
     final List<Widget> slivers = [];
@@ -2990,7 +2992,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       slivers.addAll(_buildCastTab(detailData, castAsync.valueOrNull ?? const [], 0));
     }
     if (selectedTabIndex == extrasTabIndex) {
-      slivers.addAll(_buildExtrasTab(detailData, 0));
+      slivers.addAll(_buildExtrasTab(detailData, 0, openings: openings, endings: endings));
     }
     if (selectedTabIndex == detailsTabIndex) {
       final epDataValue = episodesAsync.maybeWhen(data: (d) => d, orElse: () => null);
@@ -3084,11 +3086,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         orElse: () => false,
       );
 
+      // OP/ED desde /api/themes (fuera del detail: no lo bloquean). Movies
+      // siguen leyéndolos de su detail (si el server los envía).
+      final themesData = detailState.themes.valueOrNull;
       final currentOpenings = detailData is AnimeDetail
-          ? detailData.openings
+          ? (themesData?.openings ?? const <AnimeThemeInfo>[])
           : (detailData is MovieDetail ? (detailData as MovieDetail).openings : const <AnimeThemeInfo>[]);
       final currentEndings = detailData is AnimeDetail
-          ? detailData.endings
+          ? (themesData?.endings ?? const <AnimeThemeInfo>[])
           : (detailData is MovieDetail ? (detailData as MovieDetail).endings : const <AnimeThemeInfo>[]);
       final extrasTabIndexRaw = (currentOpenings.isNotEmpty || currentEndings.isNotEmpty) ? 1 : -1;
 
@@ -3172,6 +3177,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
         detailLoading: detailLoading,
         unifiedRelationsAsync: unifiedRelationsAsync,
         isMovieCategory: isMovieCategory,
+        openings: currentOpenings,
+        endings: currentEndings,
         isCompact: isCompact,
       );
 
@@ -4017,14 +4024,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     ];
   }
 
-  List<Widget> _buildExtrasTab(dynamic detail, double hPadding) {
+  List<Widget> _buildExtrasTab(dynamic detail, double hPadding,
+      {List<AnimeThemeInfo> openings = const [], List<AnimeThemeInfo> endings = const []}) {
     if (detail == null) return [const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 40), child: Center(child: CircularProgressIndicator(color: Colors.white24))))];
     final isMobile = context.isMobile;
+    // Los OP/ED del anime llegan de /api/themes (detail ya no los incluye).
     final List<AnimeThemeInfo> ops = detail is AnimeDetail
-        ? detail.openings
+        ? openings
         : (detail is MovieDetail ? (detail as MovieDetail).openings : const <AnimeThemeInfo>[]);
     final List<AnimeThemeInfo> eds = detail is AnimeDetail
-        ? detail.endings
+        ? endings
         : (detail is MovieDetail ? (detail as MovieDetail).endings : const <AnimeThemeInfo>[]);
     final String? fallbackImg = detail is AnimeDetail
         ? (detail.banner ?? detail.backdrop)

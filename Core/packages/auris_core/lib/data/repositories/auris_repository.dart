@@ -67,6 +67,14 @@ abstract class AurisRepository {
     String? server,
     String? imgSize,
   });
+  /// OP/ED (opening/ending): se piden aparte del detail para no bloquear la
+  /// ficha (AnimeThemes puede colgar y estaba dentro del frío de la ficha).
+  Future<AnimeThemesData> getAnimeThemes({
+    required String title,
+    String? english,
+    String? native_,
+    String? server,
+  });
   Future<MovieDetail?> getMovieDetail({
     required String title,
     int? year,

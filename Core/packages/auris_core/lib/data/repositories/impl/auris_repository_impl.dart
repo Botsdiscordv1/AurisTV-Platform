@@ -507,6 +507,35 @@ class AurisRepositoryImpl implements AurisRepository {
   }
 
   @override
+  Future<AnimeThemesData> getAnimeThemes({
+    required String title,
+    String? english,
+    String? native_,
+    String? server,
+  }) async {
+    final params = <String, dynamic>{'title': title};
+    if (english != null && english.isNotEmpty) params['english'] = english;
+    if (native_ != null && native_.isNotEmpty) params['native'] = native_;
+    try {
+      final response = await _client.get(
+        ApiEndpoints.animeThemes,
+        queryParameters: params,
+        baseUrl: server ?? ApiEndpoints.animeBaseUrl,
+        options: Options(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 15),
+        ),
+      );
+      if (response.data is! Map<String, dynamic>) return const AnimeThemesData();
+      return AnimeThemesData.fromJson(response.data as Map<String, dynamic>);
+    } catch (e) {
+      // Best effort: los OP/ED nunca rompen la ficha.
+      debugPrint('[AurisRepo] getAnimeThemes failed: $e');
+      return const AnimeThemesData();
+    }
+  }
+
+  @override
   Future<MovieDetail?> getMovieDetail({
     required String title,
     int? year,

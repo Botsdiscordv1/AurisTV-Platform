@@ -78,6 +78,38 @@ final _inputProvider = StateNotifierProvider.autoDispose
   return _UnifiedContentInputNotifier(initialSeason, seedKey);
 });
 
+/// --- PROVEEDOR DE OP/ED (fuera del detail: no bloquean la ficha) ---
+class AnimeThemesParams {
+  final String title;
+  final String? english;
+  final String? nativeTitle;
+
+  const AnimeThemesParams({required this.title, this.english, this.nativeTitle});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AnimeThemesParams &&
+          title == other.title &&
+          english == other.english &&
+          nativeTitle == other.nativeTitle;
+
+  @override
+  int get hashCode => Object.hash(title, english, nativeTitle);
+}
+
+/// OP/ED vía /api/themes (cache 7d en el server). Nunca bloquea el detail:
+/// si AnimeThemes está caído devuelve vacío y reintenta la próxima vez.
+final animeThemesProvider = FutureProvider.autoDispose
+    .family<AnimeThemesData, AnimeThemesParams>((ref, p) async {
+  final repo = ref.read(aurisRepositoryProvider);
+  return repo.getAnimeThemes(
+    title: p.title,
+    english: p.english,
+    native_: p.nativeTitle,
+  );
+});
+
 /// --- PROVEEDOR MAESTRO UNIFICADO (V14 - SELECTION LOCK) ---
 final unifiedContentProvider = Provider.autoDispose
     .family<UnifiedContentState, UnifiedDetailParams>((ref, params) {
@@ -186,6 +218,18 @@ final unifiedContentProvider = Provider.autoDispose
     relationsAsync = progState.relations;
   }
 
+  // OP/ED aparte del detail: no bloquean la ficha (AnimeThemes podía colgar
+  // 5-6s dentro del frío). Llegan cuando llegan; vacío si la API está caída.
+  AsyncValue<AnimeThemesData> themesAsync = const AsyncValue.loading();
+  final animeForThemes = detailAsync.valueOrNull?.anime;
+  if (animeForThemes != null && animeForThemes.title.isNotEmpty) {
+    themesAsync = ref.watch(animeThemesProvider(AnimeThemesParams(
+      title: animeForThemes.title,
+      english: animeForThemes.titleEnglish,
+      nativeTitle: animeForThemes.titleJapanese,
+    )));
+  }
+
   final detailData = detailAsync.valueOrNull;
   return UnifiedContentState(
     detail: detailAsync,
@@ -198,6 +242,7 @@ final unifiedContentProvider = Provider.autoDispose
     episodes: episodesAsync,
     cast: castAsync,
     relations: relationsAsync,
+    themes: themesAsync,
     isMovieish: detailData?.isMovieish ?? (params.category.contains('movie') || 
                  params.kind?.toLowerCase().contains('movie') == true || 
                  params.kind?.toLowerCase().contains('pelicula') == true ||
