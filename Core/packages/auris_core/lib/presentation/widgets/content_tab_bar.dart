@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 /// A shared content tab bar widget for all platforms (Mobile, TV, Web/Desktop).
 ///
-/// Uses Flutter's native [TabBar] with safe post-frame animation updates
-/// to guarantee butter-smooth animated indicator transitions across Web, Mobile, and Desktop
-/// without any framework assertion conflicts.
+/// Uses Flutter's native [TabBar] with [TickerProviderStateMixin] and safe post-frame
+/// animation updates to guarantee butter-smooth animated indicator transitions
+/// across Web, Mobile, and Desktop without any ticker conflicts.
 class ContentTabBar extends StatefulWidget {
   final List<String> labels;
   final int selectedIndex;
@@ -27,7 +27,7 @@ class ContentTabBar extends StatefulWidget {
   State<ContentTabBar> createState() => _ContentTabBarState();
 }
 
-class _ContentTabBarState extends State<ContentTabBar> with SingleTickerProviderStateMixin {
+class _ContentTabBarState extends State<ContentTabBar> with TickerProviderStateMixin {
   late TabController _tabController;
 
   @override
