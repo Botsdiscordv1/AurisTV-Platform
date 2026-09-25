@@ -38,10 +38,7 @@ jobs:
       - name: Upload APKs to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            Movil/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            Movil/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            Movil/build/app/outputs/flutter-apk/app-x86_64-release.apk
+          files: Movil/build/app/outputs/flutter-apk/*release.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
