@@ -100,8 +100,10 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
     final double normalWidth = ResponsiveUtils.posterWidth(context);
 
     return MouseRegion(
-      onEnter: (_) { _hovered.value = true; },
-      onExit: (_) { _hovered.value = false; },
+      hitTestBehavior: HitTestBehavior.opaque,
+      onEnter: (_) { if (mounted) _hovered.value = true; },
+      onExit: (_) { if (mounted) _hovered.value = false; },
+      onHover: (_) { if (!_hovered.value && mounted) _hovered.value = true; },
       child: Focus(
         onFocusChange: (focused) => setState(() => _focused = focused),
         onKeyEvent: (node, event) {

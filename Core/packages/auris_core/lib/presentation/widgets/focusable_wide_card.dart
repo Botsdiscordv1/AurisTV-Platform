@@ -55,8 +55,10 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
     return Focus(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       child: MouseRegion(
-        onEnter: (_) { _isHovered.value = true; },
-        onExit: (_) { _isHovered.value = false; },
+        hitTestBehavior: HitTestBehavior.opaque,
+        onEnter: (_) { if (mounted) _isHovered.value = true; },
+        onExit: (_) { if (mounted) _isHovered.value = false; },
+        onHover: (_) { if (!_isHovered.value && mounted) _isHovered.value = true; },
         child: ValueListenableBuilder<bool>(
           valueListenable: _isHovered,
           builder: (context, hovered, _) {

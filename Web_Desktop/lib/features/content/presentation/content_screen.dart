@@ -963,19 +963,15 @@ class _ThemeCardState extends State<_ThemeCard> {
     final bool isSelected = !isMobile && _isHovered;
 
     return MouseRegion(
+      hitTestBehavior: HitTestBehavior.opaque,
       onEnter: (_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _isHovered = true);
-          });
-        }
+        if (mounted && !_isHovered) setState(() => _isHovered = true);
       },
       onExit: (_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _isHovered = false);
-          });
-        }
+        if (mounted && _isHovered) setState(() => _isHovered = false);
+      },
+      onHover: (_) {
+        if (mounted && !_isHovered) setState(() => _isHovered = true);
       },
       child: GestureDetector(
         onTap: () {
@@ -1177,19 +1173,15 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
       );
     }
     return MouseRegion(
+      hitTestBehavior: HitTestBehavior.opaque,
       onEnter: (_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _isHovered = true);
-          });
-        }
+        if (mounted && !_isHovered) setState(() => _isHovered = true);
       },
       onExit: (_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _isHovered = false);
-          });
-        }
+        if (mounted && _isHovered) setState(() => _isHovered = false);
+      },
+      onHover: (_) {
+        if (mounted && !_isHovered) setState(() => _isHovered = true);
       },
       child: Tooltip(
         message: widget.label, 
@@ -4611,19 +4603,15 @@ class _HorizontalInfoCarouselState<T> extends State<_HorizontalInfoCarousel<T>> 
     final carouselHeight = (cardWidth * 1.2) + ResponsiveUtils.sp(context, 80); // Senior Fix: Aumento de 75 a 80 para evitar overflow
 
     return MouseRegion(
+      hitTestBehavior: HitTestBehavior.opaque,
       onEnter: (_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _isHovered = true);
-          });
-        }
+        if (mounted && !_isHovered) setState(() => _isHovered = true);
       },
       onExit: (_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _isHovered = false);
-          });
-        }
+        if (mounted && _isHovered) setState(() => _isHovered = false);
+      },
+      onHover: (_) {
+        if (mounted && !_isHovered) setState(() => _isHovered = true);
       },
       child: Stack(
         children: [
@@ -4758,10 +4746,11 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(0, isMobile ? 0 : 8, 0, 16),
-              child: Center(
+              padding: EdgeInsets.fromLTRB(widget.hPadding, isMobile ? 0 : 8, widget.hPadding, 16),
+              child: Align(
+                alignment: isMobile ? Alignment.center : Alignment.centerLeft,
                 child: Wrap(
-                  alignment: WrapAlignment.center,
+                  alignment: isMobile ? WrapAlignment.center : WrapAlignment.start,
                   spacing: 8,
                   runSpacing: 8,
                   children: [
@@ -4914,19 +4903,15 @@ class _GalleryItemState extends State<_GalleryItem> {
     final isMobile = context.isMobile;
 
     return MouseRegion(
+      hitTestBehavior: HitTestBehavior.opaque,
       onEnter: (_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _isHovered = true);
-          });
-        }
+        if (mounted && !_isHovered) setState(() => _isHovered = true);
       },
       onExit: (_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _isHovered = false);
-          });
-        }
+        if (mounted && _isHovered) setState(() => _isHovered = false);
+      },
+      onHover: (_) {
+        if (mounted && !_isHovered) setState(() => _isHovered = true);
       },
       child: GestureDetector(
         onTap: widget.onTap,
