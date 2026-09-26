@@ -3554,7 +3554,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                           padding: EdgeInsets.only(
                             left: overlayLeftPadding, 
                             top: topPadding, 
-                            bottom: 24, 
+                            bottom: 16, 
                             right: 32,
                           ),
                           child: Column(

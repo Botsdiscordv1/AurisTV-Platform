@@ -14,7 +14,12 @@ class UpdateDialog extends StatelessWidget {
         children: [
           const Icon(Icons.system_update, color: Colors.blue, size: 28),
           const SizedBox(width: 12),
-          const Text('¡Nueva versión disponible!'),
+          const Expanded(
+            child: Text(
+              '¡Nueva versión disponible!',
+              style: TextStyle(fontSize: 18),
+            ),
+          ),
         ],
       ),
       content: SingleChildScrollView(
