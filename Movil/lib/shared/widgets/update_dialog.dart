@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../services/update_service.dart';
 
 class UpdateDialog extends StatelessWidget {
@@ -22,33 +23,39 @@ class UpdateDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'La versión ${updateInfo.latestVersion} ya está disponible.',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Novedades y mejoras:',
-              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.85,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Versión ${updateInfo.latestVersion} ya está lista.',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
-              child: Text(
-                updateInfo.releaseNotes,
-                style: const TextStyle(fontSize: 14),
+              const SizedBox(height: 12),
+              const Text(
+                'Novedades y mejoras:',
+                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey, fontSize: 13),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: MarkdownBody(
+                  data: updateInfo.releaseNotes,
+                  styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                    p: const TextStyle(fontSize: 14),
+                    listBullet: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [

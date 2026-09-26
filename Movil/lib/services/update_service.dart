@@ -18,13 +18,19 @@ class AppUpdateInfo {
 }
 
 class UpdateService {
-  static const String _versionJsonUrl = 'https://raw.githubusercontent.com/Botsdiscordv1/AurisTV-Platform/main/version.json';
+  // Endpoint oficial de GitHub para obtener la última release publicada
+  static const String _githubApiUrl = 'https://api.github.com/repos/Botsdiscordv1/AurisTV-Platform/releases/latest';
 
   static Future<AppUpdateInfo?> checkForUpdate() async {
     try {
       final dio = Dio();
-      final url = '$_versionJsonUrl?t=${DateTime.now().millisecondsSinceEpoch}';
-      final response = await dio.get(url);
+      final url = '$_githubApiUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      final response = await dio.get(
+        url,
+        options: Options(
+          headers: {'Accept': 'application/vnd.github.v3+json'},
+        ),
+      );
       
       if (response.statusCode == 200) {
         final dynamic rawData = response.data;
@@ -32,28 +38,31 @@ class UpdateService {
             ? jsonDecode(rawData) 
             : Map<String, dynamic>.from(rawData);
 
-        final String latestVersion = data['latestVersion'] ?? '1.0.0';
-        final String minSupportedVersion = data['minSupportedVersion'] ?? '1.0.0';
-        final String releaseNotes = data['releaseNotes'] ?? 'Nuevas mejoras y correcciones.';
-        final String updateUrl = data['updateUrl'] ?? 'https://github.com/Botsdiscordv1/AurisTV-Platform/releases/latest';
+        final String tagName = data['tag_name'] ?? 'v1.0.0';
+        // Remover 'v' inicial si está presente (ej: v1.0.1 -> 1.0.1)
+        final String latestVersion = tagName.startsWith('v') || tagName.startsWith('V') 
+            ? tagName.substring(1) 
+            : tagName;
+
+        final String releaseNotes = data['body'] ?? '• Se han realizado mejoras de rendimiento y correcciones de errores.';
+        final String updateUrl = data['html_url'] ?? 'https://github.com/Botsdiscordv1/AurisTV-Platform/releases/latest';
 
         final packageInfo = await PackageInfo.fromPlatform();
         final currentVersion = packageInfo.version;
 
-        print('UpdateCheck -> Current: $currentVersion, Latest: $latestVersion');
+        print('GitHub Release Check -> Current: $currentVersion, Latest: $latestVersion');
 
         if (_isVersionNewer(currentVersion, latestVersion)) {
-          final isForced = _isVersionNewer(currentVersion, minSupportedVersion);
           return AppUpdateInfo(
             latestVersion: latestVersion,
             releaseNotes: releaseNotes,
             updateUrl: updateUrl,
-            forceUpdate: isForced,
+            forceUpdate: false,
           );
         }
       }
     } catch (e) {
-      print('Error comprobando actualizaciones: $e');
+      print('Error comprobando actualizaciones desde GitHub API: $e');
     }
     return null;
   }
