@@ -1,7 +1,7 @@
 name: auristv_mobile
 description: "AurisTV Móvil — app multimedia personal optimizada para Android/iOS"
 publish_to: 'none'
-version: 0.1.0+1
+version: 1.0.0+1
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -41,7 +41,7 @@ dependencies:
   # UI e Iconos
   cupertino_icons: ^1.0.8
   url_launcher: ^6.3.2
-  package_info_plus: ^8.1.0
+  package_info_plus: ^10.2.1
   google_fonts: ^6.2.1
   flutter_svg: ^2.0.10+1
   shimmer: ^3.0.0

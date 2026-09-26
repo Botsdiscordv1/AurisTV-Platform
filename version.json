@@ -1,6 +1,6 @@
 {
-  "latestVersion": "1.0.0",
+  "latestVersion": "1.0.1",
   "minSupportedVersion": "1.0.0",
-  "releaseNotes": "• Estrenamos el sistema de despliegue automatizado con APKs optimizados por arquitectura.\n• Mejoras de estabilidad y rendimiento en la interfaz adaptativa.\n• Correcciones generales de errores.",
+  "releaseNotes": "• Prueba en vivo del Pop-up de actualización automática.\n• Nuevas mejoras de UI y rendimiento.\n• ¡Todo funcionando a la perfección!",
   "updateUrl": "https://github.com/Botsdiscordv1/AurisTV-Platform/releases/latest"
 }
