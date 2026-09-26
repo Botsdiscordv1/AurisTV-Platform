@@ -12,6 +12,7 @@ class MainActivity: FlutterActivity() {
     private val BRIGHTNESS_CHANNEL = "auristv/brightness"
     private val VOLUME_CHANNEL = "auristv/volume"
     private var interceptVolume = false
+    private var volumeMethodChannel: MethodChannel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +47,8 @@ class MainActivity: FlutterActivity() {
             }
         }
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VOLUME_CHANNEL).setMethodCallHandler { call, result ->
+        volumeMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VOLUME_CHANNEL)
+        volumeMethodChannel?.setMethodCallHandler { call, result ->
             if (call.method == "setIntercept") {
                 interceptVolume = call.argument<Boolean>("enabled") ?: false
                 result.success(null)
@@ -57,11 +59,29 @@ class MainActivity: FlutterActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (interceptVolume && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
-            // Senior Fix: Consumimos el evento para que Android no muestre su UI de volumen,
-            // pero el plugin 'volume_controller' en Flutter seguirá detectando el cambio.
-            return true
+        if (interceptVolume) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    volumeMethodChannel?.invokeMethod("volumeUp", null)
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    volumeMethodChannel?.invokeMethod("volumeDown", null)
+                    return true
+                }
+            }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (interceptVolume) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    return true
+                }
+            }
+        }
+        return super.onKeyUp(keyCode, event)
     }
 }

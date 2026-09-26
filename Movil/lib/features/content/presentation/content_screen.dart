@@ -1816,17 +1816,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           bottomNavigationBar: AurisBottomBar(
             currentIndex: -1, // No hay rama seleccionada en detalles
             onTap: (index) {
-              final routes = ['/', '/search', '/explore', '/profile'];
-              if (routes[index] == '/profile') {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: const Color(0xFF0B0B0D),
-                  builder: (context) => const FractionallySizedBox(
-                    heightFactor: 0.9,
-                    child: ProfileScreen(),
-                  ),
-                );
+              final routes = ['/', '/search', '/explore', '/profile-with-nav'];
+              if (routes[index] == '/profile-with-nav') {
+                context.push('/profile-with-nav');
               } else {
                 while (Navigator.canPop(context)) {
                   Navigator.pop(context);

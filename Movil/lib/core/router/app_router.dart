@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -100,6 +101,10 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const StorageScreen(),
         ),
       ],
+    ),
+    GoRoute(
+      path: '/profile-with-nav',
+      builder: (context, state) => const ProfileWithNavScreen(),
     ),
     GoRoute(
       path: '/select-profile',
@@ -211,4 +216,28 @@ final GoRouter appRouter = GoRouter(
     ),
   ],
 );
+
+class ProfileWithNavScreen extends ConsumerWidget {
+  const ProfileWithNavScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B0B0D),
+      body: const ProfileScreen(),
+      bottomNavigationBar: AurisBottomBar(
+        currentIndex: 3,
+        onTap: (index) {
+          final routes = ['/', '/search', '/explore', '/profile'];
+          while (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+          context.go(routes[index]);
+        },
+      ),
+    );
+  }
+}
+
+
 
