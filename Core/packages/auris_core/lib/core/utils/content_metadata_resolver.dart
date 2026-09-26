@@ -88,7 +88,7 @@ extension SearchResultMetadataExtension on SearchResult {
 
   String? _categoryFromQuality(String quality) {
     final q = quality.toLowerCase();
-    if (q.contains('pelicula') || q.contains('película') || q.contains('movie')) return 'PELÍCULA';
+    if (q.contains('pelicula') || q.contains('película') || q.contains('movie')) return 'Película';
     if (q.contains('serie') || q.contains('series') || q.contains('tv')) return 'SERIE';
     if (q.contains('dorama') || q.contains('drama')) return 'DORAMA';
     if (q.contains('anime')) return 'TV ANIME';
@@ -97,19 +97,20 @@ extension SearchResultMetadataExtension on SearchResult {
 
   String _labelFromType(String type, String selectedCategory) {
     final up = type.toUpperCase();
-    if (up.contains('MOVIE') || up.contains('FILM') || up.contains('PELICULA') || up.contains('PELÍCULA')) return 'PELÍCULA';
+    if (up.contains('MOVIE') || up.contains('FILM') || up.contains('PELICULA') || up.contains('PELÍCULA')) return 'Película';
     if (up.contains('DORAMA') || up.contains('DRAMA')) return 'DORAMA';
     if (up.contains('SERIE') || up == 'TV' || up.contains('TV')) {
       return selectedCategory.toLowerCase() == 'anime' ? 'TV ANIME' : 'SERIE';
     }
     if (up.contains('ANIME')) return 'TV ANIME';
     if (up == 'ALL') return '';
-    return up;
+    // Casing canónico de UI: Especial/Película (acronimos OVA/ONA/TV quedan)
+    return up == 'ESPECIAL' ? 'Especial' : up;
   }
 
   String _labelFromKind(String kind) {
     final k = kind.toLowerCase();
-    if (k.contains('movie')) return 'PELÍCULA';
+    if (k.contains('movie')) return 'Película';
     if (k.contains('drama')) return 'DORAMA';
     if (k.contains('anime')) return 'TV ANIME';
     if (k.contains('series') || k.contains('tv')) return 'SERIE';
@@ -118,7 +119,7 @@ extension SearchResultMetadataExtension on SearchResult {
 
   String? _labelFromSearchCategory(String category) {
     final c = category.toLowerCase();
-    if (c == 'peliculas' || c == 'movie') return 'PELÍCULA';
+    if (c == 'peliculas' || c == 'movie') return 'Película';
     if (c == 'series' || c == 'serie') return 'SERIE';
     if (c == 'anime') return 'TV ANIME';
     return null;

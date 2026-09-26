@@ -18,10 +18,10 @@ class LibraryMediaCard extends StatelessWidget {
     if (animeHints.any((h) => source.contains(h))) return 'ANIME';
     if (movieHints.any((h) => source.contains(h))) {
       if (item.category.toLowerCase().contains('anime')) return 'ANIME';
-      return 'PELÍCULA';
+      return 'Película';
     }
     final cat = item.category.toLowerCase();
-    if (cat.contains('movie') || cat.contains('pelicula')) return 'PELÍCULA';
+    if (cat.contains('movie') || cat.contains('pelicula')) return 'Película';
     if (cat.contains('serie') || cat.contains('tv')) return 'SERIE';
     return item.category.toUpperCase();
   }
