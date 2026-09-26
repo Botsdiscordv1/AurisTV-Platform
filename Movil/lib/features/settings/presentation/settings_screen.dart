@@ -8,6 +8,7 @@ import 'package:auris_core/auris_core.dart';
 import '../../avatar/presentation/providers/avatar_providers.dart';
 import 'providers/settings_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:hive_ce/hive_ce.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -229,7 +230,7 @@ class SettingsScreen extends ConsumerWidget {
                       icon: Icons.storage_outlined,
                       title: 'Almacenamiento y caché',
                       subtitle: 'Gestionar datos locales',
-                      onTap: () {},
+                      onTap: () => context.push('/settings/storage'),
                     ),
                     FutureBuilder<PackageInfo>(
                       future: PackageInfo.fromPlatform(),

@@ -4623,7 +4623,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final bool useMobileLayout = isMobile || screenHeight < 500;
 
     // Senior UI Adaptive logic:
-    final double iconSize = useMobileLayout ? (isLandscape ? 38 : 44) : (isTablet ? 48 : 56);
+    final double iconSize = useMobileLayout ? 28 : (isTablet ? 36 : 36);
     final double playSize = useMobileLayout ? (isLandscape ? 56 : 64) : (isTablet ? 72 : 90);
     final double spacing = useMobileLayout ? (isLandscape ? 48 : 56) : (isTablet ? 64 : 80);
 

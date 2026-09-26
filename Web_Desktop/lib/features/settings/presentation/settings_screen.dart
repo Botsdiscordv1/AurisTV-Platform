@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:hive_ce/hive_ce.dart';
 
 import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import 'providers/settings_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -265,13 +268,19 @@ class SettingsScreen extends ConsumerWidget {
                       icon: Icons.storage_outlined,
                       title: 'Almacenamiento y caché',
                       subtitle: 'Gestionar datos locales',
-                      onTap: () {},
+                      onTap: () => _showStorageDialog(context),
                     ),
-                    _SettingsTile(
-                      icon: Icons.info_outline,
-                      title: 'Versión',
-                      subtitle: 'v2.1.0-alpha',
-                      onTap: () {},
+                    FutureBuilder<PackageInfo>(
+                      future: PackageInfo.fromPlatform(),
+                      builder: (context, snapshot) {
+                        final version = snapshot.hasData ? 'v${snapshot.data!.version}' : 'v1.0.0';
+                        return _SettingsTile(
+                          icon: Icons.info_outline,
+                          title: 'Versión',
+                          subtitle: version,
+                          onTap: () {},
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -402,6 +411,46 @@ class SettingsScreen extends ConsumerWidget {
               ref.read(authProvider.notifier).signOut();
             },
             child: const Text('Cerrar sesión', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showStorageDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D24),
+        title: const Text('Almacenamiento y caché', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          '¿Deseas limpiar la caché de imágenes y los historiales locales guardados en el navegador/escritorio?',
+          style: TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await DefaultCacheManager().emptyCache();
+              if (Hive.isBoxOpen('playback_history')) await Hive.box('playback_history').clear();
+              if (Hive.isBoxOpen('search_history')) await Hive.box('search_history').clear();
+              if (Hive.isBoxOpen('home_cache')) await Hive.box('home_cache').clear();
+
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Caché y datos web limpiados correctamente')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF7A1E),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Limpiar Todo', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

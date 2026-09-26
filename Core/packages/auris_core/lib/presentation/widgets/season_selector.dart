@@ -84,6 +84,7 @@ class _SeasonSelectorState extends State<SeasonSelector> {
               duration: const Duration(milliseconds: 200),
               constraints: BoxConstraints(
                 minWidth: widget.data.width ?? (widget.data.compact ? _sp(context, 140) : _sp(context, 210)),
+                maxWidth: widget.data.width ?? _sp(context, 400),
               ),
               height: _getHeight(context),
               decoration: BoxDecoration(
@@ -97,6 +98,7 @@ class _SeasonSelectorState extends State<SeasonSelector> {
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: widget.data.compact ? _sp(context, 14) : _sp(context, 18)),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(

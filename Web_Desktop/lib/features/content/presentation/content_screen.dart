@@ -2647,7 +2647,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       children: [
         Positioned(
           top: isMobile ? mobileTop : (desktopTop ?? 40),
-          left: isMobile ? 15 : 40,
+          left: isMobile ? 15 : 60,
           child: PointerInterceptor(
             child: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28, shadows: [Shadow(color: Colors.black45, blurRadius: 8)]),
@@ -3323,18 +3323,20 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     required bool isMovieCategory,
   }) {
     // Senior Responsive Desktop Architecture: Dimensiones fluidas continuas para cualquier resolución de pantalla (Laptops -> 4K Ultrawide)
-    final double headerH = (width / 3.1).clamp(480.0, 600.0);
-    final double overlayLeftPadding = (width * 0.025 + 40.0).clamp(68.0, 96.0); // Sangría segura para no chocar jamás con el botón 'back'
+    final double headerH = (width / 2.8).clamp(480.0, 620.0);
+    final double overlayLeftPadding = 60.0; // Alineado permanentemente a 60px con los tabs inferiores en cualquier tamaño de ventana desktop
     final double synopsisWidth = (width * 0.46).clamp(400.0, 760.0);
     final double logoMaxWidth = (width * 0.32).clamp(320.0, 600.0);
     final double logoMaxHeight = (headerH * (isCompactHeader ? 0.20 : 0.25)).clamp(80.0, 140.0);
     final double titleSize = (width * 0.028).clamp(30.0, 52.0);
-    final double topPadding = (headerH * (isCompactHeader ? 0.08 : 0.15)).clamp(36.0, 90.0);
+    final double topPadding = isCompactHeader 
+        ? (headerH * 0.30).clamp(96.0, 140.0) 
+        : (headerH * 0.22).clamp(90.0, 135.0);
     final bool hasLogo = detailData?.logo != null && detailData!.logo!.isNotEmpty;
-    final double gapLogoToMeta = isCompactHeader ? 8.0 : (hasLogo ? 26.0 : 14.0);
-    final double gapMetaToSynopsis = isCompactHeader ? 6.0 : (hasLogo ? 18.0 : 12.0);
-    final double gapSynopsisToActions = isCompactHeader ? 6.0 : 22.0;
-    final double gapActionsToSelectors = isCompactHeader ? 4.0 : 16.0;
+    final double gapLogoToMeta = isCompactHeader ? 6.0 : (hasLogo ? 20.0 : 10.0);
+    final double gapMetaToSynopsis = isCompactHeader ? 4.0 : (hasLogo ? 12.0 : 8.0);
+    final double gapSynopsisToActions = isCompactHeader ? 4.0 : 16.0;
+    final double gapActionsToSelectors = isCompactHeader ? 2.0 : 12.0;
     final double selectorWidth = isCompactHeader ? 220.0 : 320.0;
     final double selectorH = isCompactHeader ? 36.0 : (width * 0.026).clamp(42.0, 48.0);
     final double selectorFontSize = isCompactHeader ? 13.5 : (width * 0.009).clamp(14.0, 16.0);
@@ -3493,7 +3495,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                     ),
                                     // Máscara Inferior Maestra
                                     Positioned(
-                                      bottom: -1, left: 0, right: 0, height: 200,
+                                      bottom: -1, left: 0, right: 0, height: 160,
                                       child: DecoratedBox(
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
@@ -3557,10 +3559,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                             bottom: 16, 
                             right: 32,
                           ),
-                          child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
+                          child: OverflowBox(
+                            alignment: Alignment.topLeft,
+                            minHeight: 0,
+                            maxHeight: 1200,
+                            child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                             // Logo
                             AnimatedOpacity(
                               duration: const Duration(milliseconds: 1200),
@@ -3648,6 +3654,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                         ),
                       ),
                     ),
+                  ),
                   ],
                 ),
               ),

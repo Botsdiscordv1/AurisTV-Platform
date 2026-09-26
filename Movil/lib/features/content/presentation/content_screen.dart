@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/auris_bottom_bar.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
+import '../../profile/presentation/profile_screen.dart';
 
 // --- Galería Local Helpers ---
 final _galleryLocalProvider = FutureProvider.family<GalleryResponse, GalleryParams>((ref, params) async {
@@ -1815,8 +1816,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           bottomNavigationBar: AurisBottomBar(
             currentIndex: -1, // No hay rama seleccionada en detalles
             onTap: (index) {
-              final routes = ['/', '/search', '/explore', '/settings'];
-              context.go(routes[index]);
+              final routes = ['/', '/search', '/explore', '/profile'];
+              if (routes[index] == '/profile') {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: const Color(0xFF0B0B0D),
+                  builder: (context) => const FractionallySizedBox(
+                    heightFactor: 0.9,
+                    child: ProfileScreen(),
+                  ),
+                );
+              } else {
+                while (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
+                context.go(routes[index]);
+              }
             },
           ),
           topBar: Stack(children: [

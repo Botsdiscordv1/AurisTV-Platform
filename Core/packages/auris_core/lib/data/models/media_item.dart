@@ -2,6 +2,7 @@ import 'editorial_badge.dart';
 import 'playback_history.dart';
 import 'server/search_result.dart';
 import 'server/schedule.dart';
+import 'server/detail_params.dart';
 
 enum MediaType { anime, series, kdrama, movie }
 
@@ -140,6 +141,29 @@ extension MediaItemToSeed on MediaItem {
           MediaType.anime => 'anime',
         },
       );
+}
+
+extension MediaItemToDetailParams on MediaItem {
+  UnifiedDetailParams toUnifiedDetailParams({String? sectionId}) {
+    final String cat = switch (type) {
+      MediaType.anime => 'anime',
+      MediaType.movie => 'movie',
+      MediaType.series => 'series',
+      MediaType.kdrama => 'kdrama',
+    };
+    return UnifiedDetailParams(
+      title: title,
+      metadataTitle: english ?? romaji,
+      category: cat,
+      kind: card?.kind ?? type.name,
+      year: year,
+      source: source,
+      url: detailUrl ?? id,
+      type: card?.type ?? type.name,
+      sectionId: sectionId ?? this.sectionId,
+      initialSources: card != null ? [card!] : null,
+    );
+  }
 }
 
 extension ScheduleItemToMediaItem on ScheduleItem {

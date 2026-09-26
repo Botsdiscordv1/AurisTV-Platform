@@ -37,6 +37,7 @@ class _ContentTabBarState extends State<ContentTabBar> with TickerProviderStateM
       length: widget.labels.length,
       vsync: this,
       initialIndex: widget.selectedIndex.clamp(0, widget.labels.length - 1),
+      animationDuration: const Duration(milliseconds: 300), // Senior Fix: Animación fluida y configurable
     );
   }
 
@@ -49,11 +50,17 @@ class _ContentTabBarState extends State<ContentTabBar> with TickerProviderStateM
         length: widget.labels.length,
         vsync: this,
         initialIndex: widget.selectedIndex.clamp(0, widget.labels.length - 1),
+        animationDuration: const Duration(milliseconds: 300),
       );
-    } else if (widget.selectedIndex != _tabController.index) {
+    } else if (widget.selectedIndex != _tabController.index && !_tabController.indexIsChanging) {
+      // Senior Fix: Evitar conflicto/doble animación (race condition) si el usuario ya tocó el tab
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _tabController.index != widget.selectedIndex) {
-          _tabController.animateTo(widget.selectedIndex.clamp(0, widget.labels.length - 1));
+        if (mounted && widget.selectedIndex != _tabController.index && !_tabController.indexIsChanging) {
+          _tabController.animateTo(
+            widget.selectedIndex.clamp(0, widget.labels.length - 1),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
         }
       });
     }
@@ -83,7 +90,7 @@ class _ContentTabBarState extends State<ContentTabBar> with TickerProviderStateM
         dividerColor: Colors.transparent,
         indicatorColor: const Color(0xFFEF7A1E),
         indicatorWeight: indicatorHeight,
-        indicatorSize: TabBarIndicatorSize.label,
+        indicatorSize: TabBarIndicatorSize.tab, // Senior Fix: La barra ocupa todo el ancho del tab
         labelPadding: EdgeInsets.symmetric(horizontal: itemHPadding),
         labelColor: Colors.white,
         unselectedLabelColor: const Color(0xFFA5A5AA),

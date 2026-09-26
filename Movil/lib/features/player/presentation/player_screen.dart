@@ -3129,7 +3129,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               const SizedBox(width: 16),
             ],
             IconButton(
-              iconSize: 40,
+              iconSize: 30,
               icon: const Icon(Symbols.replay_10, color: Colors.white),
               onPressed: () => _sendRemoteSeek(target, -10000),
             ),
@@ -3153,7 +3153,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
             const SizedBox(width: 32),
             IconButton(
-              iconSize: 40,
+              iconSize: 30,
               icon: const Icon(Symbols.forward_10, color: Colors.white),
               onPressed: () => _sendRemoteSeek(target, 10000),
             ),
@@ -4737,14 +4737,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _buildCapsuleIconButton(
             icon: Symbols.replay_10,
             onTap: _skipBackward,
-            size: 30, // Unificado a 30px
+            size: 24, // Reducido para mejor jerarquía visual
             minWidth: 48,
           ),
           Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.05)),
           _buildCapsuleIconButton(
             icon: Symbols.forward_10,
             onTap: _skipForward,
-            size: 30, // Unificado a 30px
+            size: 24, // Reducido para mejor jerarquía visual
             minWidth: 48,
           ),
           const SizedBox(width: 2),
@@ -4821,8 +4821,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     if (!_isMobileDevice) return const SizedBox.shrink();
     
-    // Senior Adaptive Scaling: Refinado para un balance óptimo (Dieta sutil)
-    final double iconSize = isTablet ? 48 : 38;
+    // Senior Adaptive Scaling & Visual Hierarchy: Reducido tamaño de botones +10/-10 para mantener jerarquía visual respecto al Play/Pause (56px / 72px)
+    final double iconSize = isTablet ? 36 : 28;
     final double playSize = isTablet ? 72 : 56;
     final double spacing = isTablet ? 44 : 50;
 

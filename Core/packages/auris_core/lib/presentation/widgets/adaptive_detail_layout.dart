@@ -20,7 +20,7 @@ class AdaptiveDetailLayout extends StatelessWidget {
   final Widget? selectors;
   /// Pestañas (Tabs) con scroll horizontal edge-to-edge
   final Widget? tabs;
-  /// Contenido inferior (Slivers: Tabs, Episodios, Relacionados)
+  /// Contenido inferior (Slivers o widgets de caja como Column/ListView)
   final Widget content;
   /// Widget opcional para el botón de retroceso/cast
   final Widget? topBar;
@@ -45,69 +45,94 @@ class AdaptiveDetailLayout extends StatelessWidget {
     this.maxContentWidth = 1000,
   });
 
+  /// Helper defensivo para asegurar que el contenido inferior sea un Sliver válido,
+  /// protegiendo contra errores de geometría nula, Expanded/Spacer con altura infinita 
+  /// y evitando que la pantalla se quede en negro.
+  Widget _buildSliverContent(BuildContext context, Widget widget) {
+    if (widget is SliverList ||
+        widget is SliverGrid ||
+        widget is SliverToBoxAdapter ||
+        widget is SliverPadding ||
+        widget is SliverAppBar ||
+        widget is SliverPersistentHeader ||
+        widget is SliverFillRemaining ||
+        widget is SliverFillViewport ||
+        widget is SliverAnimatedList ||
+        widget is SliverMainAxisGroup ||
+        widget is SliverCrossAxisGroup) {
+      return widget;
+    }
+    final screenH = MediaQuery.sizeOf(context).height;
+    return SliverToBoxAdapter(
+      key: const ValueKey('detail_content_box_adapter'),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: 200,
+          maxHeight: screenH > 0 ? screenH * 1.5 : 900,
+        ),
+        child: widget,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final isWide = width > 600; 
+    final bool isDesktop = ResponsiveUtils.isDesktop(context) || width >= 1024;
+    final bool isTablet = ResponsiveUtils.isTablet(context) || (width >= 768 && width < 1024);
+    final bool isWide = width >= 768; // Botones de acción en horizontal para Tablet y Desktop
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    
-    // Altura de cabecera adaptativa centralizada (Senior Fix: Formato cinematográfico 1.5:1 en móvil)
-    final double appBarHeight = isWide ? 420 : (width * 0.65);
+    final double contentPadding = isDesktop ? horizontalPadding : (isTablet ? 16.0 : 24.0); // Senior Fix: 16px en tablets (iPad Mini) para aprovechar todo el ancho sin desbordes de 1px.
     final double topPadding = ResponsiveUtils.isNative ? MediaQuery.of(context).padding.top : 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
       bottomNavigationBar: bottomNavigationBar,
       body: CustomScrollView(
+        key: const ValueKey('adaptive_detail_scroll_view'),
         physics: const ClampingScrollPhysics(), // Senior Fix: Evitar bloque negro al scroll hacia abajo
+        cacheExtent: 1000.0, // Senior Fix: Pre-layout de slivers para evitar Null check operator en hitTestChildren durante cargas async
         slivers: [
           // 1. CABECERA ADAPTATIVA CON BOTONES INTEGRADOS
-          // Al estar dentro de un Sliver, los botones se desplazan con el header y no se sobreponen al contenido inferior.
+          // Senior Fix: Usamos StackFit.loose para permitir que el backdrop (AspectRatio)
+          // determine su altura natural sin generar excepciones de constraints (pantalla en negro).
           SliverToBoxAdapter(
-            child: SizedBox(
-              height: appBarHeight + topPadding,
+            key: const ValueKey('detail_header_sliver'),
+            child: Padding(
+              padding: EdgeInsets.only(top: topPadding),
               child: Stack(
-                fit: StackFit.expand,
+                fit: StackFit.loose,
                 children: [
-                  // Margen para Safe Area (Solo nativo)
-                  Padding(
-                    padding: EdgeInsets.only(top: topPadding),
-                    child: backdrop,
-                  ),
+                  backdrop,
                   
-                  // Botones Superiores (Integrados en el scroll)
                   if (topBar != null)
                     Positioned(
-                      top: topPadding, left: 0, right: 0,
+                      top: 0, left: 0, right: 0,
                       child: SizedBox(
                         height: 80,
                         child: topBar!,
                       ),
                     ),
 
-                  // Logo / Título
                   if (logo != null)
                     Positioned.fill(
                       child: Align(
                         alignment: Alignment.bottomCenter,
                         child: ConstrainedBox(
                           constraints: BoxConstraints(maxWidth: maxContentWidth),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                isWide ? horizontalPadding : 24, 
-                                0, 
-                                isWide ? horizontalPadding : 24, 
-                                isWide ? 24 : 12
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  logo!,
-                                ],
-                              ),
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              contentPadding, 
+                              0, 
+                              contentPadding, 
+                              isWide ? 24 : 12
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                logo!,
+                              ],
                             ),
                           ),
                         ),
@@ -119,92 +144,87 @@ class AdaptiveDetailLayout extends StatelessWidget {
           ),
 
           // 2. PANEL DE INFORMACIÓN
+          // Senior Fix: Eliminado SizedBox(width: double.infinity) que provocaba RenderBox was not laid out (infinito).
           SliverToBoxAdapter(
+            key: const ValueKey('detail_info_sliver'),
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxContentWidth),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: isWide ? 22.0 : 16.0),
-                      if (meta != null) Padding(
-                        padding: EdgeInsets.symmetric(horizontal: isWide ? horizontalPadding : 24),
-                        child: meta!,
-                      ),
-                      const SizedBox(height: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: isWide ? 22.0 : 16.0),
+                    if (meta != null) Padding(
+                      padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                      child: meta!,
+                    ),
+                    const SizedBox(height: 20),
 
-                      if (isWide)
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                          child: Row(
-                            children: [
-                              if (mainAction != null) SizedBox(width: 300, child: mainAction!),
-                              if (secondaryActions != null) ...[
-                                const SizedBox(width: 16),
-                                Expanded(child: secondaryActions!), // Senior Fix: Evitar overflow en plegables (Fold)
-                              ],
+                    if (isWide)
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                        child: Row(
+                          children: [
+                            if (mainAction != null) SizedBox(width: 300, child: mainAction!),
+                            if (secondaryActions != null) ...[
+                              const SizedBox(width: 16),
+                              Expanded(child: secondaryActions!), // Senior Fix: Evitar overflow en plegables (Fold)
                             ],
-                          ),
-                        )
-                      else ...[
-                        if (mainAction != null) Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: mainAction!,
+                          ],
                         ),
-                        if (secondaryActions != null) ...[
-                          const SizedBox(height: 16),
-                          // Senior Fix: Las acciones secundarias suelen ser un scroll horizontal.
-                          // No les ponemos padding aquí para que puedan ser edge-to-edge con su propio padding interno.
-                          secondaryActions!,
-                        ],
-                      ],
-
-                      const SizedBox(height: 16),
-                      if (synopsis != null) Padding(
-                        padding: EdgeInsets.symmetric(horizontal: isWide ? horizontalPadding : 24),
-                        child: synopsis!,
+                      )
+                    else ...[
+                      if (mainAction != null) Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: mainAction!,
                       ),
+                      if (secondaryActions != null) ...[
+                        const SizedBox(height: 16),
+                        secondaryActions!,
+                      ],
+                    ],
+
+                    const SizedBox(height: 16),
+                    if (synopsis != null) Padding(
+                      padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                      child: synopsis!,
+                    ),
+                    const SizedBox(height: 16),
+                    if (selectors != null) Padding(
+                      padding: EdgeInsets.only(
+                        left: contentPadding,
+                        right: 0,
+                      ),
+                      child: selectors!,
+                    ),
+                    if (tabs != null) ...[
                       const SizedBox(height: 16),
-                      if (selectors != null) Padding(
+                      Padding(
                         padding: EdgeInsets.only(
-                          left: isWide ? horizontalPadding : 24,
+                          left: contentPadding,
                           right: 0,
                         ),
-                        child: selectors!,
+                        child: tabs!,
                       ),
-                      if (tabs != null) ...[
-                        const SizedBox(height: 16),
-                        Padding(
-                          padding: EdgeInsets.only(
-                            left: isWide ? horizontalPadding : 24,
-                            right: 0,
-                          ),
-                          child: tabs!,
-                        ),
-                      ],
-                      const SizedBox(height: 12), // Espacio original para el resto de pestañas
                     ],
-                  ),
+                    const SizedBox(height: 12),
+                  ],
                 ),
               ),
             ),
           ),
 
           // 3. CONTENIDO (Tabs/Episodios)
-          SliverMainAxisGroup(
-            slivers: [
-              SliverPadding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: width > maxContentWidth 
-                      ? (width - maxContentWidth) / 2 
-                      : (isWide ? horizontalPadding.clamp(24.0, 100.0) : 24), // Senior Fix: Nunca menos de 24px
-                ),
-                sliver: content,
-              ),
-            ],
+          // Senior Fix: SliverPadding limpio con sliver válido directamente.
+          SliverPadding(
+            key: const ValueKey('detail_content_sliver_padding'),
+            padding: EdgeInsets.symmetric(
+              horizontal: width > maxContentWidth 
+                  ? (width - maxContentWidth) / 2 
+                  : contentPadding,
+            ),
+            sliver: _buildSliverContent(context, content),
           ),
         ],
       ),

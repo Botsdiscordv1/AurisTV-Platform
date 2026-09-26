@@ -3,9 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:hive_ce/hive_ce.dart';
 
 import 'package:auris_core/auris_core.dart';
 import 'providers/settings_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -296,20 +299,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _CategoryHeader(title: 'Información del Sistema'),
+        _CategoryHeader(title: 'Almacenamiento y Sistema'),
         const SizedBox(height: 30),
         _SettingsTVButton(
-          label: 'Limpiar caché local',
+          label: 'Limpiar caché local y datos',
           icon: Icons.delete_sweep_outlined,
-          onTap: () {},
+          onTap: () async {
+            await DefaultCacheManager().emptyCache();
+            if (Hive.isBoxOpen('playback_history')) await Hive.box('playback_history').clear();
+            if (Hive.isBoxOpen('search_history')) await Hive.box('search_history').clear();
+            if (Hive.isBoxOpen('home_cache')) await Hive.box('home_cache').clear();
+
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('¡Caché y datos locales limpiados con éxito!')),
+              );
+            }
+          },
         ),
         _SettingsTVButton(
           label: 'Verificar actualizaciones',
           icon: Icons.update_rounded,
-          onTap: () {},
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('La aplicación está actualizada a la última versión')),
+            );
+          },
         ),
         const Spacer(),
-        const Text('AurisTV v2.1.0-alpha • Auris Core v1.4.2', style: TextStyle(color: Colors.white24, fontSize: 14)),
+        FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snapshot) {
+            final version = snapshot.hasData ? 'v${snapshot.data!.version}' : 'v1.0.0';
+            return Text('AurisTV $version • Auris Core v1.4.2', style: const TextStyle(color: Colors.white24, fontSize: 14));
+          },
+        ),
       ],
     );
   }

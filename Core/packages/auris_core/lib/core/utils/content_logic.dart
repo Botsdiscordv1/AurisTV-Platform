@@ -27,6 +27,7 @@ MediaItem mapSearchResultToMediaItem(SearchResult result, String category) {
     else if (result.url.contains('animejara.com')) effectiveSource = 'AnimeJara';
     else if (result.url.contains('tudorama.net')) effectiveSource = 'TuDorama';
     else if (result.url.contains('doramaslatinox')) effectiveSource = 'DoramasLatinox';
+    else if (result.url.contains('repelishd')) effectiveSource = 'RepelisHD';
   }
 
   return MediaItem(

@@ -651,26 +651,32 @@ List<HomeLayoutSection> _interleaveInicioSections(
 
     // Intento 2: Fallback si no hubo candidato ideal en la rotación
     if (bestCandidate == null) {
-      for (int step = 0; step < availablePools.length; step++) {
-        final catIdx = categoryOrder[(categoryPointer + step) % availablePools.length];
-        final pool = availablePools[catIdx];
+      for (int pass = 0; pass < 2 && bestCandidate == null; pass++) {
+        final bool strictHarmony = pass == 0;
+        for (int step = 0; step < availablePools.length && bestCandidate == null; step++) {
+          final catIdx = categoryOrder[(categoryPointer + step) % availablePools.length];
+          final pool = availablePools[catIdx];
 
-        for (int i = 0; i < pool.length; i++) {
-          final candidate = pool[i];
-          final title = candidate.title;
+          for (int i = 0; i < pool.length; i++) {
+            final candidate = pool[i];
+            final title = candidate.title;
 
-          if (title != null && seenTitles.contains(title)) {
-            pool.removeAt(i);
-            i--;
-            continue;
+            if (title != null && seenTitles.contains(title)) {
+              pool.removeAt(i);
+              i--;
+              continue;
+            }
+
+            if (strictHarmony && forbiddenFormat != null && candidate.presentation == forbiddenFormat) {
+              continue;
+            }
+
+            bestCandidate = candidate;
+            chosenCategoryIndex = catIdx;
+            chosenItemIndex = i;
+            break;
           }
-
-          bestCandidate = candidate;
-          chosenCategoryIndex = catIdx;
-          chosenItemIndex = i;
-          break;
         }
-        if (bestCandidate != null) break;
       }
     }
 
@@ -937,6 +943,7 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
     else if (result.id.contains('animejara.com')) effectiveSource = 'AnimeJara';
     else if (result.id.contains('tudorama.net')) effectiveSource = 'TuDorama';
     else if (result.id.contains('doramaslatinox')) effectiveSource = 'DoramasLatinox';
+    else if (result.id.contains('repelishd')) effectiveSource = 'RepelisHD';
   }
 
   // Senior Fix: Fallback de imagen horizontal para secciones WIDE editoriales
@@ -1024,6 +1031,7 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
     else if (result.url.contains('animejara.com')) effectiveSource = 'AnimeJara';
     else if (result.url.contains('tudorama.net')) effectiveSource = 'TuDorama';
     else if (result.url.contains('doramaslatinox')) effectiveSource = 'DoramasLatinox';
+    else if (result.url.contains('repelishd')) effectiveSource = 'RepelisHD';
   }
 
   // Senior Fix: Eliminamos el año como subtítulo por petición UX

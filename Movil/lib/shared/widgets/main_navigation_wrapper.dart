@@ -9,6 +9,7 @@ import 'package:auris_core/auris_core.dart';
 import 'package:auristv_mobile/features/remote_control/data/models/remote_device.dart';
 import 'package:auristv_mobile/features/remote_control/presentation/providers/remote_control_provider.dart';
 import 'auris_bottom_bar.dart';
+import '../../features/profile/presentation/profile_screen.dart';
 
 class MainNavigationWrapper extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -45,7 +46,7 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     final bool isRootPath = location == '/' || 
                             location == '/search' || 
                             location == '/explore' || 
-                            location == '/settings';
+                            location == '/profile';
 
     if (!isRootPath && router.canPop()) {
       router.pop();

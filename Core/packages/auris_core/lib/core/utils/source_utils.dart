@@ -46,6 +46,7 @@ String simplifySourceName(String name) {
   if (l.contains('pelispedia')) return 'PPA';
   if (l.contains('gnulahd')) return 'GHD';
   if (l.contains('lamovie')) return 'LMV';
+  if (l.contains('repelishd')) return 'RHD';
   if (l.contains('doramaslatinox')) return 'DLX';
   return name.toUpperCase();
 }
@@ -56,6 +57,7 @@ const Map<String, int> _sourceDisplayOrder = {
   'A23': 4,
   'JKA': 5,
   'DLX': 6,
+  'RHD': 7,
   'LMV': 8,
   'OPS': 9,
   'PPA': 10,

@@ -299,6 +299,15 @@ class HarmonyRepo extends MockPersonalizedRepo {
       locale: 'es-MX',
       sections: [
         EditorialSection(
+          id: 'sec_poster_$cat',
+          title: 'Explora $cat',
+          badge: 'essential',
+          format: 'poster',
+          items: [
+            EditorialItem(id: 'item_3_$cat', title: 'T3', posterUrl: 'u', badge: 'essential')
+          ],
+        ),
+        EditorialSection(
           id: 'sec_top10_$cat',
           title: 'Top 10 $cat',
           badge: 'essential',
@@ -314,15 +323,6 @@ class HarmonyRepo extends MockPersonalizedRepo {
           format: 'wide',
           items: [
             EditorialItem(id: 'item_2_$cat', title: 'T2', posterUrl: 'u', bannerUrl: 'b', badge: 'essential')
-          ],
-        ),
-        EditorialSection(
-          id: 'sec_poster_$cat',
-          title: 'Explora $cat',
-          badge: 'essential',
-          format: 'poster',
-          items: [
-            EditorialItem(id: 'item_3_$cat', title: 'T3', posterUrl: 'u', badge: 'essential')
           ],
         ),
       ],

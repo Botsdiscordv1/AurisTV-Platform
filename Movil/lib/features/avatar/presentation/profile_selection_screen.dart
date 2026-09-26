@@ -11,13 +11,17 @@ class ProfileSelectionScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen> {
-  bool _isEditMode = false;
+  bool? _isEditModeOverride;
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider);
     const primaryColor = Color(0xFFEF7A1E);
     const backgroundColor = Color(0xFF0B0B0D);
+
+    final state = GoRouterState.of(context);
+    final bool initialEdit = state.uri.queryParameters['edit'] == 'true';
+    final bool _isEditMode = _isEditModeOverride ?? initialEdit;
 
     if (user == null) {
       return const Scaffold(
@@ -33,7 +37,16 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        leading: Navigator.canPop(context) ? const BackButton(color: Colors.white70) : null,
+        leading: BackButton(
+          color: Colors.white70,
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/profile');
+            }
+          },
+        ),
         title: Image.asset(
           'assets/icons/auris-tv-icon.png',
           height: 30,
@@ -72,7 +85,7 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
                         onTap: () {
                           if (_isEditMode) {
                             ref.read(authProvider.notifier).switchProfile(profile.id);
-                            context.go('/settings/avatar');
+                            context.push('/edit-profile/${profile.id}');
                           } else {
                             ref.read(authProvider.notifier).switchProfile(profile.id);
                             context.go('/');
@@ -81,7 +94,7 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
                         onDelete: () => _showDeleteConfirmation(context, ref, profile.id, profile.name),
                       );
                     }),
-                    if (user.profiles.length < 5 && !_isEditMode)
+                    if (user.profiles.length < 5)
                       _AddProfileItem(
                         onTap: () => _showAddProfileDialog(context, ref),
                       ),
@@ -93,7 +106,7 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
               OutlinedButton(
                 onPressed: () {
                   setState(() {
-                    _isEditMode = !_isEditMode;
+                    _isEditModeOverride = !_isEditMode;
                   });
                 },
                 style: OutlinedButton.styleFrom(

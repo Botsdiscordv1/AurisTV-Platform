@@ -19,24 +19,13 @@ class AvatarSelectorScreen extends ConsumerStatefulWidget {
 }
 
 class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
-  late TextEditingController _nameController;
-
   @override
   void initState() {
     super.initState();
-    final user = ref.read(authProvider);
-    _nameController = TextEditingController(text: user?.displayName ?? '');
-
     // Resetear la selección temporal al entrar para evitar heredar selecciones de otros perfiles
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(avatarSelectionProvider.notifier).reset();
     });
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
   }
 
   @override
@@ -67,12 +56,6 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
             onPressed: () {
               final catalog = catalogAsync.valueOrNull;
               if (catalog != null) {
-                // Guardar nombre
-                final newName = _nameController.text.trim();
-                if (newName.isNotEmpty) {
-                  ref.read(authProvider.notifier).updateProfileName(newName);
-                }
-
                 // Guardar avatar
                 final selectedAvatar = _selectedPath(catalog, selection);
                 if (selectedAvatar != null) {
@@ -104,25 +87,6 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
       ),
       body: Column(
         children: [
-          // Sección de Nombre (Nickname)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
-              child: TextField(
-                controller: _nameController,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                decoration: InputDecoration(
-                  hintText: 'Tu nombre',
-                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2)),
-                  enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
-                  focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: primaryColor)),
-                ),
-              ),
-            ),
-          ),
-
           // Barra de Categorias (Estilo Prime Video / HomeScreen)
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
