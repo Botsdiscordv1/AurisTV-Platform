@@ -2247,11 +2247,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
 
         if (isScrollable) {
           final double linePixelHeight = fontSize * lineHeight;
-          final double minH = (linePixelHeight * 3.0).ceilToDouble();
-          final double maxH = (linePixelHeight * 3.8).ceilToDouble();
+          final double fixedH = (linePixelHeight * 4.0).ceilToDouble(); // 4 líneas base exactas
           
-          return Container(
-            constraints: BoxConstraints(minHeight: minH, maxHeight: maxH),
+          return SizedBox(
+            height: fixedH,
             child: RawScrollbar(
               controller: _synopsisScrollController,
               thumbColor: const Color(0xFFEF7A1E).withOpacity(0.4),
@@ -3324,7 +3323,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     required bool isMovieCategory,
   }) {
     // Senior Responsive Desktop Architecture: Dimensiones fluidas continuas para cualquier resolución de pantalla (Laptops -> 4K Ultrawide)
-    final double headerH = (width / 3.2).clamp(420.0, 560.0);
+    final double headerH = (width / 2.6).clamp(520.0, 680.0);
     final double overlayLeftPadding = (width * 0.025 + 40.0).clamp(68.0, 96.0); // Sangría segura para no chocar jamás con el botón 'back'
     final double synopsisWidth = (width * 0.46).clamp(400.0, 760.0);
     final double logoMaxWidth = (width * 0.32).clamp(320.0, 600.0);
@@ -3332,11 +3331,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     final double titleSize = (width * 0.028).clamp(30.0, 52.0);
     final double topPadding = (headerH * (isCompactHeader ? 0.08 : 0.15)).clamp(36.0, 90.0);
     final bool hasLogo = detailData?.logo != null && detailData!.logo!.isNotEmpty;
-    final double gapLogoToMeta = isCompactHeader ? 4.0 : (hasLogo ? 18.0 : 8.0);
-    final double gapMetaToSynopsis = isCompactHeader ? 2.0 : (hasLogo ? 10.0 : 6.0);
-    final double gapSynopsisToActions = isCompactHeader ? 2.0 : 12.0;
-    final double gapActionsToSelectors = isCompactHeader ? 0.0 : 8.0;
-    final double selectorWidth = isCompactHeader ? 160.0 : 210.0;
+    final double gapLogoToMeta = isCompactHeader ? 8.0 : (hasLogo ? 26.0 : 14.0);
+    final double gapMetaToSynopsis = isCompactHeader ? 6.0 : (hasLogo ? 18.0 : 12.0);
+    final double gapSynopsisToActions = isCompactHeader ? 6.0 : 22.0;
+    final double gapActionsToSelectors = isCompactHeader ? 4.0 : 16.0;
+    final double selectorWidth = isCompactHeader ? 220.0 : 320.0;
     final double selectorH = isCompactHeader ? 36.0 : (width * 0.026).clamp(42.0, 48.0);
     final double selectorFontSize = isCompactHeader ? 13.5 : (width * 0.009).clamp(14.0, 16.0);
 
@@ -3355,7 +3354,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
             controller: _scrollController,
             physics: const ClampingScrollPhysics(), // Senior Fix: Bloquear rebote superior en Desktop para evitar bloque negro
             slivers: [
-              // 1. HEADER CINEMATOGRÁFICO (Sliver)
+              // 1. HEADER CINEMATOGRÁFICO (Sliver Fijo Espacioso)
               SliverToBoxAdapter(
                 child: SizedBox(
                   height: headerH,
@@ -3494,7 +3493,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                     ),
                                     // Máscara Inferior Maestra
                                     Positioned(
-                                      bottom: -1, left: 0, right: 0, height: headerH * 0.5,
+                                      bottom: -1, left: 0, right: 0, height: 240,
                                       child: DecoratedBox(
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
@@ -3549,70 +3548,72 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                       // BOTONES SUPERIORES (Integrados en el header para que se desplacen con el scroll)
                       _buildUpperButtons(context, desktopTop: 45),
 
-                      // OVERLAY DE INFORMACIÓN (INTERACTIVO)
+                      // OVERLAY DE INFORMACIÓN (FIJO ESPACIOSO / NO SCROLLEABLE)
                       Positioned.fill(
                         child: Padding(
                           padding: EdgeInsets.only(
                             left: overlayLeftPadding, 
                             top: topPadding, 
-                            bottom: 0, 
+                            bottom: 56, 
                             right: 32,
                           ),
-                          child: SingleChildScrollView(
-                            physics: const ClampingScrollPhysics(),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
+                          child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Logo
+                            AnimatedOpacity(
+                              duration: const Duration(milliseconds: 1200),
+                              curve: Curves.easeInOut,
+                              opacity: _revealed ? 1.0 : 0.0,
+                              child: HeroTitle(
+                                title: widget.title,
+                                logo: detailData?.logo,
+                                logoReady: detailAsync.hasValue,
+                                maxWidth: logoMaxWidth,
+                                maxHeight: (detailData?.logo != null && detailData!.logo!.isNotEmpty) ? logoMaxHeight : (titleSize * 2.2),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: titleSize,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.0,
+                                  letterSpacing: 2,
+                                  shadows: const [
+                                    Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4),
+                                    Shadow(color: Colors.black54, offset: Offset(4, 4), blurRadius: 10),
+                                  ]
+                                )
+                              ),
+                            ),
+                            SizedBox(height: gapLogoToMeta),
+                            if (detailData != null) ...[
+                              _buildMetaRow(detailData, isCompact: isCompactHeader, kind: detailParams.kind),
+                              SizedBox(height: gapMetaToSynopsis),
+                              SizedBox(
+                                width: synopsisWidth,
+                                child: _buildSynopsis(detailData, isCompact: isCompactHeader, isScrollable: true),
+                              ),
+                            ],
+                            SizedBox(height: gapSynopsisToActions),
+                            // Botones de acción
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
                               children: [
-                              // Logo
-                              AnimatedOpacity(
-                                duration: const Duration(milliseconds: 1200),
-                                curve: Curves.easeInOut,
-                                opacity: _revealed ? 1.0 : 0.0,
-                                child: HeroTitle(
-                                  title: widget.title,
-                                  logo: detailData?.logo,
-                                  logoReady: detailAsync.hasValue,
-                                  maxWidth: logoMaxWidth,
-                                  maxHeight: (detailData?.logo != null && detailData!.logo!.isNotEmpty) ? logoMaxHeight : (titleSize * 2.2),
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: titleSize,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.0,
-                                    letterSpacing: 2,
-                                    shadows: const [
-                                      Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4),
-                                      Shadow(color: Colors.black54, offset: Offset(4, 4), blurRadius: 10),
-                                    ]
-                                  )
-                                ),
-                              ),
-                              SizedBox(height: gapLogoToMeta),
-                              if (detailData != null) ...[
-                                _buildMetaRow(detailData, isCompact: isCompactHeader, kind: detailParams.kind),
-                                SizedBox(height: gapMetaToSynopsis),
-                                SizedBox(
-                                  width: synopsisWidth,
-                                  child: _buildSynopsis(detailData, isCompact: isCompactHeader, isScrollable: true),
-                                ),
+                                _buildMainActionButton(context, isCompact: isCompactHeader),
+                                _buildCircularActions(context, isCompact: isCompactHeader),
                               ],
-                              SizedBox(height: gapSynopsisToActions),
-                              // Botones de acción
+                            ),
+                            SizedBox(height: gapActionsToSelectors),
+                            // Selectores
+                            if (!isMovieCategory && (totalSeasons > 0 || currentSource != null))
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  _buildMainActionButton(context, isCompact: isCompactHeader),
-                                  const SizedBox(width: 12),
-                                  _buildCircularActions(context, isCompact: isCompactHeader),
-                                ],
-                              ),
-                              SizedBox(height: gapActionsToSelectors),
-                              // Selectores
-                              if (!isMovieCategory && (totalSeasons > 0 || currentSource != null))
-                                Row(
-                                  children: [
-                                    if (!isMovieCategory && totalSeasons > 0) ...[
-                                      SeasonSelector(
+                                  if (!isMovieCategory && totalSeasons > 0) ...[
+                                    SizedBox(
+                                      width: selectorWidth,
+                                      child: SeasonSelector(
                                         data: SeasonSelectorData(
                                           currentSeason: currentSeason,
                                           totalSeasons: totalSeasons > 0 ? totalSeasons : 1,
@@ -3624,10 +3625,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                           totalEpisodes: epData?.total,
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
-                                    ],
-                                    if (currentSource != null)
-                                      _ServerSelector(
+                                    ),
+                                    const SizedBox(width: 12),
+                                  ],
+                                  if (currentSource != null)
+                                    SizedBox(
+                                      width: selectorWidth,
+                                      child: _ServerSelector(
                                         currentSource: currentSource,
                                         sources: activeSources,
                                         onSourceSelected: (index) => ref.setSource(detailParams, activeSources[index]),
@@ -3637,17 +3641,17 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                         fontSize: selectorFontSize,
                                         season: widget.year,
                                       ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
+                                    ),
+                                ],
+                              ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
 
               // 2. CONTENIDO INFERIOR (Tabs y Episodios)
               SliverPadding(

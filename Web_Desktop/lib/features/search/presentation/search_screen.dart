@@ -354,7 +354,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  RepaintBoundary(child: _TrendingChipsRow(onChipTap: _performSearch)),
                   const _ContinueWatchingSection(),
                   RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
                   const SizedBox(height: 8),
@@ -385,7 +384,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          RepaintBoundary(child: _TrendingChipsRow(onChipTap: _performSearch)),
           const _ContinueWatchingSection(),
           RepaintBoundary(child: SearchHistorySection(onQueryTap: _performSearch)),
           RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
@@ -397,46 +395,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TrendingChipsRow extends StatelessWidget {
-  final Function(String) onChipTap;
-  const _TrendingChipsRow({required this.onChipTap});
-
-  static const List<Map<String, dynamic>> chips = [
-    {'label': '🔥 Tendencias', 'query': 'trending'},
-    {'label': '⭐ Estrenos 2025', 'query': '2025'},
-    {'label': '🎬 Películas', 'query': 'pelicula'},
-    {'label': '🎌 Anime', 'query': 'anime'},
-    {'label': '🍿 Series', 'query': 'serie'},
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.sizeOf(context).width >= 1200;
-    final hPadding = isDesktop ? 24.0 : 16.0;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: chips.map((chip) {
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ActionChip(
-                backgroundColor: const Color(0xFF1A1A1A),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                label: Text(chip['label'] as String, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-                onPressed: () => onChipTap(chip['query'] as String),
-              ),
-            );
-          }).toList(),
-        ),
       ),
     );
   }

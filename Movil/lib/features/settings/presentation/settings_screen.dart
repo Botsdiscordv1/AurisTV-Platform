@@ -7,6 +7,7 @@ import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../avatar/presentation/providers/avatar_providers.dart';
 import 'providers/settings_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -230,11 +231,17 @@ class SettingsScreen extends ConsumerWidget {
                       subtitle: 'Gestionar datos locales',
                       onTap: () {},
                     ),
-                    _SettingsTile(
-                      icon: Icons.info_outline,
-                      title: 'Versión',
-                      subtitle: 'v2.1.0-alpha',
-                      onTap: () {},
+                    FutureBuilder<PackageInfo>(
+                      future: PackageInfo.fromPlatform(),
+                      builder: (context, snapshot) {
+                        final version = snapshot.hasData ? 'v${snapshot.data!.version}' : 'v1.0.0';
+                        return _SettingsTile(
+                          icon: Icons.info_outline,
+                          title: 'Versión',
+                          subtitle: version,
+                          onTap: () {},
+                        );
+                      },
                     ),
                   ],
                 ),

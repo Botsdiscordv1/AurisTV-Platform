@@ -99,29 +99,32 @@ class _SeasonSelectorState extends State<SeasonSelector> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Temporada ${widget.data.currentSeason}',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: widget.data.fontSize ?? _sp(context, widget.data.compact ? 14 : 16),
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                          if (widget.data.totalEpisodes != null && widget.data.totalEpisodes! > 0)
+                    Flexible(
+                      child: RichText(
+                        overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          children: [
                             TextSpan(
-                              text: ' (${widget.data.totalEpisodes} episodios)',
+                              text: 'Temporada ${widget.data.currentSeason}',
                               style: TextStyle(
-                                color: const Color(0xFFB2B4BC),
-                                fontSize: widget.data.fontSize ?? _sp(context, widget.data.compact ? 13 : 15),
-                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                                fontSize: widget.data.fontSize ?? _sp(context, widget.data.compact ? 14 : 16),
+                                fontWeight: FontWeight.bold,
                                 fontFamily: 'Poppins',
                               ),
                             ),
-                        ],
+                            if (widget.data.totalEpisodes != null && widget.data.totalEpisodes! > 0)
+                              TextSpan(
+                                text: ' (${widget.data.totalEpisodes} episodios)',
+                                style: TextStyle(
+                                  color: const Color(0xFFB2B4BC),
+                                  fontSize: widget.data.fontSize ?? _sp(context, widget.data.compact ? 13 : 15),
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: 'Poppins',
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                     SizedBox(width: _sp(context, 12)),
