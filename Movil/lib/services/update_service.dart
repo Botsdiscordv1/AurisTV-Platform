@@ -23,7 +23,9 @@ class UpdateService {
   static Future<AppUpdateInfo?> checkForUpdate() async {
     try {
       final dio = Dio();
-      final response = await dio.get(_versionJsonUrl);
+      // Añadir parámetro de tiempo para evitar caché en GitHub Raw
+      final url = '$_versionJsonUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      final response = await dio.get(url);
       
       if (response.statusCode == 200) {
         final data = response.data;

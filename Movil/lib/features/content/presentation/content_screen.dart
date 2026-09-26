@@ -2926,11 +2926,12 @@ class _GalleryTabContentState extends ConsumerState<_GalleryTabContent> {
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(0, isMobile ? 0 : 8, 0, 16),
-                child: Center(
+                padding: EdgeInsets.fromLTRB(widget.hPadding, isMobile ? 0 : 8, widget.hPadding, 16),
+                child: Align(
+                  alignment: isMobile ? Alignment.center : Alignment.centerLeft,
                   child: Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 8,
+                    alignment: isMobile ? WrapAlignment.center : WrapAlignment.start,
+                    spacing: chipSpacing,
                     runSpacing: 8,
                     children: [
                       _GalleryFilterChip(
