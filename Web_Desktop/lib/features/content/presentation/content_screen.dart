@@ -3323,7 +3323,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     required bool isMovieCategory,
   }) {
     // Senior Responsive Desktop Architecture: Dimensiones fluidas continuas para cualquier resolución de pantalla (Laptops -> 4K Ultrawide)
-    final double headerH = (width / 2.6).clamp(520.0, 680.0);
+    final double headerH = (width / 3.8).clamp(400.0, 520.0);
     final double overlayLeftPadding = (width * 0.025 + 40.0).clamp(68.0, 96.0); // Sangría segura para no chocar jamás con el botón 'back'
     final double synopsisWidth = (width * 0.46).clamp(400.0, 760.0);
     final double logoMaxWidth = (width * 0.32).clamp(320.0, 600.0);
@@ -3493,7 +3493,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                     ),
                                     // Máscara Inferior Maestra
                                     Positioned(
-                                      bottom: -1, left: 0, right: 0, height: 240,
+                                      bottom: -1, left: 0, right: 0, height: 140,
                                       child: DecoratedBox(
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
@@ -3554,7 +3554,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                           padding: EdgeInsets.only(
                             left: overlayLeftPadding, 
                             top: topPadding, 
-                            bottom: 56, 
+                            bottom: 24, 
                             right: 32,
                           ),
                           child: Column(

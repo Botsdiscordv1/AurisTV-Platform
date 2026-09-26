@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,25 +18,29 @@ class AppUpdateInfo {
 }
 
 class UpdateService {
-  // URL del archivo version.json en tu repositorio o Cloudflare Pages
   static const String _versionJsonUrl = 'https://raw.githubusercontent.com/Botsdiscordv1/AurisTV-Platform/main/version.json';
 
   static Future<AppUpdateInfo?> checkForUpdate() async {
     try {
       final dio = Dio();
-      // Añadir parámetro de tiempo para evitar caché en GitHub Raw
       final url = '$_versionJsonUrl?t=${DateTime.now().millisecondsSinceEpoch}';
       final response = await dio.get(url);
       
       if (response.statusCode == 200) {
-        final data = response.data;
-        final String latestVersion = data['latestVersion'];
+        final dynamic rawData = response.data;
+        final Map<String, dynamic> data = rawData is String 
+            ? jsonDecode(rawData) 
+            : Map<String, dynamic>.from(rawData);
+
+        final String latestVersion = data['latestVersion'] ?? '1.0.0';
         final String minSupportedVersion = data['minSupportedVersion'] ?? '1.0.0';
         final String releaseNotes = data['releaseNotes'] ?? 'Nuevas mejoras y correcciones.';
         final String updateUrl = data['updateUrl'] ?? 'https://github.com/Botsdiscordv1/AurisTV-Platform/releases/latest';
 
         final packageInfo = await PackageInfo.fromPlatform();
         final currentVersion = packageInfo.version;
+
+        print('UpdateCheck -> Current: $currentVersion, Latest: $latestVersion');
 
         if (_isVersionNewer(currentVersion, latestVersion)) {
           final isForced = _isVersionNewer(currentVersion, minSupportedVersion);
@@ -67,7 +72,9 @@ class UpdateService {
         if (l > c) return true;
         if (l < c) return false;
       }
-    } catch (_) {}
+    } catch (e) {
+      print('Error in _isVersionNewer: $e');
+    }
     return false;
   }
 
