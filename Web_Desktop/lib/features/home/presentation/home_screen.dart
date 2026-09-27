@@ -990,18 +990,22 @@ class _ContinueWatchingSection extends ConsumerWidget {
       sectionId: detailParams.sectionId,
       from: '/inicio',
     );
-    final seed = SearchResult(
-      title: item.title ?? detailParams.title,
-      url: item.url ?? item.contentId,
-      quality: '',
-      thumbnail: item.posterUrl ?? '',
-      source: item.source ?? detailParams.source,
-      kind: item.kind ?? detailParams.kind,
-      type: item.type ?? detailParams.type,
-      year: item.year ?? detailParams.year,
-      metadataTitle: item.metadataTitle ?? detailParams.metadataTitle,
-      season: item.season ?? detailParams.season,
-    );
+    final seedUrl = item.url ?? item.contentId;
+    // Sin URL http real no se siembra seed (ver Movil: url=título rompe episodes).
+    final seed = isHttpUrl(seedUrl)
+        ? SearchResult(
+            title: item.title ?? detailParams.title,
+            url: seedUrl,
+            quality: '',
+            thumbnail: item.posterUrl ?? '',
+            source: item.source ?? detailParams.source,
+            kind: item.kind ?? detailParams.kind,
+            type: item.type ?? detailParams.type,
+            year: item.year ?? detailParams.year,
+            metadataTitle: item.metadataTitle ?? detailParams.metadataTitle,
+            season: item.season ?? detailParams.season,
+          )
+        : null;
     if (context.mounted) {
       context.push(uri, extra: seed);
     }

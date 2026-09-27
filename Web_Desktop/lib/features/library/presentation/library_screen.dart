@@ -56,18 +56,22 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       sectionId: detailParams.sectionId,
       from: '/settings/library',
     );
-    final seed = SearchResult(
-      title: history.title ?? detailParams.title,
-      url: history.url ?? history.contentId,
-      quality: '',
-      thumbnail: history.posterUrl ?? '',
-      source: history.source ?? detailParams.source,
-      kind: history.kind ?? detailParams.kind,
-      type: history.type ?? detailParams.type,
-      year: history.year ?? detailParams.year,
-      metadataTitle: history.metadataTitle ?? detailParams.metadataTitle,
-      season: history.season ?? detailParams.season,
-    );
+    final seedUrl = history.url ?? history.contentId;
+    // Sin URL http real no se siembra seed (ver Movil: url=título rompe episodes).
+    final seed = isHttpUrl(seedUrl)
+        ? SearchResult(
+            title: history.title ?? detailParams.title,
+            url: seedUrl,
+            quality: '',
+            thumbnail: history.posterUrl ?? '',
+            source: history.source ?? detailParams.source,
+            kind: history.kind ?? detailParams.kind,
+            type: history.type ?? detailParams.type,
+            year: history.year ?? detailParams.year,
+            metadataTitle: history.metadataTitle ?? detailParams.metadataTitle,
+            season: history.season ?? detailParams.season,
+          )
+        : null;
     if (context.mounted) {
       context.push(uri, extra: seed);
     }

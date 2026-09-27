@@ -36,8 +36,18 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
   return '$pathUrl$query';
 }
 
-String simplifySourceName(String name) {
-  final l = name.toLowerCase();
+/// true si es URL http(s) real. El historial a veces guarda el título en
+/// `url` (detailUrl null + id=título) y eso rompía el seed de continuar-viendo
+/// (episodes con url=título → el server lo rechaza).
+bool isHttpUrl(String? s) {
+  if (s == null || s.isEmpty) return false;
+  final u = Uri.tryParse(s.trim());
+  return u != null &&
+      (u.scheme == 'http' || u.scheme == 'https') &&
+      u.host.isNotEmpty;
+}
+
+String simplifySourceName(String name) {  final l = name.toLowerCase();
   if (l.contains('av1')) return 'AV1';
   if (l.contains('jkanime')) return 'JKA';
   if (l.contains('animed23')) return 'A23';

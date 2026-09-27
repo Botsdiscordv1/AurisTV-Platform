@@ -9,7 +9,10 @@ class UpdateDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
@@ -23,8 +26,11 @@ class UpdateDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.85,
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          width: screenWidth * 0.92,
+          maxWidth: 550,
+        ),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -111,6 +111,30 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     _setupHistorySync();
   }
 
+  /// Banner determinista para el historial: thumbnail del episodio en curso si
+  /// la lista ya llegó (caso normal al cerrar tras ver un rato); si no, el
+  /// banner del item (backdrop). El guardado final (stop) usaba el banner
+  /// crudo del item, así que si cerrabas antes de que llegaran los episodios
+  /// la tarjeta quedaba con backdrop aunque los ticks ya hubieran guardado
+  /// el thumb (o viceversa según el timing) → alternancia backdrop/thumb.
+  String? _resolveEpisodeBanner() {
+    final item = state.currentItem;
+    String? banner = (item?.bannerUrl != null && item!.bannerUrl!.isNotEmpty)
+        ? item.bannerUrl
+        : null;
+    if (state.episode != null && state.availableEpisodes.isNotEmpty) {
+      final int? currentEpNum = int.tryParse(state.episode!);
+      final epInfo = state.availableEpisodes.firstWhereOrNull(
+        (e) => e.number == currentEpNum,
+      );
+      // Si el episodio tiene miniatura propia, la priorizamos sobre el backdrop genérico
+      if (epInfo?.thumbnail != null && epInfo!.thumbnail!.isNotEmpty) {
+        banner = epInfo.thumbnail;
+      }
+    }
+    return banner;
+  }
+
   void _setupHistorySync() {
     _posSubscription?.cancel();
     _posSubscription = state.player?.stream.position.listen((pos) {
@@ -122,19 +146,8 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
 
         final duration = state.player?.state.duration.inMilliseconds ?? 0;
         if (duration > 0) {
-          // Senior Logic: Intentar obtener el thumbnail del episodio actual para enriquecer el banner de "Continuar Viendo"
-          String? effectiveBanner = (item.bannerUrl != null && item.bannerUrl!.isNotEmpty) ? item.bannerUrl : null;
-          
-          if (state.episode != null && state.availableEpisodes.isNotEmpty) {
-            final int? currentEpNum = int.tryParse(state.episode!);
-            final epInfo = state.availableEpisodes.firstWhereOrNull(
-              (e) => e.number == currentEpNum,
-            );
-            // Si el episodio tiene miniatura propia, la priorizamos sobre el backdrop genérico
-            if (epInfo?.thumbnail != null && epInfo!.thumbnail!.isNotEmpty) {
-              effectiveBanner = epInfo.thumbnail;
-            }
-          }
+          // Banner del episodio en curso (o backdrop si aún no llegó la lista)
+          final String? effectiveBanner = _resolveEpisodeBanner();
 
           final double calcProgress = duration > 0 ? (pos.inMilliseconds / duration).clamp(0.0, 1.0) : 0.0;
           final bool isCompleted = calcProgress > 0.95;
@@ -143,6 +156,14 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
           if ((robustSources == null || robustSources.isEmpty) && item.card != null) {
             robustSources = [item.card!];
           }
+
+          // url del historial: solo URLs http reales (detailUrl o id-url).
+          // Antes caía el título cuando detailUrl era null y el id no era URL,
+          // y ese título luego se usaba como url del seed → /api/episodes roto.
+          final String? detailUrl = item.detailUrl;
+          final String? historyUrl = (detailUrl != null && detailUrl.isNotEmpty)
+              ? detailUrl
+              : (isHttpUrl(item.id) ? item.id : null);
 
           ref.read(playbackHistoryStateProvider.notifier).updatePosition(
             contentId: item.id,
@@ -157,7 +178,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
             episode: state.episode,
             season: state.season,
             source: state.source,
-            url: item.detailUrl ?? item.id,
+            url: historyUrl,
             alternativeSources: robustSources,
             positionMs: pos.inMilliseconds,
             durationMs: duration,
@@ -327,6 +348,11 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
         if ((robustSources == null || robustSources.isEmpty) && item.card != null) {
           robustSources = [item.card!];
         }
+        // url del historial: solo URLs http reales (igual que en los ticks).
+        final String? detailUrl = item.detailUrl;
+        final String? historyUrl = (detailUrl != null && detailUrl.isNotEmpty)
+            ? detailUrl
+            : (isHttpUrl(item.id) ? item.id : null);
 
         ref.read(playbackHistoryStateProvider.notifier).updatePosition(
           contentId: item.id,
@@ -336,14 +362,14 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
           durationMs: dur,
           title: item.title,
           posterUrl: item.posterUrl,
-          bannerUrl: item.bannerUrl,
+          bannerUrl: _resolveEpisodeBanner(),
           logoUrl: item.logoUrl,
           category: item.type.name,
           kind: item.card?.kind,
           type: item.card?.type ?? item.type.name,
           year: item.year,
           source: state.source,
-          url: item.detailUrl ?? item.id,
+          url: historyUrl,
           alternativeSources: robustSources,
           force: true,
         );
