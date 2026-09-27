@@ -10,6 +10,8 @@ class WideContentItem {
   final String imageUrl;
   final String? logoUrl; // Senior Fix: Soporte para logo en WideCard
   final String? subtitle;
+  /// Segunda línea opcional bajo el subtítulo (ej. "Quedan: X").
+  final String? subtitle2;
   final String? rating;
   final double? progress;
   final Widget? badgeOverlay;
@@ -22,6 +24,7 @@ class WideContentItem {
     required this.imageUrl,
     this.logoUrl,
     this.subtitle,
+    this.subtitle2,
     this.rating,
     this.progress,
     this.badgeOverlay,
@@ -137,7 +140,13 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                 LayoutBuilder(
                   builder: (context, constraints) {
                     return SizedBox(
-                      height: TVResponsiveUtils.bannerRowHeight(context) - 10, // Ajustado para TV
+                      height: TVResponsiveUtils.bannerRowHeight(context,
+                              subtitleLines: widget.items.any((i) =>
+                                      i.subtitle2 != null &&
+                                      i.subtitle2!.isNotEmpty)
+                                  ? 2
+                                  : 1) -
+                          10, // Ajustado para TV
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           _updateScrollIndicators();
@@ -163,6 +172,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                                 logoUrl: item.logoUrl,
                                 progress: item.progress,
                                 subtitle: item.subtitle,
+                                subtitle2: item.subtitle2,
                                 rating: item.rating,
                                 badgeOverlay: item.badgeOverlay,
                                 width: cardWidth,

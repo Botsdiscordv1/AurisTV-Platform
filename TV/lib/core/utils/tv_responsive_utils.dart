@@ -61,8 +61,12 @@ class TVResponsiveUtils {
   }
 
   /// Altura de la fila de banners
-  static double bannerRowHeight(BuildContext context) {
-    return bannerHeight(context) + sp(context, 42) + 28.0;
+  /// [subtitleLines] - 2 cuando hay segunda línea ("Quedan: X" bajo "T1:E7 . Título").
+  static double bannerRowHeight(BuildContext context, {int subtitleLines = 1}) {
+    return bannerHeight(context) +
+        sp(context, 42) +
+        28.0 +
+        (subtitleLines > 1 ? (4 + sp(context, 20)) : 0);
   }
 
   /// Títulos de secciones

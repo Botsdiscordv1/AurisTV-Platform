@@ -840,7 +840,26 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                         autofocus: widget.autofocus, // Senior Fix: Autofocus inicial para TV
                       ),
                       const SizedBox(width: 12),
-                      _BannerIconButton(icon: Icons.add, label: 'Mi lista', onPressed: () {}),
+                      Builder(builder: (context) {
+                        final isFav = ref
+                            .watch(favoritesProvider)
+                            .any((f) => f.id == item.id);
+                        return _BannerIconButton(
+                          icon: isFav ? Icons.check : Icons.add,
+                          label: isFav ? 'En mi lista' : 'Mi lista',
+                          onPressed: () {
+                            final user = ref.read(authProvider);
+                            ref
+                                .read(favoritesProvider.notifier)
+                                .toggleFavorite(
+                                  favoriteFromMedia(
+                                      item,
+                                      user?.activeProfileId ??
+                                          'guest_profile'),
+                                );
+                          },
+                        );
+                      }),
                       const SizedBox(width: 12),
                       _BannerIconButton(icon: Icons.info_outline, label: 'Detalles', onPressed: () => widget.onDetails(item)),
                       if (item.trailerKey != null) ...[

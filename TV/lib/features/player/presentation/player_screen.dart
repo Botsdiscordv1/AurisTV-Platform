@@ -399,7 +399,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       durationMs: durationMs,
       title: widget.title,
       posterUrl: widget.posterUrl,
-      bannerUrl: widget.bannerUrl,
+      // Banner del episodio en curso (no el backdrop crudo): ver Movil.
+      bannerUrl: ref.read(activePlayerProvider.notifier).resolveEpisodeBanner() ?? widget.bannerUrl,
       logoUrl: widget.logoUrl,
       category: widget.category,
       source: widget.source,
@@ -1346,7 +1347,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
 
     final sources = ref.read(activeContentSourcesProvider);
-    final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
+    // Match tolerante + fallback a la primera fuente: si el nombre no matchea,
+    // reusar la URL actual re-extraía el episodio ANTERIOR (reiniciado).
+    final baseSource = findSourceByName(sources, _currentSource) ??
+        (sources.isNotEmpty ? sources.first : null);
 
     // Senior Navigation Fix: Calcular la URL del episodio destino ANTES de reemplazar
     // la ruta. context.replace recrea la pantalla (GoRouter usa la URI como page key),
@@ -1376,7 +1380,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     context.replace(Uri(path: newPath, queryParameters: queryParams).toString());
 
     final preloaded = ref.read(nextEpisodePreloadProvider);
-    if (preloaded != null && next) {
+    final preloadTarget = ref.read(nextEpisodePreloadTargetProvider);
+    // Solo consumir el preload si es para ESTE destino (url+episodio). Un
+    // preload stale reproduciría el episodio equivocado; se limpia y se sigue
+    // por extracción fresca.
+    final bool preloadValid = preloaded != null &&
+        next &&
+        preloadTarget != null &&
+        preloadTarget.url == nextSourceUrl &&
+        preloadTarget.episode == nextNum;
+    if (!preloadValid && preloaded != null) {
+      ref.read(playerPreloadControllerProvider).clearPreload();
+    }
+    if (preloadValid) {
       final tracks = preloaded.tracks.where((t) => !t.isDownload).toList();
       
       _autoplayTimer?.cancel();
@@ -3333,7 +3349,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (nextNum < 1) return;
 
     final sources = ref.read(activeContentSourcesProvider);
-    final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
+    final baseSource = findSourceByName(sources, _currentSource) ??
+        (sources.isNotEmpty ? sources.first : null);
 
     final String nextSourceUrl = baseSource != null
         ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)

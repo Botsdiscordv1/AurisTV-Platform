@@ -698,14 +698,11 @@ class _ContinueWatchingSection extends ConsumerWidget {
         return WideContentRow(
           title: 'Continuar Viendo',
           items: filteredItems.take(10).map((h) {
-            final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
-            
-            String displayTitle = h.title ?? 'Contenido';
-            if (isMovieish) {
-              displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '').trim();
-            } else if (h.episode != null && h.episode!.isNotEmpty) {
-              displayTitle = 'Ep ${h.episode} • $displayTitle';
-            }
+            // Lógica centralizada en Core (library_providers): solo diseño aquí.
+            final bool isMovieish = libraryIsMovieish(h);
+            final String displayTitle = libraryDisplayTitle(h);
+            // Subtítulo en 2 líneas: "T1:E7 . Título" + "Quedan X".
+            final sub = continueCardSubtitle(h);
 
             final String? rawUrl = h.bannerUrl ?? h.posterUrl;
             final String? logoUrl = h.logoUrl;
@@ -720,15 +717,16 @@ class _ContinueWatchingSection extends ConsumerWidget {
               ),
               logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
               progress: h.progressPercentage,
-              subtitle: remainingMs > 0 ? 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}' : '',
-              onDelete: () => ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode),
+              subtitle: sub.line1.isNotEmpty ? sub.line1 : null,
+              subtitle2: sub.line2,
+              // Ocultar de Continuar Viendo (conserva el Historial).
+              onDelete: () => ref.read(playbackHistoryStateProvider.notifier).dismissFromContinue(h.contentId, h.season, h.episode),
               originalItem: h,
             );
           }).toList(),
           onItemTap: (wideItem) {
             final item = wideItem.originalItem as PlaybackHistory;
-            final detailParams = item.toUnifiedDetailParams();
-            // FIX continuar-viendo: kind/year/type/metadataTitle + seed (extra).
+            final detailParams = item.toUnifiedDetailParams();            // FIX continuar-viendo: kind/year/type/metadataTitle + seed (extra).
             // Sin kind el discovery iba al servidor movies y remapeaba la
             // categoría (anime→series) → detalle sin fuentes.
             final uri = '/content/${Uri.encodeComponent(detailParams.title)}'
@@ -741,22 +739,8 @@ class _ContinueWatchingSection extends ConsumerWidget {
                 '${detailParams.kind != null && detailParams.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(detailParams.kind!)}' : ''}'
                 '${detailParams.type != null && detailParams.type!.isNotEmpty ? '&type=${Uri.encodeComponent(detailParams.type!)}' : ''}'
                 '${detailParams.metadataTitle != null && detailParams.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(detailParams.metadataTitle!)}' : ''}';
-            final seedUrl = item.url ?? item.contentId;
-            // Sin URL http real no se siembra seed (ver Movil: url=título rompe episodes).
-            final seed = isHttpUrl(seedUrl)
-                ? SearchResult(
-                    title: item.title ?? detailParams.title,
-                    url: seedUrl,
-                    quality: '',
-                    thumbnail: item.posterUrl ?? '',
-                    source: item.source ?? detailParams.source,
-                    kind: item.kind ?? detailParams.kind,
-                    type: item.type ?? detailParams.type,
-                    year: item.year ?? detailParams.year,
-                    metadataTitle: item.metadataTitle ?? detailParams.metadataTitle,
-                    season: item.season ?? detailParams.season,
-                  )
-                : null;
+            // Seed centralizado en Core (null si no hay URL http real).
+            final seed = historyToSeed(item);
             context.push(uri, extra: seed);
           },
         );

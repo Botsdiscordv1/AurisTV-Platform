@@ -11,6 +11,9 @@ class FocusableWideCard extends StatefulWidget {
   final String? logoUrl; // Senior Fix: Soporte para logo oficial del contenido
   final double? progress;
   final String? subtitle;
+  /// Segunda línea opcional bajo el subtítulo (ej. "Quedan X" bajo
+  /// "T1:E7 . Título"). Crece el área de texto solo cuando viene.
+  final String? subtitle2;
   final String? rating;
   final Widget? badgeOverlay;
   final VoidCallback onTap;
@@ -27,6 +30,7 @@ class FocusableWideCard extends StatefulWidget {
     this.onDelete,
     this.progress,
     this.subtitle,
+    this.subtitle2,
     this.rating,
     this.badgeOverlay,
     this.width = 440,
@@ -199,10 +203,12 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Senior Fix: Área de texto con altura fija para 2 líneas (Título + Subtítulo)
-                // Esto permite que el banner mantenga su información extra sin romper la alineación inferior.
+                // Área de texto: 2 líneas fijas (Título + Subtítulo) + 3ª
+                // opcional (segunda línea del subtítulo). Solo crece si viene.
                 SizedBox(
-                  height: isMobile ? ResponsiveUtils.sp(context, 42) : 52,
+                  height: (widget.subtitle2 != null && widget.subtitle2!.isNotEmpty)
+                      ? ((isMobile ? ResponsiveUtils.sp(context, 42) : 52) + 20)
+                      : (isMobile ? ResponsiveUtils.sp(context, 42) : 52),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -220,20 +226,41 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                           ),
                         ),
                       ),
-                      if (widget.subtitle != null) ...[
+                      if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(
-                            widget.subtitle!,
+                          child: Text.rich(
+                            subtitleRichSpan(
+                              widget.subtitle!,
+                              TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: isMobile ? ResponsiveUtils.sp(context, 13) : 15,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: isMobile ? ResponsiveUtils.sp(context, 13) : 15,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                      if (widget.subtitle2 != null && widget.subtitle2!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text.rich(
+                            subtitleRichSpan(
+                              widget.subtitle2!,
+                              TextStyle(
+                                color: Colors.white,
+                                fontSize: isMobile ? ResponsiveUtils.sp(context, 13) : 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.2,
+                              ),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],

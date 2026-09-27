@@ -204,6 +204,9 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final PlaybackHistory? latestHistory;
   final Set<String>? unavailableSources;
   final int? season;
+  final String? kind;
+  final int? year;
+  final String? type;
   final VoidCallback? onShowEpisodes;
 
   const _ContentHeader({
@@ -228,6 +231,9 @@ class _ContentHeader extends ConsumerStatefulWidget {
     this.latestHistory,
     this.unavailableSources,
     this.season,
+    this.kind,
+    this.year,
+    this.type,
     this.onShowEpisodes,
   });
 
@@ -626,6 +632,13 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 url: widget.url,
                 addedAt: DateTime.now(),
                 profileId: user?.activeProfileId ?? 'guest_profile',
+                kind: widget.kind,
+                year: widget.year,
+                type: widget.type,
+                season: widget.season,
+                // Todas las fuentes del detalle (paridad con search/home).
+                sources: flattenSources(
+                    ref.read(activeContentSourcesProvider)),
               );
               ref.read(favoritesProvider.notifier).toggleFavorite(item);
             },
@@ -804,6 +817,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       backgroundColor: const Color(0xFF0B0B0D), 
       body: _ContentHeader(
         title: widget.title, source: widget.source, url: widget.url, category: widget.category, poster: ApiEndpoints.proxyImage(currentSource?.thumbnail), banner: heroBanner, detailAsync: detailState.detail, currentSource: currentSource, sources: detailState.allSources, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSourceSelected: (index) => ref.setSource(detailParams, detailState.allSources[index]), onSeasonSelected: (s) => ref.setSeason(detailParams, s), 
+        kind: widget.kind ?? widget.result?.kind, year: widget.year, type: widget.result?.type ?? widget.type, season: widget.season ?? widget.result?.season,
         onShowEpisodes: () {
           Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSeasonSelected: (s) => ref.setSeason(detailParams, s), episodesAsync: detailState.episodes, category: widget.category, title: widget.title, bannerUrl: heroBanner, onPlayEpisode: (ep, epSource, total) {
             final epNum = ep.number; final effectiveSrc = epSource?.source ?? widget.source; final playEpisodesUrl = epSource?.url ?? widget.url; final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, detailState.currentSeason, epNum.toString());
