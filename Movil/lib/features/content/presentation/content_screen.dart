@@ -1216,6 +1216,8 @@ class ContentScreen extends ConsumerStatefulWidget {
   final String? banner;
   final String category;
   final int? year;
+  final int? season;
+  final String? kind;
   final int? totalSeasons;
   final String? sectionId;
 
@@ -1235,6 +1237,8 @@ class ContentScreen extends ConsumerStatefulWidget {
     this.banner,
     this.category = 'all',
     this.year,
+    this.season,
+    this.kind,
     this.totalSeasons,
     this.sectionId,
     this.result,
@@ -1670,9 +1674,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       title: widget.title,
       metadataTitle: widget.metadataTitle,
       category: widget.category,
-      kind: widget.result?.kind,
+      kind: widget.kind ?? widget.result?.kind,
       year: widget.year,
-      season: widget.result?.season,
+      season: widget.season ?? widget.result?.season,
       source: widget.source,
       url: widget.url,
       type: widget.result?.type ?? widget.type,

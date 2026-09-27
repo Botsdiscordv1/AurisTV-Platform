@@ -329,13 +329,30 @@ class _HistoryCard extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         final detailParams = item.toUnifiedDetailParams();
+        // FIX continuar-viendo: ver home (kind/year/type/metadataTitle + seed).
         final uri = '/content/${Uri.encodeComponent(detailParams.title)}'
             '?source=${Uri.encodeComponent(detailParams.source)}'
             '&category=${Uri.encodeComponent(detailParams.category)}'
             '&url=${Uri.encodeComponent(detailParams.url ?? item.contentId)}'
             '${detailParams.season != null ? '&season=${detailParams.season}' : ''}'
-            '${detailParams.sectionId != null ? '&sectionId=${Uri.encodeComponent(detailParams.sectionId!)}' : ''}';
-        context.push(uri);
+            '${detailParams.sectionId != null ? '&sectionId=${Uri.encodeComponent(detailParams.sectionId!)}' : ''}'
+            '&year=${detailParams.year ?? ''}'
+            '${detailParams.kind != null && detailParams.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(detailParams.kind!)}' : ''}'
+            '${detailParams.type != null && detailParams.type!.isNotEmpty ? '&type=${Uri.encodeComponent(detailParams.type!)}' : ''}'
+            '${detailParams.metadataTitle != null && detailParams.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(detailParams.metadataTitle!)}' : ''}';
+        final seed = SearchResult(
+          title: item.title ?? detailParams.title,
+          url: item.url ?? item.contentId,
+          quality: '',
+          thumbnail: item.posterUrl ?? '',
+          source: item.source ?? detailParams.source,
+          kind: item.kind ?? detailParams.kind,
+          type: item.type ?? detailParams.type,
+          year: item.year ?? detailParams.year,
+          metadataTitle: item.metadataTitle ?? detailParams.metadataTitle,
+          season: item.season ?? detailParams.season,
+        );
+        context.push(uri, extra: seed);
       },
       child: SizedBox(
         width: 260,

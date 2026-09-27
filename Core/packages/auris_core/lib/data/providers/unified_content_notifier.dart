@@ -161,13 +161,13 @@ final unifiedContentProvider = Provider.autoDispose
           : [SourceItem(source: r.source, url: r.url, quality: r.quality, slug: r.slug, type: r.type)];
       for (final s in items) {
         if (s.source.isEmpty || s.source.toUpperCase() == 'TMDB' || s.source.toUpperCase() == 'ANILIST' || s.source.toUpperCase() == 'TRAKT') continue;
-        if (s.url.isEmpty || RegExp(r'^\d+$').hasMatch(s.url.trim()) || !s.url.toLowerCase().startsWith('http')) continue;
+        if (s.url.isEmpty || RegExp(r'^\d+$').hasMatch(s.url.trim())) continue;
         add(r.copyWith(source: s.source, url: s.url, quality: s.quality, slug: s.slug, type: s.type));
       }
     }
   }
   for (final s in discovered) {
-    if (s.source.isEmpty || s.url.isEmpty || RegExp(r'^\d+$').hasMatch(s.url.trim()) || !s.url.toLowerCase().startsWith('http')) continue;
+    if (s.source.isEmpty || s.url.isEmpty || RegExp(r'^\d+$').hasMatch(s.url.trim())) continue;
     add(s);
   }
   allSources.sort((a, b) => sourceDisplayRank(a.source).compareTo(sourceDisplayRank(b.source)));

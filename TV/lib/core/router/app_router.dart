@@ -208,6 +208,8 @@ final GoRouter appRouter = GoRouter(
         final banner = state.uri.queryParameters['banner'];
         final category = state.uri.queryParameters['category'] ?? 'all';
         final year = int.tryParse(state.uri.queryParameters['year'] ?? '');
+        final season = int.tryParse(state.uri.queryParameters['season'] ?? '');
+        final kind = state.uri.queryParameters['kind'];
         final totalSeasons =
             int.tryParse(state.uri.queryParameters['totalSeasons'] ?? '');
         final sectionId = state.uri.queryParameters['sectionId'];
@@ -223,6 +225,8 @@ final GoRouter appRouter = GoRouter(
           banner: banner,
           category: category,
           year: year,
+          season: season,
+          kind: kind,
           totalSeasons: totalSeasons,
           sectionId: sectionId,
           result: extraResult,

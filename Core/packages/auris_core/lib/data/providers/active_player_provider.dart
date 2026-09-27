@@ -193,9 +193,13 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     final bool isSameContent = state.currentItem?.id == item.id;
     final bool isSameUrl = state.url == url;
 
+    final List<SearchResult> activeRegisteredSources = ref.read(activeContentSourcesProvider);
+
     final List<SearchResult> mergedSources = (sources != null && sources.isNotEmpty)
         ? sources
-        : (isSameContent ? state.availableSources : (item.card != null ? [item.card!] : []));
+        : (activeRegisteredSources.isNotEmpty
+            ? activeRegisteredSources
+            : (isSameContent ? state.availableSources : (item.card != null ? [item.card!] : [])));
 
     // Si ya está reproduciendo lo mismo, solo expandimos
     if (isSameContent && isSameUrl && state.uiState != PlayerUIState.none) {

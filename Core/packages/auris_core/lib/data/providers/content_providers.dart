@@ -699,7 +699,8 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
   if (effectiveServer == ApiEndpoints.moviesSeriesBaseUrl) requestCategory = params.kind == 'anime' ? 'movie_anime' : (requestCategory.contains('movie') ? 'movie' : 'series');
   else requestCategory = 'anime';
 
-  final searchAsync = ref.watch(contentSearchProvider(ContentSearchParams(query: params.metadataTitle ?? params.title, category: requestCategory, year: params.year, server: effectiveServer)));
+  final queryTitle = cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle ?? params.title));
+  final searchAsync = ref.watch(contentSearchProvider(ContentSearchParams(query: queryTitle, category: requestCategory, year: params.year, server: effectiveServer)));
   final List<SearchResult> searchSources = [];
   final targetSeason = params.season ?? extractSeason(params.title);
 
@@ -709,7 +710,6 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
       if (s.source.isEmpty || s.source.toUpperCase() == 'TMDB' || s.source.toUpperCase() == 'ANILIST' || s.source.toUpperCase() == 'TRAKT') continue;
       // URL numérica (ej. "9" de HomeItem TMDB sin url real) no es fuente válida
       if (s.url.isEmpty || RegExp(r'^\d+$').hasMatch(s.url.trim())) continue;
-      if (!s.url.toLowerCase().startsWith('http')) continue;
       // Variantes descubiertas (mini/spin-off) no pisan la lista curada.
       if (isRogueVariant(s, params.initialSources)) continue;
       final rSeason = r.season ?? extractSeason(r.title) ?? extractSeason(r.url);

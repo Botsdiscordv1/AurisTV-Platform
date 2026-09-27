@@ -202,23 +202,6 @@ extension PlaybackHistoryToDetailParams on PlaybackHistory {
       normalizedCategory = 'anime';
     }
 
-    final List<SearchResult> effectiveSources = (alternativeSources != null && alternativeSources!.isNotEmpty)
-        ? alternativeSources!
-        : [
-            SearchResult(
-              title: title ?? '',
-              url: url ?? contentId,
-              source: source ?? '',
-              quality: 'HD',
-              thumbnail: posterUrl ?? '',
-              banner: bannerUrl,
-              logo: logoUrl,
-              kind: kind,
-              type: type,
-              year: year,
-            )
-          ];
-
     return UnifiedDetailParams(
       title: title ?? '',
       metadataTitle: metadataTitle,
@@ -226,10 +209,10 @@ extension PlaybackHistoryToDetailParams on PlaybackHistory {
       kind: kind ?? (normalizedCategory == 'movie' ? 'movie' : 'anime'),
       type: type ?? normalizedCategory,
       year: year,
-      url: url ?? contentId,
-      source: '', // Dejar source vacío para permitir la búsqueda y descubrimiento completo de todas las fuentes y episodios en la ficha de detalles
+      url: url,
+      source: source ?? '',
       season: season,
-      initialSources: effectiveSources,
+      initialSources: alternativeSources,
       sectionId: sectionId,
     );
   }

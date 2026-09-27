@@ -42,17 +42,34 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     if (history == null) return;
 
     final detailParams = history.toUnifiedDetailParams();
+    // FIX continuar-viendo: ver home (kind/year/metadataTitle/season + seed).
     final uri = UrlUtils.buildShareableUri(
       title: detailParams.title,
       source: detailParams.source,
       url: detailParams.url ?? history.contentId,
       category: detailParams.category,
+      year: detailParams.year,
       type: detailParams.type,
+      kind: detailParams.kind,
+      metadataTitle: detailParams.metadataTitle,
+      season: detailParams.season,
       sectionId: detailParams.sectionId,
       from: '/settings/library',
     );
+    final seed = SearchResult(
+      title: history.title ?? detailParams.title,
+      url: history.url ?? history.contentId,
+      quality: '',
+      thumbnail: history.posterUrl ?? '',
+      source: history.source ?? detailParams.source,
+      kind: history.kind ?? detailParams.kind,
+      type: history.type ?? detailParams.type,
+      year: history.year ?? detailParams.year,
+      metadataTitle: history.metadataTitle ?? detailParams.metadataTitle,
+      season: history.season ?? detailParams.season,
+    );
     if (context.mounted) {
-      context.push(uri);
+      context.push(uri, extra: seed);
     }
   }
 

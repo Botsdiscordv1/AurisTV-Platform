@@ -831,25 +831,6 @@ MediaItem _mapHomeItemToMediaItem(HomeItem item, String sectionId) {
       final pos = map['positionInMilliseconds'] ?? map['position'] ?? 0;
       final dur = map['durationInMilliseconds'] ?? map['duration'] ?? 0;
       
-      final List<SearchResult> historySources = effectiveSources.isNotEmpty
-          ? [
-              SearchResult(
-                title: item.title,
-                url: effectiveUrl,
-                source: effectiveSource,
-                quality: 'HD',
-                thumbnail: item.posterUrl ?? '',
-                banner: effectiveBanner,
-                logo: item.logoUrl,
-                score: item.score ?? item.rating,
-                year: item.year,
-                kind: item.kind,
-                type: item.type,
-                sources: effectiveSources,
-              )
-            ]
-          : const [];
-
       progressHistory = PlaybackHistory(
         contentId: item.id,
         positionInMilliseconds: pos is num ? pos.toInt() : 0,
@@ -865,7 +846,7 @@ MediaItem _mapHomeItemToMediaItem(HomeItem item, String sectionId) {
         kind: item.kind,
         type: item.type,
         year: item.year,
-        alternativeSources: historySources,
+        alternativeSources: [card],
       );
     } catch (_) {}
   }

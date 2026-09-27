@@ -31,6 +31,7 @@ class UrlUtils {
     'Pandrama': 'pd|https://pandrama.com/dorama/',
     'OnlyPelis': 'op|https://onlypelis.net/',
     'PelisPedia': 'pp|https://www.pelispedia.li/',
+    'RePelisHD': 'rh|https://repelishd.pics/',
     'TMDB': 'tm|tmdb://',
     'AniList': 'ai|anilist://',
   };
@@ -51,6 +52,9 @@ class UrlUtils {
     int? year,
     String? quality,
     String? type,
+    String? kind,
+    String? metadataTitle,
+    int? season,
     String? sectionId,
     String? from,
   }) {
@@ -62,6 +66,9 @@ class UrlUtils {
       if (year != null) 'year': year.toString(),
       if (quality != null) 'quality': quality,
       if (type != null) 'type': type,
+      if (kind != null) 'kind': kind,
+      if (metadataTitle != null) 'metadataTitle': metadataTitle,
+      if (season != null) 'season': season.toString(),
       if (sectionId != null) 'sectionId': sectionId,
       if (from != null) 'from': from,
     };

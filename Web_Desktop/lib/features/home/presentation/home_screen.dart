@@ -974,17 +974,36 @@ class _ContinueWatchingSection extends ConsumerWidget {
 
   void _onTap(BuildContext context, PlaybackHistory item) {
     final detailParams = item.toUnifiedDetailParams();
+    // FIX continuar-viendo: kind/year/metadataTitle/season + seed (extra).
+    // Sin kind el discovery iba al servidor movies y remapeaba la categoría
+    // (anime→series) → detalle sin fuentes.
     final uri = UrlUtils.buildShareableUri(
       title: detailParams.title,
       source: detailParams.source,
       url: detailParams.url ?? item.contentId,
       category: detailParams.category,
+      year: detailParams.year,
       type: detailParams.type,
+      kind: detailParams.kind,
+      metadataTitle: detailParams.metadataTitle,
+      season: detailParams.season,
       sectionId: detailParams.sectionId,
       from: '/inicio',
     );
+    final seed = SearchResult(
+      title: item.title ?? detailParams.title,
+      url: item.url ?? item.contentId,
+      quality: '',
+      thumbnail: item.posterUrl ?? '',
+      source: item.source ?? detailParams.source,
+      kind: item.kind ?? detailParams.kind,
+      type: item.type ?? detailParams.type,
+      year: item.year ?? detailParams.year,
+      metadataTitle: item.metadataTitle ?? detailParams.metadataTitle,
+      season: item.season ?? detailParams.season,
+    );
     if (context.mounted) {
-      context.push(uri);
+      context.push(uri, extra: seed);
     }
   }
 }
