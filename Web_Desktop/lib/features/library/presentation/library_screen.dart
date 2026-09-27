@@ -331,24 +331,6 @@ class _LibraryMediaCard extends ConsumerWidget {
   final FavoriteItem item;
   const _LibraryMediaCard({required this.item});
 
-  String _getDisplayCategory(FavoriteItem item) {
-    final source = item.source.toLowerCase();
-    const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
-    const animeHints = ['jkanime', 'animeav1', 'animeflv', 'aniyae', 'animelatino', 'fiuzidragon', 'tioanime', 'animed23', 'animejara', 'katanime', 'animegratis'];
-    const movieHints = ['gnula', 'gnulahd'];
-
-    if (kdramaHints.any((h) => source.contains(h))) return 'KDRAMA';
-    if (animeHints.any((h) => source.contains(h))) return 'ANIME';
-    if (movieHints.any((h) => source.contains(h))) {
-      if (item.category.toLowerCase().contains('anime')) return 'ANIME';
-      return 'Película';
-    }
-    final cat = item.category.toLowerCase();
-    if (cat.contains('movie') || cat.contains('pelicula')) return 'Película';
-    if (cat.contains('serie') || cat.contains('tv')) return 'SERIE';
-    return item.category.toUpperCase();
-  }
-
   void _openDetail(BuildContext context) {
     // URI completa + seed (ver Movil).
     final uri = UrlUtils.buildShareableUri(
@@ -417,7 +399,7 @@ class _LibraryMediaCard extends ConsumerWidget {
       child: FocusablePosterCard(
         title: item.title,
         posterUrl: ApiEndpoints.proxyImage(item.posterUrl),
-        subtitle: _getDisplayCategory(item),
+        subtitle: null,
         showInfo: true,
         onTap: () => _openDetail(context),
       ),
