@@ -1103,12 +1103,23 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               isCompact: isIntermediate,
             ),
             const SizedBox(width: 12),
-            _BannerIconButton(
-              icon: Icons.add, 
-              label: 'Mi lista', 
-              onPressed: () {},
-              isCompact: isIntermediate,
-            ),
+            Builder(builder: (context) {
+              final isFav = ref
+                  .watch(favoritesProvider)
+                  .any((f) => f.id == item.id);
+              return _BannerIconButton(
+                icon: isFav ? Icons.check : Icons.add,
+                label: isFav ? 'En mi lista' : 'Mi lista',
+                onPressed: () {
+                  final user = ref.read(authProvider);
+                  ref.read(favoritesProvider.notifier).toggleFavorite(
+                        favoriteFromMedia(item,
+                            user?.activeProfileId ?? 'guest_profile'),
+                      );
+                },
+                isCompact: isIntermediate,
+              );
+            }),
             const SizedBox(width: 12),
             _BannerIconButton(
               icon: Icons.info_outline, 

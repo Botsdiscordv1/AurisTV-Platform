@@ -1,21 +1,28 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 
 /// Widget de tarjeta panorámica (16:9) enfocado en la experiencia de usuario premium.
 /// Soporta estados de foco, hover, escala animada, logos de contenido y barra de progreso.
-class FocusableWideCard extends StatefulWidget {
+class FocusableWideCard extends ConsumerStatefulWidget {
   final String title;
   final String imageUrl;
   final String? logoUrl;
   final double? progress;
   final String? subtitle;
+  /// Segunda línea opcional bajo el subtítulo (ej. "Quedan X" bajo
+  /// "T1:E7 . Título"). La fila debe reservar 2 líneas (subtitleLines: 2).
+  final String? subtitle2;
   final String? rating;
   final Widget? badgeOverlay;
   final VoidCallback onTap;
   final VoidCallback? onDelete;
+  /// Datos para "Mi lista" (opcional): si viene, el menú ofrece
+  /// agregar/quitar de verdad; si no, la opción no se muestra.
+  final FavoriteItem? favoriteItem;
   final double width;
   final double height;
 
@@ -26,8 +33,10 @@ class FocusableWideCard extends StatefulWidget {
     required this.onTap,
     this.logoUrl,
     this.onDelete,
+    this.favoriteItem,
     this.progress,
     this.subtitle,
+    this.subtitle2,
     this.rating,
     this.badgeOverlay,
     this.width = 440,
@@ -35,10 +44,10 @@ class FocusableWideCard extends StatefulWidget {
   });
 
   @override
-  State<FocusableWideCard> createState() => _FocusableWideCardState();
+  ConsumerState<FocusableWideCard> createState() => _FocusableWideCardState();
 }
 
-class _FocusableWideCardState extends State<FocusableWideCard> {
+class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
   final ValueNotifier<bool> _isHovered = ValueNotifier<bool>(false);
   bool _isFocused = false;
 
@@ -48,9 +57,234 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
     super.dispose();
   }
 
+  void _showOptionsModal(BuildContext context) {
+    ref.read(bottomNavVisibleProvider.notifier).state = false;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF18181B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.white12, height: 24),
+                  ListTile(
+                    leading: const Icon(Icons.info_outline, color: Colors.white),
+                    title: Text('Ver detalles y más', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () {
+                      Navigator.pop(context);
+                      SafeTap.run(widget.onTap);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.download_rounded, color: Colors.white),
+                    title: Text('Descargar', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Descarga no disponible')),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.thumb_down_outlined, color: Colors.white),
+                    title: Text('No es para mí', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Preferencia guardada')),
+                      );
+                    },
+                  ),
+                  if (widget.favoriteItem != null)
+                    ListTile(
+                      leading: Icon(
+                        ref.watch(favoritesProvider).any((f) => f.id == widget.favoriteItem!.id)
+                            ? Icons.check
+                            : Icons.add_rounded,
+                        color: Colors.white,
+                      ),
+                      title: Text(
+                        ref.watch(favoritesProvider).any((f) => f.id == widget.favoriteItem!.id)
+                            ? 'Quitar de Mi lista'
+                            : 'Mi lista',
+                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                      onTap: () {
+                        Navigator.pop(context);
+                        final fav = widget.favoriteItem!;
+                        final wasFav = ref.read(favoritesProvider).any((f) => f.id == fav.id);
+                        ref.read(favoritesProvider.notifier).toggleFavorite(fav);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(wasFav ? 'Quitado de Mi lista' : 'Añadido a Mi lista')),
+                        );
+                      },
+                    ),
+                  if (widget.onDelete != null) ...[
+                    const Divider(color: Colors.white12, height: 16),
+                    ListTile(
+                      leading: const Icon(Icons.close_rounded, color: Colors.white),
+                      title: Text('Quitar de la fila', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                      contentPadding: EdgeInsets.zero,
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onDelete!();
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ).whenComplete(() {
+      if (mounted) {
+        ref.read(bottomNavVisibleProvider.notifier).state = true;
+      }
+    });
+  }
+
+  void _showContextMenu(BuildContext context, Offset globalPosition) async {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final position = RelativeRect.fromRect(
+      globalPosition & const Size(40, 40),
+      Offset.zero & overlay.size,
+    );
+
+    final String? selected = await showMenu<String>(
+      context: context,
+      position: position,
+      color: const Color(0xFF282828),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      elevation: 8,
+      items: [
+        PopupMenuItem<String>(
+          value: 'details',
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.white70, size: 20),
+              const SizedBox(width: 12),
+              Text('Ver detalles y más', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'download',
+          child: Row(
+            children: [
+              const Icon(Icons.download_rounded, color: Colors.white70, size: 20),
+              const SizedBox(width: 12),
+              Text('Descargar', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'not_for_me',
+          child: Row(
+            children: [
+              const Icon(Icons.thumb_down_outlined, color: Colors.white70, size: 20),
+              const SizedBox(width: 12),
+              Text('No es para mí', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+            ],
+          ),
+        ),
+        if (widget.favoriteItem != null)
+          PopupMenuItem<String>(
+            value: 'mylist',
+            child: Row(
+              children: [
+                const Icon(Icons.add_rounded, color: Colors.white70, size: 20),
+                const SizedBox(width: 12),
+                Text('Mi lista', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+              ],
+            ),
+          ),
+        if (widget.onDelete != null)
+          PopupMenuItem<String>(
+            value: 'delete',
+            child: Row(
+              children: [
+                const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Text('Quitar de la fila', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+      ],
+    );
+
+    if (selected != null) {
+      if (selected == 'details') {
+        SafeTap.run(widget.onTap);
+      } else if (selected == 'download') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Descarga no disponible')),
+        );
+      } else if (selected == 'not_for_me') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Preferencia guardada')),
+        );
+      } else if (selected == 'mylist' && widget.favoriteItem != null) {
+        final fav = widget.favoriteItem!;
+        final wasFav = ref.read(favoritesProvider).any((f) => f.id == fav.id);
+        ref.read(favoritesProvider.notifier).toggleFavorite(fav);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(wasFav ? 'Quitado de Mi lista' : 'Añadido a Mi lista')),
+        );
+      } else if (selected == 'delete') {
+        widget.onDelete?.call();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMobile = context.useMobileLayout;
+    final isDesktopOrWeb = kIsWeb || MediaQuery.of(context).size.width >= 800;
 
     return Focus(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
@@ -65,6 +299,18 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
             final isSelected = hovered || _isFocused;
             return GestureDetector(
               onTap: () => SafeTap.run(widget.onTap),
+              onLongPressStart: (details) {
+                if (isDesktopOrWeb) {
+                  _showContextMenu(context, details.globalPosition);
+                } else {
+                  _showOptionsModal(context);
+                }
+              },
+              onSecondaryTapDown: (details) {
+                if (isDesktopOrWeb) {
+                  _showContextMenu(context, details.globalPosition);
+                }
+              },
               child: SizedBox(
                 width: widget.width,
                 child: Column(
@@ -142,26 +388,6 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                       ),
                                     ),
                                   ),
-                                if (widget.onDelete != null && (isSelected || isMobile))
-                                  Positioned(
-                                    top: 8, left: 8,
-                                    child: Tooltip(
-                                      message: 'Eliminar de continuar viendo',
-                                      child: InkWell(
-                                        onTap: widget.onDelete,
-                                        borderRadius: BorderRadius.circular(20),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withOpacity(isSelected ? 0.8 : 0.4),
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white.withOpacity(isSelected ? 0.4 : 0.1)),
-                                          ),
-                                          child: Icon(Icons.close_rounded, color: Colors.white.withOpacity(isSelected ? 1.0 : 0.7), size: isMobile ? 14 : 16),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
                                 if (widget.badgeOverlay != null) Positioned(top: 10, left: 10, child: widget.badgeOverlay!),
                                 if (widget.rating != null)
                                   Positioned(
@@ -197,25 +423,56 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                         ),
                       ),
                     ),
-                    if (widget.subtitle != null)
+                    if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
-                        child: SizedBox(
-                          height: ResponsiveUtils.sp(context, 20),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Text(
-                              widget.subtitle!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
-                                fontSize: ResponsiveUtils.bannerTitleFontSize(context) - 2.0,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.2,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              height: ResponsiveUtils.sp(context, 20),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Text.rich(
+                                  subtitleRichSpan(
+                                    widget.subtitle!,
+                                    TextStyle(
+                                      color: Colors.white.withOpacity(0.6),
+                                      fontSize: ResponsiveUtils.bannerTitleFontSize(context) - 2.0,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
-                          ),
+                            if (widget.subtitle2 != null &&
+                                widget.subtitle2!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              SizedBox(
+                                height: ResponsiveUtils.sp(context, 20),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Text.rich(
+                                  subtitleRichSpan(
+                                    widget.subtitle2!,
+                                    TextStyle(
+                                      color: Colors.white,
+                                      fontSize: ResponsiveUtils.bannerTitleFontSize(context) - 2.0,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                   ],

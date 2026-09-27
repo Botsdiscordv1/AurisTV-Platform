@@ -228,6 +228,12 @@ final extractProvider =
 /// Senior Cache: Almacena la extracción del siguiente episodio para carga instantánea.
 final nextEpisodePreloadProvider = StateProvider<ExtractResult?>((ref) => null);
 
+/// Para qué (url de página + episodio) es el preload vigente. Sin esto, un
+/// preload stale se consumía como válido: precargó E6, el usuario saltó a E8
+/// y el popup "siguiente" (E9) reproducía E6.
+final nextEpisodePreloadTargetProvider =
+    StateProvider<({String url, int episode})?>((ref) => null);
+
 /// Senior Prefetch Logic: Gestiona la extracción proactiva del siguiente contenido.
 final playerPreloadControllerProvider = Provider((ref) => PlayerPreloadController(ref));
 
@@ -255,7 +261,7 @@ class PlayerPreloadController {
     if (totalEpisodes != null && nextNum > totalEpisodes) return;
 
     final sources = ref.read(activeContentSourcesProvider);
-    final baseSource = sources.firstWhereOrNull((s) => s.source == currentSource);
+    final baseSource = findSourceByName(sources, currentSource);
     
     if (baseSource != null) {
       final nextUrl = buildEpisodeUrl(baseSource.url, baseSource.source, nextNum);
@@ -278,6 +284,8 @@ class PlayerPreloadController {
         );
         
         ref.read(nextEpisodePreloadProvider.notifier).state = extract;
+        ref.read(nextEpisodePreloadTargetProvider.notifier).state =
+            (url: nextUrl, episode: nextNum);
         _lastPreloadedUrl = nextUrl;
       } catch (e) {
         debugPrint('[PlayerPreload] Error pre-fetching next episode: $e');
@@ -289,6 +297,7 @@ class PlayerPreloadController {
 
   void clearPreload() {
     ref.read(nextEpisodePreloadProvider.notifier).state = null;
+    ref.read(nextEpisodePreloadTargetProvider.notifier).state = null;
     _lastPreloadedUrl = null;
     _isPreloading = false;
   }

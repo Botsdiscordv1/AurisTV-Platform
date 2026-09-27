@@ -22,10 +22,18 @@ class PlaybackHistory {
   final String? kind;
   final String? type;
   final int? year;
+  /// Título del episodio en curso (ej. "Es como un temblor de tierra").
+  /// Se guarda al reproducir (con la lista de episodios) para mostrar
+  /// "T1:E7 . Título" sin depender de red al pintar la tarjeta.
+  final String? episodeTitle;
 
   final double progress;
   final bool isCompleted;
   final String? profileId;
+  /// Oculto de Continuar Viendo (el usuario limpió la fila) pero CONSERVADO
+  /// en el Historial. Solo un borrado explícito en Historial lo elimina.
+  /// Ver de nuevo (updatePosition) lo revive (false).
+  final bool dismissed;
 
   PlaybackHistory({
     required this.contentId,
@@ -46,13 +54,16 @@ class PlaybackHistory {
     this.kind,
     this.type,
     this.year,
+    this.episodeTitle,
     double? progress,
     bool? isCompleted,
     this.profileId,
+    bool? dismissed,
   })  : progress = progress ?? (durationInMilliseconds > 0 
           ? (positionInMilliseconds / durationInMilliseconds).clamp(0.0, 1.0) 
           : 0.0),
-        isCompleted = isCompleted ?? (durationInMilliseconds > 0 && (positionInMilliseconds / durationInMilliseconds) > 0.95);
+        isCompleted = isCompleted ?? (durationInMilliseconds > 0 && (positionInMilliseconds / durationInMilliseconds) > 0.95),
+        dismissed = dismissed ?? false;
 
   Map<String, dynamic> toJson() {
     return {
@@ -74,9 +85,11 @@ class PlaybackHistory {
       'kind': kind,
       'type': type,
       'year': year,
+      'episodeTitle': episodeTitle,
       'progress': progress,
       'isCompleted': isCompleted,
       'profileId': profileId,
+      'dismissed': dismissed,
     };
   }
 
@@ -116,8 +129,10 @@ class PlaybackHistory {
       kind: json['kind'] as String?,
       type: json['type'] as String?,
       year: json['year'] != null ? int.tryParse(json['year'].toString()) : null,
+      episodeTitle: json['episodeTitle'] as String?,
       progress: json['progress'] != null ? double.tryParse(json['progress'].toString()) : calcProgress,
       isCompleted: json['isCompleted'] as bool? ?? (calcProgress > 0.95),
+      dismissed: json['dismissed'] as bool? ?? false,
       profileId: json['profileId'] as String? ?? 'guest_profile',
     );
   }
@@ -155,9 +170,11 @@ class PlaybackHistory {
     String? kind,
     String? type,
     int? year,
+    String? episodeTitle,
     double? progress,
     bool? isCompleted,
     String? profileId,
+    bool? dismissed,
   }) {
     return PlaybackHistory(
       contentId: contentId,
@@ -178,9 +195,11 @@ class PlaybackHistory {
       kind: kind ?? this.kind,
       type: type ?? this.type,
       year: year ?? this.year,
+      episodeTitle: episodeTitle ?? this.episodeTitle,
       progress: progress ?? this.progress,
       isCompleted: isCompleted ?? this.isCompleted,
       profileId: profileId ?? this.profileId,
+      dismissed: dismissed ?? this.dismissed,
     );
   }
 }

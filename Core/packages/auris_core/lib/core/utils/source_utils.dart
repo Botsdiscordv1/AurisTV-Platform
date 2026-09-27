@@ -1,3 +1,4 @@
+import '../../data/models/server/search_result.dart';
 
 
 String buildEpisodeUrl(String baseUrl, String source, int episode) {
@@ -31,9 +32,30 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
     final domain = parts.take(3).join('/');
     pathUrl = '$domain/capitulo/$slug-ep-$episode/';
   } else {
-    pathUrl = '$path/$episode';
+    // URLs que ya codifican temporada/episodio (p. ej. unlimplay
+    // /f/embed/tv/<id>/<S>/<E>): reemplazar el último segmento numérico en
+    // vez de anexar otro (…/2/5 + 6 → …/2/6, no …/2/5/6).
+    if (RegExp(r'/\d+/?$').hasMatch(path)) {
+      pathUrl = '${path.replaceAll(RegExp(r'/\d+/?$'), '')}/$episode/';
+    } else {
+      pathUrl = '$path/$episode';
+    }
   }
   return '$pathUrl$query';
+}
+
+/// Match tolerante de fuente por nombre (case/espacios). El match exacto
+/// fallaba tras renombrados (p. ej. "Player"→proveedor real) y la navegación
+/// al siguiente episodio reusaba la URL del anterior (reiniciaba el previo).
+/// Retorna null si no hay match (el llamador decide fallback).
+SearchResult? findSourceByName(List<SearchResult> sources, String? name) {
+  if (sources.isEmpty) return null;
+  final q = (name ?? '').toLowerCase().trim();
+  if (q.isEmpty) return sources.first;
+  for (final s in sources) {
+    if (s.source.toLowerCase().trim() == q) return s;
+  }
+  return null;
 }
 
 /// true si es URL http(s) real. El historial a veces guarda el título en

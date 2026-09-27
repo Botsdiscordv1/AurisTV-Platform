@@ -111,28 +111,57 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     _setupHistorySync();
   }
 
+  /// Extrae el número de episodio de valores como "5", "05" o "EP 5".
+  /// tryParse solo vale para numéricos puros y devolvía null en el resto,
+  /// con lo que el lookup del thumbnail se saltaba y caía al backdrop.
+  int? _parseEpisodeNumber(String? episode) {
+    if (episode == null) return null;
+    final direct = int.tryParse(episode.trim());
+    if (direct != null) return direct;
+    final m = RegExp(r'(\d+)\s*$').firstMatch(episode);
+    return m != null ? int.tryParse(m.group(1)!) : null;
+  }
+
+  /// EpisodeInfo del episodio dado en la lista dada (null si no hay match).
+  /// Público para que las pantallas resuelvan título/thumbnail sin depender
+  /// del timing del sync.
+  EpisodeInfo? episodeInfoFor(String? episode, [List<EpisodeInfo>? episodes]) {
+    final list = episodes ?? state.availableEpisodes;
+    if (list.isEmpty) return null;
+    final currentEpNum = _parseEpisodeNumber(episode);
+    if (currentEpNum == null) {
+      debugPrint('[HistoryBanner] episodio sin número parseable: "$episode"');
+      return null;
+    }
+    final epInfo = list.firstWhereOrNull(
+      (e) => e.number == currentEpNum,
+    );
+    if (epInfo == null) {
+      debugPrint('[HistoryBanner] ep $currentEpNum no está en ${list.length} episodios cargados');
+    }
+    return epInfo;
+  }
+
+  /// Thumbnail del episodio dado en la lista dada (null si no hay match).
+  /// Público para que las pantallas resuelvan sin depender del sync.
+  String? episodeThumbnail(String? episode, [List<EpisodeInfo>? episodes]) {
+    final thumb = episodeInfoFor(episode, episodes)?.thumbnail;
+    return (thumb != null && thumb.isNotEmpty) ? thumb : null;
+  }
+
   /// Banner determinista para el historial: thumbnail del episodio en curso si
   /// la lista ya llegó (caso normal al cerrar tras ver un rato); si no, el
   /// banner del item (backdrop). El guardado final (stop) usaba el banner
   /// crudo del item, así que si cerrabas antes de que llegaran los episodios
   /// la tarjeta quedaba con backdrop aunque los ticks ya hubieran guardado
   /// el thumb (o viceversa según el timing) → alternancia backdrop/thumb.
-  String? _resolveEpisodeBanner() {
+  String? resolveEpisodeBanner() {
     final item = state.currentItem;
-    String? banner = (item?.bannerUrl != null && item!.bannerUrl!.isNotEmpty)
+    final thumb = episodeThumbnail(state.episode, state.availableEpisodes);
+    if (thumb != null) return thumb;
+    return (item?.bannerUrl != null && item!.bannerUrl!.isNotEmpty)
         ? item.bannerUrl
         : null;
-    if (state.episode != null && state.availableEpisodes.isNotEmpty) {
-      final int? currentEpNum = int.tryParse(state.episode!);
-      final epInfo = state.availableEpisodes.firstWhereOrNull(
-        (e) => e.number == currentEpNum,
-      );
-      // Si el episodio tiene miniatura propia, la priorizamos sobre el backdrop genérico
-      if (epInfo?.thumbnail != null && epInfo!.thumbnail!.isNotEmpty) {
-        banner = epInfo.thumbnail;
-      }
-    }
-    return banner;
   }
 
   void _setupHistorySync() {
@@ -147,7 +176,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
         final duration = state.player?.state.duration.inMilliseconds ?? 0;
         if (duration > 0) {
           // Banner del episodio en curso (o backdrop si aún no llegó la lista)
-          final String? effectiveBanner = _resolveEpisodeBanner();
+          final String? effectiveBanner = resolveEpisodeBanner();
 
           final double calcProgress = duration > 0 ? (pos.inMilliseconds / duration).clamp(0.0, 1.0) : 0.0;
           final bool isCompleted = calcProgress > 0.95;
@@ -180,6 +209,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
             source: state.source,
             url: historyUrl,
             alternativeSources: robustSources,
+            episodeTitle: episodeInfoFor(state.episode)?.title,
             positionMs: pos.inMilliseconds,
             durationMs: duration,
           );
@@ -227,6 +257,12 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
       setUiState(PlayerUIState.full);
       return;
     }
+
+    // Cambio real de contenido/episodio/fuente: invalidar el preload del
+    // episodio anterior (si no, el popup "siguiente" consumiría tracks stale).
+    try {
+      ref.read(playerPreloadControllerProvider).clearPreload();
+    } catch (_) {}
 
     // Senior Strategy: Actualizamos el estado síncronamente para evitar tirones en la UI
     // y solo diferimos la apertura del motor si es necesario.
@@ -313,12 +349,11 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
         : state.availableEpisodes;
 
     MediaItem? nextItem = state.currentItem;
-    if (nextEpisodes.isNotEmpty && state.episode != null && nextItem != null) {
-        final int? currentEpNum = int.tryParse(state.episode!);
-        final epInfo = nextEpisodes.firstWhereOrNull((e) => e.number == currentEpNum);
-        if (epInfo?.thumbnail != null && epInfo!.thumbnail!.isNotEmpty) {
-            if (nextItem.bannerUrl != epInfo.thumbnail) {
-                nextItem = nextItem.copyWith(bannerUrl: epInfo.thumbnail);
+    if (nextEpisodes.isNotEmpty && nextItem != null) {
+        final thumb = episodeThumbnail(state.episode, nextEpisodes);
+        if (thumb != null) {
+            if (nextItem.bannerUrl != thumb) {
+                nextItem = nextItem.copyWith(bannerUrl: thumb);
             }
         }
     }
@@ -362,7 +397,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
           durationMs: dur,
           title: item.title,
           posterUrl: item.posterUrl,
-          bannerUrl: _resolveEpisodeBanner(),
+          bannerUrl: resolveEpisodeBanner(),
           logoUrl: item.logoUrl,
           category: item.type.name,
           kind: item.card?.kind,
@@ -371,6 +406,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
           source: state.source,
           url: historyUrl,
           alternativeSources: robustSources,
+          episodeTitle: episodeInfoFor(state.episode)?.title,
           force: true,
         );
       }

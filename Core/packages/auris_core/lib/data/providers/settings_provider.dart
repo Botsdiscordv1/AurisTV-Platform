@@ -48,3 +48,6 @@ class SettingsNotifier extends StateNotifier<UserSettings> {
   Future<void> setSubtitleColor(int color) => updateSettings(state.copyWith(subtitleColor: color));
   Future<void> setExternalSyncEnabled(bool value) => updateSettings(state.copyWith(externalSyncEnabled: value));
 }
+
+final bottomNavVisibleProvider = StateProvider<bool>((ref) => true);
+

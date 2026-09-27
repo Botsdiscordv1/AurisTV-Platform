@@ -193,10 +193,15 @@ class ResponsiveUtils {
 
   /// Altura del contenedor de la fila Wide.
   /// [hasSubtitle] - Si es true (Continuar Viendo / Categorías), reserva espacio para el texto inferior.
-  static double bannerRowHeight(BuildContext context, {bool hasSubtitle = true}) {
+  /// [subtitleLines] - 2 cuando hay segunda línea ("Quedan X" bajo "T1:E7 . Título").
+  static double bannerRowHeight(BuildContext context,
+      {bool hasSubtitle = true, int subtitleLines = 1}) {
     final b = getBreakpoint(context);
     // bannerHeight + (subtitleArea (20) if needed)
-    final double extraSpace = hasSubtitle ? sp(context, 20) : 0;
+    // La 2ª línea suma su alto (20, igual que la 1ª) + gap (4); 1 línea queda idéntico a antes.
+    final double extraSpace = hasSubtitle
+        ? sp(context, 20) + (subtitleLines > 1 ? (4 + sp(context, 20)) : 0)
+        : 0;
     // Senior Fix: Sincronizado con rowHeight (Posters) para paridad visual absoluta (12px mobile / 16px desktop)
     return bannerHeight(context) + extraSpace + (b < Breakpoint.md ? 12.0 : 16.0);
   }

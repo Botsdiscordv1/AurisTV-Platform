@@ -1,4 +1,5 @@
 import 'media_item.dart';
+import 'server/search_result.dart';
 
 class FavoriteItem {
   final String id;
@@ -10,6 +11,15 @@ class FavoriteItem {
   final String url;
   final DateTime addedAt;
   final String profileId;
+  /// Extras para abrir el detalle con fuentes (si no, el discovery pierde
+  /// kind/año y el detalle abre sin fuentes). Opcionales por legacy.
+  final String? kind;
+  final int? year;
+  final String? type;
+  final int? season;
+  /// Todas las fuentes conocidas (para abrir con las mismas que search/home).
+  /// Legacy/directas: vacío y el discovery las reconstruye.
+  final List<SourceItem> sources;
 
   FavoriteItem({
     required this.id,
@@ -21,6 +31,11 @@ class FavoriteItem {
     required this.url,
     required this.addedAt,
     required this.profileId,
+    this.kind,
+    this.year,
+    this.type,
+    this.season,
+    this.sources = const [],
   });
 
   Map<String, dynamic> toJson() {
@@ -34,6 +49,11 @@ class FavoriteItem {
       'url': url,
       'addedAt': addedAt.toIso8601String(),
       'profileId': profileId,
+      'kind': kind,
+      'year': year,
+      'type': type,
+      'season': season,
+      'sources': sources.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -48,6 +68,14 @@ class FavoriteItem {
       url: json['url'] as String,
       addedAt: DateTime.parse(json['addedAt'] as String),
       profileId: json['profileId'] as String,
+      kind: json['kind'] as String?,
+      year: json['year'] != null ? int.tryParse(json['year'].toString()) : null,
+      type: json['type'] as String?,
+      season: json['season'] != null ? int.tryParse(json['season'].toString()) : null,
+      sources: (json['sources'] as List<dynamic>?)
+              ?.map((e) => SourceItem.fromJson(e as Map))
+              .toList() ??
+          const [],
     );
   }
 

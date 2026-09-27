@@ -19,8 +19,9 @@ final playbackHistoryStateProvider = AsyncNotifierProvider<PlaybackHistoryNotifi
 });
 
 /// Provider especializado para el carrusel de "Continuar Viendo"
-/// Filtra contenidos completados, agrupa por serie para mostrar solo el último episodio
-/// y mantiene el orden cronológico.
+/// Filtra completados Y descartados manualmente (dismissed), agrupa por serie
+/// para mostrar solo el último episodio y mantiene el orden cronológico.
+/// Lo descartado sigue vivo en el Historial (biblioteca).
 final continueWatchingProvider = Provider<AsyncValue<List<PlaybackHistory>>>((ref) {
   final historyAsync = ref.watch(playbackHistoryStateProvider);
   
@@ -28,6 +29,7 @@ final continueWatchingProvider = Provider<AsyncValue<List<PlaybackHistory>>>((re
     final Set<String> seenContentIds = {};
     return list.where((h) {
       if (h.isCompleted) return false;
+      if (h.dismissed) return false;
       // Senior Logic: Solo mostramos la entrada más reciente para cada serie/contenido
       if (seenContentIds.contains(h.contentId)) return false;
       seenContentIds.add(h.contentId);
@@ -93,6 +95,7 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     String? kind,
     String? type,
     int? year,
+    String? episodeTitle,
     bool force = false,
   }) {
     // [PlaybackHistory] Red de seguridad definitiva contra OP/ED en el historial
@@ -158,6 +161,7 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       kind: kind ?? existingHistory?.kind,
       type: type ?? existingHistory?.type,
       year: year ?? existingHistory?.year,
+      episodeTitle: episodeTitle ?? existingHistory?.episodeTitle,
       profileId: profileId,
     );
 
@@ -203,9 +207,15 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
           (cleanTitle.isNotEmpty && (hTitle == cleanTitle || hTitle.contains(cleanTitle) || cleanTitle.contains(hTitle)))) {
           
         if (h.posterUrl != posterUrl) {
+          // No pisar un banner ya guardado (suele ser el thumbnail del
+          // episodio en curso): este sync trae el backdrop genérico del
+          // detalle y revertía la tarjeta a backdrop en cada apertura.
+          // El banner se actualiza en reproducción (play/ticks/stop).
+          final keepBanner =
+              h.bannerUrl != null && h.bannerUrl!.isNotEmpty;
           _memoryCache[i] = h.copyWith(
             posterUrl: posterUrl,
-            bannerUrl: bannerUrl ?? h.bannerUrl,
+            bannerUrl: keepBanner ? h.bannerUrl : bannerUrl,
             logoUrl: logoUrl ?? h.logoUrl,
           );
           updatedAny = true;
@@ -298,6 +308,41 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     if (updated) {
       state = AsyncData(List.from(_memoryCache));
     }
+  }
+
+  /// Borra TODAS las entradas (episodios) de un contenido. Para la tarjeta
+  /// agrupada del Historial (una por obra).
+  /// Oculta una entrada de Continuar Viendo SIN borrarla del Historial.
+  /// El usuario puede recuperarla desde Biblioteca → Historial; ver de nuevo
+  /// la revive (updatePosition resetea dismissed). Solo el borrado en
+  /// Historial (deleteContentHistory) la elimina de verdad.
+  Future<void> dismissFromContinue(
+      String contentId, int? season, String? episode) async {
+    final user = ref.read(authProvider);
+    final profileId = user?.activeProfileId ?? 'guest_profile';
+    final key =
+        PlaybackHistory.generateKey(contentId, season, episode, profileId: profileId);
+    final index = _memoryCache.indexWhere((h) => h.key == key);
+    if (index == -1) return;
+    _memoryCache[index] = _memoryCache[index]
+        .copyWith(dismissed: true, updatedAt: DateTime.now());
+    state = AsyncData(List.from(_memoryCache));
+    final repository = ref.read(playbackHistoryRepositoryProvider);
+    await repository.saveHistory(_memoryCache[index]);
+  }
+
+  Future<void> deleteContentHistory(String contentId) async {
+    final user = ref.read(authProvider);
+    final profileId = user?.activeProfileId ?? 'guest_profile';
+    final repository = ref.read(playbackHistoryRepositoryProvider);
+    final targets =
+        _memoryCache.where((h) => h.contentId == contentId).toList();
+    for (final h in targets) {
+      await repository.deleteHistory(
+          h.contentId, h.season, h.episode, profileId);
+    }
+    _memoryCache.removeWhere((h) => h.contentId == contentId);
+    state = AsyncData(List.from(_memoryCache));
   }
 
   Future<void> deleteProgress(String contentId, int? season, String? episode) async {
