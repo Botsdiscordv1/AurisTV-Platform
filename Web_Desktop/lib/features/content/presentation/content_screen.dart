@@ -2606,6 +2606,13 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
               url: widget.url,
               addedAt: DateTime.now(),
               profileId: profileId,
+              kind: widget.kind ?? widget.result?.kind,
+              year: widget.year,
+              type: widget.result?.type ?? widget.type,
+              season: widget.season ?? widget.result?.season,
+              // Todas las fuentes del detalle (paridad con search/home).
+              sources: flattenSources(
+                  ref.read(activeContentSourcesProvider)),
             );
             ref.read(favoritesProvider.notifier).toggleFavorite(item);
           },

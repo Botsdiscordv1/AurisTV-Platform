@@ -420,7 +420,8 @@ class _ContinueWatchingSection extends ConsumerWidget {
             onItemDelete: (item) {
               final h = item.playbackHistory;
               if (h != null) {
-                ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+                // Ocultar de Continuar Viendo (conserva el Historial).
+                ref.read(playbackHistoryStateProvider.notifier).dismissFromContinue(h.contentId, h.season, h.episode);
               }
             },
           ),

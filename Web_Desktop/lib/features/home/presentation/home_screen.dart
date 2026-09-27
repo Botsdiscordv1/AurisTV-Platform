@@ -934,24 +934,13 @@ class _ContinueWatchingSection extends ConsumerWidget {
   }
 
   WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
-    final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
+    // Lógica centralizada en Core (library_providers): solo diseño aquí.
+    final bool isMovieish = libraryIsMovieish(h);
+    final String displayTitle = libraryDisplayTitle(h);
+    // Subtítulo en 2 líneas: "T1:E7 . Título" + "Quedan X".
+    final sub = continueCardSubtitle(h);
 
-    String displayTitle = h.title ?? 'Contenido';
-    // Senior Logic: No mostramos el prefijo "Ep X" para películas y limpiamos el título si ya lo trae.
-    if (isMovieish) {
-      displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[.\-•]\s*'), '').trim();
-    } else if (h.episode != null && h.episode!.isNotEmpty) {
-      displayTitle = 'Ep ${h.episode} • $displayTitle';
-    }
-
-    String remainingText = '';
-    final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
-    if (remainingMs > 0) {
-      // Senior UI: Formato elegante "X horas y Y minutos"
-      remainingText = 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}';
-    }
-
-    final String? rawUrl = h.bannerUrl ?? h.posterUrl;
+    final String? rawUrl = libraryCardImage(h);
     final String? logoUrl = h.logoUrl;
 
     return WideContentItem(
@@ -964,9 +953,13 @@ class _ContinueWatchingSection extends ConsumerWidget {
       ),
       logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
       progress: h.progress,
-      subtitle: remainingText,
+      subtitle: sub.line1.isNotEmpty ? sub.line1 : null,
+      subtitle2: sub.line2,
+      favoriteItem: favoriteFromHistory(
+          h, ref.read(authProvider)?.activeProfileId ?? 'guest_profile'),
       onDelete: () {
-        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+        // Ocultar de Continuar Viendo (conserva el Historial).
+        ref.read(playbackHistoryStateProvider.notifier).dismissFromContinue(h.contentId, h.season, h.episode);
       },
       originalItem: h,
     );
@@ -990,22 +983,8 @@ class _ContinueWatchingSection extends ConsumerWidget {
       sectionId: detailParams.sectionId,
       from: '/inicio',
     );
-    final seedUrl = item.url ?? item.contentId;
-    // Sin URL http real no se siembra seed (ver Movil: url=título rompe episodes).
-    final seed = isHttpUrl(seedUrl)
-        ? SearchResult(
-            title: item.title ?? detailParams.title,
-            url: seedUrl,
-            quality: '',
-            thumbnail: item.posterUrl ?? '',
-            source: item.source ?? detailParams.source,
-            kind: item.kind ?? detailParams.kind,
-            type: item.type ?? detailParams.type,
-            year: item.year ?? detailParams.year,
-            metadataTitle: item.metadataTitle ?? detailParams.metadataTitle,
-            season: item.season ?? detailParams.season,
-          )
-        : null;
+    // Seed centralizado en Core (null si no hay URL http real).
+    final seed = historyToSeed(item);
     if (context.mounted) {
       context.push(uri, extra: seed);
     }

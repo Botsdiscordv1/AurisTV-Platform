@@ -9,6 +9,10 @@ class WideContentItem {
   final String imageUrl;
   final String? logoUrl; // Senior Fix: Soporte para logo en WideCard
   final String? subtitle;
+  /// Segunda línea opcional bajo el subtítulo (ej. "Quedan: X").
+  final String? subtitle2;
+  /// Datos para "Mi lista" (opcional): sin esto la tarjeta no ofrece la opción.
+  final FavoriteItem? favoriteItem;
   final String? rating;
   final double? progress;
   final Widget? badgeOverlay;
@@ -21,6 +25,8 @@ class WideContentItem {
     required this.imageUrl,
     this.logoUrl,
     this.subtitle,
+    this.subtitle2,
+    this.favoriteItem,
     this.rating,
     this.progress,
     this.badgeOverlay,
@@ -97,7 +103,9 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
 
     // Senior Fix: Detectar si alguna tarjeta tiene subtítulo para ajustar la altura de la fila y ganar espacio vertical.
     final bool hasSubtitles = widget.items.any((item) => item.subtitle != null && item.subtitle!.isNotEmpty);
-    final rowHeight = ResponsiveUtils.bannerRowHeight(context, hasSubtitle: hasSubtitles);
+    // 2 líneas si algún item trae segunda línea ("Quedan X" bajo "T1:E7 . Título").
+    final int subtitleLines = widget.items.any((item) => item.subtitle2 != null && item.subtitle2!.isNotEmpty) ? 2 : 1;
+    final rowHeight = ResponsiveUtils.bannerRowHeight(context, hasSubtitle: hasSubtitles, subtitleLines: subtitleLines);
 
     return Padding(
       padding: EdgeInsets.only(bottom: context.useMobileLayout ? 12 : 24), // Senior Fix: Ajustado para paridad con Poster
@@ -204,6 +212,8 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                           logoUrl: item.logoUrl,
                           progress: item.progress,
                           subtitle: item.subtitle,
+                          subtitle2: item.subtitle2,
+                          favoriteItem: item.favoriteItem,
                           rating: item.rating,
                           badgeOverlay: item.badgeOverlay,
                           width: cardWidth,

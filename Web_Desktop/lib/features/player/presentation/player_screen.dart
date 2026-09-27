@@ -412,7 +412,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       durationMs: durationMs,
       title: widget.title,
       posterUrl: widget.posterUrl,
-      bannerUrl: widget.bannerUrl,
+      // Banner del episodio en curso (no el backdrop crudo): ver Movil.
+      bannerUrl: ref.read(activePlayerProvider.notifier).resolveEpisodeBanner() ?? widget.bannerUrl,
       logoUrl: widget.logoUrl,
       category: widget.category,
       source: widget.source,
@@ -1338,14 +1339,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _webViewController = null;
     }
 
+    final sources = ref.read(activeContentSourcesProvider);
+    // Match tolerante + fallback a la primera fuente (ver Movil).
+    final baseSource = findSourceByName(sources, _currentSource) ??
+        (sources.isNotEmpty ? sources.first : null);
+    final String nextSourceUrl = baseSource != null
+        ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
+        : _currentSourceUrl;
+
     final preloaded = ref.read(nextEpisodePreloadProvider);
-    if (preloaded != null && next) {
+    final preloadTarget = ref.read(nextEpisodePreloadTargetProvider);
+    // Solo consumir el preload si es para ESTE destino (url+episodio).
+    final bool preloadValid = preloaded != null &&
+        next &&
+        preloadTarget != null &&
+        preloadTarget.url == nextSourceUrl &&
+        preloadTarget.episode == nextNum;
+    if (!preloadValid && preloaded != null) {
+      ref.read(playerPreloadControllerProvider).clearPreload();
+    }
+    if (preloadValid) {
       final tracks = preloaded.tracks.where((t) => !t.isDownload).toList();
-      final sources = ref.read(activeContentSourcesProvider);
-      final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
-      final String nextSourceUrl = baseSource != null
-          ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
-          : _currentSourceUrl;
 
       _autoplayTimer?.cancel();
       ref.read(playerPreloadControllerProvider).clearPreload();
@@ -1392,7 +1406,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (epNum == currentNum) return;
 
     final sources = ref.read(activeContentSourcesProvider);
-    final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
+    final baseSource = findSourceByName(sources, _currentSource) ??
+        (sources.isNotEmpty ? sources.first : null);
     final String nextSourceUrl = baseSource != null
         ? buildEpisodeUrl(baseSource.url, baseSource.source, epNum)
         : _currentSourceUrl;
@@ -3142,7 +3157,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               const SizedBox(width: 16),
             ],
             IconButton(
-              iconSize: 40,
+              iconSize: 24,
               icon: const Icon(Symbols.replay_10, color: Colors.white),
               onPressed: () => _sendRemoteSeek(target, -10000),
             ),
@@ -3166,7 +3181,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
             const SizedBox(width: 32),
             IconButton(
-              iconSize: 40,
+              iconSize: 24,
               icon: const Icon(Symbols.forward_10, color: Colors.white),
               onPressed: () => _sendRemoteSeek(target, 10000),
             ),
@@ -3448,7 +3463,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (nextNum < 1) return;
 
     final sources = ref.read(activeContentSourcesProvider);
-    final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
+    final baseSource = findSourceByName(sources, _currentSource) ??
+        (sources.isNotEmpty ? sources.first : null);
 
     final String nextSourceUrl = baseSource != null
         ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
@@ -4534,14 +4550,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _buildCapsuleIconButton(
             icon: Symbols.replay_10,
             onTap: _skipBackward,
-            size: 30, // Unificado a 30px
+            size: 18, // Reducido a 18px
             minWidth: 48,
           ),
           Container(width: 1, height: 16, color: Colors.white.withOpacity(0.05)),
           _buildCapsuleIconButton(
             icon: Symbols.forward_10,
             onTap: _skipForward,
-            size: 30, // Unificado a 30px
+            size: 18, // Reducido a 18px
             minWidth: 48,
           ),
           const SizedBox(width: 2),
@@ -4623,7 +4639,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final bool useMobileLayout = isMobile || screenHeight < 500;
 
     // Senior UI Adaptive logic:
-    final double iconSize = useMobileLayout ? 28 : (isTablet ? 36 : 36);
+    final double iconSize = useMobileLayout ? 22 : (isTablet ? 30 : 30);
     final double playSize = useMobileLayout ? (isLandscape ? 56 : 64) : (isTablet ? 72 : 90);
     final double spacing = useMobileLayout ? (isLandscape ? 48 : 56) : (isTablet ? 64 : 80);
 
