@@ -124,12 +124,21 @@ class SupabasePlaybackHistoryRepository implements PlaybackHistoryRepository {
           updatedAt: DateTime.parse(map['updated_at']),
           profileId: map['profile_id'],
           title: metadata['title'],
+          metadataTitle: metadata['metadata_title'],
           posterUrl: metadata['poster_url'],
           bannerUrl: metadata['banner_url'],
           category: metadata['category'],
           source: metadata['source'],
           url: metadata['url'],
           logoUrl: metadata['logo_url'],
+          kind: metadata['kind'],
+          type: metadata['type'],
+          year: metadata['year'] != null ? int.tryParse(metadata['year'].toString()) : null,
+          alternativeSources: metadata['alternative_sources'] != null
+              ? (metadata['alternative_sources'] as List<dynamic>)
+                  .map((e) => SearchResult.fromJson(e as Map))
+                  .toList()
+              : null,
         );
       }).toList();
     } catch (e) {
@@ -158,12 +167,17 @@ class SupabasePlaybackHistoryRepository implements PlaybackHistoryRepository {
         'updated_at': history.updatedAt.toIso8601String(),
         'metadata': {
           'title': history.title,
+          'metadata_title': history.metadataTitle,
           'poster_url': history.posterUrl,
           'banner_url': history.bannerUrl,
           'category': history.category,
           'source': history.source,
           'url': history.url,
           'logo_url': history.logoUrl,
+          'kind': history.kind,
+          'type': history.type,
+          'year': history.year,
+          'alternative_sources': history.alternativeSources?.map((e) => e.toJson()).toList(),
         },
       }, onConflict: 'user_id,profile_id,content_id,season,episode');
     } catch (e) {

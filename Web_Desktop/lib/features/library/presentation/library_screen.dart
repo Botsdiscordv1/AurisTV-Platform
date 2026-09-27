@@ -8,7 +8,6 @@ import '../../../core/utils/url_utils.dart';
 
 import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:auristv_web/features/player/presentation/player_screen.dart';
 import '../../home/widgets/unified_section.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
@@ -42,19 +41,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final history = item.playbackHistory;
     if (history == null) return;
 
-    final player = PlayerScreen(
-      contentId: history.contentId,
-      sourceUrl: history.url ?? history.contentId,
-      source: history.source ?? "",
-      episode: history.episode ?? "1",
-      season: history.season,
-      startPosition: history.positionInMilliseconds,
-      category: history.category,
-      title: history.title,
-      posterUrl: history.posterUrl,
-      bannerUrl: history.bannerUrl,
+    final detailParams = history.toUnifiedDetailParams();
+    final uri = UrlUtils.buildShareableUri(
+      title: detailParams.title,
+      source: detailParams.source,
+      url: detailParams.url ?? history.contentId,
+      category: detailParams.category,
+      type: detailParams.type,
+      sectionId: detailParams.sectionId,
+      from: '/settings/library',
     );
-    UrlUtils.openPlayer(context, player);
+    if (context.mounted) {
+      context.push(uri);
+    }
   }
 
   MediaItem _historyToMediaItem(PlaybackHistory h) {

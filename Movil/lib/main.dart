@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:auris_core/auris_core.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/utils/pip_service.dart';
 import 'shared/widgets/min_width_wrapper.dart';
 // import 'features/windows/presentation/windows_web_wrapper.dart';
 import 'features/remote_control/presentation/providers/remote_control_provider.dart';
@@ -93,6 +94,16 @@ class GlobalMiniPlayerOverlay extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(activePlayerProvider, (previous, next) {
+      final hasItem = next.currentItem != null;
+      PipService.setPipAllowed(hasItem);
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(activePlayerProvider);
+      PipService.setPipAllowed(state.currentItem != null);
+    });
+
     return MiniPlayerBar(
       onExpand: () {
         final state = ref.read(activePlayerProvider);

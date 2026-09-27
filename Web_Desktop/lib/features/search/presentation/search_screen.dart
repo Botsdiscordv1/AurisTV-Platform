@@ -12,7 +12,6 @@ import 'package:auristv_web/core/utils/url_utils.dart';
 import 'package:auristv_web/features/search/presentation/providers/search_provider.dart';
 import 'package:auristv_web/features/search/presentation/widgets/search_widgets.dart';
 import 'package:auristv_web/features/home/widgets/unified_section.dart';
-import 'package:auristv_web/features/player/presentation/player_screen.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   final String initialQuery;
@@ -461,19 +460,19 @@ class _ContinueWatchingSection extends ConsumerWidget {
   }
 
   void _onTap(BuildContext context, PlaybackHistory item) {
-    final player = PlayerScreen(
-      contentId: item.contentId,
-      sourceUrl: item.url ?? item.contentId,
-      source: item.source ?? "",
-      episode: item.episode ?? "1",
-      season: item.season,
-      startPosition: item.positionInMilliseconds,
-      category: item.category,
-      title: item.title,
-      posterUrl: item.posterUrl,
-      bannerUrl: item.bannerUrl,
+    final detailParams = item.toUnifiedDetailParams();
+    final uri = UrlUtils.buildShareableUri(
+      title: detailParams.title,
+      source: detailParams.source,
+      url: detailParams.url ?? item.contentId,
+      category: detailParams.category,
+      type: detailParams.type,
+      sectionId: detailParams.sectionId,
+      from: '/search',
     );
-    UrlUtils.openPlayer(context, player);
+    if (context.mounted) {
+      context.push(uri);
+    }
   }
 }
 

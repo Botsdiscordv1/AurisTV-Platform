@@ -69,7 +69,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               if (newName.isNotEmpty && profile != null) {
                 ref.read(authProvider.notifier).updateProfileName(newName);
               }
-              context.go('/select-profile');
+              if (Navigator.canPop(context)) {
+                context.pop();
+              } else {
+                context.go('/select-profile');
+              }
             },
             child: const Text('Guardar', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
           ),

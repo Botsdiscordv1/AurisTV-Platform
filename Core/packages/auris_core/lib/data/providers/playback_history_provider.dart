@@ -90,6 +90,9 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     String? source,
     String? url,
     List<SearchResult>? alternativeSources,
+    String? kind,
+    String? type,
+    int? year,
     bool force = false,
   }) {
     // [PlaybackHistory] Red de seguridad definitiva contra OP/ED en el historial
@@ -152,6 +155,9 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       source: source ?? existingHistory?.source,
       url: url ?? existingHistory?.url,
       alternativeSources: alternativeSources ?? existingHistory?.alternativeSources,
+      kind: kind ?? existingHistory?.kind,
+      type: type ?? existingHistory?.type,
+      year: year ?? existingHistory?.year,
       profileId: profileId,
     );
 
@@ -263,6 +269,25 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     final entries = _memoryCache.where((h) => h.contentId == contentId).toList();
     if (entries.isEmpty) return null;
     return entries.first;
+  }
+
+  void updateSourcesForContent(String contentId, List<SearchResult> sources) {
+    if (sources.isEmpty) return;
+    bool updated = false;
+    final repository = ref.read(playbackHistoryRepositoryProvider);
+    for (int i = 0; i < _memoryCache.length; i++) {
+      final h = _memoryCache[i];
+      if (h.contentId == contentId || h.url == contentId || (h.title != null && h.title!.isNotEmpty && sources.isNotEmpty && h.title == sources.first.title)) {
+        if (h.alternativeSources == null || h.alternativeSources!.isEmpty || h.alternativeSources!.length < sources.length) {
+          _memoryCache[i] = h.copyWith(alternativeSources: sources);
+          updated = true;
+          repository.saveHistory(_memoryCache[i]).ignore();
+        }
+      }
+    }
+    if (updated) {
+      state = AsyncData(List.from(_memoryCache));
+    }
   }
 
   Future<void> deleteProgress(String contentId, int? season, String? episode) async {

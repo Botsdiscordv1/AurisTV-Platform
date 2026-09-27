@@ -1,5 +1,6 @@
 package com.auristv.oficial
 
+import android.app.PictureInPictureParams
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
@@ -11,8 +12,10 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity: FlutterActivity() {
     private val BRIGHTNESS_CHANNEL = "auristv/brightness"
     private val VOLUME_CHANNEL = "auristv/volume"
+    private val PIP_CHANNEL = "auristv/pip"
     private var interceptVolume = false
     private var volumeMethodChannel: MethodChannel? = null
+    private var isPipAllowed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +58,40 @@ class MainActivity: FlutterActivity() {
             } else {
                 result.notImplemented()
             }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PIP_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "enterPip" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val params = PictureInPictureParams.Builder().build()
+                        val success = enterPictureInPictureMode(params)
+                        result.success(success)
+                    } else {
+                        result.error("UNSUPPORTED", "PiP requires Android 8.0+", null)
+                    }
+                }
+                "setPipAllowed" -> {
+                    isPipAllowed = call.argument<Boolean>("allowed") ?: false
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (isPipAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val params = PictureInPictureParams.Builder().build()
+            enterPictureInPictureMode(params)
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+            MethodChannel(messenger, PIP_CHANNEL).invokeMethod("onPipChanged", isInPictureInPictureMode)
         }
     }
 

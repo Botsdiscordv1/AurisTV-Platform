@@ -3330,8 +3330,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     final double logoMaxHeight = (headerH * (isCompactHeader ? 0.20 : 0.25)).clamp(80.0, 140.0);
     final double titleSize = (width * 0.028).clamp(30.0, 52.0);
     final double topPadding = isCompactHeader 
-        ? (headerH * 0.30).clamp(96.0, 140.0) 
-        : (headerH * 0.22).clamp(90.0, 135.0);
+        ? (headerH * 0.22).clamp(70.0, 105.0) 
+        : (headerH * 0.16).clamp(65.0, 95.0);
     final bool hasLogo = detailData?.logo != null && detailData!.logo!.isNotEmpty;
     final double gapLogoToMeta = isCompactHeader ? 6.0 : (hasLogo ? 20.0 : 10.0);
     final double gapMetaToSynopsis = isCompactHeader ? 4.0 : (hasLogo ? 12.0 : 8.0);

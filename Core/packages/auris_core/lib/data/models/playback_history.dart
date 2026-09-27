@@ -1,5 +1,5 @@
-
 import './server/search_result.dart';
+import './server/detail_params.dart';
 
 class PlaybackHistory {
   final String contentId;
@@ -10,6 +10,7 @@ class PlaybackHistory {
   final DateTime updatedAt;
   
   final String? title;
+  final String? metadataTitle;
   final String? posterUrl;
   final String? bannerUrl;
   final String? logoUrl;
@@ -18,6 +19,10 @@ class PlaybackHistory {
   final String? url;
   final List<SearchResult>? alternativeSources;
   
+  final String? kind;
+  final String? type;
+  final int? year;
+
   final double progress;
   final bool isCompleted;
   final String? profileId;
@@ -30,6 +35,7 @@ class PlaybackHistory {
     this.durationInMilliseconds = 0,
     required this.updatedAt,
     this.title,
+    this.metadataTitle,
     this.posterUrl,
     this.bannerUrl,
     this.logoUrl,
@@ -37,6 +43,9 @@ class PlaybackHistory {
     this.source,
     this.url,
     this.alternativeSources,
+    this.kind,
+    this.type,
+    this.year,
     double? progress,
     bool? isCompleted,
     this.profileId,
@@ -54,6 +63,7 @@ class PlaybackHistory {
       'durationInMilliseconds': durationInMilliseconds,
       'updatedAt': updatedAt.toIso8601String(),
       'title': title,
+      'metadataTitle': metadataTitle,
       'posterUrl': posterUrl,
       'bannerUrl': bannerUrl,
       'logoUrl': logoUrl,
@@ -61,6 +71,9 @@ class PlaybackHistory {
       'source': source,
       'url': url,
       'alternativeSources': alternativeSources?.map((e) => e.toJson()).toList(),
+      'kind': kind,
+      'type': type,
+      'year': year,
       'progress': progress,
       'isCompleted': isCompleted,
       'profileId': profileId,
@@ -88,6 +101,7 @@ class PlaybackHistory {
           ? DateTime.tryParse(json['updatedAt'].toString()) ?? DateTime.now() 
           : DateTime.now(),
       title: json['title'] as String?,
+      metadataTitle: json['metadataTitle'] as String?,
       posterUrl: json['posterUrl'] as String?,
       bannerUrl: json['bannerUrl'] as String?,
       logoUrl: json['logoUrl'] as String?,
@@ -99,6 +113,9 @@ class PlaybackHistory {
               .map((e) => SearchResult.fromJson(e as Map))
               .toList() 
           : null,
+      kind: json['kind'] as String?,
+      type: json['type'] as String?,
+      year: json['year'] != null ? int.tryParse(json['year'].toString()) : null,
       progress: json['progress'] != null ? double.tryParse(json['progress'].toString()) : calcProgress,
       isCompleted: json['isCompleted'] as bool? ?? (calcProgress > 0.95),
       profileId: json['profileId'] as String? ?? 'guest_profile',
@@ -127,6 +144,7 @@ class PlaybackHistory {
     int? durationInMilliseconds,
     DateTime? updatedAt,
     String? title,
+    String? metadataTitle,
     String? posterUrl,
     String? bannerUrl,
     String? logoUrl,
@@ -134,6 +152,9 @@ class PlaybackHistory {
     String? source,
     String? url,
     List<SearchResult>? alternativeSources,
+    String? kind,
+    String? type,
+    int? year,
     double? progress,
     bool? isCompleted,
     String? profileId,
@@ -146,6 +167,7 @@ class PlaybackHistory {
       durationInMilliseconds: durationInMilliseconds ?? this.durationInMilliseconds,
       updatedAt: updatedAt ?? this.updatedAt,
       title: title ?? this.title,
+      metadataTitle: metadataTitle ?? this.metadataTitle,
       posterUrl: posterUrl ?? this.posterUrl,
       bannerUrl: bannerUrl ?? this.bannerUrl,
       logoUrl: logoUrl ?? this.logoUrl,
@@ -153,9 +175,62 @@ class PlaybackHistory {
       source: source ?? this.source,
       url: url ?? this.url,
       alternativeSources: alternativeSources ?? this.alternativeSources,
+      kind: kind ?? this.kind,
+      type: type ?? this.type,
+      year: year ?? this.year,
       progress: progress ?? this.progress,
       isCompleted: isCompleted ?? this.isCompleted,
       profileId: profileId ?? this.profileId,
+    );
+  }
+}
+
+/// Extension para convertir fácilmente un elemento del historial de reproducción
+/// en parámetros de navegación hacia la pantalla de detalles (UnifiedDetailParams).
+extension PlaybackHistoryToDetailParams on PlaybackHistory {
+  UnifiedDetailParams toUnifiedDetailParams({String? sectionId}) {
+    String normalizedCategory = (category ?? 'anime').toLowerCase().trim();
+    if (normalizedCategory.contains('pelic') || normalizedCategory == 'movie') {
+      normalizedCategory = 'movie';
+    } else if (normalizedCategory.contains('serie') || normalizedCategory == 'series') {
+      normalizedCategory = 'series';
+    } else if (normalizedCategory.contains('kdrama') || normalizedCategory == 'kdrama' || normalizedCategory.contains('dorama')) {
+      normalizedCategory = 'kdrama';
+    } else if (normalizedCategory.contains('anim') || normalizedCategory == 'anime' || normalizedCategory == 'movie_anime') {
+      normalizedCategory = (kind?.toLowerCase() == 'movie' || type?.toLowerCase() == 'movie') ? 'movie' : 'anime';
+    } else {
+      normalizedCategory = 'anime';
+    }
+
+    final List<SearchResult> effectiveSources = (alternativeSources != null && alternativeSources!.isNotEmpty)
+        ? alternativeSources!
+        : [
+            SearchResult(
+              title: title ?? '',
+              url: url ?? contentId,
+              source: source ?? '',
+              quality: 'HD',
+              thumbnail: posterUrl ?? '',
+              banner: bannerUrl,
+              logo: logoUrl,
+              kind: kind,
+              type: type,
+              year: year,
+            )
+          ];
+
+    return UnifiedDetailParams(
+      title: title ?? '',
+      metadataTitle: metadataTitle,
+      category: normalizedCategory,
+      kind: kind ?? (normalizedCategory == 'movie' ? 'movie' : 'anime'),
+      type: type ?? normalizedCategory,
+      year: year,
+      url: url ?? contentId,
+      source: '', // Dejar source vacío para permitir la búsqueda y descubrimiento completo de todas las fuentes y episodios en la ficha de detalles
+      season: season,
+      initialSources: effectiveSources,
+      sectionId: sectionId,
     );
   }
 }

@@ -973,22 +973,19 @@ class _ContinueWatchingSection extends ConsumerWidget {
   }
 
   void _onTap(BuildContext context, PlaybackHistory item) {
-    final player = PlayerScreen(
-      contentId: item.contentId,
-      sourceUrl: item.url ?? item.contentId,
-      source: item.source ?? "",
-      episode: item.episode ?? "1",
-      season: item.season,
-      startPosition: item.positionInMilliseconds,
-      category: item.category,
-      title: item.title,
-      posterUrl: item.posterUrl,
-      bannerUrl: item.bannerUrl,
+    final detailParams = item.toUnifiedDetailParams();
+    final uri = UrlUtils.buildShareableUri(
+      title: detailParams.title,
+      source: detailParams.source,
+      url: detailParams.url ?? item.contentId,
+      category: detailParams.category,
+      type: detailParams.type,
+      sectionId: detailParams.sectionId,
+      from: '/inicio',
     );
-    
-    // Senior UI Fix: Abrir el reproductor como un diálogo a pantalla completa
-    // para mantener la URL actual intacta.
-    UrlUtils.openPlayer(context, player);
+    if (context.mounted) {
+      context.push(uri);
+    }
   }
 }
 

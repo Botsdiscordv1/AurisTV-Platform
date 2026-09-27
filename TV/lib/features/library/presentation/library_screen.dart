@@ -328,16 +328,13 @@ class _HistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        final uri = '/player/${Uri.encodeComponent(item.contentId)}'
-            '?url=${Uri.encodeComponent(item.url ?? item.contentId)}'
-            '&source=${Uri.encodeComponent(item.source ?? "")}'
-            '&episode=${item.episode ?? ""}'
-            '&season=${item.season ?? ""}'
-            '&startPosition=${item.positionInMilliseconds}'
-            '&category=${Uri.encodeComponent(item.category ?? "anime")}'
-            '&title=${Uri.encodeComponent(item.title ?? "")}'
-            '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? "")}'
-            '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}';
+        final detailParams = item.toUnifiedDetailParams();
+        final uri = '/content/${Uri.encodeComponent(detailParams.title)}'
+            '?source=${Uri.encodeComponent(detailParams.source)}'
+            '&category=${Uri.encodeComponent(detailParams.category)}'
+            '&url=${Uri.encodeComponent(detailParams.url ?? item.contentId)}'
+            '${detailParams.season != null ? '&season=${detailParams.season}' : ''}'
+            '${detailParams.sectionId != null ? '&sectionId=${Uri.encodeComponent(detailParams.sectionId!)}' : ''}';
         context.push(uri);
       },
       child: SizedBox(

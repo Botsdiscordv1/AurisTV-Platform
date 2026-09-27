@@ -139,6 +139,11 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
           final double calcProgress = duration > 0 ? (pos.inMilliseconds / duration).clamp(0.0, 1.0) : 0.0;
           final bool isCompleted = calcProgress > 0.95;
 
+          List<SearchResult>? robustSources = state.availableSources;
+          if ((robustSources == null || robustSources.isEmpty) && item.card != null) {
+            robustSources = [item.card!];
+          }
+
           ref.read(playbackHistoryStateProvider.notifier).updatePosition(
             contentId: item.id,
             title: item.title,
@@ -146,11 +151,14 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
             bannerUrl: effectiveBanner,
             logoUrl: item.logoUrl,
             category: item.type.name,
+            kind: item.card?.kind,
+            type: item.card?.type ?? item.type.name,
+            year: item.year,
             episode: state.episode,
             season: state.season,
             source: state.source,
-            url: state.url,
-            alternativeSources: state.availableSources,
+            url: item.detailUrl ?? item.id,
+            alternativeSources: robustSources,
             positionMs: pos.inMilliseconds,
             durationMs: duration,
           );
@@ -178,11 +186,16 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     int? season,
     String? source,
     bool triggerOpen = true,
+    List<SearchResult>? sources,
   }) async {
     initPlayerIfNeeded();
     
     final bool isSameContent = state.currentItem?.id == item.id;
     final bool isSameUrl = state.url == url;
+
+    final List<SearchResult> mergedSources = (sources != null && sources.isNotEmpty)
+        ? sources
+        : (isSameContent ? state.availableSources : (item.card != null ? [item.card!] : []));
 
     // Si ya está reproduciendo lo mismo, solo expandimos
     if (isSameContent && isSameUrl && state.uiState != PlayerUIState.none) {
@@ -200,7 +213,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
       source: source,
       uiState: PlayerUIState.full,
       // Senior Fix: Solo limpiar sesión si es un contenido nuevo de verdad
-      availableSources: isSameContent ? state.availableSources : [],
+      availableSources: mergedSources,
       availableTracks: isSameContent ? state.availableTracks : [],
       availableEpisodes: isSameContent ? state.availableEpisodes : [],
       selectedTrackIndex: isSameContent ? state.selectedTrackIndex : 0,
@@ -306,6 +319,11 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
       final dur = state.player?.state.duration.inMilliseconds ?? 0;
       final item = state.currentItem;
       if (item != null && pos > 3000 && dur > 0 && state.episode != 'OP' && state.episode != 'ED') {
+        List<SearchResult>? robustSources = state.availableSources;
+        if ((robustSources == null || robustSources.isEmpty) && item.card != null) {
+          robustSources = [item.card!];
+        }
+
         ref.read(playbackHistoryStateProvider.notifier).updatePosition(
           contentId: item.id,
           season: state.season,
@@ -317,9 +335,12 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
           bannerUrl: item.bannerUrl,
           logoUrl: item.logoUrl,
           category: item.type.name,
+          kind: item.card?.kind,
+          type: item.card?.type ?? item.type.name,
+          year: item.year,
           source: state.source,
-          url: state.url,
-          alternativeSources: state.availableSources,
+          url: item.detailUrl ?? item.id,
+          alternativeSources: robustSources,
           force: true,
         );
       }

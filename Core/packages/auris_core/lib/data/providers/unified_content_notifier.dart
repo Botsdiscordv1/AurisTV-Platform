@@ -172,6 +172,16 @@ final unifiedContentProvider = Provider.autoDispose
   }
   allSources.sort((a, b) => sourceDisplayRank(a.source).compareTo(sourceDisplayRank(b.source)));
 
+  // Auto-enriquecer el historial de reproducción con todas las fuentes completas del detalle
+  if (allSources.isNotEmpty) {
+    Future.microtask(() {
+      try {
+        final contentId = params.url ?? params.title;
+        ref.read(playbackHistoryStateProvider.notifier).updateSourcesForContent(contentId, allSources);
+      } catch (_) {}
+    });
+  }
+
   // 4. Bloqueo de Selección (Freeze)
   if (input.frozenKey == null && allSources.isNotEmpty) {
     Future.microtask(() => inputNotifier.freeze(allSources.first));
