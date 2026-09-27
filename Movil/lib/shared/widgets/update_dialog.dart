@@ -10,13 +10,14 @@ class UpdateDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    const brandOrange = Color(0xFFEF7A1E);
 
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
-          const Icon(Icons.system_update, color: Colors.blue, size: 28),
+          const Icon(Icons.system_update, color: brandOrange, size: 28),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
@@ -26,11 +27,8 @@ class UpdateDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: ConstrainedBox(
-        constraints: BoxConstraints(
-          width: screenWidth * 0.92,
-          maxWidth: 550,
-        ),
+      content: SizedBox(
+        width: screenWidth * 0.92,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,8 +53,16 @@ class UpdateDialog extends StatelessWidget {
                 child: MarkdownBody(
                   data: updateInfo.releaseNotes,
                   styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                    p: const TextStyle(fontSize: 14),
-                    listBullet: const TextStyle(fontSize: 14),
+                    p: const TextStyle(fontSize: 14, color: Colors.white70),
+                    listBullet: const TextStyle(fontSize: 14, color: Colors.white70),
+                    strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                    blockquote: const TextStyle(color: Colors.white, fontStyle: FontStyle.italic),
+                    blockquoteDecoration: BoxDecoration(
+                      color: brandOrange.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: const Border(left: BorderSide(color: brandOrange, width: 4)),
+                    ),
+                    code: const TextStyle(backgroundColor: Colors.transparent, color: brandOrange, fontSize: 13),
                   ),
                 ),
               ),
@@ -77,7 +83,7 @@ class UpdateDialog extends StatelessWidget {
           icon: const Icon(Icons.download),
           label: const Text('Actualizar ahora'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
+            backgroundColor: brandOrange,
             foregroundColor: Colors.white,
           ),
         ),

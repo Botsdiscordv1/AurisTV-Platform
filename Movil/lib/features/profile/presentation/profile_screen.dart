@@ -54,11 +54,11 @@ class ProfileScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 16),
             children: [
               // PERFIL PRINCIPAL / AVATAR
-              GestureDetector(
-                onTap: () => context.push('/select-profile?edit=true'),
-                child: Column(
-                  children: [
-                    Stack(
+              Column(
+                children: [
+                  GestureDetector(
+                    onTap: () => context.push('/select-profile?edit=true'),
+                    child: Stack(
                       alignment: Alignment.bottomRight,
                       children: [
                         Container(
@@ -91,8 +91,11 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Row(
+                  ),
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () => context.push('/select-profile'),
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
@@ -108,61 +111,50 @@ class ProfileScreen extends ConsumerWidget {
                         const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 22),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: () => context.push('/select-profile'),
-                      child: const Text(
-                        'Cambiar de perfil',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               const SizedBox(height: 28),
 
               // ACCESOS RÁPIDOS: NOTIFICACIONES Y DESCARGAS
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    _QuickActionTile(
-                      icon: Icons.notifications_rounded,
-                      iconBgColor: Colors.redAccent,
-                      title: 'Notificaciones',
-                      subtitle: 'Novedades y próximos estrenos',
-                      onTap: () {
-                        showModalBottomSheet(
-                          context: context,
-                          backgroundColor: const Color(0xFF16181D),
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              Column(
+                children: [
+                  _QuickActionTile(
+                    icon: Icons.notifications_rounded,
+                    iconBgColor: Colors.redAccent,
+                    title: 'Notificaciones',
+                    subtitle: 'Novedades y próximos estrenos',
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: const Color(0xFF16181D),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                        ),
+                        builder: (context) => Container(
+                          padding: const EdgeInsets.all(24),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Notificaciones', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                              SizedBox(height: 16),
+                              Text('No tienes notificaciones pendientes. ¡Te avisaremos cuando haya nuevos episodios!', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                            ],
                           ),
-                          builder: (context) => Container(
-                            padding: const EdgeInsets.all(24),
-                            child: const Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Notificaciones', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                                SizedBox(height: 16),
-                                Text('No tienes notificaciones pendientes. ¡Te avisaremos cuando haya nuevos episodios!', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _QuickActionTile(
-                      icon: Icons.download_rounded,
-                      iconBgColor: Colors.blueAccent,
-                      title: 'Descargas y Mi Espacio',
-                      subtitle: 'Favoritos e historial guardado',
-                      onTap: () => context.push('/settings/library'),
-                    ),
-                  ],
-                ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _QuickActionTile(
+                    icon: Icons.download_rounded,
+                    iconBgColor: Colors.blueAccent,
+                    title: 'Descargas y Mi Espacio',
+                    subtitle: 'Favoritos e historial guardado',
+                    onTap: () => context.push('/settings/library'),
+                  ),
+                ],
               ),
               const SizedBox(height: 32),
 
@@ -185,7 +177,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               SizedBox(
-                height: 180,
+                height: 240,
                 child: favorites.isEmpty
                     ? Center(
                         child: Padding(
@@ -203,50 +195,21 @@ class ProfileScreen extends ConsumerWidget {
                         itemCount: favorites.length,
                         itemBuilder: (context, index) {
                           final item = favorites[index];
-                          return Container(
-                            width: 115,
-                            margin: const EdgeInsets.only(right: 12),
-                            child: GestureDetector(
-                              onTap: () {
-                                final uri = Uri(
-                                  path: '/content/${Uri.encodeComponent(item.title)}',
-                                  queryParameters: {
-                                    'url': item.url,
-                                    'source': item.source,
-                                    'category': item.category,
-                                    'banner': item.bannerUrl ?? '',
-                                    'metadataTitle': item.title,
-                                  },
-                                );
-                                context.push(uri.toString());
-                              },
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: CachedNetworkImage(
-                                        imageUrl: ApiEndpoints.proxyImage(item.posterUrl),
-                                        width: 115,
-                                        height: 150,
-                                        fit: BoxFit.cover,
-                                        placeholder: (context, url) => Container(color: Colors.white10),
-                                        errorWidget: (context, url, error) => Container(
-                                          color: Colors.white10,
-                                          child: const Icon(Icons.image_not_supported, color: Colors.white24),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    item.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                  ),
-                                ],
+                          final cardWidth = ResponsiveUtils.posterWidth(context);
+                          return SizedBox(
+                            width: cardWidth,
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: GestureDetector(
+                                // Long-press: menú (ver detalles / quitar con Deshacer).
+                                onLongPress: () => _showFavoriteMenu(context, ref, item),
+                                child: FocusablePosterCard(
+                                  key: ValueKey(item.url),
+                                  title: item.title,
+                                  posterUrl: item.posterUrl,
+                                  showInfo: true,
+                                  onTap: () => _openFavoriteDetail(context, item),
+                                ),
                               ),
                             ),
                           );
@@ -261,7 +224,76 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showProfileMenu(BuildContext context, WidgetRef ref) {
+  void _openFavoriteDetail(
+    BuildContext context, FavoriteItem item) {
+  // URI completa (kind/year/type/season) + seed: sin esto el detalle abría
+  // sin fuentes.
+  final uri = '/content/${Uri.encodeComponent(item.title)}'
+      '?source=${Uri.encodeComponent(item.source)}'
+      '&category=${Uri.encodeComponent(item.category)}'
+      '&url=${Uri.encodeComponent(item.url)}'
+      '${item.season != null ? '&season=${item.season}' : ''}'
+      '${item.year != null ? '&year=${item.year}' : ''}'
+      '${item.kind != null && item.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(item.kind!)}' : ''}'
+      '${item.type != null && item.type!.isNotEmpty ? '&type=${Uri.encodeComponent(item.type!)}' : ''}'
+      '&metadataTitle=${Uri.encodeComponent(item.title)}&banner=${Uri.encodeComponent(item.bannerUrl)}';
+  context.push(uri, extra: seedFromFavorite(item));
+}
+
+/// Menú long-press: ver detalles / quitar (con Deshacer).
+void _showFavoriteMenu(
+    BuildContext context, WidgetRef ref, FavoriteItem item) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: const Color(0xFF2D2D2D),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.info_outline, color: Colors.white70),
+            title: const Text('Ver detalles',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w500)),
+            onTap: () {
+              Navigator.pop(ctx);
+              _openFavoriteDetail(context, item);
+            },
+          ),
+          ListTile(
+            leading:
+                const Icon(Icons.close_rounded, color: Colors.redAccent),
+            title: const Text('Quitar de Mi lista',
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.w600)),
+            onTap: () {
+              Navigator.pop(ctx);
+              ref.read(favoritesProvider.notifier).toggleFavorite(item);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Quitado de Mi lista'),
+                  action: SnackBarAction(
+                    label: 'Deshacer',
+                    onPressed: () {
+                      ref
+                          .read(favoritesProvider.notifier)
+                          .toggleFavorite(item);
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _showProfileMenu(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF2D2D2D),
@@ -432,7 +464,7 @@ class _QuickActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF1A1D24),
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,

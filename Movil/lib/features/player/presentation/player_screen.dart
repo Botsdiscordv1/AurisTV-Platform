@@ -407,6 +407,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _performHistoryUpdate(int positionMs, int durationMs, {bool force = false}) {
+    // Banner del episodio: 1) lista sincronizada del provider global, 2) estado
+    // directo de episodios (no depende del timing del sync), 3) backdrop.
+    // Sin el paso 2, si los episodios aún no se sincronizaban al guardar, la
+    // tarjeta quedaba con backdrop aunque la lista ya estaba cargada.
+    String? episodeThumb;
+    String? episodeTitle;
+    try {
+      final notifier = ref.read(activePlayerProvider.notifier);
+      episodeThumb = notifier.resolveEpisodeBanner();
+      if (episodeThumb == null || episodeThumb == widget.bannerUrl) {
+        final epsData = ref
+            .read(episodesProvider(EpisodesParams(
+              url: widget.sourceUrl,
+              source: widget.source,
+              title: widget.title,
+              season: widget.season,
+            )))
+            .valueOrNull;
+        final info = notifier.episodeInfoFor(
+            _activeEpisode, epsData?.episodes ?? const []);
+        if (info?.thumbnail != null && info!.thumbnail!.isNotEmpty) {
+          episodeThumb = info.thumbnail;
+        }
+        episodeTitle = info?.title;
+      } else {
+        episodeTitle =
+            notifier.episodeInfoFor(_activeEpisode)?.title;
+      }
+    } catch (_) {}
     _historyNotifier!.updatePosition(
       contentId: widget.contentId,
       season: widget.season,
@@ -415,7 +444,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       durationMs: durationMs,
       title: widget.title,
       posterUrl: widget.posterUrl,
-      bannerUrl: widget.bannerUrl,
+      // Banner del episodio en curso (no el backdrop crudo): ver arriba.
+      bannerUrl: episodeThumb ?? widget.bannerUrl,
+      episodeTitle: episodeTitle,
       logoUrl: widget.logoUrl,
       category: widget.category,
       source: widget.source,
@@ -1380,7 +1411,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
 
     final sources = ref.read(activeContentSourcesProvider);
-    final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
+    // Match tolerante + fallback a la primera fuente: si el nombre no matchea,
+    // reusar la URL actual re-extraía el episodio ANTERIOR (reiniciado).
+    final baseSource = findSourceByName(sources, _currentSource) ??
+        (sources.isNotEmpty ? sources.first : null);
 
     // Senior Navigation Fix: Calcular la URL del episodio destino ANTES de reemplazar
     // la ruta. context.replace recrea la pantalla (GoRouter usa la URI como page key),
@@ -1410,7 +1444,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     context.replace(Uri(path: newPath, queryParameters: queryParams).toString());
 
     final preloaded = ref.read(nextEpisodePreloadProvider);
-    if (preloaded != null && next) {
+    final preloadTarget = ref.read(nextEpisodePreloadTargetProvider);
+    // Solo consumir el preload si es para ESTE destino (url+episodio). Un
+    // preload stale (ej. precargó E6 y se saltó a E8) reproduciría el episodio
+    // equivocado; en ese caso se limpia y se sigue por extracción fresca.
+    final bool preloadValid = preloaded != null &&
+        next &&
+        preloadTarget != null &&
+        preloadTarget.url == nextSourceUrl &&
+        preloadTarget.episode == nextNum;
+    if (!preloadValid && preloaded != null) {
+      ref.read(playerPreloadControllerProvider).clearPreload();
+    }
+    if (preloadValid) {
       final tracks = preloaded.tracks.where((t) => !t.isDownload).toList();
       
       _autoplayTimer?.cancel();
@@ -3129,7 +3175,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               const SizedBox(width: 16),
             ],
             IconButton(
-              iconSize: 30,
+              iconSize: 24,
               icon: const Icon(Symbols.replay_10, color: Colors.white),
               onPressed: () => _sendRemoteSeek(target, -10000),
             ),
@@ -3153,7 +3199,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
             const SizedBox(width: 32),
             IconButton(
-              iconSize: 30,
+              iconSize: 24,
               icon: const Icon(Symbols.forward_10, color: Colors.white),
               onPressed: () => _sendRemoteSeek(target, 10000),
             ),
@@ -3432,7 +3478,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (nextNum < 1) return;
 
     final sources = ref.read(activeContentSourcesProvider);
-    final baseSource = sources.firstWhereOrNull((s) => s.source == _currentSource);
+    final baseSource = findSourceByName(sources, _currentSource) ??
+        (sources.isNotEmpty ? sources.first : null);
 
     final String nextSourceUrl = baseSource != null
         ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
@@ -4737,14 +4784,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _buildCapsuleIconButton(
             icon: Symbols.replay_10,
             onTap: _skipBackward,
-            size: 24, // Reducido para mejor jerarquía visual
+            size: 18, // Reducido adicionalmente para mejor jerarquía visual
             minWidth: 48,
           ),
           Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.05)),
           _buildCapsuleIconButton(
             icon: Symbols.forward_10,
             onTap: _skipForward,
-            size: 24, // Reducido para mejor jerarquía visual
+            size: 18, // Reducido adicionalmente para mejor jerarquía visual
             minWidth: 48,
           ),
           const SizedBox(width: 2),
@@ -4821,8 +4868,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     if (!_isMobileDevice) return const SizedBox.shrink();
     
-    // Senior Adaptive Scaling & Visual Hierarchy: Reducido tamaño de botones +10/-10 para mantener jerarquía visual respecto al Play/Pause (56px / 72px)
-    final double iconSize = isTablet ? 36 : 28;
+    // Senior Adaptive Scaling & Visual Hierarchy: Reducido tamaño de botones +10/-10 adicionalmente para mantener jerarquía visual respecto al Play/Pause (56px / 72px)
+    final double iconSize = isTablet ? 30 : 22;
     final double playSize = isTablet ? 72 : 56;
     final double spacing = isTablet ? 44 : 50;
 

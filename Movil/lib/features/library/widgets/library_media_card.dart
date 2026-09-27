@@ -1,66 +1,83 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
 
-class LibraryMediaCard extends StatelessWidget {
+class LibraryMediaCard extends ConsumerWidget {
   final FavoriteItem item;
   const LibraryMediaCard({super.key, required this.item});
 
-  String _getDisplayCategory(FavoriteItem item) {
-    final source = item.source.toLowerCase();
-    const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
-    const animeHints = ['jkanime', 'animeav1', 'animeflv', 'aniyae', 'animelatino', 'fiuzidragon', 'tioanime', 'animed23', 'animejara', 'katanime', 'animegratis'];
-    const movieHints = ['gnula', 'gnulahd'];
+  void _openDetail(BuildContext context) {
+    // URI completa (kind/year/type/season) + seed: sin esto el discovery
+    // perdía el servidor y el detalle abría sin fuentes.
+    final uri = '/content/${Uri.encodeComponent(item.title)}'
+        '?source=${Uri.encodeComponent(item.source)}'
+        '&category=${Uri.encodeComponent(item.category)}'
+        '&url=${Uri.encodeComponent(item.url)}'
+        '${item.season != null ? '&season=${item.season}' : ''}'
+        '${item.year != null ? '&year=${item.year}' : ''}'
+        '${item.kind != null && item.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(item.kind!)}' : ''}'
+        '${item.type != null && item.type!.isNotEmpty ? '&type=${Uri.encodeComponent(item.type!)}' : ''}'
+        '&metadataTitle=${Uri.encodeComponent(item.title)}&banner=${Uri.encodeComponent(item.bannerUrl)}';
+    context.push(uri, extra: seedFromFavorite(item));
+  }
 
-    if (kdramaHints.any((h) => source.contains(h))) return 'KDRAMA';
-    if (animeHints.any((h) => source.contains(h))) return 'ANIME';
-    if (movieHints.any((h) => source.contains(h))) {
-      if (item.category.toLowerCase().contains('anime')) return 'ANIME';
-      return 'Película';
-    }
-    final cat = item.category.toLowerCase();
-    if (cat.contains('movie') || cat.contains('pelicula')) return 'Película';
-    if (cat.contains('serie') || cat.contains('tv')) return 'SERIE';
-    return item.category.toUpperCase();
+  /// Menú long-press: ver detalles / quitar (con Deshacer). El borrado
+  /// directo sin confirmar se dispara por accidente (scroll, niños, mando).
+  void _showOptionsMenu(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF2D2D2D),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.info_outline, color: Colors.white70),
+              title: const Text('Ver detalles', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openDetail(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.close_rounded, color: Colors.redAccent),
+              title: const Text('Quitar de Mi lista', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(ctx);
+                ref.read(favoritesProvider.notifier).toggleFavorite(item);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Quitado de Mi lista'),
+                    action: SnackBarAction(
+                      label: 'Deshacer',
+                      onPressed: () {
+                        ref.read(favoritesProvider.notifier).toggleFavorite(item);
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
-      onTap: () {
-        final uri = '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(item.source)}&category=${Uri.encodeComponent(item.category)}&url=${Uri.encodeComponent(item.url)}&metadataTitle=${Uri.encodeComponent(item.title)}&banner=${Uri.encodeComponent(item.bannerUrl)}';
-        context.push(uri);
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4)),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: CachedNetworkImage(
-                  imageUrl: ApiEndpoints.proxyImage(item.posterUrl),
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  placeholder: (_, __) => Container(color: Colors.white10),
-                  errorWidget: (_, __, ___) => Container(color: Colors.white10),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-          Text(_getDisplayCategory(item), style: const TextStyle(fontSize: 9, color: Colors.white38, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-        ],
+      onLongPress: () => _showOptionsMenu(context, ref),
+      child: FocusablePosterCard(
+        key: ValueKey(item.url),
+        title: item.title,
+        posterUrl: item.posterUrl,
+        showInfo: true,
+        onTap: () => _openDetail(context),
       ),
     );
   }

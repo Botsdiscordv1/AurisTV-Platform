@@ -38,22 +38,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
-    final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
+    // Lógica centralizada en Core (library_providers): solo diseño aquí.
+    final bool isMovieish = libraryIsMovieish(h);
 
-    String displayTitle = h.title ?? 'Contenido';
-    if (isMovieish) {
-      displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '').trim();
-    } else if (h.episode != null && h.episode!.isNotEmpty) {
-      displayTitle = 'Ep ${h.episode} • $displayTitle';
-    }
+    String displayTitle = libraryDisplayTitle(h);
 
-    String remainingText = '';
-    final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
-    if (remainingMs > 0) {
-      remainingText = 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}';
-    }
+    String remainingText = libraryRemainingText(h);
 
-    final String? rawUrl = h.bannerUrl ?? h.posterUrl;
+    final String? rawUrl = libraryCardImage(h);
     final String? logoUrl = h.logoUrl;
 
     return WideContentItem(
@@ -68,7 +60,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       progress: h.progress,
       subtitle: remainingText,
       onDelete: () {
-        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
+        // En Historial el borrado sí es real (toda la obra).
+        ref.read(playbackHistoryStateProvider.notifier).deleteContentHistory(h.contentId);
       },
       originalItem: h,
     );
@@ -87,22 +80,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         '${detailParams.kind != null && detailParams.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(detailParams.kind!)}' : ''}'
         '${detailParams.type != null && detailParams.type!.isNotEmpty ? '&type=${Uri.encodeComponent(detailParams.type!)}' : ''}'
         '${detailParams.metadataTitle != null && detailParams.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(detailParams.metadataTitle!)}' : ''}';
-    final seedUrl = item.url ?? item.contentId;
-    // Sin URL http real no se siembra seed (ver home: url=título rompe episodes).
-    final seed = isHttpUrl(seedUrl)
-        ? SearchResult(
-            title: item.title ?? detailParams.title,
-            url: seedUrl,
-            quality: '',
-            thumbnail: item.posterUrl ?? '',
-            source: item.source ?? detailParams.source,
-            kind: item.kind ?? detailParams.kind,
-            type: item.type ?? detailParams.type,
-            year: item.year ?? detailParams.year,
-            metadataTitle: item.metadataTitle ?? detailParams.metadataTitle,
-            season: item.season ?? detailParams.season,
-          )
-        : null;
+    // Seed centralizado en Core (null si no hay URL http real).
+    final seed = historyToSeed(item);
     if (context.mounted) {
       context.push(uri, extra: seed);
     }
@@ -114,27 +93,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     
     final favorites = ref.watch(favoritesProvider);
-    final historyAsync = ref.watch(playbackHistoryStateProvider);
     final user = ref.watch(authProvider);
 
-    final filteredFavorites = favorites.where((f) {
-      if (_activeFilter == 'todos') return true;
-      final source = f.source.toLowerCase();
-      final cat = f.category.toLowerCase();
-      const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama'];
-      const animeHints = ['jkanime', 'animeav1', 'aniyae', 'animelatino', 'fiuzidragon', 'animed23', 'animejara', 'katanime', 'animegratis'];
-      const movieHints = ['gnula', 'gnulahd'];
-
-      if (_activeFilter == 'kdrama') return kdramaHints.any((h) => source.contains(h));
-      if (_activeFilter == 'anime') {
-        return animeHints.any((h) => source.contains(h)) || (movieHints.any((h) => source.contains(h)) && cat.contains('anime'));
-      }
-      if (_activeFilter == 'peliculas') {
-        return (cat.contains('movie') || cat.contains('pelicula') || movieHints.any((h) => source.contains(h))) && !cat.contains('anime');
-      }
-      if (_activeFilter == 'series') return cat.contains('serie') || cat.contains('tv');
-      return false;
-    }).toList();
+    final filteredFavorites = filterLibraryFavorites(favorites, _activeFilter);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
@@ -145,6 +106,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: _isScrolled ? 15.0 : 0.0, sigmaY: _isScrolled ? 15.0 : 0.0),
             child: AppBar(
+              leadingWidth: 44,
+              titleSpacing: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 22),
+                padding: EdgeInsets.zero,
+                onPressed: () => context.pop(),
+              ),
               title: Text('Mi biblioteca', 
                 style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20)),
               backgroundColor: _isScrolled ? const Color(0xFF0B0B0D).withValues(alpha: 0.6) : Colors.transparent,
@@ -171,23 +139,43 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         controller: _scrollController,
         slivers: [
           SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).padding.top + 60)),
-          
-          // 1. SECCIÓN: CONTINUAR VIENDO (HISTORIAL UNIFICADO)
-          historyAsync.when(
-            data: (items) {
-              if (items.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+
+          // 1. SECCIÓN: HISTORIAL (todas las reproducciones, una tarjeta por obra)
+          ref.watch(contentHistoryProvider).when(
+            data: (grouped) {
+              if (grouped.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
               return SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 24, top: 12),
+                  padding: const EdgeInsets.only(bottom: 24),
                   child: WideContentRow(
-                    title: 'Continuar Viendo',
-                    items: items.map((h) => _mapHistoryToWide(ref, h)).toList(),
+                    title: 'Historial',
+                    items: grouped.map((h) {
+                      final base = _mapHistoryToWide(ref, h);
+                      // Subtítulo con contexto del último visionado (T2 E7 • Quedan…).
+                      // WideContentItem es inmutable: reconstruir con el subtítulo.
+                      return WideContentItem(
+                        id: base.id,
+                        title: base.title,
+                        imageUrl: base.imageUrl,
+                        logoUrl: base.logoUrl,
+                        progress: base.progress,
+                        subtitle: libraryHistorySubtitle(h),
+                        favoriteItem: favoriteFromHistory(
+                            h,
+                            ref.read(authProvider)?.activeProfileId ??
+                                'guest_profile'),
+                        onDelete: () {
+                          ref.read(playbackHistoryStateProvider.notifier).deleteContentHistory(h.contentId);
+                        },
+                        originalItem: h,
+                      );
+                    }).toList(),
                     onItemTap: (wideItem) => _onHistoryTap(context, wideItem.originalItem as PlaybackHistory),
                   ),
                 ),
               );
             },
-            loading: () => SliverToBoxAdapter(child: RowSkeleton(isWide: true)),
+            loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
             error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
           ),
 
@@ -200,15 +188,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 children: [
                   _SectionHeader(title: 'Mi Lista', count: favorites.length),
                   const SizedBox(height: 16),
-                  _CategoryFilters(
-                    activeFilter: _activeFilter,
-                    onFilterChanged: (filter) => setState(() => _activeFilter = filter),
-                  ),
-                  const SizedBox(height: 24),
                 ],
               ),
             ),
           ),
+          SliverToBoxAdapter(
+            child: _CategoryFilters(
+              activeFilter: _activeFilter,
+              onFilterChanged: (filter) => setState(() => _activeFilter = filter),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
           if (filteredFavorites.isEmpty)
             SliverFillRemaining(
@@ -224,11 +214,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 3,
                   mainAxisSpacing: 20,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.65,
+                  childAspectRatio: isMobile ? 0.54 : 0.58,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => LibraryMediaCard(item: filteredFavorites[index]),
@@ -279,26 +269,40 @@ class _CategoryFilters extends StatelessWidget {
       {'id': 'kdrama', 'label': 'KDrama'},
     ];
 
+    final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 0, 0, 0),
       child: Row(
         children: filters.map((f) {
           final isSelected = activeFilter == f['id'];
           return Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: ChoiceChip(
-              label: Text(f['label']!),
-              selected: isSelected,
-              onSelected: (_) => onFilterChanged(f['id']!),
-              backgroundColor: Colors.white.withValues(alpha: 0.05),
-              selectedColor: const Color(0xFFEF7A1E),
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.black : Colors.white70,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontSize: 13,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => onFilterChanged(f['id']!),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFFEF7A1E) : Colors.white12,
+                    ),
+                  ),
+                  child: Text(
+                    f['label']!,
+                    style: TextStyle(
+                      color: isSelected ? Colors.black : Colors.white,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
-              showCheckmark: false,
             ),
           );
         }).toList(),

@@ -118,22 +118,10 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       const Divider(height: 1, color: Colors.white10),
                       _SettingsTile(
-                        icon: Icons.switch_account_outlined,
-                        title: 'Cambiar Perfil',
-                        subtitle: 'Seleccionar otro integrante',
-                        onTap: () => context.push('/select-profile'),
-                      ),
-                      _SettingsTile(
                         icon: Icons.hub_outlined,
                         title: 'Conexiones Externas',
                         subtitle: 'AniList, Simkl y más',
                         onTap: () => context.push('/connections'),
-                      ),
-                      _SettingsTile(
-                        icon: Icons.video_library_outlined,
-                        title: 'Mi espacio',
-                        subtitle: 'Favoritos, historial y más',
-                        onTap: () => context.push('/settings/library'),
                       ),
                     ],
                   );
@@ -145,31 +133,12 @@ class SettingsScreen extends ConsumerWidget {
               _SettingsCard(
                 child: Column(
                   children: [
-                    _SettingsTile(
-                      icon: Icons.high_quality_outlined,
-                      title: 'Calidad de reproducción',
-                      subtitle: settings.preferredQuality.toUpperCase(),
-                      onTap: () => _showQualityDialog(context, ref),
-                    ),
-                    _SettingsTile(
-                      icon: Icons.language_outlined,
-                      title: 'Idioma preferido',
-                      subtitle: settings.preferredLanguage.toUpperCase(),
-                      onTap: () => _showLanguageDialog(context, ref),
-                    ),
                     SwitchListTile(
                       activeColor: primaryColor,
                       secondary: const Icon(Icons.play_circle_outline, color: primaryColor),
                       title: const Text('Auto-reproducir trailers', style: TextStyle(color: Colors.white, fontSize: 15)),
                       value: settings.autoPlayTrailers,
                       onChanged: (v) => ref.read(settingsProvider.notifier).setAutoPlayTrailers(v),
-                    ),
-                    SwitchListTile(
-                      activeColor: primaryColor,
-                      secondary: const Icon(Icons.next_plan_outlined, color: primaryColor),
-                      title: const Text('Auto-reproducir siguiente episodio', style: TextStyle(color: Colors.white, fontSize: 15)),
-                      value: settings.autoPlayNextEpisode,
-                      onChanged: (v) => ref.read(settingsProvider.notifier).setAutoPlayNextEpisode(v),
                     ),
                   ],
                 ),
@@ -250,54 +219,6 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: 40),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  void _showQualityDialog(BuildContext context, WidgetRef ref) {
-    final settings = ref.read(settingsProvider);
-    final options = ['auto', '1080p', '720p', '480p'];
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        title: const Text('Calidad de reproducción', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: options.map((o) => _OptionTile(
-            label: o.toUpperCase(),
-            isSelected: settings.preferredQuality == o,
-            onTap: () {
-              ref.read(settingsProvider.notifier).setPreferredQuality(o);
-              Navigator.pop(context);
-            },
-          )).toList(),
-        ),
-      ),
-    );
-  }
-
-  void _showLanguageDialog(BuildContext context, WidgetRef ref) {
-    final settings = ref.read(settingsProvider);
-    final options = ['latino', 'subtitulado', 'castellano'];
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        title: const Text('Idioma preferido', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: options.map((o) => _OptionTile(
-            label: o.toUpperCase(),
-            isSelected: settings.preferredLanguage == o,
-            onTap: () {
-              ref.read(settingsProvider.notifier).setPreferredLanguage(o);
-              Navigator.pop(context);
-            },
-          )).toList(),
         ),
       ),
     );

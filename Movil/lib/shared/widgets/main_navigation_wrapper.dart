@@ -66,6 +66,7 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     final remoteState = ref.watch(remoteControlProvider);
     final targetId = remoteState.activeTargetDeviceId;
     final target = remoteState.availableDevices.firstWhereOrNull((d) => d.id == targetId);
+    final bool bottomBarVisible = ref.watch(bottomNavVisibleProvider);
 
     return PopScope(
       canPop: false, 
@@ -84,10 +85,10 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
               ),
           ],
         ),
-        bottomNavigationBar: AurisBottomBar(
+        bottomNavigationBar: bottomBarVisible ? AurisBottomBar(
           currentIndex: widget.navigationShell.currentIndex,
           onTap: _onTap,
-        ),
+        ) : null,
       ),
     );
   }

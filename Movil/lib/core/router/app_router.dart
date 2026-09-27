@@ -226,10 +226,11 @@ class ProfileWithNavScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final bool bottomBarVisible = ref.watch(bottomNavVisibleProvider);
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
       body: const ProfileScreen(),
-      bottomNavigationBar: AurisBottomBar(
+      bottomNavigationBar: bottomBarVisible ? AurisBottomBar(
         currentIndex: 3,
         onTap: (index) {
           final routes = ['/', '/search', '/explore', '/profile'];
@@ -238,7 +239,7 @@ class ProfileWithNavScreen extends ConsumerWidget {
           }
           context.go(routes[index]);
         },
-      ),
+      ) : null,
     );
   }
 }

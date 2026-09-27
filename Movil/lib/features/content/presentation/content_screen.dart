@@ -1525,7 +1525,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   Widget _buildMainActionButton(BuildContext context, {required bool isMobile, PlaybackHistory? latestHistory, VoidCallback? onPlay}) {
     final hasHistory = latestHistory != null;
-    final String label = hasHistory ? 'Continuar viendo' : 'Reproducir ahora';
+    // Etiqueta expresiva con episodio (solo si es número: en pelis no aplica).
+    final epNum = int.tryParse((latestHistory?.episode ?? '').trim());
+    final String label = hasHistory
+        ? (epNum != null ? 'Continuar viendo Ep $epNum' : 'Continuar viendo')
+        : 'Reproducir ahora';
     final IconData icon = Icons.play_arrow_rounded;
 
     final double? progress = hasHistory ? latestHistory.progress : null;
@@ -1542,32 +1546,52 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 0,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.black, size: 32),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.black, 
-                fontWeight: FontWeight.bold, 
-                fontSize: 18
-              )
-            ),
-            if (hasProgress) ...[
-              const SizedBox(width: 16),
-              _buildButtonProgressBar(progress, isMobile: isMobile),
-            ],
-          ],
-        ),
+          // LayoutBuilder: en pantallas estrechas (p. ej. colapso al rotar)
+          // se usa la etiqueta corta para que todo quepa en la línea.
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final displayLabel = (hasHistory &&
+                      epNum != null &&
+                      constraints.maxWidth < 340)
+                  ? 'Continuar Ep $epNum'
+                  : label;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: Colors.black, size: 32),
+                  const SizedBox(width: 8),
+                  // Solo el texto es flexible (ellipsis): la barra conserva
+                  // su tamaño original al lado y nunca desborda.
+                  Flexible(
+                    child: Text(
+                      displayLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18
+                      )
+                    ),
+                  ),
+                  if (hasProgress) ...[
+                    const SizedBox(width: 16),
+                    _buildButtonProgressBar(progress, isMobile: isMobile),
+                  ],
+                ],
+              );
+            },
+          ),
       ),
     );
   }
 
-  Widget _buildButtonProgressBar(double progress, {bool isMobile = false}) {
+  Widget _buildButtonProgressBar(double progress,
+      {bool isMobile = false, bool flexible = false}) {
     return Container(
-      width: isMobile ? 85 : 140,
+      // flexible=true: ocupa lo disponible (hasta el maxWidth del padre) para
+      // no desbordar en anchos colapsados (transición de rotación).
+      width: flexible ? double.infinity : (isMobile ? 85 : 140),
       height: 6,
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.30),
@@ -1590,7 +1614,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   }
 
   Widget _buildCircularActions(BuildContext context, {required bool isMobile, String? poster, String? banner}) {
-    const bool isFav = false; 
+    // Mi lista funcional: estado real + toggle con los datos del detalle.
+    final favorites = ref.watch(favoritesProvider);
+    final String favId = widget.url.isNotEmpty ? widget.url : widget.title;
+    final bool isFav = favorites.any((f) => f.id == favId);
     final actionRow = Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.start,
@@ -1620,7 +1647,28 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       _DetailIconButton(
         icon: isFav ? Icons.check : Icons.add,
         label: isFav ? 'En mi lista' : 'Mi lista',
-        onPressed: () {},
+        onPressed: () {
+          final user = ref.read(authProvider);
+          ref.read(favoritesProvider.notifier).toggleFavorite(
+                buildFavoriteItem(
+                  id: favId,
+                  title: widget.title,
+                  posterUrl: poster ?? '',
+                  bannerUrl: banner ?? '',
+                  category: widget.category,
+                  source: widget.source,
+                  url: widget.url,
+                  kind: widget.kind ?? widget.result?.kind,
+                  year: widget.year,
+                  type: widget.result?.type ?? widget.type,
+                  season: widget.season ?? widget.result?.season,
+                  // Todas las fuentes del detalle (paridad con search/home).
+                  sources: flattenSources(
+                      ref.read(activeContentSourcesProvider)),
+                  profileId: user?.activeProfileId ?? 'guest_profile',
+                ),
+              );
+        },
         isMobile: isMobile,
       ),
       const SizedBox(width: 8),
@@ -1808,6 +1856,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     }
 
     final int displayTotalSeasons = [totalSeasons, widget.totalSeasons ?? 0].reduce((a, b) => a > b ? a : b);
+    final bool bottomBarVisible = ref.watch(bottomNavVisibleProvider);
 
     return MouseRegion(
       onHover: (_) => _handleInteraction(),
@@ -1817,7 +1866,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         onPointerHover: (_) => _handleInteraction(),
         child: AdaptiveDetailLayout(
           maxContentWidth: 1000,
-          bottomNavigationBar: AurisBottomBar(
+          bottomNavigationBar: bottomBarVisible ? AurisBottomBar(
             currentIndex: -1, // No hay rama seleccionada en detalles
             onTap: (index) {
               final routes = ['/', '/search', '/explore', '/profile-with-nav'];
@@ -1830,7 +1879,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 context.go(routes[index]);
               }
             },
-          ),
+          ) : null,
           topBar: Stack(children: [
             Positioned(top: 12, left: 15, child: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28), onPressed: () => Navigator.of(context).pop())),
             Positioned(top: 12, right: 15, child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {})),

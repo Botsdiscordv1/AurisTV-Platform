@@ -1386,22 +1386,13 @@ class _ContinueWatchingSection extends ConsumerWidget {
   }
 
   WideContentItem _mapHistoryToWide(WidgetRef ref, PlaybackHistory h) {
-    final bool isMovieish = isMovieLike(h.category, h.title, h.durationInMilliseconds);
+    // Lógica centralizada en Core (library_providers): solo diseño aquí.
+    final bool isMovieish = libraryIsMovieish(h);
+    final String displayTitle = libraryDisplayTitle(h);
+    // Subtítulo en 2 líneas: "T1:E7 . Título" + "Quedan X".
+    final sub = continueCardSubtitle(h);
 
-    String displayTitle = h.title ?? 'Contenido';
-    if (isMovieish) {
-      displayTitle = displayTitle.replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '').trim();
-    } else if (h.episode != null && h.episode!.isNotEmpty) {
-      displayTitle = 'Ep ${h.episode} • $displayTitle';
-    }
-
-    String remainingText = '';
-    final remainingMs = h.durationInMilliseconds - h.positionInMilliseconds;
-    if (remainingMs > 0) {
-      remainingText = 'Quedan ${AurisStringUtils.formatRemainingTime(remainingMs)}';
-    }
-
-    final String? rawUrl = h.bannerUrl ?? h.posterUrl;
+    final String? rawUrl = libraryCardImage(h);
     final String? logoUrl = h.logoUrl;
 
     return WideContentItem(
@@ -1414,10 +1405,14 @@ class _ContinueWatchingSection extends ConsumerWidget {
       ),
       logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
       progress: h.progress,
-      subtitle: remainingText,
-      onDelete: () {
-        ref.read(playbackHistoryStateProvider.notifier).deleteProgress(h.contentId, h.season, h.episode);
-      },
+      subtitle: sub.line1.isNotEmpty ? sub.line1 : null,
+      subtitle2: sub.line2,
+      favoriteItem: favoriteFromHistory(
+          h, ref.read(authProvider)?.activeProfileId ?? 'guest_profile'),
+                      onDelete: () {
+                        // Ocultar de Continuar Viendo (conserva el Historial).
+                        ref.read(playbackHistoryStateProvider.notifier).dismissFromContinue(h.contentId, h.season, h.episode);
+                      },
       originalItem: h,
     );
   }
@@ -1438,24 +1433,8 @@ class _ContinueWatchingSection extends ConsumerWidget {
         '${detailParams.kind != null && detailParams.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(detailParams.kind!)}' : ''}'
         '${detailParams.type != null && detailParams.type!.isNotEmpty ? '&type=${Uri.encodeComponent(detailParams.type!)}' : ''}'
         '${detailParams.metadataTitle != null && detailParams.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(detailParams.metadataTitle!)}' : ''}';
-    final seedUrl = item.url ?? item.contentId;
-    // Sin URL http real no se siembra seed: lockearía una fuente con url=título
-    // y el /api/episodes fallaría (el server exige http). El discovery por
-    // kind/year/title reconstruye las fuentes igual.
-    final seed = isHttpUrl(seedUrl)
-        ? SearchResult(
-            title: item.title ?? detailParams.title,
-            url: seedUrl,
-            quality: '',
-            thumbnail: item.posterUrl ?? '',
-            source: item.source ?? detailParams.source,
-            kind: item.kind ?? detailParams.kind,
-            type: item.type ?? detailParams.type,
-            year: item.year ?? detailParams.year,
-            metadataTitle: item.metadataTitle ?? detailParams.metadataTitle,
-            season: item.season ?? detailParams.season,
-          )
-        : null;
+    // Seed centralizado en Core (null si no hay URL http real).
+    final seed = historyToSeed(item);
     if (context.mounted) {
       context.push(uri, extra: seed);
     }

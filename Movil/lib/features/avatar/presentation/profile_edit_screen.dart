@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../settings/presentation/providers/settings_provider.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
   final String profileId;
@@ -16,6 +17,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   late TextEditingController _nameController;
   bool _autoplayNextEpisode = true;
   bool _autoplayPreviews = true;
+  String _selectedAudioLanguage = 'Español (Latinoamérica)';
+  String _selectedQuality = 'auto';
 
   @override
   void initState() {
@@ -23,6 +26,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _nameController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider);
+      final settings = ref.read(settingsProvider);
       if (user != null) {
         final profile = user.profiles.firstWhere(
           (p) => p.id == widget.profileId,
@@ -30,6 +34,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         );
         _nameController.text = profile.name;
       }
+      setState(() {
+        _autoplayNextEpisode = settings.autoPlayNextEpisode;
+        _selectedQuality = settings.preferredQuality;
+      });
     });
   }
 
@@ -37,6 +45,63 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  void _showAudioLanguageDialog(BuildContext context) {
+    const primaryColor = Color(0xFFEF7A1E);
+    final options = [
+      'Español (Latinoamérica)',
+      'Japonés',
+      'Inglés',
+      'Español (España)',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D24),
+        title: const Text('Idioma de audio', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: options.map((lang) => ListTile(
+            title: Text(lang, style: const TextStyle(color: Colors.white)),
+            trailing: _selectedAudioLanguage == lang
+                ? const Icon(Icons.check, color: primaryColor)
+                : null,
+            onTap: () {
+              setState(() => _selectedAudioLanguage = lang);
+              Navigator.pop(context);
+            },
+          )).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showQualityDialog(BuildContext context) {
+    const primaryColor = Color(0xFFEF7A1E);
+    final options = ['auto', '1080p', '720p', '480p'];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D24),
+        title: const Text('Calidad de reproducción', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: options.map((o) => ListTile(
+            title: Text(o.toUpperCase(), style: const TextStyle(color: Colors.white)),
+            trailing: _selectedQuality == o
+                ? const Icon(Icons.check, color: primaryColor)
+                : null,
+            onTap: () {
+              setState(() => _selectedQuality = o);
+              Navigator.pop(context);
+            },
+          )).toList(),
+        ),
+      ),
+    );
   }
 
   @override
@@ -69,6 +134,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
               if (newName.isNotEmpty && profile != null) {
                 ref.read(authProvider.notifier).updateProfileName(newName);
               }
+              ref.read(settingsProvider.notifier).setAutoPlayNextEpisode(_autoplayNextEpisode);
+              ref.read(settingsProvider.notifier).setPreferredQuality(_selectedQuality);
               if (Navigator.canPop(context)) {
                 context.pop();
               } else {
@@ -180,13 +247,23 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Idiomas de audio y subtítulos
+                    // Idioma de audio
                     _buildSettingTile(
-                      icon: Icons.subtitles_rounded,
-                      title: 'Idiomas de audio y subtítulos',
-                      subtitle: 'Elige tus idiomas preferidos para series y películas.',
+                      icon: Icons.volume_up_rounded,
+                      title: 'Idioma de audio',
+                      subtitle: _selectedAudioLanguage,
                       trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white54),
-                      onTap: () {},
+                      onTap: () => _showAudioLanguageDialog(context),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Calidad de reproducción
+                    _buildSettingTile(
+                      icon: Icons.high_quality_rounded,
+                      title: 'Calidad de reproducción',
+                      subtitle: _selectedQuality.toUpperCase(),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white54),
+                      onTap: () => _showQualityDialog(context),
                     ),
                     const SizedBox(height: 12),
 
