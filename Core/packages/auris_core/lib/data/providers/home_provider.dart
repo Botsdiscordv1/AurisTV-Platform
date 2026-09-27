@@ -867,10 +867,6 @@ MediaItem _mapHomeItemToMediaItem(HomeItem item, String sectionId) {
         year: item.year,
         alternativeSources: historySources,
       );
-        type: mediaType.name,
-        year: item.year,
-        alternativeSources: historySources,
-      );
     } catch (_) {}
   }
 

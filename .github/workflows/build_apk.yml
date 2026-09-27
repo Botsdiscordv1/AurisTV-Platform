@@ -11,7 +11,7 @@ jobs:
     name: Build Android APKs (Split by ABI)
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Necesario para borrar y crear la Release
+      contents: write # Necesario para crear/actualizar la Release
 
     steps:
       - name: Checkout repository
@@ -38,15 +38,6 @@ jobs:
           cd Movil
           flutter pub get
           flutter build apk --release --split-per-abi
-
-      - name: Delete existing GitHub release (if any)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          curl -s -X DELETE \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} || true
 
       - name: Upload APKs to GitHub Release
         uses: softprops/action-gh-release@v2

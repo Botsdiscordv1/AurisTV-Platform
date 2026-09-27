@@ -271,13 +271,23 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     return entries.first;
   }
 
-  void updateSourcesForContent(String contentId, List<SearchResult> sources) {
+  void updateSourcesForContent(String contentId, String? title, List<SearchResult> sources) {
     if (sources.isEmpty) return;
     bool updated = false;
     final repository = ref.read(playbackHistoryRepositoryProvider);
+    final cleanTargetTitle = title?.toLowerCase().trim() ?? '';
+
     for (int i = 0; i < _memoryCache.length; i++) {
       final h = _memoryCache[i];
-      if (h.contentId == contentId || h.url == contentId || (h.title != null && h.title!.isNotEmpty && sources.isNotEmpty && h.title == sources.first.title)) {
+      final cleanHistoryTitle = h.title?.toLowerCase().trim() ?? '';
+      
+      final bool matches = h.contentId == contentId ||
+                           h.url == contentId ||
+                           contentId.contains(h.contentId) ||
+                           h.contentId.contains(contentId) ||
+                           (cleanTargetTitle.isNotEmpty && cleanHistoryTitle.isNotEmpty && (cleanHistoryTitle == cleanTargetTitle || cleanHistoryTitle.contains(cleanTargetTitle) || cleanTargetTitle.contains(cleanHistoryTitle)));
+
+      if (matches) {
         if (h.alternativeSources == null || h.alternativeSources!.isEmpty || h.alternativeSources!.length < sources.length) {
           _memoryCache[i] = h.copyWith(alternativeSources: sources);
           updated = true;

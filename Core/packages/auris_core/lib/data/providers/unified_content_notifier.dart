@@ -177,7 +177,7 @@ final unifiedContentProvider = Provider.autoDispose
     Future.microtask(() {
       try {
         final contentId = params.url ?? params.title;
-        ref.read(playbackHistoryStateProvider.notifier).updateSourcesForContent(contentId, allSources);
+        ref.read(playbackHistoryStateProvider.notifier).updateSourcesForContent(contentId, params.title, allSources);
       } catch (_) {}
     });
   }
