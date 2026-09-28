@@ -43,6 +43,7 @@ export 'core/utils/responsive_utils.dart';
 export 'core/utils/synopsis_cleaner.dart';
 export 'core/utils/string_utils.dart';
 export 'core/utils/subtitle_format.dart';
+export 'core/utils/cast_utils.dart';
 export 'core/utils/youtube_resolver.dart';
 export 'core/utils/personalized_home_helper.dart';
 export 'core/utils/section_composer.dart';

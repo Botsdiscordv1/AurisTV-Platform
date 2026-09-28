@@ -563,6 +563,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _hasInitialized = true;
       _initPlayer(widget.sourceUrl);
       _findAlternatives();
+    } else if (widget.source == 'YouTube' && widget.sourceUrl.isNotEmpty) {
+      // OP/ED de /api/themes con solo ID de YouTube (igual que Movil): van
+      // directo al WebView en formato embed (watch no sirve en TV).
+      _hasInitialized = true;
+      _initEmbedPlayer(_youTubeEmbedUrl(widget.sourceUrl));
+      _findAlternatives();
     } else {
       _findAlternatives();
     }
@@ -2548,6 +2554,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
+  /// Normaliza cualquier URL de YouTube (watch, youtu.be, embed) al formato
+  /// embed con autoplay, que es el único reproducible en el WebView de TV.
+  String _youTubeEmbedUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      String? id;
+      if (uri.host.contains('youtu.be')) {
+        id = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+      } else if (uri.host.contains('youtube.com')) {
+        id = uri.queryParameters['v'];
+        if (id == null && uri.pathSegments.contains('embed') && uri.pathSegments.length > 1) {
+          id = uri.pathSegments[uri.pathSegments.indexOf('embed') + 1];
+        }
+      }
+      if (id != null && id.isNotEmpty) return 'https://www.youtube.com/embed/$id?autoplay=1&rel=0';
+    } catch (_) {}
+    return url;
+  }
+
   void _initEmbedPlayer(String url, [Map<String, String> headers = const {}]) {
     // En Android el backend devuelve URLs con localhost:3000 (el servidor corre
     // en el PC); hay que apuntar a la IP real de la LAN.
@@ -4264,40 +4289,43 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   )
                 else
                   Text(
-                    widget.category.toUpperCase(),
+                    (widget.category ?? '').toUpperCase(),
                     style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
                   ),
+                const SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    final currentTrack = _allTracks.isNotEmpty
+                        ? _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0]
+                        : null;
+
+                    // Etiqueta de idioma (quality) con fallback al estado actual
+                    // para asegurar visibilidad constante en Web y durante la carga inicial.
+                    String label = currentTrack?.quality ?? _currentTrackQuality;
+                    if (label.isEmpty) label = _currentLanguage ?? '';
+
+                    Color color = const Color(0xFFEF7A1E);
+                    if (currentTrack?.color != null) {
+                      color = Color(currentTrack!.color!);
+                    } else {
+                      // Fallback visual por tipo de contenido
+                      final type = trackQualityType(label);
+                      if (type == 'SUB') color = Colors.blueAccent;
+                    }
+
+                    return ActiveSourceBadge(
+                      serverName: _currentServerName ?? widget.serverName ?? widget.source,
+                      label: label,
+                      color: color,
+                    );
+                  },
+                ),
               ],
             ),
           ],
         ),
       ),
     );
-  }
-                // para asegurar visibilidad constante en Web y durante la carga inicial.
-                String label = currentTrack?.quality ?? _currentTrackQuality;
-                if (label.isEmpty) label = _currentLanguage ?? '';
-                
-                Color color = const Color(0xFFEF7A1E);
-                if (currentTrack?.color != null) {
-                  color = Color(currentTrack!.color!);
-                } else {
-                  // Fallback visual por tipo de contenido
-                  final type = trackQualityType(label);
-                  if (type == 'SUB') color = Colors.blueAccent;
-                }
-
-                return ActiveSourceBadge(
-                  serverName: _currentServerName ?? widget.serverName ?? widget.source, 
-                  label: label,
-                  color: color,
-                );
-              },
-            ),
-            const SizedBox(width: 16),
-            if (_isMobileDevice)
-              const SizedBox.shrink(),
-          ])));
   }
 
   Widget _buildPlayPauseButton({double? size}) {
@@ -4684,113 +4712,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           ],
         );
       },
-    );
-  }
-                      builder: (context, bufSnapshot) {
-                        final bPos = bufSnapshot.data ?? initialBuffer;
-                        final double bufferValue = (bPos.inMilliseconds / maxMs).clamp(0.0, 1.0);
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: SizedBox(
-                            height: 2,
-                            child: LinearProgressIndicator(
-                              value: bufferValue,
-                              backgroundColor: Colors.transparent,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.25)),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 4,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                        activeTrackColor: const Color(0xFFEF7A1E),
-                        inactiveTrackColor: Colors.white10,
-                        thumbColor: Colors.white,
-                        overlayColor: const Color(0xFFEF7A1E).withOpacity(0.2),
-                      ),
-                      child: Slider(
-                        value: currentMs,
-                        max: maxMs,
-                        onChanged: (value) {
-                          final int targetMs = value.toInt();
-                          _isStabilizing = true;
-                          _isCompleted = false;
-                          _lastManualSeekTime = DateTime.now();
-                          _lastFrameMs = targetMs;
-                          _lastStablePositionMs = targetMs;
-                          _player?.seek(Duration(milliseconds: targetMs));
-                          _startStabilizationTimer();
-                          _updateHistory(positionMs: targetMs, durationMs: duration.inMilliseconds, force: true);
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-
-            // CAPA DE TIEMPO (Independiente de los StreamBuilders y del Layout del video)
-            if (!_isMobileDevice)
-              IgnorePointer(
-                child: ValueListenableBuilder<Offset?>(
-                  valueListenable: _hoverInfoNotifier,
-                  builder: (context, info, _) {
-                    if (info == null) return const SizedBox.shrink();
-                    return Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 40,
-                      child: Align(
-                        alignment: Alignment.bottomLeft,
-                        child: Transform.translate(
-                          offset: Offset(info.dx - 40, 0),
-                          child: RepaintBoundary(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.85),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.white10),
-                              ),
-                              child: Text(
-                                _formatDuration(Duration(milliseconds: info.dy.toInt())),
-                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-        
-        // Tiempos Current/Duration (Ocultos en Desktop porque se usa DurationCapsule)
-        if (_isMobileDevice)
-        StreamBuilder<Duration>(
-          stream: posStream,
-          initialData: initialPos,
-          builder: (context, snapshot) {
-            final position = snapshot.data ?? initialPos;
-            final duration = _player?.state.duration ?? Duration.zero;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(_formatDuration(position), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                  Text(_formatDuration(duration), style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold))
-                ],
-              ),
-            );
-          },
-        ),
-      ],
     );
   }
 

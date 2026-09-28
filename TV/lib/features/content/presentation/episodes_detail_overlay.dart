@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:auris_core/auris_core.dart';
 import 'package:auris_core/auris_core.dart';
 
 class EpisodesDetailOverlay extends ConsumerStatefulWidget {
@@ -19,6 +19,9 @@ class EpisodesDetailOverlay extends ConsumerStatefulWidget {
   final String title;
   final String? bannerUrl;
   final Function(EpisodeInfo, SearchResult?, int total) onPlayEpisode;
+  /// OP/ED vía /api/themes (ver Movil/Web): el overlay muestra la sección
+  /// "Trailers y más" solo cuando hay datos (o mientras cargan).
+  final AsyncValue<AnimeThemesData>? themesAsync;
 
   const EpisodesDetailOverlay({
     super.key,
@@ -33,6 +36,7 @@ class EpisodesDetailOverlay extends ConsumerStatefulWidget {
     required this.title,
     this.bannerUrl,
     required this.onPlayEpisode,
+    this.themesAsync,
   });
 
   @override
@@ -40,7 +44,7 @@ class EpisodesDetailOverlay extends ConsumerStatefulWidget {
 }
 
 class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
-  int _selectedMenuIndex = 0;
+  int _selectedMenuId = 0;
   final ScrollController _episodesScrollController = ScrollController();
 
   @override
@@ -157,35 +161,75 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
     );
   }
 
-  Widget _buildSideMenu() {
-    final List<Map<String, dynamic>> menuItems = [
-      {'label': widget.totalSeasons > 1 ? 'Temporada ${widget.currentSeason}' : 'Episodios', 'icon': Icons.layers_outlined},
-      {'label': 'Trailers y m\u00E1s', 'icon': Icons.movie_outlined},
-      {'label': 'Detalles', 'icon': Icons.info_outline_rounded},
-      {'label': 'Galer\u00EDa', 'icon': Icons.photo_library_outlined},
+  /// OP/ED: en anime llegan de /api/themes; en pelis vienen en el detail.
+  List<AnimeThemeInfo> get _openings {
+    final d = widget.detailData;
+    if (d is MovieDetail) return d.openings;
+    return widget.themesAsync?.valueOrNull?.openings ?? const [];
+  }
+
+  List<AnimeThemeInfo> get _endings {
+    final d = widget.detailData;
+    if (d is MovieDetail) return d.endings;
+    return widget.themesAsync?.valueOrNull?.endings ?? const [];
+  }
+
+  bool get _hasExtras => _openings.isNotEmpty || _endings.isNotEmpty;
+
+  /// La entrada "Trailers y más" se muestra mientras los themes cargan o
+  /// cuando hay datos; se oculta solo si cargó vacío o falló (igual que
+  /// Movil/Web, que solo agregan el tab 'Extras' con datos).
+  bool get _showExtrasMenu {
+    if (widget.detailData is MovieDetail) return _hasExtras;
+    final t = widget.themesAsync;
+    if (t == null) return false;
+    return t.isLoading || _hasExtras;
+  }
+
+  // Ids estables de menú (la lista es dinámica: Extras puede no estar).
+  static const int _menuEpisodes = 0;
+  static const int _menuExtras = 1;
+  static const int _menuDetails = 2;
+  static const int _menuGallery = 3;
+
+  List<Map<String, dynamic>> _menuItems() {
+    return [
+      {'id': _menuEpisodes, 'label': widget.totalSeasons > 1 ? 'Temporada ${widget.currentSeason}' : 'Episodios', 'icon': Icons.layers_outlined},
+      if (_showExtrasMenu) {'id': _menuExtras, 'label': 'Trailers y m\u00E1s', 'icon': Icons.movie_outlined},
+      {'id': _menuDetails, 'label': 'Detalles', 'icon': Icons.info_outline_rounded},
+      {'id': _menuGallery, 'label': 'Galer\u00EDa', 'icon': Icons.photo_library_outlined},
     ];
+  }
+
+  Widget _buildSideMenu() {
+    final menuItems = _menuItems();
+    final int selectedIndex = menuItems.indexWhere((m) => m['id'] == _selectedMenuId);
+    final int safeIndex = (selectedIndex == -1 ? 0 : selectedIndex).clamp(0, menuItems.length - 1);
 
     return ListView.separated(
       itemCount: menuItems.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final bool isSelected = _selectedMenuIndex == index;
+        final bool isSelected = safeIndex == index;
         return _MenuButton(
           label: menuItems[index]['label'],
           icon: menuItems[index]['icon'],
           isSelected: isSelected,
-          onPressed: () => setState(() => _selectedMenuIndex = index),
+          onPressed: () => setState(() => _selectedMenuId = menuItems[index]['id'] as int),
         );
       },
     );
   }
 
   Widget _buildRightPanelContent() {
-    switch (_selectedMenuIndex) {
-      case 0: return _buildEpisodesView();
-      case 1: return const Center(child: Text('Contenido adicional no disponible', style: TextStyle(color: Colors.white38, fontSize: 20)));
-      case 2: return _buildDetailsView();
-      case 3: return _buildGalleryPlaceholder();
+    final menuItems = _menuItems();
+    final int selectedIndex = menuItems.indexWhere((m) => m['id'] == _selectedMenuId);
+    final int safeIndex = (selectedIndex == -1 ? 0 : selectedIndex).clamp(0, menuItems.length - 1);
+    switch (menuItems[safeIndex]['id']) {
+      case _menuEpisodes: return _buildEpisodesView();
+      case _menuExtras: return _buildExtrasView();
+      case _menuDetails: return _buildDetailsView();
+      case _menuGallery: return _buildGalleryPlaceholder();
       default: return const SizedBox.shrink();
     }
   }
@@ -222,6 +266,76 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
       loading: () => const Center(child: CircularProgressIndicator(color: Colors.white24)),
       error: (e, _) => Center(child: Text('Error al cargar episodios: $e', style: const TextStyle(color: Colors.white70))),
     );
+  }
+
+  Widget _buildExtrasView() {
+    // En pelis los OP/ED vienen en el detail; en anime llegan de /api/themes.
+    if (widget.detailData is! MovieDetail) {
+      final t = widget.themesAsync;
+      if (t == null) {
+        return const Center(child: Text('Contenido adicional no disponible', style: TextStyle(color: Colors.white38, fontSize: 20)));
+      }
+      return t.when(
+        data: (_) => _buildExtrasList(),
+        loading: () => const Center(child: CircularProgressIndicator(color: Colors.white24)),
+        error: (e, _) => Center(child: Text('Error al cargar extras: $e', style: const TextStyle(color: Colors.white70))),
+      );
+    }
+    return _buildExtrasList();
+  }
+
+  Widget _buildExtrasList() {
+    final ops = _openings;
+    final eds = _endings;
+    if (ops.isEmpty && eds.isEmpty) {
+      return const Center(child: Text('Contenido adicional no disponible', style: TextStyle(color: Colors.white38, fontSize: 20)));
+    }
+    return ListView(
+      children: [
+        if (ops.isNotEmpty) ...[
+          Text('Openings', style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          ...ops.map((th) => Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: _ThemeRowCard(theme: th, isOP: true, onTap: () => _playTheme(th, true)),
+              )),
+          const SizedBox(height: 16),
+        ],
+        if (eds.isNotEmpty) ...[
+          Text('Endings', style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          ...eds.map((th) => Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: _ThemeRowCard(theme: th, isOP: false, onTap: () => _playTheme(th, false)),
+              )),
+        ],
+      ],
+    );
+  }
+
+  /// Reproduce un OP/ED en el player (mismos parámetros que Movil: el player
+  /// TV ya soporta flujo directo Themes/YouTube con episode=OP/ED sin
+  /// historial ni autoplay).
+  void _playTheme(AnimeThemeInfo theme, bool isOP) {
+    final typeLabel = isOP ? 'OP' : 'ED';
+    final dynamic d = widget.detailData;
+    String logo = '';
+    try {
+      final l = d?.logo as String?;
+      if (l != null && l.isNotEmpty) logo = '&logoUrl=${Uri.encodeComponent(l)}';
+    } catch (_) {}
+    final titleParam = '&title=${Uri.encodeComponent(widget.title)}&episodeTitle=${Uri.encodeComponent(theme.title)}$logo';
+
+    String url = theme.videoUrl;
+    if (!url.startsWith('http')) {
+      // Solo ID de YouTube (igual que Movil): el player lo abre en embed.
+      url = 'https://www.youtube.com/watch?v=$url';
+      context.push('/player/${Uri.encodeComponent(theme.title)}?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube$titleParam');
+      return;
+    }
+    final v720 = (theme.video720?.isNotEmpty ?? false) ? '&video720=${Uri.encodeComponent(theme.video720!)}' : '';
+    final v1080 = (theme.video1080?.isNotEmpty ?? false) ? '&video1080=${Uri.encodeComponent(theme.video1080!)}' : '';
+    context.push('/player/${Uri.encodeComponent(theme.title)}?source=&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes$v720$v1080$titleParam');
   }
 
   Widget _buildDetailsView() {
@@ -386,16 +500,17 @@ class _ExpandedEpisodeCardState extends State<_ExpandedEpisodeCard> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Miniatura 16:9
+                // Miniatura 16:9 (el ancho va FUERA del AspectRatio: dentro de
+                // un ListView vertical ambos ejes llegan ilimitados y crashea).
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: SizedBox(
-                      width: 280,
+                  child: SizedBox(
+                    width: 280,
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
                       child: (widget.episode.thumbnail?.isNotEmpty ?? false)
                         ? CachedNetworkImage(
-                            imageUrl: ApiEndpoints.proxyImage(widget.episode.thumbnail!), 
+                            imageUrl: ApiEndpoints.proxyImage(widget.episode.thumbnail!),
                             fit: BoxFit.cover,
                             placeholder: (_, __) => Container(color: Colors.white.withOpacity(0.05)),
                             errorWidget: (_, __, ___) => Container(color: Colors.white.withOpacity(0.05), child: const Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 40)),
@@ -423,17 +538,119 @@ class _ExpandedEpisodeCardState extends State<_ExpandedEpisodeCard> {
                           ),
                           const SizedBox(width: 16),
                           Text(
-                            widget.episode.duration ?? (widget.episode.runtime != null ? '${widget.episode.runtime}m' : '40m'), 
+                            widget.episode.duration ?? (widget.episode.runtime != null ? '${widget.episode.runtime}m' : '40m'),
                             style: const TextStyle(color: Colors.white38, fontSize: 16, fontWeight: FontWeight.bold)
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        (widget.episode.description?.isNotEmpty ?? false) 
-                          ? widget.episode.description! 
+                        (widget.episode.description?.isNotEmpty ?? false)
+                          ? widget.episode.description!
                           : 'Sinopsis no disponible para este episodio.',
                         maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 16, height: 1.5),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeRowCard extends StatefulWidget {
+  final AnimeThemeInfo theme;
+  final bool isOP;
+  final VoidCallback onTap;
+
+  const _ThemeRowCard({
+    required this.theme,
+    required this.isOP,
+    required this.onTap,
+  });
+
+  @override
+  State<_ThemeRowCard> createState() => _ThemeRowCardState();
+}
+
+class _ThemeRowCardState extends State<_ThemeRowCard> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = widget.isOP ? Colors.blueAccent : Colors.pinkAccent;
+    return Focus(
+      onFocusChange: (f) => setState(() => _focused = f),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _focused ? 1.02 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _focused ? Colors.white.withOpacity(0.08) : Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _focused ? accent.withOpacity(0.6) : Colors.transparent),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Miniatura 16:9 (ancho fuera del AspectRatio: ver tarjeta episodio).
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 280,
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: (widget.theme.imageUrl?.isNotEmpty ?? false)
+                        ? CachedNetworkImage(
+                            imageUrl: ApiEndpoints.proxyImage(widget.theme.imageUrl!),
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(color: Colors.white.withOpacity(0.05)),
+                            errorWidget: (_, __, ___) => Container(color: Colors.white.withOpacity(0.05), child: const Icon(Icons.music_note_rounded, color: Colors.white24, size: 40)),
+                          )
+                        : Container(color: Colors.white.withOpacity(0.05), child: const Icon(Icons.music_note_rounded, color: Colors.white24, size: 40)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 32),
+                // Información
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(color: accent.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
+                            child: Text(
+                              widget.isOP ? 'OP' : 'ED',
+                              style: TextStyle(color: accent, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              widget.theme.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.theme.artist.isNotEmpty ? widget.theme.artist : 'Artista desconocido',
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 16, height: 1.5),
                       ),

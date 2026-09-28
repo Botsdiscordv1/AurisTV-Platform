@@ -2027,52 +2027,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   }
 
   List<Widget> _buildCastTab(dynamic detailData, List<CastInfo> serverCast, double hPadding) {
-    final List<CastInfo> cast;
-
-    // Senior Strategy: Si hay datos del servidor, reemplazan totalmente a los de detalles.
-    // Mientras carga (serverCast será [] si lo manejamos así desde el build), mostramos detalles.
-    if (serverCast.isNotEmpty) {
-      cast = serverCast;
-    } else {
-      final Map<String, CastInfo> detailCast = {};
-
-      // 1. Cast de Películas/Series (TMDB)
-      if (detailData is MovieDetail) {
-        for (var c in detailData.cast) {
-          detailCast[c.name] = CastInfo(
-            id: c.id,
-            name: c.name,
-            character: c.character,
-            profile: c.profile,
-          );
-        }
-      }
-
-      // 2. Anime (AniList): los actores de voz son las personas del cast;
-      // con su nombre se resuelve la filmografía en vivo vía TMDB. Si no hay
-      // seiyuu, se muestra el personaje (best-effort por nombre).
-      if (detailData is AnimeDetail) {
-        for (var c in detailData.characters) {
-          if (c.voiceActors.isNotEmpty) {
-            for (final va in c.voiceActors) {
-              if (va.name.isEmpty || detailCast.containsKey(va.name)) continue;
-              detailCast[va.name] = CastInfo(
-                name: va.name,
-                character: c.name,
-                profile: va.image ?? c.image,
-              );
-            }
-          } else if (!detailCast.containsKey(c.name)) {
-            detailCast[c.name] = CastInfo(
-              name: c.name,
-              character: c.role,
-              profile: c.image,
-            );
-          }
-        }
-      }
-      cast = detailCast.values.toList();
-    }
+    // Mezcla centralizada (Core): servidor (con ID) + detalle, sin duplicados.
+    final List<CastInfo> cast = mergeDetailCast(detailData, serverCast);
 
     final width = MediaQuery.of(context).size.width;
     

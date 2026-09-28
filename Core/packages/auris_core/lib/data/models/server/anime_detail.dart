@@ -440,9 +440,15 @@ class AnimeThemesData {
   });
 
   factory AnimeThemesData.fromJson(Map<String, dynamic> json) {
+    // El server responde con envelope {success,data:{themes:[...]}}: hay que
+    // desenvolverlo igual que AnimeDetail.fromJson (sin esto themes siempre
+    // llegaba vacío y el tab/sección Extras nunca aparecía).
+    final root = (json.containsKey('data') && json['data'] is Map)
+        ? Map<String, dynamic>.from(json['data'] as Map)
+        : json;
     final openings = <AnimeThemeInfo>[];
     final endings = <AnimeThemeInfo>[];
-    for (final t in (json['themes'] as List<dynamic>? ?? const [])) {
+    for (final t in (root['themes'] as List<dynamic>? ?? const [])) {
       if (t is Map) {
         final theme = AnimeThemeInfo.fromJson(Map<String, dynamic>.from(t));
         if (theme.type == 'OPENING') {

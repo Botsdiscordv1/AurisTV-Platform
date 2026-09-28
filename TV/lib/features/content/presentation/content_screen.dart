@@ -662,9 +662,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 
   Widget _buildUpperButtons(BuildContext context) {
-    return Stack(children: [
-      Positioned(top: ResponsiveUtils.sp(context, 20), left: ResponsiveUtils.sp(context, 30), child: PointerInterceptor(child: IconButton(icon: Icon(Icons.arrow_back, color: Colors.white, size: ResponsiveUtils.sp(context, 24)), onPressed: () => Navigator.of(context).pop()))),
-    ]);
+    return const SizedBox.shrink();
   }
 }
 
@@ -845,7 +843,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         title: widget.title, source: widget.source, url: widget.url, category: widget.category, poster: ApiEndpoints.proxyImage(currentSource?.thumbnail), banner: heroBanner, detailAsync: detailState.detail, currentSource: currentSource, sources: detailState.allSources, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSourceSelected: (index) => ref.setSource(detailParams, detailState.allSources[index]), onSeasonSelected: (s) => ref.setSeason(detailParams, s), 
         kind: widget.kind ?? widget.result?.kind, year: widget.year, type: widget.result?.type ?? widget.type, season: widget.season ?? widget.result?.season,
         onShowEpisodes: () {
-          Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSeasonSelected: (s) => ref.setSeason(detailParams, s), episodesAsync: detailState.episodes, category: widget.category, title: widget.title, bannerUrl: heroBanner, onPlayEpisode: (ep, epSource, total) {
+          Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSeasonSelected: (s) => ref.setSeason(detailParams, s), episodesAsync: detailState.episodes, category: widget.category, title: widget.title, bannerUrl: heroBanner, themesAsync: detailState.themes, onPlayEpisode: (ep, epSource, total) {
             final epNum = ep.number; final effectiveSrc = epSource?.source ?? widget.source; final playEpisodesUrl = epSource?.url ?? widget.url; final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, detailState.currentSeason, epNum.toString());
             final epThumb = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
             context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${detailState.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=$total&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
