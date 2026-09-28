@@ -25,16 +25,11 @@ android {
         applicationId = "com.auristv.oficial.tv"
         minSdk = flutter.minSdkVersion 
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
 
         multiDexEnabled = true
         manifestPlaceholders["appAuthRedirectScheme"] = "auristv"
-
-        ndk {
-            abiFilters.add("x86_64")
-            abiFilters.add("arm64-v8a")
-        }
     }
 
     buildTypes {
