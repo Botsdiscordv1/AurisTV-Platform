@@ -10,6 +10,18 @@ import 'playback_history_provider.dart';
 
 enum PlayerUIState { none, mini, full, pip }
 
+/// Etiqueta de episodio `T1:E1 "Título"` (o `T1:E1` sin título / tal cual si
+/// no es numérico como OP/ED). Formato único para los subtítulos de los
+/// players de las 3 plataformas. Un genérico ("Episodio 1") cuenta como
+/// ausente: mostrarlo entrecomillado finge un título que no existe.
+String episodeDisplayLabel(String? episode, {int? season, String? title}) {
+  final m = RegExp(r'(\d+)').firstMatch(episode ?? '');
+  final base = m == null ? (episode ?? '') : 'T${season ?? 1}:E${int.parse(m.group(1)!)}';
+  final raw = (title ?? '').trim();
+  final t = CommunityTranslationManager.isGenericTitle(raw) ? '' : raw;
+  return t.isEmpty ? base : '$base "$t"';
+}
+
 class ActivePlayerState {
   final Player? player;
   final VideoController? controller;
@@ -19,6 +31,10 @@ class ActivePlayerState {
   final int? season;
   final String? source;
   final String? url;
+  /// Título del episodio en curso, fijado explícitamente por el player (que
+  /// ya lo tiene cargado para el display). Manda sobre el lookup en
+  /// availableEpisodes; se limpia al cambiar de episodio sin título nuevo.
+  final String? episodeTitle;
   
   // Senior: Session Persistence & Continuity Data
   final List<SearchResult> availableSources;
@@ -36,12 +52,16 @@ class ActivePlayerState {
     this.season,
     this.source,
     this.url,
+    this.episodeTitle,
     this.availableSources = const [],
     this.availableTracks = const [],
     this.availableEpisodes = const [],
     this.selectedTrackIndex = 0,
     GlobalKey? videoKey,
   }) : videoKey = videoKey ?? GlobalKey();
+
+  /// Centinela para distinguir "no pasar" de "limpiar con null" en copyWith.
+  static const keepField = Object();
 
   ActivePlayerState copyWith({
     Player? player,
@@ -52,6 +72,7 @@ class ActivePlayerState {
     int? season,
     String? source,
     String? url,
+    Object? episodeTitle = keepField,
     List<SearchResult>? availableSources,
     List<VideoTrackOption>? availableTracks,
     List<EpisodeInfo>? availableEpisodes,
@@ -66,6 +87,9 @@ class ActivePlayerState {
       season: season ?? this.season,
       source: source ?? this.source,
       url: url ?? this.url,
+      episodeTitle: identical(episodeTitle, keepField)
+          ? this.episodeTitle
+          : episodeTitle as String?,
       availableSources: availableSources ?? this.availableSources,
       availableTracks: availableTracks ?? this.availableTracks,
       availableEpisodes: availableEpisodes ?? this.availableEpisodes,
@@ -209,7 +233,9 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
             source: state.source,
             url: historyUrl,
             alternativeSources: robustSources,
-            episodeTitle: episodeInfoFor(state.episode)?.title,
+            // Título explícito del player (display T1:E1 "x") manda; si no
+            // hay, lookup en la lista sincronizada.
+            episodeTitle: state.episodeTitle ?? episodeInfoFor(state.episode)?.title,
             positionMs: pos.inMilliseconds,
             durationMs: duration,
           );
@@ -238,6 +264,9 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     String? source,
     bool triggerOpen = true,
     List<SearchResult>? sources,
+    // Título ya resuelto por el player para el display T1:E1 "x": se guarda
+    // tal cual en el historial al salir (sin depender del timing del sync).
+    String? episodeTitle,
   }) async {
     initPlayerIfNeeded();
     
@@ -266,12 +295,17 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
 
     // Senior Strategy: Actualizamos el estado síncronamente para evitar tirones en la UI
     // y solo diferimos la apertura del motor si es necesario.
+    // El título explícito manda; si el episodio cambió y no viene título se
+    // limpia para no arrastrar el anterior (el lookup lo repondrá al llegar
+    // la lista).
+    final bool episodeChanged = state.episode != episode;
     state = state.copyWith(
       currentItem: item,
       url: url,
       episode: episode,
       season: season,
       source: source,
+      episodeTitle: episodeTitle ?? (episodeChanged ? null : ActivePlayerState.keepField),
       uiState: PlayerUIState.full,
       // Senior Fix: Solo limpiar sesión si es un contenido nuevo de verdad
       availableSources: mergedSources,
@@ -335,6 +369,9 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     List<VideoTrackOption>? tracks,
     List<EpisodeInfo>? episodes,
     int? selectedIndex,
+    // Título ya resuelto por el player (display): fija el campo sin esperar
+    // al sync de la lista. Null = conservar el actual.
+    String? episodeTitle,
   }) {
     final List<SearchResult> nextSources = (sources != null && sources.isNotEmpty) 
         ? sources 
@@ -366,6 +403,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
         availableEpisodes: nextEpisodes,
         selectedTrackIndex: selectedIndex ?? state.selectedTrackIndex,
         currentItem: nextItem,
+        episodeTitle: episodeTitle ?? ActivePlayerState.keepField,
       );
     } catch (_) {
       // Ignora notify a Consumer defunct (race al cerrar mini y reabrir)
@@ -406,7 +444,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
           source: state.source,
           url: historyUrl,
           alternativeSources: robustSources,
-          episodeTitle: episodeInfoFor(state.episode)?.title,
+          episodeTitle: state.episodeTitle ?? episodeInfoFor(state.episode)?.title,
           force: true,
         );
       }

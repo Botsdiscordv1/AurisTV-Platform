@@ -209,6 +209,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return widget.title ?? widget.contentId;
   }
 
+  /// Subtítulo del episodio en formato `T1:E1 "Título"` (igual en las 3
+  /// plataformas). Observa la lista sincronizada: el título aparece en cuanto
+  /// llega, y al mostrarse ya queda cargado para el guardado.
+  String _episodeLabel() {
+    if (_isSpecial) return 'Temporada 0';
+    String? title;
+    try {
+      final synced = ref.watch(activePlayerProvider.select((s) => s.availableEpisodes));
+      final notifier = ref.read(activePlayerProvider.notifier);
+      title = notifier.episodeInfoFor(_activeEpisode, synced)?.title;
+      if (title == null || title.isEmpty) {
+        final eps = ref
+            .read(episodesProvider(EpisodesParams(
+              url: widget.sourceUrl,
+              source: widget.source,
+              title: widget.title,
+              season: widget.season,
+            )))
+            .valueOrNull
+            ?.episodes;
+        title = notifier.episodeInfoFor(_activeEpisode, eps ?? const [])?.title;
+      }
+    } catch (_) {}
+    return episodeDisplayLabel(_activeEpisode, season: widget.season, title: title);
+  }
+
   /// Si el contenido actual es un Opening (OP) o Ending (ED).
   bool get _isOpEd => widget.episode == 'OP' || widget.episode == 'ED';
   bool get _isTrailer => widget.episode == 'Trailer';
@@ -1960,6 +1986,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       season: widget.season,
       source: _currentSource.isNotEmpty ? _currentSource : widget.source,
       triggerOpen: false,
+      episodeTitle: ref.read(activePlayerProvider.notifier).episodeInfoFor(_activeEpisode)?.title,
     );
 
     if (_player == null) {
@@ -3121,7 +3148,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ),
         if (_activeEpisode != null && !_isMovie)
           Text(
-            _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
+            _episodeLabel(),
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 18, fontWeight: FontWeight.bold),
           ),
         const SizedBox(height: 60),
@@ -3140,7 +3167,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ),
         if (_activeEpisode != null && !_isMovie)
           Text(
-            _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
+            _episodeLabel(),
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 16, fontWeight: FontWeight.bold),
           ),
         const SizedBox(height: 32),
@@ -4399,7 +4426,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         )
                       else if (_activeEpisode != null && !_isMovie)
                         Text(
-                          _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
+                          _episodeLabel(),
                           style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
                         )
                     ],
@@ -4559,14 +4586,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _buildCapsuleIconButton(
             icon: Symbols.replay_10,
             onTap: _skipBackward,
-            size: 18, // Reducido a 18px
+            size: 30, // Unificado a 30px (Desktop original)
             minWidth: 48,
           ),
           Container(width: 1, height: 16, color: Colors.white.withOpacity(0.05)),
           _buildCapsuleIconButton(
             icon: Symbols.forward_10,
             onTap: _skipForward,
-            size: 18, // Reducido a 18px
+            size: 30, // Unificado a 30px (Desktop original)
             minWidth: 48,
           ),
           const SizedBox(width: 2),

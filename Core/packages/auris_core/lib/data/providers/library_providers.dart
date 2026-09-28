@@ -7,6 +7,7 @@ import '../../core/utils/category_utils.dart';
 import '../../core/utils/string_utils.dart';
 import '../../core/utils/source_utils.dart';
 import 'playback_history_provider.dart';
+import 'community_translation_provider.dart';
 
 /// Lógica de Biblioteca centralizada (las 3 apps solo conectan UI).
 ///
@@ -119,7 +120,7 @@ SearchResult? historyToSeed(PlaybackHistory h) {
 }
 
 /// Subtítulo de Continuar Viendo en 2 líneas (no-películas):
-/// line1 = "T1:E7 . Título del episodio" (o "T1:E7" sin título),
+/// line1 = "T1:E7 . Título del episodio" (o "T1:E7" sin título / genérico),
 /// line2 = "Quedan X" (o null). Películas y sin episodio → (remaining, null).
 ({String line1, String? line2}) continueCardSubtitle(PlaybackHistory h) {
   final remaining = libraryRemainingText(h);
@@ -129,7 +130,9 @@ SearchResult? historyToSeed(PlaybackHistory h) {
   }
   final season = h.season ?? 1;
   final ep = h.episode!;
-  final epTitle = (h.episodeTitle ?? '').trim();
+  final rawTitle = (h.episodeTitle ?? '').trim();
+  // Un genérico guardado ("Episodio 1") equivale a sin título.
+  final epTitle = CommunityTranslationManager.isGenericTitle(rawTitle) ? '' : rawTitle;
   final line1 =
       epTitle.isNotEmpty ? 'T$season:E$ep . $epTitle' : 'T$season:E$ep';
   final remaining2 = libraryRemainingText(h, colon: true);

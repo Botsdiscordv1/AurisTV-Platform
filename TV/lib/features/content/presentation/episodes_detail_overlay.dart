@@ -14,14 +14,15 @@ class EpisodesDetailOverlay extends ConsumerStatefulWidget {
   final int totalSeasons;
   final int currentSeason;
   final ValueChanged<int> onSeasonSelected;
-  final AsyncValue<GroupedEpisodesResult?> episodesAsync;
+  /// Params del provider unificado: el overlay observa en VIVO (episodios +
+  /// themes progresivos). Pasar el AsyncValue como snapshot lo dejaba
+  /// congelado (spinner eterno si se abría antes de resolver, sin updates
+  /// del full) y con temporada vieja tras cambiar de season.
+  final UnifiedDetailParams detailParams;
   final String category;
   final String title;
   final String? bannerUrl;
   final Function(EpisodeInfo, SearchResult?, int total) onPlayEpisode;
-  /// OP/ED vía /api/themes (ver Movil/Web): el overlay muestra la sección
-  /// "Trailers y más" solo cuando hay datos (o mientras cargan).
-  final AsyncValue<AnimeThemesData>? themesAsync;
 
   const EpisodesDetailOverlay({
     super.key,
@@ -31,12 +32,11 @@ class EpisodesDetailOverlay extends ConsumerStatefulWidget {
     required this.totalSeasons,
     required this.currentSeason,
     required this.onSeasonSelected,
-    required this.episodesAsync,
+    required this.detailParams,
     required this.category,
     required this.title,
     this.bannerUrl,
     required this.onPlayEpisode,
-    this.themesAsync,
   });
 
   @override
@@ -46,6 +46,14 @@ class EpisodesDetailOverlay extends ConsumerStatefulWidget {
 class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
   int _selectedMenuId = 0;
   final ScrollController _episodesScrollController = ScrollController();
+  final int _tInit = DateTime.now().millisecondsSinceEpoch;
+  bool _loggedEpsData = false;
+
+  @override
+  void initState() {
+    super.initState();
+    debugPrint('[perf] overlay init t=$_tInit');
+  }
 
   @override
   void dispose() {
@@ -93,7 +101,7 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
                 // PANEL DERECHO: CONTENIDO
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(40, 60, 60, 40),
+                    padding: const EdgeInsets.fromLTRB(40, 40, 60, 16),
                     child: _buildRightPanelContent(),
                   ),
                 ),
@@ -161,17 +169,21 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
     );
   }
 
+  /// Estado vivo del provider unificado (misma instancia que content_screen:
+  /// la family cachea por params, no refetchea).
+  UnifiedContentState get _live => ref.watch(unifiedContentProvider(widget.detailParams));
+
   /// OP/ED: en anime llegan de /api/themes; en pelis vienen en el detail.
   List<AnimeThemeInfo> get _openings {
     final d = widget.detailData;
     if (d is MovieDetail) return d.openings;
-    return widget.themesAsync?.valueOrNull?.openings ?? const [];
+    return _live.themes.valueOrNull?.openings ?? const [];
   }
 
   List<AnimeThemeInfo> get _endings {
     final d = widget.detailData;
     if (d is MovieDetail) return d.endings;
-    return widget.themesAsync?.valueOrNull?.endings ?? const [];
+    return _live.themes.valueOrNull?.endings ?? const [];
   }
 
   bool get _hasExtras => _openings.isNotEmpty || _endings.isNotEmpty;
@@ -181,8 +193,7 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
   /// Movil/Web, que solo agregan el tab 'Extras' con datos).
   bool get _showExtrasMenu {
     if (widget.detailData is MovieDetail) return _hasExtras;
-    final t = widget.themesAsync;
-    if (t == null) return false;
+    final t = _live.themes;
     return t.isLoading || _hasExtras;
   }
 
@@ -235,8 +246,12 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
   }
 
   Widget _buildEpisodesView() {
-    return widget.episodesAsync.when(
+    return _live.episodes.when(
       data: (result) {
+        if (!_loggedEpsData) {
+          _loggedEpsData = true;
+          debugPrint('[perf] overlay episodes data t=${DateTime.now().millisecondsSinceEpoch} (+${DateTime.now().millisecondsSinceEpoch - _tInit}ms desde init)');
+        }
         final eps = result?.response.episodes ?? [];
         if (eps.isEmpty) return const Center(child: CircularProgressIndicator(color: Colors.white24));
 
@@ -251,7 +266,8 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
         return ListView.separated(
           controller: _episodesScrollController,
           itemCount: eps.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 24),
+          padding: const EdgeInsets.only(bottom: 24),
+          separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
             final ep = eps[index];
             final epSource = result?.sourceForNumber(ep.number) ?? widget.currentSource;
@@ -271,15 +287,13 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
   Widget _buildExtrasView() {
     // En pelis los OP/ED vienen en el detail; en anime llegan de /api/themes.
     if (widget.detailData is! MovieDetail) {
-      final t = widget.themesAsync;
-      if (t == null) {
-        return const Center(child: Text('Contenido adicional no disponible', style: TextStyle(color: Colors.white38, fontSize: 20)));
+      final t = _live.themes;
+      if (t.isLoading) {
+        return const Center(child: CircularProgressIndicator(color: Colors.white24));
       }
-      return t.when(
-        data: (_) => _buildExtrasList(),
-        loading: () => const Center(child: CircularProgressIndicator(color: Colors.white24)),
-        error: (e, _) => Center(child: Text('Error al cargar extras: $e', style: const TextStyle(color: Colors.white70))),
-      );
+      if (t.hasError) {
+        return Center(child: Text('Error al cargar extras: ${t.error}', style: const TextStyle(color: Colors.white70)));
+      }
     }
     return _buildExtrasList();
   }
@@ -426,11 +440,23 @@ class _MenuButtonState extends State<_MenuButton> {
     
     return Focus(
       onFocusChange: (f) => setState(() => _focused = f),
+      // TV: el OK del control (select/enter/space) debe activar el botón,
+      // GestureDetector solo responde a puntero.
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+             event.logicalKey == LogicalKeyboardKey.select ||
+             event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onPressed();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
       child: GestureDetector(
         onTap: widget.onPressed,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
             color: widget.isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
             borderRadius: const BorderRadius.only(topRight: Radius.circular(30), bottomRight: Radius.circular(30)),
@@ -443,14 +469,14 @@ class _MenuButtonState extends State<_MenuButton> {
           ),
           child: Row(
             children: [
-              Icon(widget.icon, color: active ? Colors.white : Colors.white38, size: 28),
-              const SizedBox(width: 20),
+              Icon(widget.icon, color: active ? Colors.white : Colors.white38, size: 22),
+              const SizedBox(width: 16),
               Expanded(
                 child: Text(
                   widget.label,
                   style: TextStyle(
                     color: active ? Colors.white : Colors.white38,
-                    fontSize: 20,
+                    fontSize: 15,
                     fontWeight: active ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
@@ -485,13 +511,25 @@ class _ExpandedEpisodeCardState extends State<_ExpandedEpisodeCard> {
   Widget build(BuildContext context) {
     return Focus(
       onFocusChange: (f) => setState(() => _focused = f),
+      // TV: el OK del control (select/enter/space) debe abrir el episodio,
+      // GestureDetector solo responde a puntero.
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+             event.logicalKey == LogicalKeyboardKey.select ||
+             event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedScale(
           scale: _focused ? 1.02 : 1.0,
           duration: const Duration(milliseconds: 200),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: _focused ? Colors.white.withOpacity(0.08) : Colors.transparent,
               borderRadius: BorderRadius.circular(16),
@@ -505,7 +543,7 @@ class _ExpandedEpisodeCardState extends State<_ExpandedEpisodeCard> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: SizedBox(
-                    width: 280,
+                    width: 180,
                     child: AspectRatio(
                       aspectRatio: 16 / 9,
                       child: (widget.episode.thumbnail?.isNotEmpty ?? false)
@@ -513,13 +551,13 @@ class _ExpandedEpisodeCardState extends State<_ExpandedEpisodeCard> {
                             imageUrl: ApiEndpoints.proxyImage(widget.episode.thumbnail!),
                             fit: BoxFit.cover,
                             placeholder: (_, __) => Container(color: Colors.white.withOpacity(0.05)),
-                            errorWidget: (_, __, ___) => Container(color: Colors.white.withOpacity(0.05), child: const Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 40)),
+                            errorWidget: (_, __, ___) => Container(color: Colors.white.withOpacity(0.05), child: const Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 30)),
                           )
-                        : Container(color: Colors.white.withOpacity(0.05), child: const Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 40)),
+                        : Container(color: Colors.white.withOpacity(0.05), child: const Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 30)),
                     ),
                   ),
                 ),
-                const SizedBox(width: 32),
+                const SizedBox(width: 16),
                 // Información
                 Expanded(
                   child: Column(
@@ -533,24 +571,24 @@ class _ExpandedEpisodeCardState extends State<_ExpandedEpisodeCard> {
                               '${widget.episode.number}. ${widget.episode.title}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
                             ),
                           ),
                           const SizedBox(width: 16),
                           Text(
                             widget.episode.duration ?? (widget.episode.runtime != null ? '${widget.episode.runtime}m' : '40m'),
-                            style: const TextStyle(color: Colors.white38, fontSize: 16, fontWeight: FontWeight.bold)
+                            style: const TextStyle(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.bold)
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 6),
                       Text(
                         (widget.episode.description?.isNotEmpty ?? false)
                           ? widget.episode.description!
                           : 'Sinopsis no disponible para este episodio.',
-                        maxLines: 3,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 16, height: 1.5),
+                        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13, height: 1.4),
                       ),
                     ],
                   ),
@@ -587,6 +625,18 @@ class _ThemeRowCardState extends State<_ThemeRowCard> {
     final accent = widget.isOP ? Colors.blueAccent : Colors.pinkAccent;
     return Focus(
       onFocusChange: (f) => setState(() => _focused = f),
+      // TV: el OK del control (select/enter/space) debe reproducir el tema,
+      // GestureDetector solo responde a puntero.
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+             event.logicalKey == LogicalKeyboardKey.select ||
+             event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedScale(

@@ -1,6 +1,7 @@
 package com.auristv.oficial
 
 import android.app.PictureInPictureParams
+import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
@@ -13,6 +14,7 @@ class MainActivity: FlutterActivity() {
     private val BRIGHTNESS_CHANNEL = "auristv/brightness"
     private val VOLUME_CHANNEL = "auristv/volume"
     private val PIP_CHANNEL = "auristv/pip"
+    private val ORIENTATION_CHANNEL = "auristv/orientation"
     private var interceptVolume = false
     private var volumeMethodChannel: MethodChannel? = null
     private var isPipAllowed = false
@@ -73,6 +75,20 @@ class MainActivity: FlutterActivity() {
                 }
                 "setPipAllowed" -> {
                     isPipAllowed = call.argument<Boolean>("allowed") ?: false
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ORIENTATION_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setOrientationLandscape" -> {
+                    this@MainActivity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    result.success(null)
+                }
+                "resetOrientation" -> {
+                    this@MainActivity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     result.success(null)
                 }
                 else -> result.notImplemented()

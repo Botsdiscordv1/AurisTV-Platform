@@ -208,6 +208,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Si el contenido actual es un Tráiler.
   bool get _isTrailer => widget.episode == 'Trailer';
 
+  /// Subtítulo del episodio en formato `T1:E1 "Título"` (igual en las 3
+  /// plataformas). Observa la lista sincronizada: el título aparece en cuanto
+  /// llega, y al mostrarse ya queda cargado para el guardado.
+  String _episodeLabel() {
+    if (_isSpecial) return 'Temporada 0';
+    String? title;
+    try {
+      final synced = ref.watch(activePlayerProvider.select((s) => s.availableEpisodes));
+      final notifier = ref.read(activePlayerProvider.notifier);
+      title = notifier.episodeInfoFor(_activeEpisode, synced)?.title;
+      if (title == null || title.isEmpty) {
+        final eps = ref
+            .read(episodesProvider(EpisodesParams(
+              url: widget.sourceUrl,
+              source: widget.source,
+              title: widget.title,
+              season: widget.season,
+            )))
+            .valueOrNull
+            ?.episodes;
+        title = notifier.episodeInfoFor(_activeEpisode, eps ?? const [])?.title;
+      }
+    } catch (_) {}
+    return episodeDisplayLabel(_activeEpisode, season: widget.season, title: title);
+  }
+
   /// Al navegar al siguiente/anterior episodio, el nuevo stream debe arrancar
   /// desde cero y NO reaplicar el startPosition/resume del episodio anterior.
   bool _skipResumeOnNextInit = false;
@@ -398,6 +424,40 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _performHistoryUpdate(int positionMs, int durationMs, {bool force = false}) {
+    // Título/banner del episodio: 1) lista sincronizada del provider global,
+    // 2) lectura directa de episodios (no depende del timing del sync), igual
+    // que Movil. Sin esto Continuar Viendo mostraba "T1:E1" sin título en TV.
+    String? episodeThumb;
+    String? episodeTitle;
+    int syncedCount = 0;
+    int directCount = 0;
+    try {
+      final notifier = ref.read(activePlayerProvider.notifier);
+      syncedCount = notifier.state.availableEpisodes.length;
+      episodeThumb = notifier.resolveEpisodeBanner();
+      if (episodeThumb == null || episodeThumb == widget.bannerUrl) {
+        final epsData = ref
+            .read(episodesProvider(EpisodesParams(
+              url: widget.sourceUrl,
+              source: widget.source,
+              title: widget.title,
+              season: widget.season,
+            )))
+            .valueOrNull;
+        directCount = epsData?.episodes.length ?? 0;
+        final info = notifier.episodeInfoFor(
+            _activeEpisode, epsData?.episodes ?? const []);
+        if (info?.thumbnail != null && info!.thumbnail!.isNotEmpty) {
+          episodeThumb = info.thumbnail;
+        }
+        episodeTitle = info?.title;
+      } else {
+        episodeTitle =
+            notifier.episodeInfoFor(_activeEpisode)?.title;
+      }
+    } catch (_) {}
+    // Diagnóstico: título resuelto al guardar (ver por qué la tarjeta pierde el título).
+    debugPrint('[tv-save] ep=$_activeEpisode title=${episodeTitle ?? "-NULL-"} synced=$syncedCount direct=$directCount force=$force');
     _historyNotifier!.updatePosition(
       contentId: widget.contentId,
       season: widget.season,
@@ -407,7 +467,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       title: widget.title,
       posterUrl: widget.posterUrl,
       // Banner del episodio en curso (no el backdrop crudo): ver Movil.
-      bannerUrl: ref.read(activePlayerProvider.notifier).resolveEpisodeBanner() ?? widget.bannerUrl,
+      bannerUrl: episodeThumb ?? widget.bannerUrl,
+      episodeTitle: episodeTitle,
       logoUrl: widget.logoUrl,
       category: widget.category,
       kind: widget.kind,
@@ -2790,6 +2851,34 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _isMobileDevice = ResponsiveUtils.isTactic(context);
     final settings = ref.watch(settingsProvider);
 
+    // Senior Session Sync: lista de episodios al provider global (igual que
+    // Movil/Web). Sin esto el historial guardaba "T1:E1" sin título en TV:
+    // los ticks/stop resuelven el título desde availableEpisodes.
+    // Key anti re-sync: el whenData dispara por cada rebuild con data.
+    final episodesForSession = ref.watch(episodesProvider(EpisodesParams(
+      url: widget.sourceUrl,
+      source: widget.source,
+      title: widget.title,
+      season: widget.season,
+    )));
+    episodesForSession.whenData((data) {
+      if (data == null || data.episodes.isEmpty) return;
+      final key = '${widget.sourceUrl}|${widget.source}|${widget.season}|${data.episodes.length}';
+      if (_episodesSyncKey == key) return;
+      _episodesSyncKey = key;
+      Future.microtask(() {
+        if (!mounted) return;
+        try {
+          final notifier = ref.read(activePlayerProvider.notifier);
+          final t = notifier.episodeInfoFor(_activeEpisode, data.episodes)?.title;
+          notifier.updateSession(
+            episodes: data.episodes,
+            episodeTitle: (t != null && t.isNotEmpty) ? t : null,
+          );
+        } catch (_) {}
+      });
+    });
+
     // Senior Shield: Interceptamos la navegación de retroceso (Mouse 4, Botón Atrás, Gestos)
     return PopScope(
       canPop: _isExiting,
@@ -2875,6 +2964,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 season: widget.season,
                 source: _currentSource,
                 triggerOpen: false,
+                episodeTitle: ref.read(activePlayerProvider.notifier).episodeInfoFor(_activeEpisode)?.title,
               );
               ref.read(activePlayerProvider.notifier).updateSession(
                 tracks: playableTracks,
@@ -3067,7 +3157,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ),
         if (_activeEpisode != null && !_isMovie)
           Text(
-            _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
+            _episodeLabel(),
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 16, fontWeight: FontWeight.bold),
           ),
         const SizedBox(height: 32),
@@ -4284,7 +4374,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 const SizedBox(height: 4),
                 if (_activeEpisode != null && !_isMovie)
                   Text(
-                    _isSpecial ? 'Temporada 0' : 'St. 1: Flg. $_activeEpisode',
+                    _episodeLabel(),
                     style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
                   )
                 else

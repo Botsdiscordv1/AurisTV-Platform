@@ -450,14 +450,14 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
     if (!mounted) return;
 
     final initialEpisodes = fastRes.episodes.map((ep) {
-      final displayTitle = (ep.title != null && ep.title!.isNotEmpty)
-          ? ep.title
-          : 'Episodio ${ep.number}';
+      // Sin fabricar "Episodio N": un título genérico inventado aquí bloquea
+      // el gap-fill desde full en el merge (cuenta como "título en ES") y el
+      // real nunca aparece. El display ya pone fallback (rows, subtítulos).
       return EpisodeInfo(
         number: ep.number,
         id: ep.id,
         url: ep.url,
-        title: displayTitle,
+        title: ep.title,
         thumbnail: ep.thumbnail,
         description: ep.description,
         airDate: ep.airDate,
@@ -570,14 +570,20 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
             final fastIsEs = !fastEp.needsTranslation && fastHasText;
 
             // Título / sinopsis (por campo):
-            // - fast en ES y con texto → no pisar
-            // - fast sin ese campo → gap-fill desde full
+            // - fast en ES y con texto REAL → no pisar
+            // - fast sin ese campo (o con genérico "Episodio N" fabricado o
+            //   del scraper) → gap-fill desde full
             // - fast needsTranslation → full manda si trae texto
+            // Un genérico cuenta como ausente: si no, bloquea el título real
+            // del full y "Episodio N" quedaba fijo en rows, headers e historial.
+            final fastTitleGeneric =
+                CommunityTranslationManager.isGenericTitle(fastTitle);
+            final fastHasTitleReal = fastHasTitle && !fastTitleGeneric;
             String? mergedTitle;
-            if (fastHasTitle && fastIsEs) {
+            if (fastHasTitleReal && fastIsEs) {
               mergedTitle = fastTitle;
             } else if (fullHasTitle) {
-              mergedTitle = (!fastHasTitle || !fastIsEs) ? fullTitle : fastTitle;
+              mergedTitle = (!fastHasTitleReal || !fastIsEs) ? fullTitle : fastTitle;
             } else {
               mergedTitle = fastTitle;
             }

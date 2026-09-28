@@ -193,11 +193,36 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   String? get _activeEpisode => _currentEpisode ?? widget.episode;
 
   bool get _isSpecial => widget.season == 0;
-  String get _displayTitle {
-    if (_isOpEd && widget.title != null) return widget.title!;
+  String get _displayTitle {    if (_isOpEd && widget.title != null) return widget.title!;
     if (_isTrailer) return 'Tráiler: ${widget.title ?? widget.contentId}';
     if (_isSpecial && widget.episodeTitle?.isNotEmpty == true) return widget.episodeTitle!;
     return widget.title ?? widget.contentId;
+  }
+
+  /// Subtítulo del episodio en formato `T1:E1 "Título"` (igual en las 3
+  /// plataformas). Observa la lista sincronizada: el título aparece en cuanto
+  /// llega, y al mostrarse ya queda cargado para el guardado.
+  String _episodeLabel() {
+    if (_isSpecial) return 'Temporada 0';
+    String? title;
+    try {
+      final synced = ref.watch(activePlayerProvider.select((s) => s.availableEpisodes));
+      final notifier = ref.read(activePlayerProvider.notifier);
+      title = notifier.episodeInfoFor(_activeEpisode, synced)?.title;
+      if (title == null || title.isEmpty) {
+        final eps = ref
+            .read(episodesProvider(EpisodesParams(
+              url: widget.sourceUrl,
+              source: widget.source,
+              title: widget.title,
+              season: widget.season,
+            )))
+            .valueOrNull
+            ?.episodes;
+        title = notifier.episodeInfoFor(_activeEpisode, eps ?? const [])?.title;
+      }
+    } catch (_) {}
+    return episodeDisplayLabel(_activeEpisode, season: widget.season, title: title);
   }
 
   /// Si el contenido actual es un Opening (OP) o Ending (ED).
@@ -492,6 +517,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Map<String, String> _lastVideoHeaders = const {};
 
   static const _volumeControlChannel = MethodChannel('auristv/volume');
+  static const _orientationChannel = MethodChannel('auristv/orientation');
   
   @override
   void initState() {
@@ -555,6 +581,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
 
     SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    if (Platform.isAndroid) {
+      try {
+        _orientationChannel.invokeMethod('setOrientationLandscape');
+      } catch (_) {}
+    }
     
     // Senior Immersive Fix: Usar immersiveSticky para máxima compatibilidad con notch
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -748,6 +779,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       VolumeController().showSystemUI = false;
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true});
       ScreenBrightnessController.setBrightness(_brightness);
+      if (_isLandscapeOnly) {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      }
     }
   }
 
@@ -1804,7 +1841,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _startHideTimer() {
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && !_isLocked) {
+      if (mounted) {
         setState(() => _showControls = false);
       }
     });
@@ -2045,6 +2082,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       season: widget.season,
       source: _currentSource,
       triggerOpen: false,
+      episodeTitle: ref.read(activePlayerProvider.notifier).episodeInfoFor(_activeEpisode)?.title,
     );
 
     if (_player == null) {
@@ -2806,6 +2844,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // 2. Forzar restauración del sistema (Orientación + UI)
     if (_isMobileDevice) {
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      if (Platform.isAndroid) {
+        try {
+          _orientationChannel.invokeMethod('resetOrientation');
+        } catch (_) {}
+      }
       // Senior Fix: Disparar de forma paralela sin 'await' para evitar retrasos en transiciones
       // y eliminar el efecto de estiramiento visual en pantallas móviles de refresco rápido.
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -3141,7 +3184,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ),
         if (_activeEpisode != null && !_isMovie)
           Text(
-            _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
+            _episodeLabel(),
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 18, fontWeight: FontWeight.bold),
           ),
         const SizedBox(height: 60),
@@ -3160,7 +3203,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ),
         if (_activeEpisode != null && !_isMovie)
           Text(
-            _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
+            _episodeLabel(),
             style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 16, fontWeight: FontWeight.bold),
           ),
         const SizedBox(height: 32),
@@ -3769,7 +3812,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildMobilePlayer(List<VideoTrackOption> playableTracks, UserSettings settings) {
     final bool isAnyGestureActive = _isBrightnessGesture != null || _showSeekIndicator || _isLongPressSpeedActive;
-    final bool showAnyway = (_showControls || _isLocked || (_autoplayCountdown >= 0 && _isAutoplayResume) || _showEpisodesOverlay || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
+    final bool showAnyway = (_showControls || (_autoplayCountdown >= 0 && _isAutoplayResume) || _showEpisodesOverlay || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
 
     return Focus(
       autofocus: true, 
@@ -3833,7 +3876,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       }, 
                       child: GestureDetector(
                         onTap: () {
-                          if (_isLocked) return;
+                          if (_isLocked) {
+                            if (!_showControls) setState(() => _showControls = true);
+                            _startHideTimer();
+                            return;
+                          }
                           if (!_isMobileDevice) {
                             final bool wasPlaying = _player?.state.playing ?? false;
                             if (wasPlaying) _player?.pause(); else _player?.play();
@@ -4509,21 +4556,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             fontWeight: FontWeight.bold
                           ),
                         )
-                      else if (_activeEpisode != null && !_isMovie)
-                        Text(
-                          _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
-                          style: TextStyle(
-                            color: Colors.white70, 
-                            fontSize: useMobileLayout ? (isLandscape ? 12 : 14) : 14, 
-                            fontWeight: FontWeight.bold
-                          ),
-                        )
-                    ],
-                  );
-                },
-              ),
-            ),
-            Builder(
+else if (_activeEpisode != null && !_isMovie)
+Text(
+_episodeLabel(),
+style: TextStyle(
+color: Colors.white70,
+fontSize: useMobileLayout ? (isLandscape ? 12 : 14) : 14,
+fontWeight: FontWeight.bold
+),
+)
+],
+);
+},
+),
+),
+Builder(
               builder: (context) {
                 final currentTrack = _allTracks.isNotEmpty
                     ? _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0]
