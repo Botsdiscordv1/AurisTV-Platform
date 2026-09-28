@@ -1,0 +1,162 @@
+name: Build and Release All Platforms
+
+on:
+  push:
+    tags:
+      - 'v*' # Se activa al crear cualquier tag v1.0.0, v1.0.1, etc.
+
+jobs:
+  build-mobile:
+    name: Build Mobile APKs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Fix Gradle Java Home for CI
+        run: |
+          sed -i '/org.gradle.java.home/d' Movil/android/gradle.properties
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.8'
+
+      - name: Build Mobile APK
+        run: |
+          cd Movil
+          flutter pub get
+          flutter build apk --release --split-per-abi
+
+      - name: Rename Mobile APKs
+        run: |
+          cd Movil/build/app/outputs/flutter-apk/
+          for f in *release.apk; do
+            mv "$f" "app-mobile-${f}"
+          done
+
+      - name: Upload Mobile Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-apks
+          path: Movil/build/app/outputs/flutter-apk/app-mobile-*.apk
+
+  build-tv:
+    name: Build TV APKs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Fix Gradle Java Home for CI
+        run: |
+          sed -i '/org.gradle.java.home/d' TV/android/gradle.properties || true
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.8'
+
+      - name: Build TV APK
+        run: |
+          cd TV
+          flutter pub get
+          flutter build apk --release --split-per-abi
+
+      - name: Rename TV APKs
+        run: |
+          cd TV/build/app/outputs/flutter-apk/
+          for f in *release.apk; do
+            mv "$f" "app-tv-${f}"
+          done
+
+      - name: Upload TV Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-apks
+          path: TV/build/app/outputs/flutter-apk/app-tv-*.apk
+
+  build-windows:
+    name: Build Windows Desktop
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.8'
+
+      - name: Build Windows Release
+        working-directory: ./Web_Desktop
+        run: |
+          flutter pub get
+          flutter build windows --release
+
+      - name: Compress Windows Build
+        run: |
+          Compress-Archive -Path "Web_Desktop/build/windows/x64/runner/Release/*" -DestinationPath "auristv-windows-x64.zip"
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: auristv-windows-x64.zip
+
+  release:
+    name: Publish GitHub Release
+    needs: [build-mobile, build-tv, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Mobile Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: mobile-apks
+          path: artifacts/mobile
+
+      - name: Download TV Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tv-apks
+          path: artifacts/tv
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: artifacts/windows
+
+      - name: Upload all assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/mobile/*.apk
+            artifacts/tv/*.apk
+            artifacts/windows/*.zip
+          body_path: RELEASE_NOTES.md
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
