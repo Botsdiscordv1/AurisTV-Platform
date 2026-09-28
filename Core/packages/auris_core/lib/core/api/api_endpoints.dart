@@ -80,6 +80,49 @@ class ApiEndpoints {
   static String get moviesSeriesBaseUrl => baseUrlForPort(_moviesSeriesPort);
   static String get kdramasBaseUrl => baseUrlForPort(_kdramasPort);
 
+  /// Listas canónicas de hints por servidor (un solo lugar: el discovery,
+  /// los filtros y el routing las comparten).
+  static const List<String> kdramaSourceHints = [
+    'tudorama',
+    'doramasyt',
+    'doramasmp4',
+    'pandrama',
+    'doramaslatinox',
+  ];
+  static const List<String> animeSourceHints = [
+    'jkanime',
+    'animeav1',
+    'animed23',
+    'animejara',
+    'aniyae',
+    'animelatino',
+    'fiuzidragon',
+    'tioanime',
+    'katanime',
+    'animegratis',
+    'animeflv',
+  ];
+  static const List<String> movieSourceHints = [
+    'gnula',
+    'gnulahd',
+    'onlypelis',
+    'pelispedia',
+    'lamovie',
+    'repelishd',
+    'cuevana',
+  ];
+
+  /// Servidor por nombre de fuente, o null si no hay hint conocido (el
+  /// llamador aplica su fallback, p. ej. por kind). Nunca adivinar: una
+  /// fuente anime desconocida NO debe caer a movies por defecto aquí.
+  static String? baseUrlForSourceOrNull(String source) {
+    final s = source.toLowerCase();
+    if (kdramaSourceHints.any(s.contains)) return kdramasBaseUrl;
+    if (movieSourceHints.any(s.contains)) return moviesSeriesBaseUrl;
+    if (animeSourceHints.any(s.contains)) return animeBaseUrl;
+    return null;
+  }
+
   static String baseUrlForCategory(String category) {
     final c = category.toLowerCase().trim();
     if (c == 'kdrama' || c == 'kdramas' || c == 'dorama' || c == 'doramas') return kdramasBaseUrl;
@@ -92,14 +135,9 @@ class ApiEndpoints {
   }
 
   static String baseUrlForSource(String source, [String? category]) {
-    final s = source.toLowerCase();
-    const kdramaHints = ['tudorama', 'doramasyt', 'doramasmp4', 'pandrama', 'doramaslatinox'];
-    const animeHints = ['jkanime', 'animeav1', 'animed23', 'animejara', 'themes'];
-    const movieHints = ['gnulahd', 'onlypelis', 'pelispedia', 'lamovie', 'repelishd'];
-    if (kdramaHints.any(s.contains)) return kdramasBaseUrl;
-    if (movieHints.any(s.contains)) return moviesSeriesBaseUrl;
-    if (animeHints.any(s.contains)) return animeBaseUrl;
-    return moviesSeriesBaseUrl;
+    // Comportamiento histórico intacto (desconocido → movies); quien necesite
+    // distinguir "sin hint" usa baseUrlForSourceOrNull.
+    return baseUrlForSourceOrNull(source) ?? moviesSeriesBaseUrl;
   }
 
   static String fixUrl(String? url) {

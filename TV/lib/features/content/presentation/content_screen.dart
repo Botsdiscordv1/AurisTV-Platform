@@ -80,7 +80,7 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
       text.toUpperCase(),
       style: GoogleFonts.poppins(
         color: Colors.white, 
-        fontSize: ResponsiveUtils.sp(context, small ? 11 : 14), 
+        fontSize: small ? 11 : 14, 
         fontWeight: FontWeight.w800,
         letterSpacing: 0.5,
       ),
@@ -107,7 +107,7 @@ Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) 
       text,
       style: TextStyle(
         color: Colors.white, 
-        fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
+        fontSize: small ? 10 : 13, 
         fontWeight: FontWeight.w900,
       ),
     ),
@@ -426,7 +426,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   Widget _buildNetflixContentColumn(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
     final titleSize = ResponsiveUtils.sp(context, width < 1050 ? 22.0 : 36.0); 
-    final contentSpacing = ResponsiveUtils.sp(context, 14.0);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start, 
@@ -454,7 +453,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 ),
               ),
               if (d is MovieDetail && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   d.originalTitle!,
                   style: GoogleFonts.poppins(
@@ -468,15 +467,15 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             ],
           )
         ),
-        SizedBox(height: contentSpacing * 1.5),
+        const SizedBox(height: 10),
         _buildNetflixMetaRow(d),
-        SizedBox(height: contentSpacing),
+        const SizedBox(height: 6),
         _buildSynopsis(d),
-        SizedBox(height: contentSpacing),
+        const SizedBox(height: 6),
         _buildCastInfo(d),
-        SizedBox(height: contentSpacing * 1.5),
+        const SizedBox(height: 6),
         _buildCircularActions(context),
-        SizedBox(height: contentSpacing * 2),
+        const SizedBox(height: 4),
         Expanded(
           child: SingleChildScrollView(
             child: Column(
@@ -484,7 +483,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               children: [
                 _buildNetflixActionList(context),
                 if (widget.totalSeasons > 1) ...[
-                  SizedBox(height: contentSpacing),
+                  const SizedBox(height: 8),
                   SeasonSelector(
                     data: SeasonSelectorData(
                       currentSeason: widget.currentSeason,
@@ -497,7 +496,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   ),
                 ],
                 if (widget.currentSource != null) ...[
-                  SizedBox(height: contentSpacing),
+                  const SizedBox(height: 8),
                   SourceChipsBar(sources: widget.sources, currentSource: widget.currentSource, onSourceSelected: widget.onSourceSelected, unavailableSources: widget.unavailableSources, season: widget.season),
                 ],
               ],
@@ -554,7 +553,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DefaultTextStyle(
-          style: GoogleFonts.poppins(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 17), fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
           child: Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 12,
@@ -568,14 +567,14 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 else if (widget.totalSeasons > 1) ...[ Text('${widget.totalSeasons} Temporadas') ] 
                 else if (detail?.episodes != null) ...[ Text('${detail.episodes} Episodios') ],
                 if (genres.isNotEmpty) ...genres.take(2).map((g) => _buildBadge(context, g.toUpperCase(), small: true)),
-                if (r != null && r > 0) Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.star_rounded, color: Colors.amber, size: ResponsiveUtils.sp(context, 20)), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A')]),
+                if (r != null && r > 0) Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.star_rounded, color: Colors.amber, size: 16), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A')]),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         if (!_revealed) _SkeletonBox(width: ResponsiveUtils.sp(context, 200), height: ResponsiveUtils.sp(context, 16))
-        else Row(children: [_buildAgeBadge(context, cert, small: true), const SizedBox(width: 12), Expanded(child: Text(_getWarningText(cert), maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 14), fontWeight: FontWeight.w500)))]),
+        else Row(children: [_buildAgeBadge(context, cert, small: true), const SizedBox(width: 12), Expanded(child: Text(_getWarningText(cert), maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(color: const Color(0xFFA5A5AA), fontSize: 12, fontWeight: FontWeight.w500)))]),
       ],
     );
   }
@@ -585,7 +584,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     if (d is AnimeDetail) castText = d.characters.take(3).map((c) => c.name).join(', ');
     else if (d is MovieDetail) castText = d.cast.take(3).map((c) => c.name).join(', ');
     if (castText.isEmpty) return const SizedBox.shrink();
-    return RichText(text: TextSpan(style: GoogleFonts.poppins(color: Colors.white70, fontSize: ResponsiveUtils.sp(context, 16), fontWeight: FontWeight.w500), children: [const TextSpan(text: 'Cast: ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)), TextSpan(text: castText)]));
+    return RichText(text: TextSpan(style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500), children: [const TextSpan(text: 'Cast: ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)), TextSpan(text: castText)]));
   }
 
   Widget _buildNetflixActionList(BuildContext context) {
@@ -609,14 +608,22 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             autofocus: true,
             onPressed: widget.onPlay,
           ),
-          const SizedBox(height: 10),
-          _NetflixListButton(icon: Icons.replay, label: 'Reproducir desde el inicio', onPressed: widget.onPlay),
-          const SizedBox(height: 10),
-          if (_lastTrailerKey != null) _NetflixListButton(icon: Icons.movie_outlined, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true)),
-          const SizedBox(height: 10),
-          if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime'))
+          const SizedBox(height: 6),
+          // Solo con historial real (progreso > 3s): sin progreso no tiene
+          // sentido ofrecer "desde el inicio".
+          if (latestHistory != null &&
+              latestHistory.positionInMilliseconds > 3000) ...[
+            _NetflixListButton(icon: Icons.replay, label: 'Reproducir desde el inicio', onPressed: widget.onPlay),
+            const SizedBox(height: 6),
+          ],
+          if (_lastTrailerKey != null) ...[
+            _NetflixListButton(icon: Icons.movie_outlined, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true)),
+            const SizedBox(height: 6),
+          ],
+          if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime')) ...[
             _NetflixListButton(icon: Icons.layers_outlined, label: 'Episodios y más', onPressed: () => widget.onShowEpisodes?.call()),
-          const SizedBox(height: 10),
+            const SizedBox(height: 6),
+          ],
           _NetflixListButton(
             icon: isFav ? Icons.check : Icons.add,
             label: isFav ? 'En mi lista' : 'Añadir a mi lista',
@@ -651,7 +658,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   Widget _buildSynopsis(dynamic detail) {
     final text = detail?.overview ?? '';
     if (!_revealed && text.isEmpty) return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_SkeletonBox(width: ResponsiveUtils.sp(context, 400), height: ResponsiveUtils.sp(context, 16)), const SizedBox(height: 8), _SkeletonBox(width: ResponsiveUtils.sp(context, 380), height: ResponsiveUtils.sp(context, 16))]);
-    return Text(text, maxLines: 4, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: ResponsiveUtils.sp(context, 18), height: 1.3, fontWeight: FontWeight.w500));
+    return Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14, height: 1.3, fontWeight: FontWeight.w500));
   }
 
   Widget _buildUpperButtons(BuildContext context) {
@@ -689,6 +696,8 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
             scale: isActive ? 1.1 : 1.0, 
             duration: const Duration(milliseconds: 200), 
             child: IconButton(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              constraints: const BoxConstraints(),
               icon: Icon(widget.icon, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)), 
               onPressed: widget.onPressed,
             )
@@ -716,21 +725,38 @@ class _NetflixListButtonState extends State<_NetflixListButton> {
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
-        child: AnimatedScale(
-          scale: isActive ? 1.02 : 1.0,
-          duration: const Duration(milliseconds: 200),
-          child: Container(
-            width: ResponsiveUtils.sp(context, 480),
-            height: ResponsiveUtils.sp(context, 52),
-            decoration: BoxDecoration(color: isActive ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(4)),
-            child: InkWell(
-              onTap: widget.onPressed,
-              child: Stack(alignment: Alignment.centerLeft, children: [
-                Padding(padding: const EdgeInsets.only(left: 6, right: 20), child: Row(children: [Icon(widget.icon, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 28), const SizedBox(width: 10), Expanded(child: Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isActive ? Colors.black : const Color(0xFFC8C8CE), fontSize: 18, fontWeight: FontWeight.w500)))])),
-                if (widget.progress != null && widget.progress! > 0)
-                  Positioned(right: 20, child: Container(width: 80, height: 6, decoration: BoxDecoration(color: isActive ? Colors.black.withOpacity(0.15) : Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(3)), child: FractionallySizedBox(alignment: Alignment.centerLeft, widthFactor: widget.progress!.clamp(0.0, 1.0), child: Container(color: const Color(0xFFE50914))))),
-              ]),
-            ),
+        child: Container(
+          width: ResponsiveUtils.sp(context, 440),
+          height: ResponsiveUtils.sp(context, 36),
+          decoration: BoxDecoration(color: isActive ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(8)),
+          child: InkWell(
+            onTap: widget.onPressed,
+            borderRadius: BorderRadius.circular(8),
+            child: Stack(alignment: Alignment.centerLeft, children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10), 
+                child: Row(
+                  children: [
+                    Icon(widget.icon, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: widget.icon == Icons.play_arrow ? 26 : 22), 
+                    const SizedBox(width: 8), 
+                    Expanded(
+                      child: Text(
+                        widget.label, 
+                        maxLines: 1, 
+                        overflow: TextOverflow.ellipsis, 
+                        style: TextStyle(
+                          color: isActive ? Colors.black : const Color(0xFFC8C8CE), 
+                          fontSize: 14, 
+                          fontWeight: FontWeight.w500
+                        )
+                      )
+                    )
+                  ]
+                )
+              ),
+              if (widget.progress != null && widget.progress! > 0 && isActive)
+                Positioned(right: 16, child: Container(width: 70, height: 5, decoration: BoxDecoration(color: isActive ? Colors.black.withOpacity(0.15) : Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(3)), child: FractionallySizedBox(alignment: Alignment.centerLeft, widthFactor: widget.progress!.clamp(0.0, 1.0), child: Container(color: const Color(0xFFE50914))))),
+            ]),
           ),
         ),
       ),
@@ -822,7 +848,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSeasonSelected: (s) => ref.setSeason(detailParams, s), episodesAsync: detailState.episodes, category: widget.category, title: widget.title, bannerUrl: heroBanner, onPlayEpisode: (ep, epSource, total) {
             final epNum = ep.number; final effectiveSrc = epSource?.source ?? widget.source; final playEpisodesUrl = epSource?.url ?? widget.url; final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, detailState.currentSeason, epNum.toString());
             final epThumb = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
-            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${detailState.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=$total&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}');
+            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${detailState.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=$total&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
           })));
         },
         inferredSeasonAirDate: detailState.episodes.valueOrNull?.response.seasonAirDate, 
@@ -833,7 +859,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           final playEpisodesUrl = playSource?.url ?? widget.url;
           if (detailState.isMovieish) {
             final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Película', thumbnail: ApiEndpoints.proxyImage(playSource?.thumbnail));
-            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1)}&episode=1&serverName=${simplifySourceName(effectiveSrc)}&startPosition=&category=${widget.category}&totalEpisodes=1&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}');
+            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1)}&episode=1&serverName=${simplifySourceName(effectiveSrc)}&startPosition=&category=${widget.category}&totalEpisodes=1&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
             return;
           }
           final latest = ref.read(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull;
@@ -842,7 +868,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           final epSource = detailState.episodes.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
           final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
           final epThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
-          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? detailState.currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}');
+          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? detailState.currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
         }
       ),
     );

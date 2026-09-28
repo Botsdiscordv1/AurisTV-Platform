@@ -40,6 +40,9 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? serverName;
   final int? startPosition;
   final String? category;
+  /// Kind granular + año para historial fiel (ver Movil).
+  final String? kind;
+  final int? year;
   final int? totalEpisodes;
   final String? title;
   final String? metadataTitle;
@@ -61,6 +64,8 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.serverName,
     this.startPosition,
     this.category,
+    this.kind,
+    this.year,
     this.totalEpisodes,
     this.title,
     this.metadataTitle,
@@ -416,6 +421,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       bannerUrl: ref.read(activePlayerProvider.notifier).resolveEpisodeBanner() ?? widget.bannerUrl,
       logoUrl: widget.logoUrl,
       category: widget.category,
+      kind: widget.kind,
+      year: widget.year,
       source: widget.source,
       url: _currentSourceUrl,
       alternativeSources: ref.read(activeContentSourcesProvider),
@@ -1941,10 +1948,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       item: MediaItem(
         id: widget.contentId,
         title: widget.title ?? _displayTitle,
-          posterUrl: widget.posterUrl ?? '',
+        posterUrl: widget.posterUrl ?? '',
         bannerUrl: widget.bannerUrl,
         logoUrl: widget.logoUrl,
-        type: widget.category == 'movie' ? MediaType.movie : MediaType.anime,
+        type: mediaTypeFromCategory(widget.category),
+        kind: widget.kind,
+        year: widget.year,
       ),
       url: videoUrl,
       episode: _activeEpisode,

@@ -221,8 +221,16 @@ extension PlaybackHistoryToDetailParams on PlaybackHistory {
       normalizedCategory = 'anime';
     }
 
+    // Título nunca vacío: sin él la ruta /content/:title no matchea
+    // (Page Not Found). Fallback a metadataTitle y luego contentId.
+    final resolvedTitle = (title != null && title!.isNotEmpty)
+        ? title!
+        : ((metadataTitle != null && metadataTitle!.isNotEmpty)
+            ? metadataTitle!
+            : contentId);
+
     return UnifiedDetailParams(
-      title: title ?? '',
+      title: resolvedTitle,
       metadataTitle: metadataTitle,
       category: normalizedCategory,
       kind: kind ?? (normalizedCategory == 'movie' ? 'movie' : 'anime'),

@@ -59,17 +59,27 @@ final unifiedContentDetailProvider =
   final String? rawKind = params.kind?.toLowerCase();
   final String? rawType = params.type?.toLowerCase();
 
-  // Senior Decision: Prioridad absoluta al 'kind' para evitar 404s en servidores incorrectos.
-  // Si el kind es genérico (series/movie), debe ir al puerto 3001, incluso si la categoría es anime.
+  // Senior Decision: la FUENTE manda sobre el kind para elegir servidor.
+  // El kind es ambiguo entre servidores (OnlyPelis marca animes con kind
+  // 'anime' viviendo en movies); el source guardado es el dato fiel.
   final bool isExplicitAnimeKind = rawKind == 'anime' || rawKind == 'movie_anime' || rawKind == 'tv_anime';
   final bool isExplicitMovieSeriesKind = rawKind == 'movie' || rawKind == 'series' || rawKind == 'pelicula';
   final bool isExplicitKdramaKind = rawKind == 'kdrama' || rawKind == 'dorama';
 
-  // 1. Determinar el servidor objetivo basándose en los metadatos más granulares
+  // 1. Determinar el servidor objetivo. Orden: hint explícito > nombre de
+  // fuente (canónico) > kind. El kind solo no basta: OnlyPelis/Gnula sirven
+  // series animadas en movies aunque su kind sea 'anime', y el historial
+  // guarda el source real del visionado.
   String? effectiveBaseUrl;
   String technicalCategory = params.category.toLowerCase().trim();
 
-  if (isExplicitAnimeKind || rawType == 'anime' || rawType == 'movie_anime') {
+  final String? hintedServer = (params.source.isNotEmpty && !isMetadataSource)
+      ? ApiEndpoints.baseUrlForSourceOrNull(params.source)
+      : null;
+
+  if (hintedServer != null) {
+    effectiveBaseUrl = hintedServer;
+  } else if (isExplicitAnimeKind || rawType == 'anime' || rawType == 'movie_anime') {
     effectiveBaseUrl = ApiEndpoints.animeBaseUrl;
     technicalCategory = (rawKind == 'movie_anime' || rawType == 'movie_anime') ? 'movie_anime' : 'anime';
   } else if (isExplicitMovieSeriesKind || rawType == 'movie' || rawType == 'series') {

@@ -42,6 +42,9 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? serverName;
   final int? startPosition;
   final String? category;
+  /// Kind granular ('anime','series','movie',...) para historial fiel.
+  final String? kind;
+  final int? year;
   final int? totalEpisodes;
   final String? title;
   final String? metadataTitle;
@@ -63,6 +66,8 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.serverName,
     this.startPosition,
     this.category,
+    this.kind,
+    this.year,
     this.totalEpisodes,
     this.title,
     this.metadataTitle,
@@ -447,6 +452,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       // Banner del episodio en curso (no el backdrop crudo): ver arriba.
       bannerUrl: episodeThumb ?? widget.bannerUrl,
       episodeTitle: episodeTitle,
+      kind: widget.kind,
+      year: widget.year,
       logoUrl: widget.logoUrl,
       category: widget.category,
       source: widget.source,
@@ -2027,7 +2034,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           posterUrl: widget.posterUrl ?? '',
         bannerUrl: widget.bannerUrl,
         logoUrl: widget.logoUrl,
-        type: widget.category == 'movie' ? MediaType.movie : MediaType.anime,
+        // Taxonomía fiel (Core): series del server de pelis ya no se guardan
+        // como 'anime'; kind/year viajan para reaperturas exactas.
+        type: mediaTypeFromCategory(widget.category),
+        kind: widget.kind,
+        year: widget.year,
       ),
       url: videoUrl,
       episode: _activeEpisode,

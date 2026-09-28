@@ -191,6 +191,10 @@ final GoRouter appRouter = GoRouter(
         final posterUrl = state.uri.queryParameters['posterUrl'];
         final bannerUrl = state.uri.queryParameters['bannerUrl'];
         final logoUrl = state.uri.queryParameters['logoUrl'];
+        // Kind/year para guardar historial fiel (si no, el re-tap re-deriva
+        // mal el servidor: serie animada en OnlyPelis quedaba kind=anime).
+        final kind = state.uri.queryParameters['kind'];
+        final year = int.tryParse(state.uri.queryParameters['year'] ?? '');
 
         final video720 = state.uri.queryParameters['video720'];
         final video1080 = state.uri.queryParameters['video1080'];
@@ -215,6 +219,8 @@ final GoRouter appRouter = GoRouter(
           video720: video720,
           video1080: video1080,
           skipResume: skipResume,
+          kind: kind,
+          year: year,
         );
       },
     ),

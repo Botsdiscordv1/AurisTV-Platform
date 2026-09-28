@@ -39,6 +39,9 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? serverName;
   final int? startPosition;
   final String? category;
+  /// Kind granular + año para historial fiel (ver Movil).
+  final String? kind;
+  final int? year;
   final int? totalEpisodes;
   final String? title;
   final String? metadataTitle;
@@ -60,6 +63,8 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.serverName,
     this.startPosition,
     this.category,
+    this.kind,
+    this.year,
     this.totalEpisodes,
     this.title,
     this.metadataTitle,
@@ -92,11 +97,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   StreamSubscription<Tracks>? _tracksSubscription;
   WebViewController? _webViewController;
-  bool _hasInitialized = false;
+    bool _hasInitialized = false;
+    // Clave del último sync de episodios al provider global (evita re-syncs
+    // en cada rebuild: el whenData dispara por cada frame mientras hay data).
+    String? _episodesSyncKey;
 
   bool _showControls = true;
   bool _isLocked = false;
-  bool _isLandscapeOnly = true;
   bool _hasResetPosition = false;
   int _resumePosition = 0;
   DateTime? _resumeGuardUntil;
@@ -403,6 +410,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       bannerUrl: ref.read(activePlayerProvider.notifier).resolveEpisodeBanner() ?? widget.bannerUrl,
       logoUrl: widget.logoUrl,
       category: widget.category,
+      kind: widget.kind,
+      year: widget.year,
       source: widget.source,
       url: _currentSourceUrl,
       alternativeSources: ref.read(activeContentSourcesProvider),
@@ -462,6 +471,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
 
     // En App Nativa mantenemos el control total del hardware.
+    // TV: siempre horizontal 16:9 (las TV no tienen variante vertical).
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     if (_isMobileDevice) {
       SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
       // Senior Elite Fix: ImmersiveSticky es el modo correcto para video Fullscreen Real.
@@ -2714,9 +2728,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _setVolumeIntercept(false);
       // Senior Fix: Disparar de forma paralela sin 'await' para evitar retrasos en transiciones
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       VolumeController.instance.showSystemUI = true;
     }
+    // TV: siempre horizontal 16:9, también al salir (antes restauraba
+    // portraitUp y la plataforma cambiaba a vertical).
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
 
     // 3. Salida limpia usando GoRouter para asegurar consistencia
     if (mounted) {
@@ -2812,6 +2831,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               if (mounted) {
               _allTracks = playableTracks;
               setState(() => _extractTracks = playableTracks.where((t) => !t.isEmbed).toList());
+              // Core session: registrar item/episodio/fuente/pistas (triggerOpen
+              // false: TV mantiene el control del hardware, igual que Movil).
+              // Sin esto, stop()/saves del provider eran no-op en TV.
+              ref.read(activePlayerProvider.notifier).play(
+                item: MediaItem(
+                  id: widget.contentId,
+                  title: widget.title ?? '',
+                  posterUrl: widget.posterUrl ?? '',
+                  bannerUrl: widget.bannerUrl,
+                  logoUrl: widget.logoUrl,
+                  type: mediaTypeFromCategory(widget.category),
+                  kind: widget.kind,
+                  year: widget.year,
+                ),
+                url: safeIdx < playableTracks.length ? playableTracks[safeIdx].url : result.url,
+                episode: _activeEpisode,
+                season: widget.season,
+                source: _currentSource,
+                triggerOpen: false,
+              );
+              ref.read(activePlayerProvider.notifier).updateSession(
+                tracks: playableTracks,
+                selectedIndex: safeIdx,
+              );
             }
             });
           }
@@ -2872,9 +2915,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       backgroundColor: const Color(0xFF0B0B0D),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final double h = constraints.maxHeight;
-          final bool isLandscape = h < 550;
-
           return Stack(
             children: [
               if (widget.bannerUrl != null)
@@ -2896,16 +2936,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     
                     Expanded(
                       child: SingleChildScrollView(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isLandscape ? 32 : 40,
-                          vertical: isLandscape ? 8 : 20,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 8,
                         ),
+                        // TV: solo layout horizontal (sin variante vertical).
                         child: Column(
                           children: [
-                            if (isLandscape)
-                              _buildLandscapeRemoteLayout(target)
-                            else
-                              _buildPortraitRemoteLayout(target),
+                            _buildLandscapeRemoteLayout(target),
                           ],
                         ),
                       ),
@@ -2991,26 +3029,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           const SizedBox.shrink(),
         ],
       ),
-    );
-  }
-
-  Widget _buildPortraitRemoteLayout(RemoteDevice target) {
-    return Column(
-      children: [
-        const SizedBox(height: 60),
-        Text(
-          _displayTitle,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
-        ),
-        if (_activeEpisode != null && !_isMovie)
-          Text(
-            _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
-            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        const SizedBox(height: 60),
-        _buildRemoteControls(target),
-      ],
     );
   }
 
@@ -4179,57 +4197,83 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Widget _buildMobileHeader() {
     final bool hideBack = _isFullscreen && !_isMobileDevice;
     final double iconSize = _isMobileDevice ? 24 : 30;
-    final double spacing = _isMobileDevice ? 8 : 12;
 
-    return Positioned(top: 0, left: 0, right: 0, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            if (!hideBack) ...[
-              IconButton(iconSize: iconSize, icon: const Icon(Symbols.arrow_back, color: Colors.white), onPressed: _handleBackNavigation),
-              SizedBox(width: spacing),
-            ],
-            Expanded(
-              child: Consumer(
-                builder: (context, ref, _) {
-                  final targetId = ref.watch(remoteControlProvider.select((s) => s.activeTargetDeviceId));
-                  final devices = ref.watch(remoteControlProvider.select((s) => s.availableDevices));
-                  final targetDevice = devices.firstWhereOrNull((d) => d.id == targetId);
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _displayTitle,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (targetDevice != null)
-                        Row(
-                          children: [
-                            const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 14),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Reproduciendo en ${targetDevice.name}',
-                              style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        )
-                      else if (_activeEpisode != null && !_isMovie)
+    return Positioned(
+      top: 0, 
+      left: 0, 
+      right: 0, 
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Top-Left: Back, Replay 10s, Optionen
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (!hideBack) ...[
+                  IconButton(
+                    iconSize: iconSize,
+                    icon: const Icon(Symbols.arrow_back, color: Colors.white),
+                    onPressed: _handleBackNavigation,
+                  ),
+                  const SizedBox(width: 16),
+                ],
+                IconButton(
+                  iconSize: iconSize,
+                  icon: const Icon(Symbols.replay_10, color: Colors.white),
+                  onPressed: _skipBackward,
+                ),
+                const SizedBox(width: 16),
+                InkWell(
+                  onTap: _showLanguageSelector,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Icon(Symbols.settings, color: Colors.white, size: 24),
+                        SizedBox(height: 2),
                         Text(
-                          _isSpecial ? 'Temporada 0' : 'Episodio $_activeEpisode',
-                          style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
-                        )
-                    ],
-                  );
-                },
-              ),
+                          'OPTIONEN',
+                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            Builder(
-              builder: (context) {
-                final currentTrack = _allTracks.isNotEmpty 
-                    ? _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0]
-                    : null;
-                
-                // Senior Fix: Usar la etiqueta de idioma (quality) con fallback al estado actual
+            // Top-Right: Show Title & Episode
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _displayTitle.toUpperCase(),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: 1.0),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                if (_activeEpisode != null && !_isMovie)
+                  Text(
+                    _isSpecial ? 'Temporada 0' : 'St. 1: Flg. $_activeEpisode',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+                  )
+                else
+                  Text(
+                    widget.category.toUpperCase(),
+                    style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
                 // para asegurar visibilidad constante en Web y durante la carga inicial.
                 String label = currentTrack?.quality ?? _currentTrackQuality;
                 if (label.isEmpty) label = _currentLanguage ?? '';
@@ -4499,178 +4543,79 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildMobileBottomBar() {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final bool showLabels = screenWidth > 750;
-
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final double vPadding = _isMobileDevice && isLandscape ? 8 : 16;
-    
-    final double iconSize = _isMobileDevice ? 24 : 30;
-    final double spacing = _isMobileDevice ? 8 : 12;
-    final double playSize = _isMobileDevice ? 28 : 44; // Unificado a 44px
-
-    // Senior Navigation Shield: Verificar si existen episodios anterior/siguiente
-    final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
-      source: widget.source,
-      title: widget.title,
-      season: widget.season,
-    )));
-
-    final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
-    final bool hasPrevious = currentNum > 1;
-    final bool hasNext = episodesAsync.when(
-      data: (data) {
-        if (data == null || data.episodes.isEmpty) {
-          if (widget.totalEpisodes != null) return currentNum < widget.totalEpisodes!;
-          return true; 
-        }
-        return data.episodes.any((e) => e.number > currentNum);
-      },
-      loading: () => true,
-      error: (_, __) => true,
-    );
-
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24, vertical: vPadding),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildMobileTimeline(),
-            SizedBox(height: isLandscape ? 4 : 12),
-            // Senior: Usar SingleChildScrollView para evitar overflow en pantallas pequeñas/anchas
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: screenWidth - 48),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          iconSize: iconSize,
-                          icon: Icon(
-                            _useVideoFitCycle 
-                              ? (_videoFit == BoxFit.contain ? Symbols.aspect_ratio : (_videoFit == BoxFit.fill ? Symbols.fit_screen : Symbols.fullscreen))
-                              : (_isFullscreen ? Symbols.close_fullscreen : Symbols.open_in_full),
-                            color: Colors.white,
-                            weight: 300,
-                          ),
-                          onPressed: _toggleFullscreen,
-                        ),
-                        // Controles desktop solo si no estamos en móvil (donde se usan gestos y centro)
-                        if (!_isMobileDevice) ...[
-                          SizedBox(width: spacing),
-                          _buildPlayPauseButton(size: playSize),
-                          const SizedBox(width: 12),
-                          _buildSeekCapsule(),
-                          const SizedBox(width: 12),
-                          _buildNavigationCapsule(hasPrevious, hasNext),
-                          const SizedBox(width: 12),
-                          _buildVolumePill(),
-                          const SizedBox(width: 12),
-                          _buildDurationCapsule(),
-                        ],
-                        // Rotación (Nativo y Web Móvil)
-                        if (_isMobileDevice) ...[
-                          SizedBox(width: spacing),
-                          IconButton(
-                            iconSize: iconSize,
-                            icon: const Icon(Symbols.screen_rotation, color: Colors.white),
-                            onPressed: () {
-                              setState(() {
-                                _isLandscapeOnly = !_isLandscapeOnly;
-                                if (_isLandscapeOnly) {
-                                  lockAppOrientation();
-                                } else {
-                                  unlockAppOrientation();
-                                }
-                              });
-                            },
-                          ),
-                        ],
-                      ],
+                    _buildPlayPauseButton(size: 48),
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildPillButton(
+                      label: _currentLanguage ?? 'Deutsch',
+                      isSelected: true,
+                      onTap: _showLanguageSelector,
                     ),
-                    if (!_isOpEd && _isMobileDevice)
-                    Row(
-                      children: [
-                        if (hasPrevious)
-                        _PlayerTextButton(
-                          onPressed: () => _navigateToEpisode(false),
-                          icon: Symbols.skip_previous,
-                          label: showLabels ? 'Anterior' : '',
-                        ),
-                        if (hasPrevious && hasNext) const SizedBox(width: 12),
-                        if (hasNext)
-                        _PlayerTextButton(
-                          onPressed: () => _navigateToEpisode(true),
-                          icon: Symbols.skip_next,
-                          label: showLabels ? 'Siguiente' : '',
-                          isBold: true,
-                        ),
-                      ],
+                    const SizedBox(width: 10),
+                    _buildPillButton(
+                      label: 'Englisch [Original] mit Untertiteln',
+                      isSelected: false,
+                      onTap: _showLanguageSelector,
                     ),
-                    Row(
-                      children: [
-                        IconButton(
-                          iconSize: iconSize,
-                          icon: const Icon(Symbols.speed, color: Colors.white),
-                          onPressed: () {
-                            setState(() {
-                              const speeds = [0.5, 0.7, 1.0, 1.2, 1.5, 1.7, 2.0];
-                              int currentIndex = speeds.indexOf(_playbackSpeed);
-                              if (currentIndex == -1) currentIndex = 2; // Default a 1.0 si hay un valor intermedio
-                              
-                              _playbackSpeed = speeds[(currentIndex + 1) % speeds.length];
-                              _player?.setRate(_playbackSpeed);
-                            });
-                          },
-                        ),
-                        Text('${_playbackSpeed.toStringAsFixed(1)}x', style: TextStyle(color: Colors.white, fontSize: _isMobileDevice ? 13 : 14, fontWeight: FontWeight.w900)),
-                        SizedBox(width: spacing),
-                        if (!_isOpEd) ...[
-                          IconButton(iconSize: iconSize, icon: const Icon(Symbols.dns, color: Colors.white), onPressed: _showServerSelector),
-                          SizedBox(width: spacing),
-                        ],
-                        if (_hasQualityOptions) ...[
-                          _PlayerTextButton(
-                            onPressed: _showQualitySelector,
-                            icon: Symbols.hd,
-                            label: _selectedQuality == 'auto'
-                                ? 'Calidad'
-                                : (_qualityMenuOptions.firstWhereOrNull((o) => o['key'] == _selectedQuality)?['label'] as String? ?? 'Calidad'),
-                            useBackground: true,
-                          ),
-                          SizedBox(width: spacing),
-                        ],
-                        if (!_isOpEd) ...[
-                          IconButton(iconSize: iconSize, icon: const Icon(Symbols.subtitles, color: Colors.white), onPressed: _showLanguageSelector),
-                          SizedBox(width: spacing),
-                        ],
-                        if (!_isOpEd && !_isMovie)
-                        IconButton(
-                          iconSize: iconSize, 
-                          icon: const Icon(Symbols.video_library, color: Colors.white), 
-                          onPressed: _showEpisodesCarousel
-                        ),
-                        SizedBox(width: spacing),
-                        const SizedBox.shrink(),
-                        if (!_isOpEd && !_isMovie) ...[
-                          SizedBox(width: spacing),
-                          _PlayerTextButton(onPressed: _skipOpEd, icon: Symbols.fast_forward, label: 'OP / ED', useBackground: true),
-                        ],
-                      ],
+                    const SizedBox(width: 10),
+                    _buildPillButton(
+                      label: 'Deutsch mit Untertiteln',
+                      isSelected: false,
+                      onTap: _showLanguageSelector,
+                    ),
+                    const SizedBox(width: 10),
+                    _buildPillButton(
+                      label: 'Andere ...',
+                      isSelected: false,
+                      onTap: _showLanguageSelector,
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPillButton({required String label, required bool isSelected, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
@@ -4682,53 +4627,65 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final Stream<Duration> bufferStream = _player?.stream.buffer ?? const Stream.empty();
     final Duration initialBuffer = _player?.state.buffer ?? Duration.zero;
 
-    final double screenWidth = MediaQuery.sizeOf(context).width;
-    final double sliderWidth = (screenWidth - 48).clamp(0.0, double.infinity);
+    return StreamBuilder<Duration>(
+      stream: posStream,
+      initialData: initialPos,
+      builder: (context, snapshot) {
+        final position = snapshot.data ?? initialPos;
+        final duration = _player?.state.duration ?? Duration.zero;
+        final double maxMs = duration.inMilliseconds.toDouble().clamp(0.01, double.infinity);
+        final double currentMs = position.inMilliseconds.toDouble().clamp(0.0, maxMs);
 
-    return Column(
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
+        return Row(
           children: [
-            // ÁREA DE EVENTOS (Capa invisible para el ratón - Aislada de StreamBuilders)
-            if (!_isMobileDevice)
-              Positioned.fill(
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  onHover: (event) {
-                    final duration = _player?.state.duration ?? Duration.zero;
-                    if (duration.inMilliseconds <= 0) return;
-                    
-                    final double localX = event.localPosition.dx - 24; 
-                    if (localX >= 0 && localX <= sliderWidth) {
-                      final double ms = (localX / sliderWidth) * duration.inMilliseconds;
-                      _hoverInfoNotifier.value = Offset(event.localPosition.dx, ms);
-                    } else {
-                      _hoverInfoNotifier.value = null;
-                    }
-                  },
-                  onExit: (_) => _hoverInfoNotifier.value = null,
-                  child: Container(color: Colors.transparent),
-                ),
+            Text(
+              _formatDuration(position),
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: StreamBuilder<Duration>(
+                stream: bufferStream,
+                initialData: initialBuffer,
+                builder: (context, bufSnapshot) {
+                  return SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                      activeTrackColor: const Color(0xFFE50914), // Netflix Red
+                      inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
+                      thumbColor: Colors.white,
+                      overlayColor: const Color(0xFFE50914).withOpacity(0.3),
+                    ),
+                    child: Slider(
+                      value: currentMs,
+                      max: maxMs,
+                      onChanged: (value) {
+                        final int targetMs = value.toInt();
+                        _isStabilizing = true;
+                        _isCompleted = false;
+                        _lastManualSeekTime = DateTime.now();
+                        _lastFrameMs = targetMs;
+                        _lastStablePositionMs = targetMs;
+                        _player?.seek(Duration(milliseconds: targetMs));
+                        _startStabilizationTimer();
+                        _updateHistory(positionMs: targetMs, durationMs: duration.inMilliseconds, force: true);
+                      },
+                    ),
+                  );
+                },
               ),
-
-            // CAPA DE DIBUJO (Solo barras y slider - Se actualizan con el video)
-            StreamBuilder<Duration>(
-              stream: posStream,
-              initialData: initialPos,
-              builder: (context, snapshot) {
-                final position = snapshot.data ?? initialPos;
-                final duration = _player?.state.duration ?? Duration.zero;
-                final double maxMs = duration.inMilliseconds.toDouble().clamp(0.01, double.infinity);
-                final double currentMs = position.inMilliseconds.toDouble().clamp(0.0, maxMs);
-
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    StreamBuilder<Duration>(
-                      stream: bufferStream,
-                      initialData: initialBuffer,
+            ),
+            const SizedBox(width: 16),
+            Text(
+              _formatDuration(duration),
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ],
+        );
+      },
+    );
+  }
                       builder: (context, bufSnapshot) {
                         final bPos = bufSnapshot.data ?? initialBuffer;
                         final double bufferValue = (bPos.inMilliseconds / maxMs).clamp(0.0, 1.0);
@@ -4949,7 +4906,8 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    // TV: siempre horizontal 16:9 (sin variante vertical).
+    const isLandscape = true;
     
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
@@ -5182,7 +5140,8 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    // TV: siempre horizontal 16:9 (sin variante vertical).
+    const isLandscape = true;
     
     // Senior UI Adaptive logic:
     final double cardWidth = isMobile ? 240.0 : 440.0;
@@ -5325,7 +5284,8 @@ class _PlayerSidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    final bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    // TV: siempre horizontal 16:9 (sin variante vertical).
+    const isLandscape = true;
     
     // Senior UI Adaptive logic:
     // En móvil landscape o tablet, el ancho es 380. En desktop 450.

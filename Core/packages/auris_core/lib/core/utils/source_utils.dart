@@ -1,4 +1,5 @@
 import '../../data/models/server/search_result.dart';
+import '../../data/models/media_item.dart';
 
 
 String buildEpisodeUrl(String baseUrl, String source, int episode) {
@@ -67,6 +68,19 @@ bool isHttpUrl(String? s) {
   return u != null &&
       (u.scheme == 'http' || u.scheme == 'https') &&
       u.host.isNotEmpty;
+}
+
+/// MediaType fiel desde la categoría (antes: todo lo no-movie era anime,
+/// y las series del servidor de películas se guardaban como 'anime').
+MediaType mediaTypeFromCategory(String? category) {
+  final c = (category ?? '').toLowerCase();
+  if (c.contains('movie') || c.contains('pelic')) return MediaType.movie;
+  if (c.contains('serie') ||
+      c == 'series' ||
+      c.contains('tv_series') ||
+      c.contains('series_western')) return MediaType.series;
+  if (c.contains('kdrama') || c.contains('dorama')) return MediaType.kdrama;
+  return MediaType.anime;
 }
 
 String simplifySourceName(String name) {  final l = name.toLowerCase();

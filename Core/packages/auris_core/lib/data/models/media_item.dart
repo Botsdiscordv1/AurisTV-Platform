@@ -37,6 +37,10 @@ class MediaItem {
   final List<String> reasonKeys;
   final PlaybackHistory? playbackHistory;
   final String? sectionId;
+  /// Kind granular del contenido ('anime','series','movie',...) — la taxonomía
+  /// MediaType no distingue series animadas en servidor de películas, y ese
+  /// dato se perdía al guardar historial (reaperturas al servidor erróneo).
+  final String? kind;
 
   final SearchResult? card;
 
@@ -70,6 +74,7 @@ class MediaItem {
     this.reasonKeys = const [],
     this.playbackHistory,
     this.sectionId,
+    this.kind,
     this.card,
   });
 
@@ -78,6 +83,7 @@ class MediaItem {
     PlaybackHistory? playbackHistory,
     String? sectionId,
     bool? available,
+    String? kind,
   }) {
     return MediaItem(
       id: id,
@@ -109,6 +115,7 @@ class MediaItem {
       reasonKeys: reasonKeys,
       playbackHistory: playbackHistory ?? this.playbackHistory,
       sectionId: sectionId ?? this.sectionId,
+      kind: kind ?? this.kind,
       card: card,
     );
   }

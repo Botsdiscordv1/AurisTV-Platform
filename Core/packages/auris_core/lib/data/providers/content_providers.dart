@@ -694,7 +694,20 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
 
   if (isAuthoritative) return const <SearchResult>[];
 
-  final String? effectiveServer = params.server ?? (params.kind == 'anime' ? ApiEndpoints.animeBaseUrl : ApiEndpoints.moviesSeriesBaseUrl);
+  // Servidor: hint explícito > nombre de fuente (canónico) > heurística kind.
+  // El historial/favoritos guardan `source` pero no la URL del servidor, así
+  // que se re-deriva aquí. El kind solo no basta (serie animada en OnlyPelis
+  // vive en movies aunque su kind sea 'anime'); y una fuente desconocida no
+  // debe caer a movies sin más (OrNull + fallback por kind).
+  final String? effectiveServer = params.server ??
+      (params.source.isNotEmpty
+          ? (ApiEndpoints.baseUrlForSourceOrNull(params.source) ??
+              (params.kind == 'anime'
+                  ? ApiEndpoints.animeBaseUrl
+                  : ApiEndpoints.moviesSeriesBaseUrl))
+          : (params.kind == 'anime'
+              ? ApiEndpoints.animeBaseUrl
+              : ApiEndpoints.moviesSeriesBaseUrl));
   String requestCategory = params.category.toLowerCase();
   if (effectiveServer == ApiEndpoints.moviesSeriesBaseUrl) requestCategory = params.kind == 'anime' ? 'movie_anime' : (requestCategory.contains('movie') ? 'movie' : 'series');
   else requestCategory = 'anime';

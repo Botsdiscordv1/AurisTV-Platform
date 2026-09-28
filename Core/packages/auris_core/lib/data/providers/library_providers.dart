@@ -52,16 +52,14 @@ List<PlaybackHistory> historyEntriesForContent(
 bool libraryIsMovieish(PlaybackHistory h) =>
     isMovieLike(h.category, h.title, h.durationInMilliseconds);
 
-/// Título para tarjeta: limpia "Ep N •" en pelis, lo antepone en series.
+/// Título para tarjeta: limpia "Ep N •" en pelis. En series NO se antepone
+/// "Ep X" (ya va en el subtítulo "T1:E7 . Título" o "T2 E7 • ...").
 String libraryDisplayTitle(PlaybackHistory h) {
   final displayTitle = h.title ?? 'Contenido';
   if (libraryIsMovieish(h)) {
     return displayTitle
         .replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '')
         .trim();
-  }
-  if (h.episode != null && h.episode!.isNotEmpty) {
-    return 'Ep ${h.episode} • $displayTitle';
   }
   return displayTitle;
 }
