@@ -44,6 +44,7 @@ Future<void> main() async {
 
   // Inicializa el motor de video (media_kit) — necesario antes de correr la app
   MediaKit.ensureInitialized();
+  PipService.initialize();
 
   runApp(
     ProviderScope(
@@ -96,12 +97,12 @@ class GlobalMiniPlayerOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(activePlayerProvider, (previous, next) {
       final hasItem = next.currentItem != null;
-      PipService.setPipAllowed(hasItem);
+      _updatePipRect(context, hasItem);
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = ref.read(activePlayerProvider);
-      PipService.setPipAllowed(state.currentItem != null);
+      _updatePipRect(context, state.currentItem != null);
     });
 
     return MiniPlayerBar(
@@ -125,63 +126,25 @@ class GlobalMiniPlayerOverlay extends ConsumerWidget {
       },
     );
   }
-}
 
-class NotificationInitializer extends ConsumerStatefulWidget {
-  final Widget child;
-  const NotificationInitializer({super.key, required this.child});
-
-  @override
-  ConsumerState<NotificationInitializer> createState() => _NotificationInitializerState();
-}
-
-class _NotificationInitializerState extends ConsumerState<NotificationInitializer> {
-  @override
-  void initState() {
-    super.initState();
-    _initNotifications();
-  }
-
-  Future<void> _initNotifications() async {
-    // Senior Fix: Diferimos la inicialización para no bloquear el arranque
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      ref.read(notificationServiceProvider).init();
+  void _updatePipRect(BuildContext context, bool allowed) {
+    if (!allowed) {
+      PipService.setPipAllowed(false);
+      return;
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return widget.child;
-  }
-}
-
-class RemoteCommandListener extends ConsumerWidget {
-  final Widget child;
-  const RemoteCommandListener({super.key, required this.child});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen(remoteControlProvider.select((s) => s.lastReceivedCommand), (prev, next) {
-      if (next != null && next != prev) {
-        if (next['action'] == RemoteAction.openMedia) {
-          final p = next['params'] as Map<String, dynamic>?;
-          if (p != null) {
-            final contentId = p['contentId'];
-            final query = Map<String, String>.from(p);
-            query.remove('contentId');
-            
-            final uri = Uri(
-              path: '/player/${Uri.encodeComponent(contentId)}',
-              queryParameters: query,
-            );
-            
-            appRouter.push(uri.toString());
-          }
-        }
-      }
-    });
-    
-    return child;
+    final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox != null && renderBox.hasSize) {
+      final position = renderBox.localToGlobal(Offset.zero);
+      final size = renderBox.size;
+      PipService.setPipAllowed(
+        true,
+        left: position.dx,
+        top: position.dy,
+        right: position.dx + size.width,
+        bottom: position.dy + size.height,
+      );
+    } else {
+      PipService.setPipAllowed(true);
+    }
   }
 }

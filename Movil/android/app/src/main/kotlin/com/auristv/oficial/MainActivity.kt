@@ -2,8 +2,10 @@ package com.auristv.oficial
 
 import android.app.PictureInPictureParams
 import android.content.pm.ActivityInfo
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import android.view.KeyEvent
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
@@ -18,6 +20,9 @@ class MainActivity: FlutterActivity() {
     private var interceptVolume = false
     private var volumeMethodChannel: MethodChannel? = null
     private var isPipAllowed = false
+    private var currentAspectRatioWidth = 16
+    private var currentAspectRatioHeight = 9
+    private var currentSourceRect: Rect? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,8 +71,25 @@ class MainActivity: FlutterActivity() {
             when (call.method) {
                 "enterPip" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        val params = PictureInPictureParams.Builder().build()
-                        val success = enterPictureInPictureMode(params)
+                        val width = call.argument<Double>("aspectRatioWidth")?.toInt() ?: 16
+                        val height = call.argument<Double>("aspectRatioHeight")?.toInt() ?: 9
+                        currentAspectRatioWidth = width
+                        currentAspectRatioHeight = height
+
+                        val left = call.argument<Double>("rectLeft")?.toInt()
+                        val top = call.argument<Double>("rectTop")?.toInt()
+                        val right = call.argument<Double>("rectRight")?.toInt()
+                        val bottom = call.argument<Double>("rectBottom")?.toInt()
+
+                        val builder = PictureInPictureParams.Builder()
+                            .setAspectRatio(Rational(width, height))
+
+                        if (left != null && top != null && right != null && bottom != null && right > left && bottom > top) {
+                            currentSourceRect = Rect(left, top, right, bottom)
+                            builder.setSourceRectHint(currentSourceRect!!)
+                        }
+
+                        val success = enterPictureInPictureMode(builder.build())
                         result.success(success)
                     } else {
                         result.error("UNSUPPORTED", "PiP requires Android 8.0+", null)
@@ -75,6 +97,31 @@ class MainActivity: FlutterActivity() {
                 }
                 "setPipAllowed" -> {
                     isPipAllowed = call.argument<Boolean>("allowed") ?: false
+                    val width = call.argument<Double>("aspectRatioWidth")?.toInt() ?: 16
+                    val height = call.argument<Double>("aspectRatioHeight")?.toInt() ?: 9
+                    currentAspectRatioWidth = width
+                    currentAspectRatioHeight = height
+
+                    val left = call.argument<Double>("rectLeft")?.toInt()
+                    val top = call.argument<Double>("rectTop")?.toInt()
+                    val right = call.argument<Double>("rectRight")?.toInt()
+                    val bottom = call.argument<Double>("rectBottom")?.toInt()
+
+                    if (left != null && top != null && right != null && bottom != null && right > left && bottom > top) {
+                        currentSourceRect = Rect(left, top, right, bottom)
+                    }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val builder = PictureInPictureParams.Builder()
+                            .setAutoEnterEnabled(isPipAllowed)
+                            .setAspectRatio(Rational(width, height))
+
+                        currentSourceRect?.let {
+                            builder.setSourceRectHint(it)
+                        }
+
+                        setPictureInPictureParams(builder.build())
+                    }
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -98,9 +145,13 @@ class MainActivity: FlutterActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (isPipAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val params = PictureInPictureParams.Builder().build()
-            enterPictureInPictureMode(params)
+        if (isPipAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            val builder = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(currentAspectRatioWidth, currentAspectRatioHeight))
+            currentSourceRect?.let {
+                builder.setSourceRectHint(it)
+            }
+            enterPictureInPictureMode(builder.build())
         }
     }
 

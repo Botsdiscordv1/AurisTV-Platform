@@ -24,6 +24,7 @@ import 'package:material_symbols_icons/material_symbols_icons.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
+import '../../../core/utils/pip_service.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/screen_brightness.dart';
 import '../../../core/utils/web_utils.dart';
@@ -522,6 +523,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   @override
   void initState() {
     super.initState();
+    PipService.setPipAllowed(true);
     _videoKey = ref.read(activePlayerProvider).videoKey;
     _screenInitTime = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
@@ -2756,6 +2758,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
     }
     
+    PipService.setPipAllowed(false);
     _showNextNotifier.dispose();
     _hoverInfoNotifier.dispose();
     super.dispose();
