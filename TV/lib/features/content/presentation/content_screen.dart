@@ -825,9 +825,17 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       if (detailState.isMovieish) {
         prefetchUrl = currentSource.url;
       } else {
+        // Episodio a prefetch: sin historial → E1; con progreso a medias →
+        // ese episodio; terminado → el siguiente (clamp al total).
         final latest = history.where((h) => h.contentId == widget.title).firstOrNull;
-        int epNum = latest != null ? int.tryParse(latest.episode ?? '1') ?? 1 : 1;
+        int epNum = 1;
+        final latestEp = latest != null ? int.tryParse(latest.episode ?? '') : null;
+        if (latestEp != null && latestEp > 0) {
+          epNum = (latest?.isCompleted ?? false) ? latestEp + 1 : latestEp;
+        }
         final epData = detailState.episodes.valueOrNull?.response;
+        final totalEps = epData?.total ?? 0;
+        if (totalEps > 0) epNum = epNum.clamp(1, totalEps);
         final epSource = detailState.episodes.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
         final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
         prefetchUrl = _episodeUrlFor(ep, epSource.url, epSource.source, epNum);

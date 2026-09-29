@@ -2,7 +2,6 @@ package com.auristv.oficial
 
 import android.app.PictureInPictureParams
 import android.content.pm.ActivityInfo
-import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
@@ -22,7 +21,7 @@ class MainActivity: FlutterActivity() {
     private var isPipAllowed = false
     private var currentAspectRatioWidth = 16
     private var currentAspectRatioHeight = 9
-    private var currentSourceRect: Rect? = null
+    private var isInPlayer = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,20 +75,15 @@ class MainActivity: FlutterActivity() {
                         currentAspectRatioWidth = width
                         currentAspectRatioHeight = height
 
-                        val left = call.argument<Double>("rectLeft")?.toInt()
-                        val top = call.argument<Double>("rectTop")?.toInt()
-                        val right = call.argument<Double>("rectRight")?.toInt()
-                        val bottom = call.argument<Double>("rectBottom")?.toInt()
-
-                        val builder = PictureInPictureParams.Builder()
-                            .setAspectRatio(Rational(width, height))
-
-                        if (left != null && top != null && right != null && bottom != null && right > left && bottom > top) {
-                            currentSourceRect = Rect(left, top, right, bottom)
-                            builder.setSourceRectHint(currentSourceRect!!)
+                        // Notificar a Flutter que prepare la UI para PiP
+                        flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                            MethodChannel(messenger, PIP_CHANNEL).invokeMethod("prepareForPip", null)
                         }
 
-                        val success = enterPictureInPictureMode(builder.build())
+                        val params = PictureInPictureParams.Builder()
+                            .setAspectRatio(Rational(width, height))
+                            .build()
+                        val success = enterPictureInPictureMode(params)
                         result.success(success)
                     } else {
                         result.error("UNSUPPORTED", "PiP requires Android 8.0+", null)
@@ -102,27 +96,36 @@ class MainActivity: FlutterActivity() {
                     currentAspectRatioWidth = width
                     currentAspectRatioHeight = height
 
-                    val left = call.argument<Double>("rectLeft")?.toInt()
-                    val top = call.argument<Double>("rectTop")?.toInt()
-                    val right = call.argument<Double>("rectRight")?.toInt()
-                    val bottom = call.argument<Double>("rectBottom")?.toInt()
-
-                    if (left != null && top != null && right != null && bottom != null && right > left && bottom > top) {
-                        currentSourceRect = Rect(left, top, right, bottom)
-                    }
-
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        val builder = PictureInPictureParams.Builder()
+                        val params = PictureInPictureParams.Builder()
                             .setAutoEnterEnabled(isPipAllowed)
                             .setAspectRatio(Rational(width, height))
-
-                        currentSourceRect?.let {
-                            builder.setSourceRectHint(it)
-                        }
-
-                        setPictureInPictureParams(builder.build())
+                            .build()
+                        setPictureInPictureParams(params)
                     }
                     result.success(null)
+                }
+                "setPlayerActive" -> {
+                    isInPlayer = call.argument<Boolean>("active") ?: false
+                    result.success(null)
+                }
+                "isPipPermitted" -> {
+                    result.success(hasPipPermission())
+                }
+                "openPipSettings" -> {
+                    // No existe intent directo a los ajustes PiP: se abre la
+                    // ficha de la app, donde vive el interruptor PiP.
+                    try {
+                        val intent = android.content.Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.parse("package:$packageName"))
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        android.util.Log.d("AurisPip", "openPipSettings failed: ${e.message}")
+                        result.success(false)
+                    }
                 }
                 else -> result.notImplemented()
             }
@@ -143,20 +146,68 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    private fun hasPipPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val hasFeature = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)
+        var opAllowed = true
+        try {
+            val appOps = getSystemService(APP_OPS_SERVICE) as android.app.AppOpsManager
+            val mode = appOps.checkOpNoThrow(
+                android.app.AppOpsManager.OPSTR_PICTURE_IN_PICTURE,
+                android.os.Process.myUid(), packageName)
+            opAllowed = mode == android.app.AppOpsManager.MODE_ALLOWED
+        } catch (e: Exception) { opAllowed = true }
+        val permitted = hasFeature && opAllowed
+        android.util.Log.d("AurisPip", "hasPipPermission -> $permitted (feature=$hasFeature op=$opAllowed)")
+        return permitted
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (isPipAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            val builder = PictureInPictureParams.Builder()
-                .setAspectRatio(Rational(currentAspectRatioWidth, currentAspectRatioHeight))
-            currentSourceRect?.let {
-                builder.setSourceRectHint(it)
+        val permitted = hasPipPermission()
+        android.util.Log.d("AurisPip", "onUserLeaveHint allowed=$isPipAllowed permitted=$permitted sdk=${Build.VERSION.SDK_INT}")
+        if (isPipAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Notificar a Flutter de inmediato antes de que el sistema tome la captura para PiP
+            flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                MethodChannel(messenger, PIP_CHANNEL).invokeMethod("prepareForPip", null)
             }
-            enterPictureInPictureMode(builder.build())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Re-afirmar auto-enter aqui mismo: si un setPipAllowed(false)
+                // tardio (p. ej. dispose en pleno minimize) gano la carrera,
+                // el Home no entraria a PiP.
+                try {
+                    val autoParams = PictureInPictureParams.Builder()
+                        .setAutoEnterEnabled(true)
+                        .setAspectRatio(Rational(currentAspectRatioWidth, currentAspectRatioHeight))
+                        .build()
+                    setPictureInPictureParams(autoParams)
+                } catch (e: Exception) {
+                    android.util.Log.d("AurisPip", "re-assert auto-enter failed: ${e.message}")
+                }
+            }
+            // Entrada manual en TODAS las APIs: el auto-enter de Android 12+
+            // (setAutoEnterEnabled) falla en varios OEMs; el manual es no-op
+            // si el sistema ya esta entrando.
+            try {
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(currentAspectRatioWidth, currentAspectRatioHeight))
+                    .build()
+                val ok = enterPictureInPictureMode(params)
+                android.util.Log.d("AurisPip", "manual enterPictureInPictureMode -> $ok")
+            } catch (e: Exception) {
+                android.util.Log.d("AurisPip", "manual enter failed: ${e.message}")
+            }
         }
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+
+        // NO tocar requestedOrientation al salir: Flutter restaura la
+        // orientacion previa al PiP (PipService.onPipChanged). Resetear aqui
+        // a UNSPECIFIED abria una carrera donde el sensor decidia (p. ej.
+        // apaisado) y luego Dart re-fijaba vertical con salto visible.
+        android.util.Log.d("AurisPip", "onPictureInPictureModeChanged inPip=$isInPictureInPictureMode")
         flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
             MethodChannel(messenger, PIP_CHANNEL).invokeMethod("onPipChanged", isInPictureInPictureMode)
         }

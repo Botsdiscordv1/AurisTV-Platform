@@ -52,9 +52,9 @@ void openTVDetails(BuildContext context, MediaItem item, String uiCategory) {
       '${typeVal != null ? '&type=${Uri.encodeComponent(typeVal)}' : ''}'
       '&sectionId=${Uri.encodeComponent(item.sectionId ?? '')}';
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (context.mounted) context.push(uri, extra: item.toContentSeed());
-  });
+  // Push directo (sin post-frame): diferirlo dejaba la navegación colgada
+  // si la app estaba idle (sin frames), y solo avanzaba al hacer scroll.
+  if (context.mounted) context.push(uri, extra: item.toContentSeed());
 }
 
 void openTVScheduleItem(BuildContext context, MediaItem item) {
@@ -73,9 +73,9 @@ void openTVScheduleItem(BuildContext context, MediaItem item) {
   final uri =
       '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(source)}&category=anime&url=${Uri.encodeComponent(url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=&year=${itemYear ?? ''}&quality=${Uri.encodeComponent(quality)}&type=${Uri.encodeComponent(type)}';
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (context.mounted) context.push(uri, extra: item.toContentSeed());
-  });
+  // Push directo (sin post-frame): diferirlo dejaba la navegación colgada
+  // si la app estaba idle (sin frames), y solo avanzaba al hacer scroll.
+  if (context.mounted) context.push(uri, extra: item.toContentSeed());
 }
 
 class HomeScreen extends ConsumerStatefulWidget {

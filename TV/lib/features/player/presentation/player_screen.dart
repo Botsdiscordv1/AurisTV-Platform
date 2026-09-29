@@ -106,6 +106,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isLocked = false;
   bool _hasResetPosition = false;
   int _resumePosition = 0;
+  /// Generación del seek de resume: cada _initPlayer la incrementa para que
+  /// los loops de reintento del episodio/fuente anterior se aborten y no
+  /// apliquen su seek tardío sobre el nuevo stream (igual que Movil).
+  int _resumeSeekGen = 0;
   DateTime? _resumeGuardUntil;
   int _resumeGuardRetries = 0;
   Timer? _hideTimer;
@@ -407,6 +411,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _updateHistory({required int positionMs, required int durationMs, bool force = false}) {
+    if (_isDisposed) return;
     if (widget.contentId.isEmpty || _historyNotifier == null || _isOpEd) return;
     
     // Senior Performance Fix: Throttling de guardado en base de datos.
@@ -414,7 +419,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (!force) {
       _historySaveTimer?.cancel();
       _historySaveTimer = Timer(const Duration(seconds: 1), () {
-        if (!mounted) return;
+        if (!mounted || _isDisposed) return;
         _performHistoryUpdate(positionMs, durationMs, force: false);
       });
       return;
@@ -424,16 +429,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _performHistoryUpdate(int positionMs, int durationMs, {bool force = false}) {
+    // Tras dispose el ref muere (StateError): el guardado final usa
+    // _finalSaveOnDispose (sin ref). Igual que Movil.
+    if (_isDisposed) return;
     // Título/banner del episodio: 1) lista sincronizada del provider global,
     // 2) lectura directa de episodios (no depende del timing del sync), igual
     // que Movil. Sin esto Continuar Viendo mostraba "T1:E1" sin título en TV.
     String? episodeThumb;
     String? episodeTitle;
-    int syncedCount = 0;
-    int directCount = 0;
     try {
       final notifier = ref.read(activePlayerProvider.notifier);
-      syncedCount = notifier.state.availableEpisodes.length;
       episodeThumb = notifier.resolveEpisodeBanner();
       if (episodeThumb == null || episodeThumb == widget.bannerUrl) {
         final epsData = ref
@@ -444,7 +449,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               season: widget.season,
             )))
             .valueOrNull;
-        directCount = epsData?.episodes.length ?? 0;
         final info = notifier.episodeInfoFor(
             _activeEpisode, epsData?.episodes ?? const []);
         if (info?.thumbnail != null && info!.thumbnail!.isNotEmpty) {
@@ -456,8 +460,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             notifier.episodeInfoFor(_activeEpisode)?.title;
       }
     } catch (_) {}
-    // Diagnóstico: título resuelto al guardar (ver por qué la tarjeta pierde el título).
-    debugPrint('[tv-save] ep=$_activeEpisode title=${episodeTitle ?? "-NULL-"} synced=$syncedCount direct=$directCount force=$force');
+    // Cachear lo resuelto para el guardado final en dispose (sin ref).
+    // Solo se pisa con valores reales.
+    if (episodeTitle != null && episodeTitle.isNotEmpty) {
+      _lastResolvedEpisodeTitle = episodeTitle;
+    }
+    final _resolvedBanner = episodeThumb ?? widget.bannerUrl;
+    if (_resolvedBanner != null && _resolvedBanner.isNotEmpty) {
+      _lastResolvedEpisodeBanner = _resolvedBanner;
+    }
     _historyNotifier!.updatePosition(
       contentId: widget.contentId,
       season: widget.season,
@@ -480,7 +491,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
+  /// Guardado final en dispose SIN usar ref (ver Movil: el ref muere con el
+  /// widget y ref.read lanza StateError en finalizeTree).
+  void _finalSaveOnDispose(int positionMs, int durationMs) {
+    try {
+      final hn = _historyNotifier;
+      if (hn == null) return;
+      hn.updatePosition(
+        contentId: widget.contentId,
+        season: widget.season,
+        episode: _activeEpisode,
+        positionMs: positionMs,
+        durationMs: durationMs,
+        title: widget.title,
+        posterUrl: widget.posterUrl,
+        bannerUrl: _lastResolvedEpisodeBanner ?? widget.bannerUrl,
+        episodeTitle: _lastResolvedEpisodeTitle,
+        kind: widget.kind,
+        year: widget.year,
+        logoUrl: widget.logoUrl,
+        category: widget.category,
+        source: widget.source,
+        url: _currentSourceUrl,
+        alternativeSources: _groupedSources.values.expand((e) => e).toList(),
+        force: true,
+      );
+      hn.flush();
+    } catch (_) {}
+  }
+
   PlaybackHistoryNotifier? _historyNotifier;
+  // Tras dispose el ref muere: bandera + últimos valores para el guardado
+  // final sin ref (igual que Movil).
+  bool _isDisposed = false;
+  String? _lastResolvedEpisodeTitle;
+  String? _lastResolvedEpisodeBanner;
   late PlaybackPolicy _policy;
   final ValueNotifier<bool> _showNextNotifier = ValueNotifier<bool>(false);
   int _autoplayCountdown = -1;
@@ -2045,6 +2090,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // diálogo de "reanudar" aunque el widget se haya recreado (widget.skipResume).
     final bool skipResume = _skipResumeOnNextInit || widget.skipResume;
     _skipResumeOnNextInit = false;
+    // Invalidar loops de resume-retry de inits anteriores (ver campo).
+    _resumeSeekGen++;
 
     _lastVideoUrl = videoUrl;
     _lastVideoHeaders = headers;
@@ -2457,7 +2504,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // "parezca" aplicado, a veces se pierde y el video arranca desde 0 con
         // el overlay mostrando la posición guardada. Verificamos por posición
         // SIEMPRE en reanudaciones y reintentamos hasta que aterrice.
-        unawaited(_resumeSeekWhenReady(Duration(milliseconds: _resumePosition), player));
+        unawaited(_resumeSeekWhenReady(
+            Duration(milliseconds: _resumePosition), player, _resumeSeekGen));
       }
       
       if (mounted) {
@@ -2504,7 +2552,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             // manifest/segmentos carguen en paralelo y aplicamos el seek en
             // cuanto el elemento <video> esté listo.
             _startStabilizationTimer();
-            unawaited(_webResumeSeek(player, resumeMs));
+            unawaited(_webResumeSeek(player, resumeMs, _resumeSeekGen));
             player.play();
           } else {
             _startStabilizationTimer();
@@ -2550,9 +2598,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// reproducción arranca desde 0. Aquí esperamos a que el stream esté listo y
   /// reintentamos el seek absoluto, verificando por posición (no por errores,
   /// que llegan por player.stream y no lanzan excepción).
-  Future<void> _resumeSeekWhenReady(Duration target, Player player) async {
+  Future<void> _resumeSeekWhenReady(Duration target, Player player, int gen) async {
     int waited = 0;
-    while (waited < 60 && mounted) {
+    while (waited < 60 && mounted && gen == _resumeSeekGen) {
       await Future.delayed(const Duration(milliseconds: 100));
       waited++;
       final d = player.state.duration;
@@ -2560,15 +2608,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (d > Duration.zero) break;
       if (p > 150) break;
     }
-    if (!mounted) return;
+    if (!mounted || gen != _resumeSeekGen) return;
 
     final tMs = target.inMilliseconds;
-    for (int attempt = 0; attempt < 3 && mounted; attempt++) {
+    for (int attempt = 0; attempt < 3 && mounted && gen == _resumeSeekGen; attempt++) {
       final before = player.state.position.inMilliseconds;
       if (before >= tMs - 2000 && before <= tMs + 4000) {
         debugPrint('[player] Resume confirmado en $before (objetivo $tMs)');
         return;
       }
+      if (gen != _resumeSeekGen) return;
       debugPrint('[player] Resume retry seek a $tMs (attempt ${attempt + 1}, pos $before)');
       await player.seek(target);
       // Senior: 900ms de settle; el seek en MP4 progresivo dispara una petición
@@ -2587,20 +2636,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// stream sin cargar ~2.3s), esperamos a que el media arranque (posición > 0
   /// o duración conocida) y ahí sí aplicamos el seek absoluto verificando por
   /// posición. El spinner se oculta al confirmar el salto.
-  Future<void> _webResumeSeek(Player player, int targetMs) async {
+  Future<void> _webResumeSeek(Player player, int targetMs, int gen) async {
     int waited = 0;
-    while (waited < 80 && mounted) {
+    while (waited < 80 && mounted && gen == _resumeSeekGen) {
       await Future.delayed(const Duration(milliseconds: 100));
       waited++;
       if (player.state.position.inMilliseconds > 0) break;
       if (player.state.duration > Duration.zero) break;
     }
-    if (!mounted) return;
+    if (!mounted || gen != _resumeSeekGen) return;
 
-    for (int attempt = 0; attempt < 3 && mounted; attempt++) {
+    for (int attempt = 0; attempt < 3 && mounted && gen == _resumeSeekGen; attempt++) {
       final before = player.state.position.inMilliseconds;
       if (before >= targetMs - 1500) break;
       debugPrint('[player] Web resume seek $targetMs (attempt ${attempt + 1}, pos $before)');
+      if (gen != _resumeSeekGen) return;
       await player.seek(Duration(milliseconds: targetMs));
       await Future.delayed(const Duration(milliseconds: 400));
       final after = player.state.position.inMilliseconds;
@@ -2686,6 +2736,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   @override
   void dispose() {
+    // Primero la bandera: a partir de aquí el ref está muerto (igual que Movil).
+    _isDisposed = true;
     // Senior Fix: Cancelar TODOS los timers para evitar fugas de memoria y llamadas a setState
     _loadWatchdogTimer?.cancel();
     _hideTimer?.cancel();
@@ -2713,12 +2765,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     // Senior Shield: Solo guardamos si el reproductor realmente logró sincronizar la posición
     // de reanudación. Si cerramos antes de que MPV enganche, evitamos sobreescribir con 0ms.
+    // Guardado final SIN ref (ver _finalSaveOnDispose).
     if (_hasResetPosition && ms > 3000 && duration > 0) {
-      _updateHistory(
-        positionMs: ms,
-        durationMs: duration,
-        force: true,
-      );
+      _finalSaveOnDispose(ms, duration);
     }
     
     _historyNotifier?.flush();
@@ -2863,7 +2912,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     )));
     episodesForSession.whenData((data) {
       if (data == null || data.episodes.isEmpty) return;
-      final key = '${widget.sourceUrl}|${widget.source}|${widget.season}|${data.episodes.length}';
+      // Huella de contenido (NO solo longitud): fast y full suelen medir
+      // igual; si no, el full enriquecido nunca reemplazaba al fast pobre.
+      final key = '${widget.sourceUrl}|${widget.source}|${widget.season}|${episodesFingerprint(data.episodes)}';
       if (_episodesSyncKey == key) return;
       _episodesSyncKey = key;
       Future.microtask(() {

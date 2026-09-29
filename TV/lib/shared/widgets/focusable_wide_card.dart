@@ -115,19 +115,17 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                   Positioned(
                                     bottom: 16, // Elevado para mejor balance visual
                                     left: 12,
-                                    right: 12,
-                                    child: Center(
-                                      child: ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxWidth: widget.width * 0.75, // Expandido para logos anchos
-                                          maxHeight: widget.height * 0.35,
-                                        ),
-                                        child: CachedNetworkImage(
-                                          imageUrl: widget.logoUrl!,
-                                          fit: BoxFit.contain,
-                                          filterQuality: FilterQuality.medium,
-                                          errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                                        ),
+                                    // Caja FIJA como la wide Core (sin ella el logo
+                                    // aparece centrado y salta al cargar) + abajo-izq.
+                                    child: Container(
+                                      height: widget.height * 0.35,
+                                      width: widget.width * 0.65,
+                                      alignment: Alignment.bottomLeft,
+                                      child: CachedNetworkImage(
+                                        imageUrl: widget.logoUrl!,
+                                        fit: BoxFit.contain,
+                                        filterQuality: FilterQuality.medium,
+                                        errorWidget: (_, __, ___) => const SizedBox.shrink(),
                                       ),
                                     ),
                                   ),

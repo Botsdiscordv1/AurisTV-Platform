@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +10,9 @@ import '../../auris_core.dart';
 
 class MiniPlayerBar extends ConsumerStatefulWidget {
   final VoidCallback onExpand;
-  const MiniPlayerBar({super.key, required this.onExpand});
+  /// Entrada manual a PiP nativo (solo Movil Android; null = sin botón).
+  final VoidCallback? onEnterPip;
+  const MiniPlayerBar({super.key, required this.onExpand, this.onEnterPip});
 
   @override
   ConsumerState<MiniPlayerBar> createState() => _MiniPlayerBarState();
@@ -17,12 +20,33 @@ class MiniPlayerBar extends ConsumerStatefulWidget {
 
 class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   Offset _position = Offset.zero;
+  /// La posición inicial se calcula en post-frame: hasta entonces no se
+  /// pinta nada (evita 1 frame en (0,0) arriba-izquierda al volver de PiP).
+  bool _positionReady = false;
+  /// Suscripciones propias del mini (fin de video + umbral de preload).
+  /// El motor es compartido con el fullscreen: solo actúan en modo mini.
+  StreamSubscription<Duration>? _miniPosSub;
+  StreamSubscription<bool>? _miniCompletedSub;
+  Player? _listenedPlayer;
+  String? _preloadedForKey;
+  bool _showReplay = false;
+  String? _lastMiniEpisode;
+  String? _episodesSyncKey;
   bool _isDragging = false;
   bool _isHovered = false; 
   bool _isExpandedList = false; 
+  /// Posición/ancho previos a desmontar (ida y vuelta a PiP nativo desmonta
+  /// todo el árbol): estáticos para sobrevivir al State. Se restauran en
+  /// initState; un inicio fresco usa la esquina por defecto.
+  static Offset? _savedPosition;
+  static double? _savedUserWidth;
   late AnimationController _snapController;
   late Animation<Offset> _snapAnimation;
   final FocusNode _keyboardFocusNode = FocusNode(); 
+  // Controles tap-to-toggle (estilo YouTube mini): ocultos por defecto tras
+  // 3s, tap en el video los muestra. El hover en desktop también los revela.
+  bool _showControls = true;
+  Timer? _controlsHideTimer;
   
   // Senior Adaptive Design System - breakpoints continuos (no binario desktop/mobile)
   double get _edgeMargin {
@@ -38,18 +62,49 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
     return 70.0; // móvil deja espacio para bottom nav
   }
   double get _topOffset => 16.0;
-  
-  double get _playerWidth {
+
+  /// Ancho fijado por pellizco (null = breakpoint por defecto). Como el PiP
+  /// nativo: se conserva entre movimientos y solo lo acotan los bounds.
+  double? _userWidth;
+  double _scaleBaseWidth = 0.0;
+  /// Posición previa a expandir la lista (para volver al contraer).
+  Offset? _preExpandPosition;
+
+  double get _breakpointWidth {
     final w = MediaQuery.of(context).size.width;
     if (w >= 1200) return 400.0; // desktop
-    if (w >= 900) return 320.0;  // compact desktop
-    if (w >= 600) return 280.0;  // tablet
+    if (w >= 900) return 320.0; // compact desktop
+    if (w >= 600) return 280.0; // tablet
     return 210.0; // móvil
   }
-  double get _videoHeight => _playerWidth * (9 / 16);
-  double get _metadataHeight => _playerWidth >= 280 ? 62.0 : 0.0; 
+
+  double get _minPlayerWidth => 160.0;
+  /// Controles por tipo de entrada, NO por ancho: la tablet (280px+) caía en
+  /// el overlay desktop (hover) sin hover táctil → sin controles y tap =
+  /// play/pausa. Táctil (Android/iOS) siempre lleva controles móviles.
+  bool get _useMobileControls {
+    if (kIsWeb) return false;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+      case TargetPlatform.fuchsia:
+        return true;
+      case TargetPlatform.windows:
+      case TargetPlatform.macOS:
+      case TargetPlatform.linux:
+        return false;
+    }
+  }  double get _maxPlayerWidth {
+    final w = MediaQuery.of(context).size.width;
+    return (w - _edgeMargin * 2).clamp(160.0, 480.0);
+  }
+
+  double get _playerWidth {
+    final base = _userWidth ?? _breakpointWidth;
+    return base.clamp(_minPlayerWidth, _maxPlayerWidth);
+  }
   double get _listHeight => _isExpandedList && _playerWidth >= 280 ? 300.0 : 0.0; 
-  double get _totalHeight => _videoHeight + _metadataHeight + _listHeight + (_playerWidth >= 280 ? 4.0 : 0.0);
+  double get _totalHeight => _totalHeightFor(_playerWidth);
 
   @override
   void initState() {
@@ -57,67 +112,164 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
     WidgetsBinding.instance.addObserver(this);
     _snapController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 280),
     );
     
-    // Posición inicial: Abajo a la derecha con márgenes senior
+    // Posición inicial: la previa al desmontaje (vuelta de PiP) o abajo a
+    // la derecha por defecto. Se acota a las métricas actuales.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final size = MediaQuery.of(context).size;
       if (size.width > 100 && size.height > 100) {
+        if (_savedUserWidth != null) {
+          _userWidth = _savedUserWidth!.clamp(_minPlayerWidth, _maxPlayerWidth);
+        }
+        final Offset initial = _savedPosition ?? Offset(
+          size.width - _playerWidth - _edgeMargin,
+          size.height - _totalHeight - _bottomOffset,
+        );
         setState(() {
-          _position = Offset(
-            size.width - _playerWidth - _edgeMargin,
-            size.height - _totalHeight - _bottomOffset,
-          );
+          _position = _clampPosition(initial, _playerWidth);
+          _positionReady = true;
         });
       }
+    });
+    // Auto-ocultar controles a los 3s (tap en video los revela).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _restartControlsTimer();
     });
   }
 
   @override
   void didChangeMetrics() {
-    // Senior: Re-snap al redimensionar (rotación tablet, resize desktop estrecho)
+    // Senior: al redimensionar/rotar/volver de PiP, RE-ACOTAR sin re-anclar:
+    // la posición del usuario se respeta (el anclaje al borde es solo al
+    // soltar un arrastre). Re-anclar aquí movía el mini a una esquina al
+    // volver de PiP.
     if (!mounted || _isDragging) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _snapToCorner(Offset.zero);
+      if (_userWidth != null) {
+        _userWidth = _userWidth!.clamp(_minPlayerWidth, _maxPlayerWidth);
+      }
+      setState(() {
+        _position = _clampPosition(_position, _playerWidth);
+      });
     });
   }
 
   @override
   void dispose() {
+    _miniPosSub?.cancel();
+    _miniCompletedSub?.cancel();
+    // Guardar el punto visual real (si hay glide en curso, el valor animado).
+    _savedPosition =
+        _snapController.isAnimating ? _snapAnimation.value : _position;
+    _savedUserWidth = _userWidth;
     WidgetsBinding.instance.removeObserver(this);
+    _controlsHideTimer?.cancel();
     _snapController.dispose();
     _keyboardFocusNode.dispose();
     super.dispose();
   }
 
-  void _snapToCorner(Offset velocity) {
+  void _revealControls() {
+    if (!mounted) return;
+    setState(() => _showControls = true);
+    _restartControlsTimer();
+  }
+
+  void _toggleControls() {
+    if (!mounted) return;
+    setState(() => _showControls = !_showControls);
+    if (_showControls) {
+      _restartControlsTimer();
+    } else {
+      _controlsHideTimer?.cancel();
+    }
+  }
+
+  void _restartControlsTimer() {
+    _controlsHideTimer?.cancel();
+    _controlsHideTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() => _showControls = false);
+    });
+  }
+
+  /// Los botones viven anidados sobre la capa de tap-toggle: ambos disparan.
+  /// Re-mostrar en post-frame gana determinísticamente al toggle.
+  void _keepControlsVisible() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _revealControls();
+    });
+  }
+
+  /// Acota una posición a la pantalla con el ancho dado.
+  Offset _clampPosition(Offset p, double w) {
     final size = MediaQuery.of(context).size;
-    final double centerX = _position.dx + (_playerWidth / 2);
-    final double centerY = _position.dy + (_totalHeight / 2);
-
-    double targetX = _edgeMargin;
-    if (centerX > size.width / 2) {
-      targetX = size.width - _playerWidth - _edgeMargin;
-    }
-
-    double targetY = _topOffset;
-    if (centerY > size.height / 2) {
-      targetY = size.height - _totalHeight - _bottomOffset;
-    }
-
-    final targetOffset = Offset(targetX, targetY);
-
-    _snapAnimation = _snapController.drive(
-      Tween<Offset>(begin: _position, end: targetOffset),
+    final h = _totalHeightFor(w);
+    return Offset(
+      p.dx.clamp(_edgeMargin, (size.width - w - _edgeMargin).clamp(_edgeMargin, size.width)),
+      p.dy.clamp(_topOffset, (size.height - h - _bottomOffset).clamp(_topOffset, size.height)),
     );
+  }
 
+  double _totalHeightFor(double w, [bool? expanded]) {
+    final showList = expanded ?? _isExpandedList;
+    final videoH = w * (9 / 16);
+    final metaH = w >= 280 ? 62.0 : 0.0;
+    final listH = (showList && w >= 280) ? 300.0 : 0.0;
+    return videoH + metaH + listH + (w >= 280 ? 4.0 : 0.0);
+  }
+
+  /// Asentamiento estilo PiP nativo: proyección por velocidad (fricción) y
+  /// anclaje al borde lateral más cercano manteniendo la Y (no a esquinas).
+  /// Un solo tween easeOut ~280ms: arranque con inercia, llegada suave.
+  void _settle(Offset velocity, {bool animate = true}) {
+    final size = MediaQuery.of(context).size;
+    final w = _playerWidth;
+    Offset start = _clampPosition(_position, w);
+
+    // Proyección con fricción solo si hay impulso real.
+    const double kFlingThreshold = 350.0;
+    const double kFrictionDistance = 0.22;
+    Offset projected = start;
+    if (velocity.distance > kFlingThreshold) {
+      projected = _clampPosition(
+        start + Offset(velocity.dx * kFrictionDistance, velocity.dy * kFrictionDistance),
+        w,
+      );
+    }
+
+    // Borde lateral más cercano por centro; Y clampada donde quedó.
+    final double centerX = projected.dx + w / 2;
+    final double targetX = centerX > size.width / 2
+        ? size.width - w - _edgeMargin
+        : _edgeMargin;
+    final target = _clampPosition(Offset(targetX, projected.dy), w);
+
+    _snapController.stop();
+    if (!animate) {
+      setState(() => _position = target);
+      return;
+    }
+    _glideTo(target);
+  }
+
+  /// Deslizamiento animado a un punto arbitrario (expandir/contraer lista).
+  void _glideTo(Offset target) {
+    _snapController.stop();
+    _snapAnimation = _snapController.drive(
+      Tween<Offset>(begin: _position, end: target)
+          .chain(CurveTween(curve: Curves.easeOutCubic)),
+    );
     _snapController.forward(from: 0).then((_) {
       if (mounted) {
         setState(() {
-          _position = targetOffset;
+          _position = target;
         });
       }
     });
@@ -129,6 +281,22 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
     if (state.uiState != PlayerUIState.mini || state.currentItem == null) {
       return const SizedBox.shrink();
     }
+    // Posición aún no calculada (primer frame tras montar, p. ej. vuelta de
+    // PiP): no pintar a (0,0), esperar al post-frame con la posición real.
+    if (!_positionReady) return const SizedBox.shrink();
+
+    _listenMiniPlayer(state.player);
+    // Cambio de episodio: resetear replay/preload (sincrono en build, sin
+    // setState: el build en curso ya lee los valores frescos).
+    if (state.episode != _lastMiniEpisode) {
+      _lastMiniEpisode = state.episode;
+      _showReplay = false;
+      _preloadedForKey = null;
+    }
+    // Convergencia de sesión: si el fullscreen no sincronizó la lista (deep
+    // link, fetch tardío), traerla una vez para que el auto-avance, el
+    // preload y los títulos la vean. Con key anti re-sync.
+    _syncMiniEpisodes(state);
 
     final item = state.currentItem!;
     final bool isDesktop = ResponsiveUtils.isDesktop(context);
@@ -148,18 +316,29 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
         onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
         onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
         child: GestureDetector(
-          onPanStart: (_) {
+          // Arrastre 1:1 + pellizco para redimensionar (estilo PiP nativo).
+          // onScale cubre ambos (un dedo = mover, dos = mover+escalar).
+          onScaleStart: (details) {
             _snapController.stop();
+            _scaleBaseWidth = _playerWidth;
+            // Si el usuario lo mueve a mano, esa es su nueva casa: no
+            // restaurar la previa al contraer.
+            _preExpandPosition = null;
             setState(() => _isDragging = true);
           },
-          onPanUpdate: (details) {
+          onScaleUpdate: (details) {
             setState(() {
-              _position += details.delta;
+              _position += details.focalPointDelta;
+              if ((details.scale - 1.0).abs() > 0.01) {
+                _userWidth = (_scaleBaseWidth * details.scale)
+                    .clamp(_minPlayerWidth, _maxPlayerWidth);
+              }
+              _position = _clampPosition(_position, _playerWidth);
             });
           },
-          onPanEnd: (details) {
+          onScaleEnd: (details) {
             setState(() => _isDragging = false);
-            _snapToCorner(details.velocity.pixelsPerSecond);
+            _settle(details.velocity.pixelsPerSecond);
           },
           child: KeyboardListener(
             focusNode: _keyboardFocusNode,
@@ -205,8 +384,21 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                                 : Image.network(item.posterUrl, fit: BoxFit.cover),
                           ),
 
-                          // Adaptive overlay: >=280 usa hover desktop, <280 usa controles móviles siempre visibles
-                          if (_playerWidth >= 280)
+                          // CAPA TAP-TOGGLE (solo controles móviles): en desktop el
+                          // propio overlay raíz ya alterna (dos toggles apilados
+                          // se cancelarían). Tap en botón dispara ambos y el
+                          // botón re-muestra en post-frame.
+                          if (_useMobileControls)
+                            Positioned.fill(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _toggleControls,
+                              ),
+                            ),
+
+                          // Adaptive overlay: desktop = SOLO hover, móvil/táctil =
+                          // tap-toggle con auto-hide 3s (independiente del ancho).
+                          if (!_useMobileControls)
                             Positioned.fill(
                               child: AnimatedOpacity(
                                 opacity: _isHovered ? 1.0 : 0.0,
@@ -216,6 +408,57 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                             )
                           else
                             Positioned.fill(child: _buildMobileOverlay(state)),
+
+                          // Fin del video: Repetir + Cerrar + Fullscreen (si no hay
+                          // siguiente, el auto-avance ya cambió de episodio).
+                          // Botones explícitos (sin tap-en-cualquiera: un tap
+                          // en X no debe disparar también el replay).
+                          if (_showReplay)
+                            Positioned.fill(
+                              child: Container(
+                                color: Colors.black54,
+                                child: Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.close_rounded,
+                                            color: Colors.white, size: 28),
+                                        onPressed: () => ref
+                                            .read(activePlayerProvider.notifier)
+                                            .stop(),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                                Icons.replay_rounded,
+                                                color: Color(0xFFEF7A1E),
+                                                size: 44),
+                                            onPressed: _replayMini,
+                                          ),
+                                          const Text('Repetir',
+                                              style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 16),
+                                      IconButton(
+                                        icon: const Icon(
+                                            Icons.open_in_full_rounded,
+                                            color: Colors.white,
+                                            size: 28),
+                                        onPressed: widget.onExpand,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -223,7 +466,19 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                     // Progress siempre visible (slim en móvil), metadata/lista solo si hay espacio
                     _buildProgressBar(state),
                     if (_playerWidth >= 280) _buildMetadataArea(item, state),
-                    if (_playerWidth >= 280 && _isExpandedList) _buildEpisodesList(state),
+                    // Acordeón: misma curva/duración que el deslizamiento de
+                    // posición (280ms easeOutCubic) para moverse como una pieza.
+                    if (_playerWidth >= 280)
+                      ClipRect(
+                        child: AnimatedSize(
+                          duration: const Duration(milliseconds: 280),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.topCenter,
+                          child: _isExpandedList
+                              ? _buildEpisodesList(state)
+                              : const SizedBox.shrink(),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -239,72 +494,78 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        // Tap en el overlay alterna Play/Pause (los controles solo viven
+        // mientras el mouse está encima).
         onTap: () {
-          // Senior: Click en cualquier parte del overlay alterna Play/Pause
           final player = state.player;
           if (player != null) {
             if (player.state.playing) player.pause();
             else player.play();
           }
         },
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.45),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withOpacity(0.2),
-                Colors.transparent,
-                Colors.black.withOpacity(0.4),
-              ],
-              stops: const [0.0, 0.5, 1.0],
+        child: IgnorePointer(
+          // Ocultos = no clicables (solo visibles en hover).
+          ignoring: !_isHovered,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.45),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.2),
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.4),
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
             ),
-          ),
-          child: Stack(
-            children: [
-              // 1. Expandir (PiP) - Top Left
-              Positioned(
-                top: 10, left: 10,
-                child: GestureDetector(
-                  onTap: widget.onExpand,
-                  child: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 24),
-                ),
-              ),
-              
-              // 2. Cerrar (X) - Top Right
-              Positioned(
-                top: 10, right: 10,
-                child: GestureDetector(
-                  onTap: () => ref.read(activePlayerProvider.notifier).stop(),
-                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
-                ),
-              ),
-              
-              // 3. Play/Pause Icon - Center
-              IgnorePointer(
-                child: Center(
-                  child: StreamBuilder<bool>(
-                    stream: state.player?.stream.playing,
-                    initialData: state.player?.state.playing ?? false,
-                    builder: (context, snapshot) {
-                      final playing = snapshot.data ?? false;
-                      return Icon(
-                        playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                        color: Colors.white,
-                        size: 64,
-                      );
-                    },
+            child: Stack(
+              children: [
+                // 1. Expandir - Top Left
+                Positioned(
+                  top: 10, left: 10,
+                  child: GestureDetector(
+                    onTap: widget.onExpand,
+                    child: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 24),
                   ),
                 ),
-              ),
-              
-              // 4. Time - Bottom Left
-              Positioned(
-                bottom: 12, left: 14,
-                child: _buildTimeDisplay(state),
-              ),
-            ],
+                
+                // 2. Cerrar (X) - Top Right
+                Positioned(
+                  top: 10, right: 10,
+                  child: GestureDetector(
+                    onTap: () => ref.read(activePlayerProvider.notifier).stop(),
+                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
+                  ),
+                ),
+                
+                // 3. Play/Pause Icon - Center (solo indicador; el tap del
+                // overlay alterna play/pausa)
+                IgnorePointer(
+                  child: Center(
+                    child: StreamBuilder<bool>(
+                      stream: state.player?.stream.playing,
+                      initialData: state.player?.state.playing ?? false,
+                      builder: (context, snapshot) {
+                        final playing = snapshot.data ?? false;
+                        return Icon(
+                          playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 64,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                
+                // 4. Time - Bottom Left
+                Positioned(
+                  bottom: 12, left: 14,
+                  child: _buildTimeDisplay(state),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -312,38 +573,63 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
   }
 
   Widget _buildMobileOverlay(ActivePlayerState state) {
-    return Stack(
-      children: [
-        Positioned(
-          top: 4, right: 4,
-          child: IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-            onPressed: () => ref.read(activePlayerProvider.notifier).stop(),
-          ),
-        ),
-        Positioned(
-          top: 4, left: 4,
-          child: StreamBuilder<bool>(
-            stream: state.player?.stream.playing,
-            initialData: state.player?.state.playing ?? false,
-            builder: (context, snapshot) {
-              final playing = snapshot.data ?? false;
-              return IconButton(
+    // El tap-toggle vive en la capa de video (debajo); aquí solo fade +
+    // bloqueo de toques cuando están ocultos.
+    return AnimatedOpacity(
+      opacity: _showControls ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 200),
+      child: IgnorePointer(
+        ignoring: !_showControls,
+        child: Stack(
+          children: [
+            Positioned(
+              top: 4, right: 4,
+              child: IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: Icon(
-                  playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  color: Colors.white.withOpacity(0.9),
-                  size: 20,
-                ),
-                onPressed: () => playing ? state.player?.pause() : state.player?.play(),
-              );
-            },
-          ),
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                onPressed: () => ref.read(activePlayerProvider.notifier).stop(),
+              ),
+            ),
+            Positioned(
+              top: 4, left: 4,
+              child: StreamBuilder<bool>(
+                stream: state.player?.stream.playing,
+                initialData: state.player?.state.playing ?? false,
+                builder: (context, snapshot) {
+                  final playing = snapshot.data ?? false;
+                  return IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(
+                      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      color: Colors.white.withOpacity(0.9),
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      playing ? state.player?.pause() : state.player?.play();
+                      _keepControlsVisible();
+                    },
+                  );
+                },
+              ),
+            ),
+            // Reabrir fullscreen (no existía en el overlay móvil).
+            Positioned(
+              bottom: 4, right: 4,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.open_in_full_rounded, color: Colors.white, size: 20),
+                onPressed: () {
+                  widget.onExpand();
+                  _keepControlsVisible();
+                },
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -440,22 +726,36 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () {
-                    setState(() {
-                      final size = MediaQuery.of(context).size;
-                      final double bottomLimit = size.height - _bottomOffset;
-                      final bool wasAtBottom = (_position.dy + _totalHeight) >= (bottomLimit - 10);
-                      _isExpandedList = !_isExpandedList;
-                      if (_isExpandedList) {
-                        if (_position.dy + _totalHeight > bottomLimit) _position = Offset(_position.dx, bottomLimit - _totalHeight);
-                      } else if (wasAtBottom) {
-                        _position = Offset(_position.dx, bottomLimit - _totalHeight);
+                    // Expandir: recordar posición y subir SOLO lo necesario
+                    // para que quepa la lista (no a un punto fijo).
+                    // Contraer: volver a la posición previa.
+                    final size = MediaQuery.of(context).size;
+                    if (!_isExpandedList) {
+                      _preExpandPosition = _position;
+                      final expandedH = _totalHeightFor(_playerWidth, true);
+                      final overflow = (_position.dy + expandedH) -
+                          (size.height - _bottomOffset);
+                      setState(() => _isExpandedList = true);
+                      if (overflow > 0) {
+                        final target = _clampPosition(
+                          Offset(_position.dx, _position.dy - overflow),
+                          _playerWidth,
+                        );
+                        _glideTo(target);
                       }
-                    });
+                    } else {
+                      final back = _preExpandPosition;
+                      _preExpandPosition = null;
+                      setState(() => _isExpandedList = false);
+                      if (back != null) {
+                        _glideTo(_clampPosition(back, _playerWidth));
+                      }
+                    }
                   },
                   customBorder: const CircleBorder(),
                   child: Padding(
                     padding: const EdgeInsets.all(6.0),
-                    child: Icon(_isExpandedList ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded, color: Colors.white.withOpacity(0.9), size: 24),
+                    child: Icon(_isExpandedList ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: Colors.white.withOpacity(0.9), size: 24),
                   ),
                 ),
               ),
@@ -546,9 +846,148 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
     );
   }
 
+  /// Episodios para el mini: lista sincronizada primero, lectura directa
+  /// después (el fullscreen pudo no sincronizarla). Sin esto el auto-avance
+  /// creía que E1 era único.
+  List<EpisodeInfo> _miniEpisodes(ActivePlayerState st) {
+    if (st.availableEpisodes.isNotEmpty) return st.availableEpisodes;    try {
+      final url = st.url ?? '';
+      final source = st.source ?? '';
+      if (url.isEmpty || source.isEmpty) return const [];
+      final eps = ref
+          .read(episodesProvider(EpisodesParams(
+            url: url,
+            source: source,
+            title: st.currentItem?.title,
+            season: st.season,
+          )))
+          .valueOrNull
+          ?.episodes;
+      return eps ?? const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Converge la lista de la sesión (una vez por contenido). Con huella, no
+  /// solo longitud: así el full enriquecido reemplaza al fast pobre aunque
+  /// midan igual. Sin el early-return por lista no vacía, a propósito.
+  void _syncMiniEpisodes(ActivePlayerState st) {
+    final url = st.url ?? '';
+    final source = st.source ?? '';
+    if (url.isEmpty || source.isEmpty) return;
+    List<EpisodeInfo>? eps;
+    try {
+      eps = ref
+          .read(episodesProvider(EpisodesParams(
+            url: url,
+            source: source,
+            title: st.currentItem?.title,
+            season: st.season,
+          )))
+          .valueOrNull
+          ?.episodes;
+    } catch (_) {}
+    if (eps == null || eps.isEmpty) return;
+    final key = '$url|$source|${st.season}|${episodesFingerprint(eps)}';
+    if (_episodesSyncKey == key) return;
+    _episodesSyncKey = key;
+    Future.microtask(() {
+      try {
+        ref.read(activePlayerProvider.notifier).updateSession(episodes: eps!);
+      } catch (_) {}
+    });
+  }
+
+  /// Fin de video + preload en el mini (paridad con el fullscreen). El motor
+  /// es compartido: estas suscripciones solo actúan en modo mini para no
+  /// duplicar el autoplay/preload del player grande.
+  void _listenMiniPlayer(Player? player) {
+    if (player == _listenedPlayer) return;
+    _miniPosSub?.cancel();
+    _miniCompletedSub?.cancel();
+    _listenedPlayer = player;
+    if (player == null) return;
+
+    bool _isMiniActive() {
+      try {
+        return ref.read(activePlayerProvider).uiState == PlayerUIState.mini;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    // Umbral 90%: precargar el siguiente (una vez por episodio).
+    _miniPosSub = player.stream.position.listen((pos) {
+      if (!mounted || !_isMiniActive()) return;
+      if (_showReplay) {
+        final d = player.state.duration.inMilliseconds;
+        if (d <= 0 || pos.inMilliseconds < (d * 0.9).toInt()) {
+          setState(() => _showReplay = false);
+        }
+        return;
+      }
+      final d = player.state.duration.inMilliseconds;
+      if (d <= 0 || pos.inMilliseconds / d < 0.9) return;
+      try {
+        final st = ref.read(activePlayerProvider);
+        if (st.episode == null) return;
+        final key = '${st.url}|${st.episode}';
+        if (_preloadedForKey == key) return;
+        _preloadedForKey = key;
+        final eps = _miniEpisodes(st);
+        final int? total = eps.isEmpty
+            ? null
+            : eps.map((e) => e.number).reduce((a, b) => a > b ? a : b);
+        ref.read(playerPreloadControllerProvider).triggerNextPreload(
+              currentSource: st.source ?? '',
+              currentEpisode: st.episode,
+              totalEpisodes: total,
+              currentSourceUrl: st.url ?? '',
+              category: st.currentItem?.type.name,
+            );
+      } catch (_) {}
+    });
+
+    // Fin: auto-avanzar si hay siguiente, si no mostrar Repetir.
+    _miniCompletedSub = player.stream.completed.listen((completed) {
+      if (!mounted || !completed || !_isMiniActive()) return;
+      try {
+        final st = ref.read(activePlayerProvider);
+        if (player.state.duration.inMilliseconds <= 0) return;
+        if (player.state.position.inMilliseconds <= 0) return;
+        final cur = int.tryParse(st.episode ?? '');
+        if (cur == null) {
+          if (mounted) setState(() => _showReplay = true);
+          return;
+        }
+        EpisodeInfo? next;
+        for (final e in _miniEpisodes(st)) {
+          if (e.number == cur + 1) {
+            next = e;
+            break;
+          }
+        }
+        if (next != null && !_isSwitchingEp) {
+          _switchEpisodeMini(next, st);
+        } else if (mounted) {
+          setState(() => _showReplay = true);
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _replayMini() {
+    try {
+      final st = ref.read(activePlayerProvider);
+      st.player?.seek(Duration.zero);
+      st.player?.play();
+      if (mounted) setState(() => _showReplay = false);
+    } catch (_) {}
+  }
+
   bool _isSwitchingEp = false;
-  Future<void> _switchEpisodeMini(EpisodeInfo ep, ActivePlayerState state) async {
-    if (_isSwitchingEp) return;
+  Future<void> _switchEpisodeMini(EpisodeInfo ep, ActivePlayerState state) async {    if (_isSwitchingEp) return;
     setState(() => _isSwitchingEp = true);
     try {
       await ref.read(activePlayerProvider.notifier).switchEpisodeInSession(ep);
@@ -579,7 +1018,6 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                   : null,
                 color: Colors.white10,
               ),
-              child: Center(child: Text(ep.number.toString(), style: GoogleFonts.poppins(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
             ),
             const SizedBox(width: 12),
             Expanded(

@@ -790,18 +790,24 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           children: [
             // Logo o Título (Lado Izquierdo)
             Expanded(
+              // Altura reservada siempre: sin esto la caja colapsa a 0 hasta
+              // que carga la imagen y todo el hero salta (logos cortos o
+              // bajos). El ancho lo da el Expanded (constante).
               child: item.logoUrl != null && item.logoUrl!.isNotEmpty
-                  ? Container(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.7,
-                        maxHeight: ResponsiveUtils.heroLogoHeight(context),
-                      ),
-                      child: CachedNetworkImage(
-                        key: ValueKey('logo_mob_${item.id}'),
-                        imageUrl: item.logoUrl!, 
-                        fit: BoxFit.contain,
-                        alignment: Alignment.bottomLeft,
-                        fadeInDuration: const Duration(milliseconds: 200),
+                  ? SizedBox(
+                      height: ResponsiveUtils.heroLogoHeight(context),
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.7,
+                          maxHeight: ResponsiveUtils.heroLogoHeight(context),
+                        ),
+                        child: CachedNetworkImage(
+                          key: ValueKey('logo_mob_${item.id}'),
+                          imageUrl: item.logoUrl!, 
+                          fit: BoxFit.contain,
+                          alignment: Alignment.bottomLeft,
+                          fadeInDuration: const Duration(milliseconds: 200),
+                        ),
                       ),
                     )
                   : Text(
@@ -971,20 +977,24 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         ),
         SizedBox(height: isIntermediate ? 8 : 16),
 
-        // 2. EL LOGO / TÍTULO
+        // 2. EL LOGO / TÍTULO (altura reservada siempre: sin esto la caja
+        // colapsa a 0 hasta que carga y el hero salta)
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
-          Container(
-            constraints: BoxConstraints(
-              // Senior Fix: En tablets reducimos el ancho para dejar aire a los lados
-              maxWidth: screenWidth * (isTablet ? 0.30 : (isIntermediate ? 0.35 : 0.38)),
-              maxHeight: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
-            ),
-            child: CachedNetworkImage(
-              key: ValueKey('logo_${item.id}'),
-              imageUrl: item.logoUrl!, 
-              fit: BoxFit.contain, 
-              alignment: Alignment.bottomLeft,
-              fadeInDuration: const Duration(milliseconds: 100),
+          SizedBox(
+            height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
+            child: Container(
+              constraints: BoxConstraints(
+                // Senior Fix: En tablets reducimos el ancho para dejar aire a los lados
+                maxWidth: screenWidth * (isTablet ? 0.30 : (isIntermediate ? 0.35 : 0.38)),
+                maxHeight: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
+              ),
+              child: CachedNetworkImage(
+                key: ValueKey('logo_${item.id}'),
+                imageUrl: item.logoUrl!, 
+                fit: BoxFit.contain, 
+                alignment: Alignment.bottomLeft,
+                fadeInDuration: const Duration(milliseconds: 100),
+              ),
             ),
           )
         else

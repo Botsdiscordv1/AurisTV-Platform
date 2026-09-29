@@ -359,15 +359,28 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                 if (widget.logoUrl != null && widget.logoUrl!.isNotEmpty)
                                   Positioned(
                                     bottom: 16, left: 12,
-                                    child: Container(
+                                    // Caja + imagen con geometría idéntica antes y
+                                    // después de cargar (sin esto el logo aparece
+                                    // centrado y salta a bottomLeft al resolver).
+                                    child: SizedBox(
                                       height: widget.height * 0.35,
                                       width: widget.width * 0.65,
-                                      alignment: Alignment.bottomLeft,
                                       child: CachedNetworkImage(
                                         imageUrl: widget.logoUrl!,
+                                        width: widget.width * 0.65,
+                                        height: widget.height * 0.35,
                                         fit: BoxFit.contain,
+                                        alignment: Alignment.bottomLeft,
                                         filterQuality: FilterQuality.medium,
-                                        errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                                        fadeInDuration:
+                                            const Duration(milliseconds: 150),
+                                        placeholder: (context, url) => Container(
+                                          width: widget.width * 0.65,
+                                          height: widget.height * 0.35,
+                                          color: Colors.white.withOpacity(0.04),
+                                        ),
+                                        errorWidget: (_, __, ___) =>
+                                            const SizedBox.shrink(),
                                       ),
                                     ),
                                   )

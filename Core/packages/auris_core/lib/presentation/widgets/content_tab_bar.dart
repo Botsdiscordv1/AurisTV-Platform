@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 /// A shared content tab bar widget for all platforms (Mobile, TV, Web/Desktop).
 ///
-/// Uses Flutter's native [TabBar] with [TickerProviderStateMixin] and safe post-frame
-/// animation updates to guarantee butter-smooth animated indicator transitions
-/// across Web, Mobile, and Desktop without any ticker conflicts.
+/// Uses Flutter's native [TabBar] with `TabBarIndicatorSize.tab` to ensure
+/// the animated indicator spans the **full width of each tab** (including padding)
+/// with buttery-smooth native animation and absolute precision.
 class ContentTabBar extends StatefulWidget {
   final List<String> labels;
   final int selectedIndex;
@@ -37,37 +37,40 @@ class _ContentTabBarState extends State<ContentTabBar> with TickerProviderStateM
       length: widget.labels.length,
       vsync: this,
       initialIndex: widget.selectedIndex.clamp(0, widget.labels.length - 1),
-      animationDuration: const Duration(milliseconds: 300), // Senior Fix: Animación fluida y configurable
     );
+    _tabController.addListener(_handleTabSelection);
+  }
+
+  void _handleTabSelection() {
+    if (!_tabController.indexIsChanging) {
+      if (_tabController.index != widget.selectedIndex) {
+        widget.onTabSelected(_tabController.index);
+      }
+    }
   }
 
   @override
   void didUpdateWidget(covariant ContentTabBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.labels.length != widget.labels.length) {
+      _tabController.removeListener(_handleTabSelection);
       _tabController.dispose();
       _tabController = TabController(
         length: widget.labels.length,
         vsync: this,
         initialIndex: widget.selectedIndex.clamp(0, widget.labels.length - 1),
-        animationDuration: const Duration(milliseconds: 300),
       );
-    } else if (widget.selectedIndex != _tabController.index && !_tabController.indexIsChanging) {
-      // Senior Fix: Evitar conflicto/doble animación (race condition) si el usuario ya tocó el tab
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && widget.selectedIndex != _tabController.index && !_tabController.indexIsChanging) {
-          _tabController.animateTo(
-            widget.selectedIndex.clamp(0, widget.labels.length - 1),
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-        }
-      });
+      _tabController.addListener(_handleTabSelection);
+    } else if (widget.selectedIndex != _tabController.index) {
+      if (!_tabController.indexIsChanging) {
+        _tabController.animateTo(widget.selectedIndex.clamp(0, widget.labels.length - 1));
+      }
     }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabSelection);
     _tabController.dispose();
     super.dispose();
   }
@@ -90,15 +93,10 @@ class _ContentTabBarState extends State<ContentTabBar> with TickerProviderStateM
         dividerColor: Colors.transparent,
         indicatorColor: const Color(0xFFEF7A1E),
         indicatorWeight: indicatorHeight,
-        indicatorSize: TabBarIndicatorSize.tab, // Senior Fix: La barra ocupa todo el ancho del tab
+        indicatorSize: TabBarIndicatorSize.tab, // <--- Abarca todo el ancho del tab (incluyendo padding)
         labelPadding: EdgeInsets.symmetric(horizontal: itemHPadding),
         labelColor: Colors.white,
         unselectedLabelColor: const Color(0xFFA5A5AA),
-        onTap: (i) {
-          if (widget.selectedIndex != i) {
-            widget.onTabSelected(i);
-          }
-        },
         tabs: widget.labels.map((label) {
           return Tab(
             child: Padding(

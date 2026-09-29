@@ -109,7 +109,7 @@ class ResponsiveUtils {
     final width = MediaQuery.of(context).size.width;
     final b = getBreakpoint(context);
 
-    if (b < Breakpoint.md) return 24.0; // Senior Fix: 24px mínimo para evitar que plegables/tablets se peguen al borde
+    if (b < Breakpoint.md) return 16.0; // Móvil: estándar Material (antes 24px)
     if (width > 2200) return (width - 2000) / 2 + 32.0;
 
     final double percentage = b >= Breakpoint.xl ? 0.03 : 0.04;

@@ -108,6 +108,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isLandscapeOnly = true;
   bool _hasResetPosition = false;
   int _resumePosition = 0;
+  /// Generación del seek de resume: cada _initPlayer la incrementa para que
+  /// los loops de reintento del episodio/fuente anterior se aborten y no
+  /// apliquen su seek tardío sobre el nuevo stream (episodios abriendo
+  /// adelantados 8-14s = el resume viejo aterrizando tarde).
+  int _resumeSeekGen = 0;
   DateTime? _resumeGuardUntil;
   int _resumeGuardRetries = 0;
   Timer? _hideTimer;
@@ -421,6 +426,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _updateHistory({required int positionMs, required int durationMs, bool force = false}) {
+    if (_isDisposed) return;
     if (widget.contentId.isEmpty || _historyNotifier == null || _isOpEd || _isTrailer) return;
 
     // Senior Performance Fix: Throttling de guardado en base de datos.
@@ -428,7 +434,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (!force) {
       _historySaveTimer?.cancel();
       _historySaveTimer = Timer(const Duration(seconds: 1), () {
-        if (!mounted) return;
+        if (!mounted || _isDisposed) return;
         _performHistoryUpdate(positionMs, durationMs, force: false);
       });
       return;
@@ -438,6 +444,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _performHistoryUpdate(int positionMs, int durationMs, {bool force = false}) {
+    // Tras dispose el ref muere (StateError en _assertNotDisposed): el guardado
+    // final usa _finalSaveOnDispose (sin ref). Esto reventaba el frame al
+    // entrar a PiP nativo (el árbol entero se desmonta a PipVideoContainer).
+    if (_isDisposed) return;
     // Banner del episodio: 1) lista sincronizada del provider global, 2) estado
     // directo de episodios (no depende del timing del sync), 3) backdrop.
     // Sin el paso 2, si los episodios aún no se sincronizaban al guardar, la
@@ -467,6 +477,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             notifier.episodeInfoFor(_activeEpisode)?.title;
       }
     } catch (_) {}
+    // Cachear lo resuelto para el guardado final en dispose (sin ref).
+    // Solo se pisa con valores reales: un null posterior (lista aún no
+    // cargada) no debe borrar el título ya resuelto.
+    if (episodeTitle != null && episodeTitle.isNotEmpty) {
+      _lastResolvedEpisodeTitle = episodeTitle;
+    }
+    final _resolvedBanner = episodeThumb ?? widget.bannerUrl;
+    if (_resolvedBanner != null && _resolvedBanner.isNotEmpty) {
+      _lastResolvedEpisodeBanner = _resolvedBanner;
+    }
     _historyNotifier!.updatePosition(
       contentId: widget.contentId,
       season: widget.season,
@@ -489,7 +509,43 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
+  /// Guardado final en dispose SIN usar ref (el ref muere con el widget y
+  /// cualquier ref.read lanza StateError). Usa el notifier capturado (vive en
+  /// el container global) y los últimos valores resueltos cacheados.
+  void _finalSaveOnDispose(int positionMs, int durationMs) {
+    try {
+      final hn = _historyNotifier;
+      if (hn == null) return;
+      hn.updatePosition(
+        contentId: widget.contentId,
+        season: widget.season,
+        episode: _activeEpisode,
+        positionMs: positionMs,
+        durationMs: durationMs,
+        title: widget.title,
+        posterUrl: widget.posterUrl,
+        bannerUrl: _lastResolvedEpisodeBanner ?? widget.bannerUrl,
+        episodeTitle: _lastResolvedEpisodeTitle,
+        kind: widget.kind,
+        year: widget.year,
+        logoUrl: widget.logoUrl,
+        category: widget.category,
+        source: widget.source,
+        url: _currentSourceUrl,
+        alternativeSources: _groupedSources.values.expand((e) => e).toList(),
+        force: true,
+      );
+      hn.flush();
+    } catch (_) {}
+  }
+
   PlaybackHistoryNotifier? _historyNotifier;
+  // Tras dispose el ref muere: estas banderas/datos permiten el guardado
+  // final sin ref (ver _finalSaveOnDispose). Sin esto, entrar a PiP nativo
+  // (desmonta todo el árbol) lanzaba StateError en finalizeTree.
+  bool _isDisposed = false;
+  String? _lastResolvedEpisodeTitle;
+  String? _lastResolvedEpisodeBanner;
   late PlaybackPolicy _policy;
   final ValueNotifier<bool> _showNextNotifier = ValueNotifier<bool>(false);
   late DateTime _screenInitTime;
@@ -519,11 +575,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   static const _volumeControlChannel = MethodChannel('auristv/volume');
   static const _orientationChannel = MethodChannel('auristv/orientation');
+
+  void _enforceLandscapeOrientation() {
+    try {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      if (Platform.isAndroid) {
+        _orientationChannel.invokeMethod('setOrientationLandscape');
+      }
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } catch (_) {}
+  }
   
   @override
   void initState() {
     super.initState();
+    ref.listen(activePlayerProvider.select((s) => s.uiState), (previous, next) {
+      if (next == PlayerUIState.full && mounted) {
+        _enforceLandscapeOrientation();
+      }
+    });
+    _enforceLandscapeOrientation();
     PipService.setPipAllowed(true);
+    PipService.setPlayerActive(true);
     _videoKey = ref.read(activePlayerProvider).videoKey;
     _screenInitTime = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
@@ -582,12 +658,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
 
-    SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
-    if (Platform.isAndroid) {
-      try {
-        _orientationChannel.invokeMethod('setOrientationLandscape');
-      } catch (_) {}
-    }
+    _enforceLandscapeOrientation();
     
     // Senior Immersive Fix: Usar immersiveSticky para máxima compatibilidad con notch
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -781,12 +852,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       VolumeController().showSystemUI = false;
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true});
       ScreenBrightnessController.setBrightness(_brightness);
-      if (_isLandscapeOnly) {
-        SystemChrome.setPreferredOrientations([
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight,
-        ]);
-      }
+      _enforceLandscapeOrientation();
     }
   }
 
@@ -2010,6 +2076,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // diálogo de "reanudar" aunque el widget se haya recreado (widget.skipResume).
     final bool skipResume = _skipResumeOnNextInit || widget.skipResume;
     _skipResumeOnNextInit = false;
+    // Invalidar loops de resume-retry de inits anteriores (ver campo).
+    _resumeSeekGen++;
 
     _lastVideoUrl = videoUrl;
     _lastVideoHeaders = headers;
@@ -2445,7 +2513,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // "parezca" aplicado, a veces se pierde y el video arranca desde 0 con
         // el overlay mostrando la posición guardada. Verificamos por posición
         // SIEMPRE en reanudaciones y reintentamos hasta que aterrice.
-        unawaited(_resumeSeekWhenReady(Duration(milliseconds: _resumePosition), player));
+        unawaited(_resumeSeekWhenReady(
+            Duration(milliseconds: _resumePosition), player, _resumeSeekGen));
       }
       
       if (mounted) {
@@ -2492,7 +2561,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             // manifest/segmentos carguen en paralelo y aplicamos el seek en
             // cuanto el elemento <video> esté listo.
             _startStabilizationTimer();
-            unawaited(_webResumeSeek(player, resumeMs));
+            unawaited(_webResumeSeek(player, resumeMs, _resumeSeekGen));
             player.play();
           } else {
             _startStabilizationTimer();
@@ -2538,9 +2607,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// reproducción arranca desde 0. Aquí esperamos a que el stream esté listo y
   /// reintentamos el seek absoluto, verificando por posición (no por errores,
   /// que llegan por player.stream y no lanzan excepción).
-  Future<void> _resumeSeekWhenReady(Duration target, Player player) async {
+  Future<void> _resumeSeekWhenReady(Duration target, Player player, int gen) async {
     int waited = 0;
-    while (waited < 60 && mounted) {
+    while (waited < 60 && mounted && gen == _resumeSeekGen) {
       await Future.delayed(const Duration(milliseconds: 100));
       waited++;
       final d = player.state.duration;
@@ -2548,15 +2617,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (d > Duration.zero) break;
       if (p > 150) break;
     }
-    if (!mounted) return;
+    if (!mounted || gen != _resumeSeekGen) return;
 
     final tMs = target.inMilliseconds;
-    for (int attempt = 0; attempt < 3 && mounted; attempt++) {
+    for (int attempt = 0; attempt < 3 && mounted && gen == _resumeSeekGen; attempt++) {
       final before = player.state.position.inMilliseconds;
       if (before >= tMs - 2000 && before <= tMs + 4000) {
         debugPrint('[player] Resume confirmado en $before (objetivo $tMs)');
         return;
       }
+      if (gen != _resumeSeekGen) return;
       debugPrint('[player] Resume retry seek a $tMs (attempt ${attempt + 1}, pos $before)');
       await player.seek(target);
       // Senior: 900ms de settle; el seek en MP4 progresivo dispara una petición
@@ -2575,20 +2645,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// stream sin cargar ~2.3s), esperamos a que el media arranque (posición > 0
   /// o duración conocida) y ahí sí aplicamos el seek absoluto verificando por
   /// posición. El spinner se oculta al confirmar el salto.
-  Future<void> _webResumeSeek(Player player, int targetMs) async {
+  Future<void> _webResumeSeek(Player player, int targetMs, int gen) async {
     int waited = 0;
-    while (waited < 80 && mounted) {
+    while (waited < 80 && mounted && gen == _resumeSeekGen) {
       await Future.delayed(const Duration(milliseconds: 100));
       waited++;
       if (player.state.position.inMilliseconds > 0) break;
       if (player.state.duration > Duration.zero) break;
     }
-    if (!mounted) return;
+    if (!mounted || gen != _resumeSeekGen) return;
 
-    for (int attempt = 0; attempt < 3 && mounted; attempt++) {
+    for (int attempt = 0; attempt < 3 && mounted && gen == _resumeSeekGen; attempt++) {
       final before = player.state.position.inMilliseconds;
       if (before >= targetMs - 1500) break;
       debugPrint('[player] Web resume seek $targetMs (attempt ${attempt + 1}, pos $before)');
+      if (gen != _resumeSeekGen) return;
       await player.seek(Duration(milliseconds: targetMs));
       await Future.delayed(const Duration(milliseconds: 400));
       final after = player.state.position.inMilliseconds;
@@ -2706,6 +2777,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   @override
   void dispose() {
+    // Primero la bandera: a partir de aquí el ref está muerto y cualquier
+    // ref.read lanza StateError (rompía el frame al entrar a PiP nativo).
+    _isDisposed = true;
     // Senior Fix: Cancelar TODOS los timers para evitar fugas de memoria y llamadas a setState
     _loadWatchdogTimer?.cancel();
     _hideTimer?.cancel();
@@ -2735,12 +2809,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     // Senior Shield: Solo guardamos si el reproductor realmente logró sincronizar la posición
     // de reanudación. Si cerramos antes de que MPV enganche, evitamos sobreescribir con 0ms.
+    // Guardado final SIN ref (ver _finalSaveOnDispose): _updateHistory usaría
+    // ref.read y lanzaría StateError en finalizeTree.
     if (_hasResetPosition && ms > 3000 && duration > 0) {
-      _updateHistory(
-        positionMs: ms,
-        durationMs: duration,
-        force: true,
-      );
+      _finalSaveOnDispose(ms, duration);
     }
     
     _historyNotifier?.flush();
@@ -2758,7 +2830,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
     }
     
-    PipService.setPipAllowed(false);
+    // El PiP lo gobierna SOLO el overlay (hay contenido o no): el dispose NO
+    // lo toca. Antes lo desactivaba aquí y el mini quedaba con allowed=false
+    // hasta (y si) el listener lo reactivaba → Home no entraba a PiP.
+    PipService.setPlayerActive(false);
     _showNextNotifier.dispose();
     _hoverInfoNotifier.dispose();
     super.dispose();
@@ -2798,19 +2873,80 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _minimizePlayer() {
     if (!mounted || _isExiting) return;
 
+    // El notifier sobrevive a la ruta (el ref del widget muere con el pop):
+    // se captura para programar el mini tras la rotación.
+    final sessionNotifier = ref.read(activePlayerProvider.notifier);
+    final String? exitUrl = sessionNotifier.state.url;
+    final String? exitEpisode = sessionNotifier.state.episode;
+
     if (_allTracks.isNotEmpty) {
-      ref.read(activePlayerProvider.notifier).updateSession(
+      sessionNotifier.updateSession(
         tracks: _allTracks,
         selectedIndex: _selectedTrackIndex,
       );
     }
     if (_groupedSources.isNotEmpty) {
-      ref.read(activePlayerProvider.notifier).updateSession(
+      sessionNotifier.updateSession(
         sources: _groupedSources.values.expand((e) => e).toList(),
       );
     }
-    ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
-    _exitPlayer(minimizing: true);
+
+    // Transición rápida y fluida a mini (horizontal -> vertical):
+    // 1. Flush de historial (rápido, seguridad de datos).
+    // 2. Restauración del sistema YA (sin await): la rotación la anima el SO
+    //    en paralelo al pop de la ruta, en vez de en serie.
+    // 3. Pop inmediato (la ruta se desliza mientras rota; el video sigue
+    //    visible hasta el pop, sin flash negro).
+    // 4. El mini aparece cuando la rotación ya asentó (~350ms): así monta
+    //    directo en coords portrait y se evita el deslizamiento cruzado
+    //    del re-snap (landscape -> portrait). En portrait no se difiere.
+    try {
+      final ms = _player?.state.position.inMilliseconds ?? 0;
+      final duration = _player?.state.duration.inMilliseconds ?? 0;
+      if (_hasResetPosition && ms > 3000 && duration > 0) {
+        _historyNotifier?.flush();
+      }
+    } catch (e) {
+      debugPrint('[player] Error during safety flush: $e');
+    }
+
+    final bool isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    setState(() => _isExiting = true);
+    if (_isMobileDevice) {
+      _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
+      if (Platform.isAndroid) {
+        try {
+          _orientationChannel.invokeMethod('resetOrientation');
+        } catch (_) {}
+      }
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      VolumeController().showSystemUI = true;
+      ScreenBrightnessController.resetBrightness();
+    }
+
+    if (mounted) {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/');
+      }
+    }
+
+    Future.delayed(Duration(milliseconds: isLandscape ? 350 : 0), () {
+      // Sin chequeo de mounted: la ruta ya hizo pop; el notifier global sigue
+      // vivo. Si el usuario reabrió otro contenido, no degradar a mini.
+      try {
+        final s = sessionNotifier.state;
+        if (s.uiState == PlayerUIState.full &&
+            s.url == exitUrl &&
+            s.episode == exitEpisode) {
+          sessionNotifier.setUiState(PlayerUIState.mini);
+        }
+      } catch (_) {}
+    });
   }
 
   void _exitPlayer({bool minimizing = false}) async {

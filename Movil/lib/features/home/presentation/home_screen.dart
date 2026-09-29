@@ -120,9 +120,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         '${typeVal != null ? '&type=${Uri.encodeComponent(typeVal)}' : ''}'
         '&sectionId=${Uri.encodeComponent(item.sectionId ?? '')}';
         
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) context.push(uri, extra: item.toContentSeed());
-    });
+    // Push directo (sin post-frame): diferirlo dejaba la navegación colgada
+    // si la app estaba idle (sin frames), y solo avanzaba al hacer scroll.
+    if (context.mounted) context.push(uri, extra: item.toContentSeed());
   }
 
   List<Widget> _buildEditorialRows(
@@ -341,9 +341,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final uri =
         '/content/${Uri.encodeComponent(item.title)}?source=${Uri.encodeComponent(source)}&category=${Uri.encodeComponent(effectiveCat)}&url=${Uri.encodeComponent(url)}&metadataTitle=${Uri.encodeComponent(metaTitle)}&banner=&year=${itemYear ?? ''}&quality=${Uri.encodeComponent(quality)}&type=${Uri.encodeComponent(type)}&kind=${Uri.encodeComponent(kind)}';
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) context.push(uri, extra: item.toContentSeed());
-    });
+    // Push directo (sin post-frame): diferirlo dejaba la navegación colgada
+    // si la app estaba idle (sin frames), y solo avanzaba al hacer scroll.
+    if (context.mounted) context.push(uri, extra: item.toContentSeed());
   }
 
   WideContentItem _wideItemFromMedia(MediaItem m, {Widget? badgeOverlay}) {

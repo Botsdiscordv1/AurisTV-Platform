@@ -82,7 +82,7 @@ class AdaptiveDetailLayout extends StatelessWidget {
     final bool isTablet = ResponsiveUtils.isTablet(context) || (width >= 768 && width < 1024);
     final bool isWide = width >= 768; // Botones de acción en horizontal para Tablet y Desktop
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final double contentPadding = isDesktop ? horizontalPadding : (isTablet ? 16.0 : 24.0); // Senior Fix: 16px en tablets (iPad Mini) para aprovechar todo el ancho sin desbordes de 1px.
+    final double contentPadding = isDesktop ? horizontalPadding : (isTablet ? 16.0 : horizontalPadding); // Móvil hereda el padding global (16px) tablets (iPad Mini) para aprovechar todo el ancho sin desbordes de 1px.
     final double topPadding = ResponsiveUtils.isNative ? MediaQuery.of(context).padding.top : 0;
 
     return Scaffold(
@@ -176,7 +176,7 @@ class AdaptiveDetailLayout extends StatelessWidget {
                       )
                     else ...[
                       if (mainAction != null) Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        padding: EdgeInsets.symmetric(horizontal: contentPadding),
                         child: mainAction!,
                       ),
                       if (secondaryActions != null) ...[

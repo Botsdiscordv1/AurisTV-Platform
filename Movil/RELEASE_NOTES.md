@@ -1,4 +1,4 @@
-# 🚀 AurisTV v1.0.0 - Lanzamiento Oficial
+ # 🚀 AurisTV v1.0.0 - Lanzamiento Oficial
 
 ¡Nos complace anunciar el lanzamiento oficial de **AurisTV v1.0.0**! Esta versión inicial trae consigo una experiencia optimizada, moderna y fluida para disfrutar de todo tu contenido multimedia favorito en múltiples plataformas.
 

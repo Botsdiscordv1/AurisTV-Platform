@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:auris_core/auris_core.dart';
@@ -70,81 +71,207 @@ class AurisApp extends StatelessWidget {
       builder: (context, child) {
         if (child == null) return const SizedBox.shrink();
         
-        return NotificationInitializer(
-          child: RemoteCommandListener(
-            child: MinWidthWrapper(
-              minWidth: 360, // Sincronizado con Web para evitar inconsistencias en tablets
-              child: Stack(
-                fit: StackFit.expand, // Senior Fix: Garantiza que el contenido principal llene la pantalla
-                children: [
-                  child,
-                  // Senior: Floating MiniPlayer (Global y Persistente)
-                  const GlobalMiniPlayerOverlay(),
-                ],
+        return ValueListenableBuilder<bool>(
+          valueListenable: PipService.isPipMode,
+          builder: (context, inPip, _) {
+            if (inPip) {
+              return const PipVideoContainer();
+            }
+
+            return NotificationInitializer(
+              child: RemoteCommandListener(
+                child: MinWidthWrapper(
+                  minWidth: 360, // Sincronizado con Web para evitar inconsistencias en tablets
+                  child: Stack(
+                    fit: StackFit.expand, // Senior Fix: Garantiza que el contenido principal llene la pantalla
+                    children: [
+                      child,
+                      // Senior: Floating MiniPlayer (Global y Persistente)
+                      const GlobalMiniPlayerOverlay(),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
   }
 }
 
-class GlobalMiniPlayerOverlay extends ConsumerWidget {
-  const GlobalMiniPlayerOverlay({super.key});
+class PipVideoContainer extends ConsumerWidget {
+  const PipVideoContainer({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(activePlayerProvider);
+    final controller = state.controller;
+    final posterUrl = state.currentItem?.posterUrl;
+
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: controller != null
+              ? Video(
+                  key: state.videoKey,
+                  controller: controller,
+                  fill: Colors.black,
+                  controls: NoVideoControls,
+                )
+              : (posterUrl != null
+                  ? Image.network(posterUrl, fit: BoxFit.cover)
+                  : const SizedBox.shrink()),
+        ),
+      ),
+    );
+  }
+}
+
+class GlobalMiniPlayerOverlay extends ConsumerStatefulWidget {
+  const GlobalMiniPlayerOverlay({super.key});
+
+  @override
+  ConsumerState<GlobalMiniPlayerOverlay> createState() => _GlobalMiniPlayerOverlayState();
+}
+
+class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverlay> {
+  final GlobalKey _key = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
     ref.listen(activePlayerProvider, (previous, next) {
       final hasItem = next.currentItem != null;
-      _updatePipRect(context, hasItem);
+      _updatePipRect(hasItem);
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = ref.read(activePlayerProvider);
-      _updatePipRect(context, state.currentItem != null);
+      _updatePipRect(state.currentItem != null);
     });
 
-    return MiniPlayerBar(
-      onExpand: () {
-        final state = ref.read(activePlayerProvider);
-        if (state.currentItem != null) {
-          // Senior: Sincroniza uiState antes del push para que PlayerScreen vea isFull=true y no oculte extract
-          ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
-          final posterParam = '&posterUrl=${Uri.encodeComponent(state.currentItem!.posterUrl)}&bannerUrl=${Uri.encodeComponent(state.currentItem!.bannerUrl ?? '')}&logoUrl=${Uri.encodeComponent(state.currentItem!.logoUrl ?? '')}';
-          final serverParam = state.source != null ? '&serverName=${Uri.encodeComponent(simplifySourceName(state.source!))}' : '';
-          final uri = '/player/${Uri.encodeComponent(state.currentItem!.title)}'
-              '?source=${Uri.encodeComponent(state.source ?? '')}'
-              '&url=${Uri.encodeComponent(state.url ?? '')}'
-              '&episode=${Uri.encodeComponent(state.episode ?? '')}'
-              '&season=${state.season ?? ''}'
-              '&category=${state.currentItem!.type.name}'
-              '$posterParam$serverParam';
-          
-          appRouter.push(uri);
-        }
-      },
+    return KeyedSubtree(
+      key: _key,
+      child: MiniPlayerBar(
+        onExpand: () {          final state = ref.read(activePlayerProvider);
+          if (state.currentItem != null) {
+            // Senior: Sincroniza uiState antes del push para que PlayerScreen vea isFull=true y no oculte extract
+            ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
+            final posterParam = '&posterUrl=${Uri.encodeComponent(state.currentItem!.posterUrl)}&bannerUrl=${Uri.encodeComponent(state.currentItem!.bannerUrl ?? '')}&logoUrl=${Uri.encodeComponent(state.currentItem!.logoUrl ?? '')}';
+            final serverParam = state.source != null ? '&serverName=${Uri.encodeComponent(simplifySourceName(state.source!))}' : '';
+            // kind/year viajan para que el player reabierto guarde historial fiel
+            // aunque tenga que re-ejecutar play() (p. ej. motor muerto en background).
+            final kindYearParam = '${state.currentItem!.kind != null && state.currentItem!.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(state.currentItem!.kind!)}' : ''}${state.currentItem!.year != null ? '&year=${state.currentItem!.year}' : ''}';
+            final uri = '/player/${Uri.encodeComponent(state.currentItem!.title)}'
+                '?source=${Uri.encodeComponent(state.source ?? '')}'
+                '&url=${Uri.encodeComponent(state.url ?? '')}'
+                '&episode=${Uri.encodeComponent(state.episode ?? '')}'
+                '&season=${state.season ?? ''}'
+                '&category=${state.currentItem!.type.name}'
+                '$posterParam$serverParam$kindYearParam';
+            
+            appRouter.push(uri).catchError((_) {
+              // Si el push falla, revertir a mini: si no, queda audio sin UI.
+              try {
+                ref
+                    .read(activePlayerProvider.notifier)
+                    .setUiState(PlayerUIState.mini);
+              } catch (_) {}
+              return null;
+            });
+          }
+        },
+        onEnterPip: () async {
+          // Entrada manual a PiP + verificación del permiso del SO: si el
+          // sistema lo revocó, enterPictureInPictureMode falla en silencio.
+          final permitted = await PipService.isPipPermitted();
+          if (!context.mounted) return;
+          if (permitted) {
+            final ok = await PipService.enterPip();
+            if (!ok && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('PiP no disponible ahora mismo, reintenta'),
+                ),
+              );
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Permite Picture-in-picture en la ficha de AurisTV'),
+                action: SnackBarAction(
+                  label: 'Abrir',
+                  onPressed: () => PipService.openPipSettings(),
+                ),
+              ),
+            );
+          }
+        },
+      ),
     );
   }
 
-  void _updatePipRect(BuildContext context, bool allowed) {
-    if (!allowed) {
-      PipService.setPipAllowed(false);
-      return;
+  void _updatePipRect(bool allowed) {
+    PipService.setPipAllowed(allowed);
+  }
+}
+
+class NotificationInitializer extends ConsumerStatefulWidget {
+  final Widget child;
+  const NotificationInitializer({super.key, required this.child});
+
+  @override
+  ConsumerState<NotificationInitializer> createState() => _NotificationInitializerState();
+}
+
+class _NotificationInitializerState extends ConsumerState<NotificationInitializer> {
+  @override
+  void initState() {
+    super.initState();
+    _initNotifications();
+  }
+
+  Future<void> _initNotifications() async {
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      ref.read(notificationServiceProvider).init();
     }
-    final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox != null && renderBox.hasSize) {
-      final position = renderBox.localToGlobal(Offset.zero);
-      final size = renderBox.size;
-      PipService.setPipAllowed(
-        true,
-        left: position.dx,
-        top: position.dy,
-        right: position.dx + size.width,
-        bottom: position.dy + size.height,
-      );
-    } else {
-      PipService.setPipAllowed(true);
-    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
+  }
+}
+
+class RemoteCommandListener extends ConsumerWidget {
+  final Widget child;
+  const RemoteCommandListener({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(remoteControlProvider.select((s) => s.lastReceivedCommand), (prev, next) {
+      if (next != null && next != prev) {
+        if (next['action'] == RemoteAction.openMedia) {
+          final p = next['params'] as Map<String, dynamic>?;
+          if (p != null) {
+            final contentId = p['contentId'];
+            final query = Map<String, String>.from(p);
+            query.remove('contentId');
+            
+            final uri = Uri(
+              path: '/player/${Uri.encodeComponent(contentId)}',
+              queryParameters: query,
+            );
+            
+            appRouter.push(uri.toString());
+          }
+        }
+      }
+    });
+    
+    return child;
   }
 }

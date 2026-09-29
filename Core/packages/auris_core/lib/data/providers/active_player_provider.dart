@@ -22,6 +22,15 @@ String episodeDisplayLabel(String? episode, {int? season, String? title}) {
   return t.isEmpty ? base : '$base "$t"';
 }
 
+/// Huella de una lista de episodios (números+títulos+thumbs). El fast y el
+/// full suelen tener LA MISMA longitud: una key solo-longitud bloquea el
+/// reemplazo y la sesión se queda con el fast pobre para siempre.
+String episodesFingerprint(List<EpisodeInfo> eps) {
+  final body =
+      eps.map((e) => '${e.number}:${e.title ?? ''}:${e.thumbnail ?? ''}').join('|');
+  return '${eps.length}:${body.hashCode}';
+}
+
 class ActivePlayerState {
   final Player? player;
   final VideoController? controller;
@@ -499,9 +508,33 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
       source: state.source,
       triggerOpen: false,
     );
+    // Consumir el preload vigente si es para este mismo episodio (si no,
+    // extracción fresca como antes). Sin el match por url+episodio se podía
+    // reproducir un preload stale (E6 precargado, salto a E8, abría E6).
+    ExtractResult? preloaded;
     try {
-      final repo = ref.read(aurisRepositoryProvider);
-      final extract = await repo.extractVideo(pageUrl, state.source!, category: category);
+      final target = ref.read(nextEpisodePreloadTargetProvider);
+      if (target != null && target.url == pageUrl && target.episode == ep.number) {
+        preloaded = ref.read(nextEpisodePreloadProvider);
+      }
+    } catch (_) {}
+    ExtractResult extract;
+    if (preloaded != null && preloaded.tracks.isNotEmpty) {
+      debugPrint('[player_session] switchEpisode consume preload E${ep.number}');
+      extract = preloaded;
+      try {
+        ref.read(playerPreloadControllerProvider).clearPreload();
+      } catch (_) {}
+    } else {
+      try {
+        final repo = ref.read(aurisRepositoryProvider);
+        extract = await repo.extractVideo(pageUrl, state.source!, category: category);
+      } catch (e) {
+        debugPrint('[player_session] switchEpisode fail: $e');
+        return;
+      }
+    }
+    try {
       final tracks = extract.tracks.where((t) => !t.isDownload).toList();
       String? streamUrl;
       Map<String, String> headers = const {};
