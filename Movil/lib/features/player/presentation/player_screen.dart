@@ -113,12 +113,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// apliquen su seek tardío sobre el nuevo stream (episodios abriendo
   /// adelantados 8-14s = el resume viejo aterrizando tarde).
   int _resumeSeekGen = 0;
+  /// Gate de primer frame (solo videos nuevos): oculta el video hasta
+  /// verificar posición sana (0..elapsed+2.5s). Sin esto se veía el salto
+  /// inicial (14s) antes de que el vigía lo corrigiera.
+  bool _holdingFirstFrame = false;
+  int _holdingGen = -1;
   DateTime? _resumeGuardUntil;
   int _resumeGuardRetries = 0;
   Timer? _hideTimer;
   double _playbackSpeed = 1.0;
   StreamSubscription? _posSubscription;
   StreamSubscription? _completedSubscription;
+  ProviderSubscription<PlayerUIState>? _uiStateSub;
   bool _isStabilizing = false;
   Timer? _stabilizationTimer;
   bool _isMobileDevice = false;
@@ -592,7 +598,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   @override
   void initState() {
     super.initState();
-    ref.listen(activePlayerProvider.select((s) => s.uiState), (previous, next) {
+    // listenManual (no ref.listen): en initState el ref aún no admite listen
+    // (StateError en finalizeTree). Se cierra en dispose.
+    _uiStateSub = ref.listenManual(
+        activePlayerProvider.select((s) => s.uiState), (previous, next) {
       if (next == PlayerUIState.full && mounted) {
         _enforceLandscapeOrientation();
       }
@@ -2493,7 +2502,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         await Future.delayed(const Duration(milliseconds: 1200));
       } else {
         debugPrint('[player] 4. NEW VIDEO (Start from 0)');
-        await player.seek(Duration.zero);
+        // Garantía 0:00 (1/2): el seek puede fallar en silencio con el
+        // demuxer frío (visto en logs como command-error). Verificar +
+        // reintentar acotado antes del play.
+        for (int i = 0; i < 3; i++) {
+          await player.seek(Duration.zero);
+          await Future.delayed(const Duration(milliseconds: 300));
+          if (player.state.position.inMilliseconds <= 1500) break;
+        }
+        _watchZeroStart(player, _resumeSeekGen);
+        // Ocultar video hasta verificar primer frame sano (ver campo).
+        if (mounted) {
+          _holdingGen = _resumeSeekGen;
+          setState(() => _holdingFirstFrame = true);
+        }
       }
       
       if (_isAutoplayResume) {
@@ -2502,6 +2524,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       } else {
         debugPrint('[player] 5. PLAY');
         await player.play();
+        // Gate de primer frame solo para videos nuevos (ver campo).
+        if (_resumePosition <= 3000 && !_isAutoplayResume) {
+          _gateFirstFrame(player, _resumeSeekGen);
+        }
         // Senior Autoplay Fix: Garantizar que el stream arranca aunque el motor
         // reporte pausa justo después del open (común en HLS nativo).
         _ensureAutoplay(player);
@@ -2581,11 +2607,54 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
+  /// Gate de primer frame (solo videos nuevos): mantiene el video oculto
+  /// hasta que la posición es sana (0..elapsed+2.5s) o 6s timeout (revela de
+  /// todos modos para no atrapar al usuario en el loader). Así el salto
+  /// inicial del demuxer nunca se ve: o arranca en 0 o sigue cargando.
+  Future<void> _gateFirstFrame(Player player, int gen) async {
+    final t0 = DateTime.now();
+    while (mounted && gen == _resumeSeekGen) {
+      await Future.delayed(const Duration(milliseconds: 250));
+      if (gen != _resumeSeekGen) break;
+      final elapsed = DateTime.now().difference(t0).inMilliseconds;
+      final pos = player.state.position.inMilliseconds;
+      final dur = player.state.duration.inMilliseconds;
+      if (dur > 0 && pos >= 0 && pos <= elapsed + 2500) break;
+      if (elapsed > 6000) break;
+    }
+    if (mounted && _holdingGen == gen) {
+      setState(() => _holdingFirstFrame = false);
+    }
+  }
+
+  /// Vigía de arranque en cero (solo videos nuevos, 2/2 de la garantía).
+  /// Si en los primeros segundos la posición supera lo reproducible
+  /// (elapsed + 3s), el demuxer saltó solo → re-seek(0) una vez.
+  /// No actúa si el usuario tocó la velocidad o hizo seek manual.
+  void _watchZeroStart(Player player, int gen) {
+    final t0 = DateTime.now();
+    final manualAtStart = _lastManualSeekTime;
+    Future<void> check() async {
+      if (!mounted || gen != _resumeSeekGen) return;
+      if (_playbackSpeed != 1.0) return;
+      if (_lastManualSeekTime != manualAtStart) return;
+      final elapsed = DateTime.now().difference(t0).inMilliseconds;
+      final pos = player.state.position.inMilliseconds;
+      final dur = player.state.duration.inMilliseconds;
+      if (dur > 0 && pos > elapsed + 3000) {
+        debugPrint('[player] Salto inicial detectado (pos $pos vs $elapsed ms): re-seek(0)');
+        await player.seek(Duration.zero);
+      }
+    }
+
+    Future.delayed(const Duration(seconds: 2), check);
+    Future.delayed(const Duration(milliseconds: 4500), check);
+  }
+
   /// Red de seguridad: si el player quedó en pausa tras abrir el nuevo
   /// stream (mpv puede reportar pause=true durante la carga del HLS),
   /// reintenta el play hasta que efectivamente esté reproduciendo.
-  void _ensureAutoplay(Player player) {
-    void tryPlay() {
+  void _ensureAutoplay(Player player) {    void tryPlay() {
       if (mounted && !player.state.playing && !_isAutoplayResume && !_userHasPaused) {
         player.play();
       }
@@ -2780,6 +2849,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Primero la bandera: a partir de aquí el ref está muerto y cualquier
     // ref.read lanza StateError (rompía el frame al entrar a PiP nativo).
     _isDisposed = true;
+    _uiStateSub?.close();
     // Senior Fix: Cancelar TODOS los timers para evitar fugas de memoria y llamadas a setState
     _loadWatchdogTimer?.cancel();
     _hideTimer?.cancel();
@@ -3964,8 +4034,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           else if (_controller != null)
             RepaintBoundary(
               child: AnimatedOpacity(
-                // Senior Visual Shield: Opacidad 0 hasta que el seek de reanudación sea estable
-                opacity: (!_hasResetPosition && _resumePosition > 3000) ? 0.0 : 1.0,
+                // Senior Visual Shield: Opacidad 0 hasta que el seek de reanudación sea estable.
+                // Más gate de primer frame en videos nuevos (ver campo).
+                opacity: ((!_hasResetPosition && _resumePosition > 3000) || _holdingFirstFrame) ? 0.0 : 1.0,
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeIn,
                 child: Video(
@@ -3986,8 +4057,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 ),
               ),
             )
-          else
-            const SizedBox.shrink(),
+            else
+              const SizedBox.shrink(),
+
+            // Gate de primer frame: spinner mientras el video está oculto
+            // verificando posición (si no, pantalla negra muerta).
+            if (_holdingFirstFrame)
+              const Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                        color: Color(0xFFEF7A1E)),
+                  ),
+                ),
+              ),
 
           // EL DETECTOR UNIVERSAL DE GESTOS Y CAPA DE CONTROLES
           // Senior Elite Fix: Unificamos todo bajo un solo PointerInterceptor para evitar que

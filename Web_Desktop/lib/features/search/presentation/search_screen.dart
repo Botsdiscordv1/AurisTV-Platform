@@ -503,18 +503,7 @@ class _SearchResultsGrid extends ConsumerWidget {
         final isMobile = ResponsiveUtils.isMobile(context);
         final screenWidth = MediaQuery.sizeOf(context).width;
 
-        int crossAxisCount = 3;
-        if (!isMobile) {
-          if (screenWidth > 1800) {
-            crossAxisCount = 8;
-          } else if (screenWidth > 1400) {
-            crossAxisCount = 7;
-          } else if (screenWidth > 1000) {
-            crossAxisCount = 6;
-          } else {
-            crossAxisCount = 5;
-          }
-        }
+        int crossAxisCount = isMobile ? 3 : (screenWidth / 180).round().clamp(5, 9);
 
         final notifier = ref.read(notifierProvider.notifier);
 
@@ -524,7 +513,7 @@ class _SearchResultsGrid extends ConsumerWidget {
             padding: EdgeInsets.fromLTRB(isMobile ? 16 : 24, 8, isMobile ? 16 : 24, 40),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
-              childAspectRatio: isMobile ? 0.54 : 0.58,
+              childAspectRatio: isMobile ? 0.54 : 0.54,
               crossAxisSpacing: isMobile ? 12 : 20,
               mainAxisSpacing: isMobile ? 12 : 16,
             ),

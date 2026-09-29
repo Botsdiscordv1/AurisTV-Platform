@@ -10,16 +10,16 @@ import 'playback_history_provider.dart';
 
 enum PlayerUIState { none, mini, full, pip }
 
-/// Etiqueta de episodio `T1:E1 "Título"` (o `T1:E1` sin título / tal cual si
+/// Etiqueta de episodio `T1:E1 Título` (o `T1:E1` sin título / tal cual si
 /// no es numérico como OP/ED). Formato único para los subtítulos de los
 /// players de las 3 plataformas. Un genérico ("Episodio 1") cuenta como
-/// ausente: mostrarlo entrecomillado finge un título que no existe.
+/// ausente: mostrarlo finge un título que no existe.
 String episodeDisplayLabel(String? episode, {int? season, String? title}) {
   final m = RegExp(r'(\d+)').firstMatch(episode ?? '');
   final base = m == null ? (episode ?? '') : 'T${season ?? 1}:E${int.parse(m.group(1)!)}';
   final raw = (title ?? '').trim();
   final t = CommunityTranslationManager.isGenericTitle(raw) ? '' : raw;
-  return t.isEmpty ? base : '$base "$t"';
+  return t.isEmpty ? base : '$base $t';
 }
 
 /// Huella de una lista de episodios (números+títulos+thumbs). El fast y el

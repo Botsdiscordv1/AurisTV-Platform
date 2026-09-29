@@ -54,7 +54,7 @@ bool libraryIsMovieish(PlaybackHistory h) =>
     isMovieLike(h.category, h.title, h.durationInMilliseconds);
 
 /// Título para tarjeta: limpia "Ep N •" en pelis. En series NO se antepone
-/// "Ep X" (ya va en el subtítulo "T1:E7 . Título" o "T2 E7 • ...").
+/// "Ep X" (ya va en el subtítulo "T1:E7 · Título" o "T2 E7 • ...").
 String libraryDisplayTitle(PlaybackHistory h) {
   final displayTitle = h.title ?? 'Contenido';
   if (libraryIsMovieish(h)) {
@@ -120,7 +120,7 @@ SearchResult? historyToSeed(PlaybackHistory h) {
 }
 
 /// Subtítulo de Continuar Viendo en 2 líneas (no-películas):
-/// line1 = "T1:E7 . Título del episodio" (o "T1:E7" sin título / genérico),
+/// line1 = "T1:E7 · Título del episodio" (o "T1:E7" sin título / genérico),
 /// line2 = "Quedan X" (o null). Películas y sin episodio → (remaining, null).
 ({String line1, String? line2}) continueCardSubtitle(PlaybackHistory h) {
   final remaining = libraryRemainingText(h);
@@ -134,7 +134,7 @@ SearchResult? historyToSeed(PlaybackHistory h) {
   // Un genérico guardado ("Episodio 1") equivale a sin título.
   final epTitle = CommunityTranslationManager.isGenericTitle(rawTitle) ? '' : rawTitle;
   final line1 =
-      epTitle.isNotEmpty ? 'T$season:E$ep . $epTitle' : 'T$season:E$ep';
+      epTitle.isNotEmpty ? 'T$season:E$ep · $epTitle' : 'T$season:E$ep';
   final remaining2 = libraryRemainingText(h, colon: true);
   return (line1: line1, line2: remaining2.isNotEmpty ? remaining2 : null);
 }

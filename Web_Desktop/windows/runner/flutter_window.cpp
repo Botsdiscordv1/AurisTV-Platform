@@ -27,6 +27,10 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  volume_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "auristv/volume",
+      &flutter::StandardMethodCodec::GetInstance());
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
   });
@@ -51,6 +55,23 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_APPCOMMAND) {
+    short cmd = GET_APPCOMMAND_LPARAM(lparam);
+    if (cmd == APPCOMMAND_VOLUME_UP || cmd == APPCOMMAND_VOLUME_DOWN || cmd == APPCOMMAND_VOLUME_MUTE) {
+      if (volume_channel_) {
+        std::string method = "";
+        if (cmd == APPCOMMAND_VOLUME_UP) method = "volumeUp";
+        else if (cmd == APPCOMMAND_VOLUME_DOWN) method = "volumeDown";
+        else if (cmd == APPCOMMAND_VOLUME_MUTE) method = "volumeMute";
+
+        if (!method.empty()) {
+          volume_channel_->InvokeMethod(method, std::make_unique<flutter::EncodableValue>());
+        }
+      }
+      return TRUE;
+    }
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

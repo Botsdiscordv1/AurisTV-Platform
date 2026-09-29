@@ -17,9 +17,9 @@ PlaybackHistory _history({String? episodeTitle}) => PlaybackHistory(
 
 void main() {
   group('episodeDisplayLabel', () {
-    test('real -> T1:E1 "Titulo"', () {
+    test('real -> T1:E1 Titulo (sin comillas)', () {
       expect(episodeDisplayLabel('1', season: 1, title: 'Matrimonio'),
-          'T1:E1 "Matrimonio"');
+          'T1:E1 Matrimonio');
     });
     test('genérico cuenta como ausente', () {
       expect(episodeDisplayLabel('1', season: 1, title: 'Episodio 1'), 'T1:E1');
@@ -27,14 +27,14 @@ void main() {
       expect(episodeDisplayLabel('1', season: 1), 'T1:E1');
     });
     test('no numérico pasa tal cual', () {
-      expect(episodeDisplayLabel('OP', title: 'Koi no Uta'), 'OP "Koi no Uta"');
+      expect(episodeDisplayLabel('OP', title: 'Koi no Uta'), 'OP Koi no Uta');
     });
   });
 
   group('continueCardSubtitle', () {
-    test('real -> T1:E1 . Titulo', () {
+    test('real -> T1:E1 · Titulo', () {
       final s = continueCardSubtitle(_history(episodeTitle: 'Matrimonio'));
-      expect(s.line1, 'T1:E1 . Matrimonio');
+      expect(s.line1, 'T1:E1 · Matrimonio');
     });
     test('genérico guardado -> bare T1:E1', () {
       final s = continueCardSubtitle(_history(episodeTitle: 'Episodio 1'));

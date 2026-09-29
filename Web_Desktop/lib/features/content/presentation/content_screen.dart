@@ -1378,7 +1378,7 @@ class _CastCreditsModal extends ConsumerWidget {
                         sliver: SliverGrid(
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: crossAxisCount,
-                            childAspectRatio: isMobile ? 0.54 : 0.58,
+                            childAspectRatio: isMobile ? 0.54 : 0.54,
                             crossAxisSpacing: isMobile ? 12 : 20,
                             mainAxisSpacing: isMobile ? 12 : 16,
                           ),
@@ -3974,8 +3974,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
 
     final isMobile = context.isMobile;
     final width = MediaQuery.of(context).size.width;
-    // Senior Fix: Diseño de Avatar requiere una rejilla más compacta y centrada
-    final crossAxisCount = isMobile ? 3 : (width < 1000 ? 4 : (width < 1400 ? 6 : (width < 1800 ? 8 : 10)));
+    // Senior Fix: Rejilla adaptativa fluida basada en el ancho disponible para mantener iconos compactos y consistentes (ej. ~10 en 1080p y 1366x768)
+    final crossAxisCount = isMobile ? 3 : (width / 140).round().clamp(6, 12);
 
     return [
       SliverPadding(
@@ -4052,7 +4052,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
 
   List<Widget> _buildDetailsTab(dynamic detail, double hPadding, {String? inferredSeasonAirDate, double? sourceRating, bool showRatingSkeleton = false}) {
     if (detail == null) return [const SliverToBoxAdapter(child: SizedBox.shrink())];
-    final isMobile = context.isMobile;     final rating = formatRating((detail.rating as double?) ?? sourceRating);
+    final isMobile = context.isMobile;
+    final width = MediaQuery.of(context).size.width;
+    final isCompact = isMobile || width < 1400;
+
+    final rating = formatRating((detail.rating as double?) ?? sourceRating);
     final effectiveDate = _pickDisplayDate((detail is AnimeDetail ? detail.firstAirDate : detail.releaseDate), inferredSeasonAirDate);
     final year = effectiveDate?.split('-').first ?? 'N/A';
     String sInfo = _isMovieContent(detail, widget.result?.kind ?? widget.type) ? _formatRuntime(_getRuntime(detail)) : (detail is AnimeDetail ? '${detail.episodes ?? 0} episodios' : (detail is MovieDetail ? '${detail.totalSeasons ?? 1} temporadas' : ''));
@@ -4064,124 +4068,97 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     final status = detail is MovieDetail ? detail.status : (detail is AnimeDetail ? detail.status : null);
     final languages = detail is MovieDetail ? detail.languages : <String>[];
 
-    if (isMobile) return [ 
-      SliverPadding(padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 0, bottom: 10), sliver: SliverToBoxAdapter(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ 
-        const Text('M\u00E1s informaci\u00F3n', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)), 
+    final Widget leftColumn = Column(children: [
+      _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(detail.title, style: TextStyle(color: Colors.white, fontSize: isCompact ? 20 : 24, fontWeight: FontWeight.w700)),
         if (detail is MovieDetail && detail.originalTitle != null && detail.originalTitle!.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
             detail.originalTitle!,
             style: TextStyle(
               color: Colors.white.withOpacity(0.5),
-              fontSize: 15,
+              fontSize: isCompact ? 16 : 18,
               fontWeight: FontWeight.w500,
               fontStyle: FontStyle.italic,
             ),
           ),
         ],
-        const SizedBox(height: 20),
-        if (detail.genres is List) Wrap(spacing: 8, runSpacing: 8, children: (detail.genres as List).map<Widget>((g) => _buildBadge(context, g.toString().toUpperCase())).toList()), 
-        const SizedBox(height: 20), 
-        Text(detail.overview ?? '', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 15, height: 1.5)), 
-        const SizedBox(height: 24),
-        if (platforms.isNotEmpty) ...[
-          const Text('Disponible en', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          Wrap(spacing: 12, runSpacing: 12, children: platforms.map<Widget>((p) => _buildPlatformLogo(context, p, size: 32)).toList()),
-          const SizedBox(height: 24),
-        ],
-        const Text('Advertencias de contenido', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)), 
-        const SizedBox(height: 8), 
-        Text(_getWarningText(cert), style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 14)), 
-        const SizedBox(height: 24), 
-        if (status != null) ...[const Text('Estado', style: TextStyle(color: Colors.white, fontSize: 16)), Text(status, style: const TextStyle(color: const Color(0xFFA5A5AA))), const SizedBox(height: 24)],
-        if (languages.isNotEmpty) ...[
-          const Text('Pa\u00EDs', style: TextStyle(color: Colors.white, fontSize: 16)),
-          Text(() {
-              return languages.map((l) {
-                final country = l.toLowerCase();
-                String emoji = '';
-                if (country.contains('jap')) emoji = '🇯🇵';
-                else if (country.contains('cor')) emoji = '🇰🇷';
-                else if (country.contains('usa') || country.contains('estat') || country.contains('eeuu')) emoji = '🇺🇸';
-                else if (country.contains('esp') || country.contains('spain')) emoji = '🇪🇸';
-                else if (country.contains('mex')) emoji = '🇲🇽';
-                else if (country.contains('chi')) emoji = '🇨🇳';
-                else if (country.contains('fra')) emoji = '🇫🇷';
-                else if (country.contains('ing') || country.contains('uk')) emoji = '🇬🇧';
-                else if (country.contains('ale') || country.contains('ger')) emoji = '🇩🇪';
-                else if (country.contains('ita')) emoji = '🇮🇹';
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, children: [ Text(detail is AnimeDetail ? 'Jap\u00F3n' : 'Internacional', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)), const Text('•', style: TextStyle(color: Colors.white24)), Text(detail is AnimeDetail ? 'Anime' : 'Pel\u00EDcula', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)) ]), const SizedBox(height: 10),
+        Row(children: [ const Text('IMDb ', style: TextStyle(color: Color(0xFFA5A5AA), fontSize: 15, fontWeight: FontWeight.w900)), if (showRatingSkeleton && rating == null) const _RatingSkeleton(width: 36, height: 18) else Text(rating ?? 'N/A', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15)), const Text('/10', style: TextStyle(color: Color(0xFFA5A5AA))), const SizedBox(width: 16), Text((detail is MovieDetail && detail.releaseDate != null && detail.releaseDate!.isNotEmpty) ? detail.releaseDate! : year, style: const TextStyle(color: Color(0xFFA5A5AA))), if (sInfo.isNotEmpty) ...[const SizedBox(width: 16), Text(sInfo, style: const TextStyle(color: Color(0xFFA5A5AA)))] ]), const SizedBox(height: 16),
+        _ExpandableText(text: detail.overview ?? '', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: isCompact ? 16 : 20), maxLines: 4)
+      ])),
+      const SizedBox(height: 24), 
+      if (dir.isNotEmpty || cast.isNotEmpty || std.isNotEmpty || status != null || languages.isNotEmpty) 
+        _DetailInfoCard(child: Column(children: [ 
+          if (status != null) _buildPrimeRow('Estado', status),
+          if (languages.isNotEmpty) _buildPrimeRow('Pa\u00EDs', () {
+            return languages.map((l) {
+              final country = l.toLowerCase();
+              String emoji = '';
+              if (country.contains('jap')) emoji = '🇯🇵';
+              else if (country.contains('cor')) emoji = '🇰🇷';
+              else if (country.contains('usa') || country.contains('estat') || country.contains('eeuu')) emoji = '🇺🇸';
+              else if (country.contains('esp') || country.contains('spain')) emoji = '🇪🇸';
+              else if (country.contains('mex')) emoji = '🇲🇽';
+              else if (country.contains('chi')) emoji = '🇨🇳';
+              else if (country.contains('fra')) emoji = '🇫🇷';
+              else if (country.contains('ing') || country.contains('uk')) emoji = '🇬🇧';
+              else if (country.contains('ale') || country.contains('ger')) emoji = '🇩🇪';
+              else if (country.contains('ita')) emoji = '🇮🇹';
 
-                return emoji.isNotEmpty ? '$emoji $l' : l;
-              }).join('  ');
-          }(), style: const TextStyle(color: const Color(0xFFA5A5AA))),
-          const SizedBox(height: 24)
-        ],
-        if (dir.isNotEmpty) ...[const Text('Direcci\u00F3n', style: TextStyle(color: Colors.white, fontSize: 16)), Text(dir.join(', '), style: const TextStyle(color: Color(0xFFA5A5AA)))], 
-        if (std.isNotEmpty) ...[const SizedBox(height: 24), const Text('Estudio', style: TextStyle(color: Colors.white, fontSize: 16)), Text(std.join(', '), style: const TextStyle(color: const Color(0xFFA5A5AA)))]
-      ]))),
-    ];
+              return emoji.isNotEmpty ? '$emoji $l' : l;
+            }).join('  ');
+          }()),
+          if (dir.isNotEmpty) _buildPrimeRow('Direcci\u00F3n', dir.join(', ')), 
+          if (std.isNotEmpty) _buildPrimeRow('Estudio', std.join(', '))
+        ]))
+    ]);
+
+    final Widget rightColumn = Column(children: [
+      _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ const Text('Advertencias de contenido', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)), const SizedBox(height: 16), _ContentScreenState._buildAgeBadge(context, cert), const SizedBox(height: 16), Text('${_getWarningText(cert)} Las luces intermitentes pueden afectar a espectadores fotosensibles', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: isCompact ? 16 : 20)) ])),
+      if (platforms.isNotEmpty) ...[
+        const SizedBox(height: 24),
+        _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Disponible en', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 20),
+          Wrap(spacing: 16, runSpacing: 16, children: platforms.map<Widget>((p) => _buildPlatformLogo(context, p)).toList()),
+        ])),
+      ],
+    ]);
+
+    if (isCompact) {
+      return [
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 8),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                leftColumn,
+                const SizedBox(height: 24),
+                rightColumn,
+              ],
+            ),
+          ),
+        ),
+      ];
+    }
 
     return [ 
-      SliverPadding(padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 8, bottom: 20), sliver: SliverToBoxAdapter(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(flex: 15, child: Column(children: [
-          _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(detail.title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
-            if (detail is MovieDetail && detail.originalTitle != null && detail.originalTitle!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                detail.originalTitle!,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
+      SliverPadding(
+        padding: EdgeInsets.only(left: hPadding, right: hPadding, top: 8, bottom: 20),
+        sliver: SliverToBoxAdapter(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 15, child: leftColumn),
+              const SizedBox(width: 24),
+              Expanded(flex: 10, child: rightColumn),
             ],
-            const SizedBox(height: 10),
-            Wrap(spacing: 8, children: [ Text(detail is AnimeDetail ? 'Jap\u00F3n' : 'Internacional', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 17)), const Text('•', style: TextStyle(color: Colors.white24)), Text(detail is AnimeDetail ? 'Anime' : 'Pel\u00EDcula', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 17)) ]), const SizedBox(height: 10),
-            Row(children: [ const Text('IMDb ', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17, fontWeight: FontWeight.w900)), if (showRatingSkeleton && rating == null) const _RatingSkeleton(width: 36, height: 18) else Text(rating ?? 'N/A', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17)), const Text('/10', style: TextStyle(color: const Color(0xFFA5A5AA))), const SizedBox(width: 16), Text((detail is MovieDetail && detail.releaseDate != null && detail.releaseDate!.isNotEmpty) ? detail.releaseDate! : year, style: const TextStyle(color: const Color(0xFFA5A5AA))), if (sInfo.isNotEmpty) ...[const SizedBox(width: 16), Text(sInfo, style: const TextStyle(color: const Color(0xFFA5A5AA)))] ]), const SizedBox(height: 16),
-            _ExpandableText(text: detail.overview ?? '', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 20), maxLines: 4)
-          ])),
-          const SizedBox(height: 24), if (dir.isNotEmpty || cast.isNotEmpty || std.isNotEmpty || status != null || languages.isNotEmpty) _DetailInfoCard(child: Column(children: [ 
-            if (status != null) _buildPrimeRow('Estado', status),
-            if (languages.isNotEmpty) _buildPrimeRow('Pa\u00EDs', () {
-              return languages.map((l) {
-                final country = l.toLowerCase();
-                String emoji = '';
-                if (country.contains('jap')) emoji = '🇯🇵';
-                else if (country.contains('cor')) emoji = '🇰🇷';
-                else if (country.contains('usa') || country.contains('estat') || country.contains('eeuu')) emoji = '🇺🇸';
-                else if (country.contains('esp') || country.contains('spain')) emoji = '🇪🇸';
-                else if (country.contains('mex')) emoji = '🇲🇽';
-                else if (country.contains('chi')) emoji = '🇨🇳';
-                else if (country.contains('fra')) emoji = '🇫🇷';
-                else if (country.contains('ing') || country.contains('uk')) emoji = '🇬🇧';
-                else if (country.contains('ale') || country.contains('ger')) emoji = '🇩🇪';
-                else if (country.contains('ita')) emoji = '🇮🇹';
-
-                return emoji.isNotEmpty ? '$emoji $l' : l;
-              }).join('  ');
-            }()),
-            if (dir.isNotEmpty) _buildPrimeRow('Direcci\u00F3n', dir.join(', ')), 
-            if (std.isNotEmpty) _buildPrimeRow('Estudio', std.join(', '))
-          ]))
-        ])),
-        const SizedBox(width: 24), Expanded(flex: 10, child: Column(
-          children: [
-            _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ const Text('Advertencias de contenido', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)), const SizedBox(height: 16), _ContentScreenState._buildAgeBadge(context, cert), const SizedBox(height: 16), Text('${_getWarningText(cert)} Las luces intermitentes pueden afectar a espectadores fotosensibles', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 20)) ])),
-            if (platforms.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              _DetailInfoCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Disponible en', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 20),
-                Wrap(spacing: 16, runSpacing: 16, children: platforms.map<Widget>((p) => _buildPlatformLogo(context, p)).toList()),
-              ])),
-            ],
-          ],
-        ))
-      ]))),
+          ),
+        ),
+      ),
     ];
   }
 
