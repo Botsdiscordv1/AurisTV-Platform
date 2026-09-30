@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../../shared/widgets/tv_scroll.dart';
 
 class CategoryShortcutsRow extends StatelessWidget {
   final ValueChanged<String> onCategoryTap;
@@ -44,20 +45,30 @@ class CategoryShortcutsRow extends StatelessWidget {
           const SizedBox(height: 16),
           SizedBox(
             height: isMobile ? 100 : 130,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              itemCount: shortcuts.length,
-              separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 20),
-              itemBuilder: (context, index) {
-                final item = shortcuts[index];
-                return _ShortcutCard(
-                  label: item['label'] as String,
-                  icon: item['icon'] as IconData,
-                  color: item['color'] as Color,
-                  onTap: () => onCategoryTap(item['id'] as String),
-                );
+            // Foco entra a la sección -> anclarla debajo del topbar
+            // (context = la sección, título incluido).
+            child: Focus(
+              canRequestFocus: false,
+              onFocusChange: (focused) {
+                if (focused) {
+                  TvScroll.anchorSectionBelowTopbar(context);
+                }
               },
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                itemCount: shortcuts.length,
+                separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 20),
+                itemBuilder: (context, index) {
+                  final item = shortcuts[index];
+                  return _ShortcutCard(
+                    label: item['label'] as String,
+                    icon: item['icon'] as IconData,
+                    color: item['color'] as Color,
+                    onTap: () => onCategoryTap(item['id'] as String),
+                  );
+                },
+              ),
             ),
           ),
         ],

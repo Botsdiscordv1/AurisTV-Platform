@@ -1504,7 +1504,7 @@ class ContentScreen extends ConsumerStatefulWidget {
   ConsumerState<ContentScreen> createState() => _ContentScreenState();
 }
 
-class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindingObserver {
+class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindingObserver, RouteAware {
   int? _extractSeason(String? s) => extractSeason(s);
   String _stripSeasonSuffix(String? title) => stripSeasonSuffix(title ?? '');
   String _seasonTitleFor(String baseTitle, int season) => seasonTitleFor(baseTitle, season);
@@ -1730,13 +1730,22 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     }
   }
 
-  void _openPlayer(PlayerScreen player) {
-    UrlUtils.openPlayer(context, player);
-  }
-
-  @override void initState() {
+void _openPlayer(PlayerScreen player) {
+  // Pausa directa + reanudar al cerrar (el player abre por diálogo
+  // showGeneralDialog, que RouteObserver ignora por no ser PageRoute).
+  _pauseTrailerForNav();
+  // ignore: use_build_context_synchronously
+  UrlUtils.openPlayer(context, player).then((_) {
+    if (mounted) _resumeTrailerAfterNav();
+  });
+}
+  @override
+  void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Pausar el tráiler si el player abre por otra vía (mini, remoto).
+    // (El caso propio content→episodio lo cubre _openPlayer directo.)
+    UrlUtils.playerOpenedTick.addListener(_pauseTrailerForNav);
     _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () {
       if (mounted) setState(() => _showContent = true);
     });
@@ -1755,7 +1764,63 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     }
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Suscribirse al observador global para pausar el tráiler cuando otra
+    // ruta se abre encima (player) y reanudarlo al volver.
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      try {
+        routeObserver.unsubscribe(this);
+      } catch (_) {}
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    // Player (u otra ruta) encima: pausar el tráiler para que no siga
+    // sonando de fondo. Se reanuda en didPopNext.
+    _pauseTrailerForNav();
+  }
+
+  @override
+  void didPopNext() {
+    // De vuelta en el detalle: reanudar si se pausó por navegación.
+    _resumeTrailerAfterNav();
+  }
+
+  /// Tráiler pausado por navegación (vs por usuario/ajustes).
+  bool _trailerPausedByNav = false;
+
+  void _pauseTrailerForNav() {
+    if (_lastTrailerKey == null || !_showPlayer) return;
+    try {
+      _ytController?.pauseVideo();
+    } catch (_) {}
+    if (_trailerPausedByNav) return;
+    _trailerPausedByNav = true;
+    // El fallback es un iframe plano sin API: se reconstruye con autoplay=0.
+    if (mounted) setState(() {});
+  }
+
+  void _resumeTrailerAfterNav() {
+    if (!_trailerPausedByNav || _lastTrailerKey == null) return;
+    _trailerPausedByNav = false;
+    try {
+      final settings = ref.read(settingsProvider);
+      if (!settings.autoPlayTrailers) return;
+      _ytController?.playVideo();
+    } catch (_) {}
+    if (mounted) setState(() {});
+  }
+
   @override void dispose() {
+    UrlUtils.playerOpenedTick.removeListener(_pauseTrailerForNav);
+    try {
+      routeObserver.unsubscribe(this);
+    } catch (_) {}
     WidgetsBinding.instance.removeObserver(this);
     _loadTimer?.cancel();
     _revealTimeout?.cancel();
@@ -1795,6 +1860,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       if (k != _lastTrailerKey) {
         if (_lastTrailerKey != null) _disposeController();
         _lastTrailerKey = k;
+        // Tráiler nuevo: la pausa por navegación era del anterior.
+        _trailerPausedByNav = false;
         if (!isMobile && settings.autoPlayTrailers) {
           _initTrailer(k);
         }
@@ -3423,14 +3490,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
                                         alignment: Alignment.centerRight,
                                         child: AspectRatio(
                                           aspectRatio: 16 / 9,
-                                          child: _useHtmlIframeFallback
-                                              ? HtmlElementView.fromTagName(
-                                                  key: ValueKey('html-iframe-$_lastTrailerKey'),
-                                                  tagName: 'iframe',
-                                                  onElementCreated: (Object element) {
-                                                    // ignore: avoid_dynamic_calls
-                                                    final dynamic el = element;
-                                                    el.src = 'https://www.youtube-nocookie.com/embed/$_lastTrailerKey?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0&cc_load_policy=0&cc_lang_pref=none';
+                    child: _useHtmlIframeFallback
+                        ? HtmlElementView.fromTagName(
+                            // La key incluye el estado de pausa por navegación
+                            // para reconstruir el iframe con autoplay 0/1.
+                            key: ValueKey('html-iframe-$_lastTrailerKey-${_trailerPausedByNav ? "paused" : "play"}'),
+                            tagName: 'iframe',
+                            onElementCreated: (Object element) {
+                              // ignore: avoid_dynamic_calls
+                              final dynamic el = element;
+                              el.src = 'https://www.youtube-nocookie.com/embed/$_lastTrailerKey?autoplay=${_trailerPausedByNav ? 0 : 1}&mute=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0&cc_load_policy=0&cc_lang_pref=none';
                                                     el.style.border = 'none';
                                                     el.style.width = '100%';
                                                     el.style.height = '100%';

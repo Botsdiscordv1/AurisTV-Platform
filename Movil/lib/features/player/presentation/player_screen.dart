@@ -607,7 +607,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     });
     _enforceLandscapeOrientation();
-    PipService.setPipAllowed(true);
+    // PiP lo gobierna SOLO el overlay (pipReady: mini/full + item + url).
+    // Forzar true aquí abría PiP sin stream (player recién abierto / sin url).
     PipService.setPlayerActive(true);
     _videoKey = ref.read(activePlayerProvider).videoKey;
     _screenInitTime = DateTime.now();
@@ -2992,7 +2993,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         } catch (_) {}
       }
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      // Fuera del player se sigue al sensor (móvil vertical -> portrait,
+      // tablet horizontal -> landscape): el retorno de PiP restaura esta
+      // forma (ver PipService.noteWindowMetrics). No forzar portraitUp.
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
       VolumeController().showSystemUI = true;
       ScreenBrightnessController.resetBrightness();
     }
@@ -3061,7 +3070,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       // Senior Fix: Disparar de forma paralela sin 'await' para evitar retrasos en transiciones
       // y eliminar el efecto de estiramiento visual en pantallas móviles de refresco rápido.
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      // Fuera del player se sigue al sensor (móvil vertical -> portrait,
+      // tablet horizontal -> landscape): el retorno de PiP restaura esta
+      // forma (ver PipService.noteWindowMetrics). No forzar portraitUp.
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
       VolumeController().showSystemUI = true;
       ScreenBrightnessController.resetBrightness();
     }

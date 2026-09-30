@@ -5,6 +5,7 @@ import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/prime_expandable_card.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../../shared/widgets/top_item.dart';
+import '../../../shared/widgets/tv_scroll.dart';
 
 class EditorialContentRow extends StatefulWidget {
   final String title;
@@ -131,7 +132,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 16), // Gap ampliado: deja respirar el pop-out del póster enfocado
           _buildStandardRow(isMobile, horizontalPadding, cardWidth, rowHeight),
         ],
       ),
@@ -143,6 +144,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: Stack(
+        // Sin recorte: el pop-out del póster enfocado sobresale de la ranura.
+        clipBehavior: Clip.none,
         children: [
           SizedBox(
             height: rowHeight, // Usamos la altura calculada dinámicamente
@@ -150,9 +153,17 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               horizontalPadding: horizontalPadding,
               child: Focus(
                 canRequestFocus: false,
+                // Foco entra a la sección -> anclarla debajo del topbar
+                // (this.context = la fila, título incluido).
+                onFocusChange: (focused) {
+                  if (focused && mounted) {
+                    TvScroll.anchorSectionBelowTopbar(this.context);
+                  }
+                },
                 child: ListView.separated(
                   controller: _scrollController,
                   physics: const ClampingScrollPhysics(),
+                  clipBehavior: Clip.none,
                   scrollDirection: Axis.horizontal,
                   primary: false, 
                   padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
@@ -203,10 +214,10 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                   Text(
                     widget.title,
                     style: GoogleFonts.poppins(
-                      fontSize: isMobile ? 20 : 24, // Reducido de 30
+                      fontSize: TVResponsiveUtils.rowTitleFontSize(context),
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
-                      letterSpacing: -0.8,
+                      letterSpacing: -0.4,
                     ),
                   ),
                   if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
@@ -224,33 +235,45 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16), // Gap ampliado: deja respirar el pop-out del póster enfocado
           MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
             child: Stack(
+              // Sin recorte: el pop-out del póster enfocado sobresale de la ranura.
+              clipBehavior: Clip.none,
               children: [
                 SizedBox(
                   height: rowHeight, // Unificado con posters estándar
                   child: _buildFadedWrapper(
                     horizontalPadding: horizontalPadding,
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      scrollDirection: Axis.horizontal,
-                      primary: false, // Senior Fix: Evita que el ScrollView intente capturar el foco
-                      clipBehavior: Clip.none, 
-                      padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 0), // Senior: Zero padding
-                      itemCount: widget.items.length.clamp(0, 10),
-                      itemBuilder: (context, index) {
-                        final item = widget.items[index];
-                        return TopItem(
-                          index: index,
-                          item: item,
-                          height: posterHeight,
-                          textOffset: 0,
-                          onTap: () => widget.onItemTap(item),
-                        );
+                    // Foco entra a la sección Top10 -> anclarla debajo del
+                    // topbar (this.context = la fila, título incluido).
+                    child: Focus(
+                      canRequestFocus: false,
+                      onFocusChange: (focused) {
+                        if (focused && mounted) {
+                          TvScroll.anchorSectionBelowTopbar(this.context);
+                        }
                       },
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        scrollDirection: Axis.horizontal,
+                        primary: false, // Senior Fix: Evita que el ScrollView intente capturar el foco
+                        clipBehavior: Clip.none, 
+                        padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 0), // Senior: Zero padding
+                        itemCount: widget.items.length.clamp(0, 10),
+                        itemBuilder: (context, index) {
+                          final item = widget.items[index];
+                          return TopItem(
+                            index: index,
+                            item: item,
+                            height: posterHeight,
+                            textOffset: 0,
+                            onTap: () => widget.onItemTap(item),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -279,16 +302,21 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       Positioned(
         left: horizontalPadding - 25,
         top: 0, bottom: 60, // Ajustado para nuevo posterHeight
-        child: AnimatedOpacity(
-          opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 300),
-          child: IgnorePointer(
-            ignoring: !(_isHovered && _canScrollLeft),
-            child: Center(
-              child: NavArrow(
-                icon: Icons.arrow_back_ios_new,
-                useBackground: true,
-                onTap: () => _scroll(-800),
+        // Excluida del D-pad cuando está oculta: invisible + enfocable =
+        // trampa de foco (el foco "desaparece" al bajar de fila).
+        child: ExcludeFocus(
+          excluding: !(_isHovered && _canScrollLeft),
+          child: AnimatedOpacity(
+            opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: IgnorePointer(
+              ignoring: !(_isHovered && _canScrollLeft),
+              child: Center(
+                child: NavArrow(
+                  icon: Icons.arrow_back_ios_new,
+                  useBackground: true,
+                  onTap: () => _scroll(-800),
+                ),
               ),
             ),
           ),
@@ -297,16 +325,19 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       Positioned(
         right: horizontalPadding - 25,
         top: 0, bottom: 60, // Ajustado para nuevo posterHeight
-        child: AnimatedOpacity(
-          opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 300),
-          child: IgnorePointer(
-            ignoring: !(_isHovered && _canScrollRight),
-            child: Center(
-              child: NavArrow(
-                icon: Icons.arrow_forward_ios,
-                useBackground: true,
-                onTap: () => _scroll(800),
+        child: ExcludeFocus(
+          excluding: !(_isHovered && _canScrollRight),
+          child: AnimatedOpacity(
+            opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: IgnorePointer(
+              ignoring: !(_isHovered && _canScrollRight),
+              child: Center(
+                child: NavArrow(
+                  icon: Icons.arrow_forward_ios,
+                  useBackground: true,
+                  onTap: () => _scroll(800),
+                ),
               ),
             ),
           ),

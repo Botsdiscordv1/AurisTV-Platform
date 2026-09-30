@@ -23,8 +23,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     'Cuenta',
     'Reproducción',
     'Subtítulos',
-    'Fuentes',
-    'Sistema',
   ];
 
   @override
@@ -38,19 +36,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           // BARRA LATERAL DE CATEGORÍAS
           Container(
-            width: 300,
+            width: 260,
             color: const Color(0xFF0B0B0D),
-            padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Padding(
-                  padding: EdgeInsets.only(left: 10, bottom: 30),
+                  padding: EdgeInsets.only(left: 10, bottom: 24),
                   child: Text(
                     'AJUSTES',
                     style: TextStyle(
                       color: primaryColor,
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 2,
                     ),
@@ -86,8 +84,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // CONTENIDO DE LA CATEGORÍA SELECCIONADA
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 80),
-              child: _buildCategoryContent(settings),
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 48),
+              child: SingleChildScrollView(
+                child: _buildCategoryContent(settings),
+              ),
             ),
           ),
         ],
@@ -100,8 +100,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case 0: return _buildAccountCategory();
       case 1: return _buildPlaybackCategory(settings);
       case 2: return _buildSubtitlesCategory(settings);
-      case 3: return _buildSourcesCategory();
-      case 4: return _buildSystemCategory();
       default: return const SizedBox.shrink();
     }
   }
@@ -129,19 +127,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ? const Icon(Icons.person_rounded, color: Colors.white70, size: 50)
                   : null,
             ),
-            const SizedBox(width: 30),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isLoggedIn ? (user.displayName ?? user.email!) : 'Modo Invitado',
-                  style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  isLoggedIn ? user.email! : 'Inicia sesión para sincronizar favoritos e historial',
-                  style: const TextStyle(color: Colors.white54, fontSize: 18),
-                ),
-              ],
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isLoggedIn ? (user.displayName ?? user.email!) : 'Modo Invitado',
+                    style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isLoggedIn ? user.email! : 'Inicia sesión para sincronizar favoritos e historial',
+                    style: const TextStyle(color: Colors.white54, fontSize: 16),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -387,35 +392,61 @@ class _CategoryTileState extends State<_CategoryTile> {
 
   @override
   Widget build(BuildContext context) {
-    final bool active = widget.isSelected || _focused;
     const primaryColor = Color(0xFFEF7A1E);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Focus(
         onFocusChange: (f) => setState(() => _focused = f),
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.select ||
+               event.logicalKey == LogicalKeyboardKey.enter ||
+               event.logicalKey == LogicalKeyboardKey.space)) {
+            widget.onTap();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
         child: GestureDetector(
           onTap: widget.onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
-              color: active ? Colors.white.withOpacity(0.1) : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              border: _focused ? Border.all(color: primaryColor, width: 2) : null,
+              color: Colors.transparent, // Fondo transparente siempre
+              borderRadius: BorderRadius.zero,
+              border: Border(
+                bottom: BorderSide(
+                  color: _focused || widget.isSelected ? primaryColor : Colors.transparent,
+                  width: _focused ? 2 : (widget.isSelected ? 3 : 0),
+                ),
+                left: BorderSide(
+                  color: _focused ? primaryColor : Colors.transparent,
+                  width: _focused ? 2 : 0,
+                ),
+                right: BorderSide(
+                  color: _focused ? primaryColor : Colors.transparent,
+                  width: _focused ? 2 : 0,
+                ),
+                top: BorderSide(
+                  color: _focused ? primaryColor : Colors.transparent,
+                  width: _focused ? 2 : 0,
+                ),
+              ),
             ),
             child: Row(
               children: [
                 if (widget.icon != null) ...[
-                  Icon(widget.icon, color: widget.color ?? (active ? primaryColor : Colors.white60), size: 22),
+                  Icon(widget.icon, color: widget.color ?? (_focused || widget.isSelected ? primaryColor : Colors.white60), size: 22),
                   const SizedBox(width: 15),
                 ],
                 Text(
                   widget.label,
                   style: TextStyle(
-                    color: widget.color ?? (active ? Colors.white : Colors.white60),
+                    color: widget.color ?? (_focused || widget.isSelected ? Colors.white : Colors.white60),
                     fontSize: 18,
-                    fontWeight: active ? FontWeight.w900 : FontWeight.bold,
+                    fontWeight: _focused || widget.isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ],
@@ -468,23 +499,31 @@ class _SettingsTVButtonState extends State<_SettingsTVButton> {
           onTap: widget.onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
-            width: 500,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            width: double.infinity,
+            constraints: const BoxConstraints(maxWidth: 440),
             decoration: BoxDecoration(
-              color: widget.primary ? primaryColor : (active ? Colors.white10 : Colors.white.withOpacity(0.05)),
-              borderRadius: BorderRadius.circular(12),
-              border: active ? Border.all(color: widget.primary ? Colors.white : primaryColor, width: 2) : null,
+              color: widget.primary ? primaryColor : Colors.transparent,
+              borderRadius: BorderRadius.zero,
+              border: Border.all(
+                color: active ? (widget.primary ? Colors.white : primaryColor) : Colors.white38,
+                width: active ? 2.5 : 1.5,
+              ),
             ),
             child: Row(
               children: [
-                Icon(widget.icon, color: widget.primary ? Colors.black : (active ? primaryColor : Colors.white70)),
-                const SizedBox(width: 20),
-                Text(
-                  widget.label,
-                  style: TextStyle(
-                    color: widget.primary ? Colors.black : Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                Icon(widget.icon, color: widget.primary ? Colors.black : (active ? primaryColor : Colors.white70), size: 22),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    style: TextStyle(
+                      color: widget.primary ? Colors.black : Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -536,17 +575,28 @@ class _SettingsTVSelectorState extends State<_SettingsTVSelector> {
         child: GestureDetector(
           onTap: _cycle,
           child: Container(
-            width: 600,
-            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+            width: double.infinity,
+            constraints: const BoxConstraints(maxWidth: 520),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              color: _focused ? Colors.white10 : Colors.white.withOpacity(0.03),
-              borderRadius: BorderRadius.circular(12),
-              border: _focused ? Border.all(color: primaryColor, width: 2) : null,
+              color: Colors.transparent,
+              borderRadius: BorderRadius.zero,
+              border: Border.all(
+                color: _focused ? primaryColor : Colors.white38,
+                width: _focused ? 2.5 : 1.5,
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(widget.label, style: const TextStyle(color: Colors.white70, fontSize: 18, fontWeight: FontWeight.w600)),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    style: const TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 Row(
                   children: widget.options.map((o) {
                     final isSelected = widget.value == o;
@@ -596,17 +646,28 @@ class _SettingsTVSwitchState extends State<_SettingsTVSwitch> {
         child: GestureDetector(
           onTap: () => widget.onChanged(!widget.value),
           child: Container(
-            width: 600,
-            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+            width: double.infinity,
+            constraints: const BoxConstraints(maxWidth: 520),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              color: _focused ? Colors.white10 : Colors.white.withOpacity(0.03),
-              borderRadius: BorderRadius.circular(12),
-              border: _focused ? Border.all(color: primaryColor, width: 2) : null,
+              color: Colors.transparent,
+              borderRadius: BorderRadius.zero,
+              border: Border.all(
+                color: _focused ? primaryColor : Colors.white38,
+                width: _focused ? 2.5 : 1.5,
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(widget.label, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 Switch(
                   value: widget.value,
                   onChanged: widget.onChanged,

@@ -136,7 +136,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: isActive
-                              ? [BoxShadow(color: Colors.white.withOpacity(0.18), blurRadius: 30, spreadRadius: 2)]
+                              ? []
                               : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
                         ),
                         child: Stack(

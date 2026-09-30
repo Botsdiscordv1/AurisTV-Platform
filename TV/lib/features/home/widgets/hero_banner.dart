@@ -16,6 +16,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/tv_responsive_utils.dart';
+import '../../../shared/widgets/tv_focus_wrapper.dart';
 
 enum HeroBannerLayout { mobile, cinematic }
 
@@ -27,6 +28,9 @@ class HeroBanner extends ConsumerStatefulWidget {
   final bool autofocus;
   final String currentCategory;
   final VoidCallback? onFocused; // Callback para notificar enfoque al padre
+  /// Nodo de la cápsula activa del topbar: D-pad arriba desde el hero salta
+  /// directo a ella (Inicio en Inicio, Anime en Anime, ...).
+  final FocusNode? pillFocusNode;
 
   const HeroBanner({
     super.key,
@@ -37,6 +41,7 @@ class HeroBanner extends ConsumerStatefulWidget {
     this.autofocus = false,
     this.currentCategory = 'inicio',
     this.onFocused,
+    this.pillFocusNode,
     dynamic layout,
   });
 
@@ -57,6 +62,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   bool _isFocused = false; 
 
   final FocusNode _playButtonFocusNode = FocusNode(); 
+  final FocusNode _prevButtonFocusNode = FocusNode();
+  final FocusNode _nextButtonFocusNode = FocusNode();
 
   yt.YoutubePlayerController? _ytController;
   StreamSubscription? _ytSubscription;
@@ -113,6 +120,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
     _playButtonFocusNode.dispose();
+    _prevButtonFocusNode.dispose();
+    _nextButtonFocusNode.dispose();
     _stopAutoPlay();
     _stopCycle();
     super.dispose();
@@ -124,8 +133,25 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     return widget.items[_contentIndex % widget.items.length];
   }
 
+  String? _lastNavButton; // 'prev', 'next', o null
+
   void _nextPage() => _runCinematicSequence((_backgroundIndex + 1) % widget.items.length);
   void _previousPage() => _runCinematicSequence((_backgroundIndex - 1 + widget.items.length) % widget.items.length);
+
+  void _manualNextPage() {
+    _lastNavButton = 'next';
+    _nextPage();
+  }
+
+  void _manualPreviousPage() {
+    _lastNavButton = 'prev';
+    _previousPage();
+  }
+
+  void _autoNextPage() {
+    _lastNavButton = null;
+    _nextPage();
+  }
 
   void _runCinematicSequence(int nextIndex) {
     if (widget.items.isEmpty || !_isAppActive) return;
@@ -150,6 +176,15 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       _delayTimer = Timer(const Duration(milliseconds: 350), () {
         if (!mounted || !_isAppActive) return;
         if (mounted) setState(() => _contentIndex = nextIndex);
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (_lastNavButton == 'prev' && _prevButtonFocusNode.canRequestFocus) {
+            _prevButtonFocusNode.requestFocus();
+          } else if (_lastNavButton == 'next' && _nextButtonFocusNode.canRequestFocus) {
+            _nextButtonFocusNode.requestFocus();
+          }
+        });
 
         _delayTimer = Timer(const Duration(seconds: 1), () {
           if (!mounted || !_isAppActive) return;
@@ -334,7 +369,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   void _startAutoPlay() {
     _autoPlayTimer?.cancel();
     _autoPlayTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      if (!_isHovered && !_showTrailerLayer && mounted) _nextPage();
+      if (!_isHovered && !_showTrailerLayer && mounted) _autoNextPage();
     });
   }
 
@@ -373,10 +408,16 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               if (mounted) setState(() => _isFocused = true);
               if (widget.onFocused != null) widget.onFocused!();
 
-              // Si el contenedor capturó el foco primario, lo delegamos al botón de reproducir
+              // Si el contenedor capturó el foco primario, respetamos el botón manual si fue usado recientemente, sino vamos a reproducir
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted && _isFocused && !_playButtonFocusNode.hasFocus) {
-                  _playButtonFocusNode.requestFocus();
+                if (mounted && _isFocused) {
+                  if (_lastNavButton == 'prev' && _prevButtonFocusNode.canRequestFocus) {
+                    _prevButtonFocusNode.requestFocus();
+                  } else if (_lastNavButton == 'next' && _nextButtonFocusNode.canRequestFocus) {
+                    _nextButtonFocusNode.requestFocus();
+                  } else if (!_playButtonFocusNode.hasFocus) {
+                    _playButtonFocusNode.requestFocus();
+                  }
                 }
               });
             } else {
@@ -385,7 +426,25 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             }
           },
           onKeyEvent: (node, event) {
-            return KeyEventResult.ignored; // Desactivado cambio manual para no interferir con botones
+            // D-pad desde los botones del hero (burbujea hasta este contenedor):
+            // - Arriba: salto directo a la cápsula activa del topbar.
+            // - Abajo: primer elemento de la fila de abajo (típicamente el
+            //   único/primo de Continuar Viendo). El resto se ignora para no
+            //   interferir con botones.
+            if (event is KeyDownEvent) {
+              if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                final target = widget.pillFocusNode;
+                if (target != null && target.canRequestFocus) {
+                  target.requestFocus();
+                  return KeyEventResult.handled;
+                }
+              } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                if (TvDirectionalFocus.focusFirstBelow()) {
+                  return KeyEventResult.handled;
+                }
+              }
+            }
+            return KeyEventResult.ignored;
           },
           child: GestureDetector(
             onTap: () {
@@ -691,13 +750,26 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
         // 2. Logo / Título
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
-          CachedNetworkImage(
-            key: ValueKey('logo_tv_${item.id}'),
-            imageUrl: item.logoUrl!, 
+          SizedBox(
             height: TVResponsiveUtils.heroLogoHeight(context),
-            fit: BoxFit.contain, 
-            alignment: Alignment.bottomLeft,
-            fadeInDuration: const Duration(milliseconds: 100),
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.45,
+                maxHeight: TVResponsiveUtils.heroLogoHeight(context),
+              ),
+              child: CachedNetworkImage(
+                key: ValueKey('logo_tv_${item.id}'),
+                imageUrl: item.logoUrl!,
+                fit: BoxFit.contain,
+                alignment: Alignment.bottomLeft,
+                fadeInDuration: const Duration(milliseconds: 100),
+                placeholder: (context, url) => Container(
+                  height: TVResponsiveUtils.heroLogoHeight(context),
+                  color: Colors.white.withOpacity(0.04),
+                ),
+                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
           )
         else
           Text(
@@ -900,6 +972,28 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                           );
                         }),
                       ],
+                      if (widget.items.length > 1) ...[
+                        const SizedBox(width: 12),
+                        _BannerIconButton(
+                          focusNode: _prevButtonFocusNode,
+                          icon: Icons.chevron_left,
+                          label: 'Anterior',
+                          onPressed: () {
+                            _manualPreviousPage();
+                            _startAutoPlay();
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _BannerIconButton(
+                          focusNode: _nextButtonFocusNode,
+                          icon: Icons.chevron_right,
+                          label: 'Siguiente',
+                          onPressed: () {
+                            _manualNextPage();
+                            _startAutoPlay();
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -972,11 +1066,13 @@ class _BannerIconButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
   final bool isLoading;
+  final FocusNode? focusNode;
   const _BannerIconButton({
     required this.icon, 
     required this.label, 
     required this.onPressed,
     this.isLoading = false,
+    this.focusNode,
   });
 
   @override
@@ -984,6 +1080,7 @@ class _BannerIconButton extends StatelessWidget {
     return Tooltip(
       message: label,
       child: IconButton.filledTonal(
+        focusNode: focusNode,
         onPressed: isLoading ? null : onPressed,
         icon: isLoading 
           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))

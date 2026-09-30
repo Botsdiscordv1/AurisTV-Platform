@@ -329,7 +329,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                           curve: Curves.easeOutQuint,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: isSelected ? [BoxShadow(color: Colors.white.withOpacity(0.12), blurRadius: 40, spreadRadius: 0)] : [],
+                            boxShadow: [],
                             border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: isSelected ? 2.5 : 0.0),
                           ),
                           child: ClipRRect(
@@ -402,22 +402,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                     ),
                                   ),
                                 if (widget.badgeOverlay != null) Positioned(top: 10, left: 10, child: widget.badgeOverlay!),
-                                if (widget.rating != null)
-                                  Positioned(
-                                    top: 10, right: 10,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                                      decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.star, color: Color(0xFFFFC107), size: 12),
-                                          const SizedBox(width: 4),
-                                          Text(widget.rating!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+
                                 if (widget.progress != null && widget.progress! > 0)
                                   Positioned(
                                     bottom: 0, left: 0, right: 0,

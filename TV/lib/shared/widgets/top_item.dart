@@ -124,6 +124,9 @@ class TopItem extends StatelessWidget {
                 rating: formatRating(item.rating),
                 subtitle: null, // Senior: Limpiamos overlay de año
                 showInfo: false, // Senior: Ocultar título debajo en fila mítica
+                // El ancla del scroll es el inicio del elemento (número), no
+                // el del póster: número + tarjeta nunca se separan.
+                anchorInset: numberVisiblePart,
                 onTap: onTap,
               ),
             ),

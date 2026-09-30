@@ -299,7 +299,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                           curve: Curves.easeOutQuint,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: isActive ? [BoxShadow(color: Colors.white.withOpacity(0.12), blurRadius: 40, spreadRadius: 0)] : [],
+                            boxShadow: [],
                             border: Border.all(color: isActive ? Colors.white : Colors.transparent, width: isActive ? 2.5 : 0.0),
                           ),
                           child: ClipRRect(

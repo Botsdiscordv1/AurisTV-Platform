@@ -264,7 +264,16 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     }
     _startTitleHideTimer();
   }
-  @override void didChangeDependencies() { super.didChangeDependencies(); _checkAndInitTrailer(); }
+  @override void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkAndInitTrailer();
+    // Primer build ya con datos (revelado temprano del screen): sin esto el
+    // header mostraba skeletons hasta el siguiente update.
+    if (!_revealed &&
+        (widget.detailAsync.valueOrNull != null || widget.detailAsync.hasValue)) {
+      _revealed = true;
+    }
+  }
   @override void didUpdateWidget(covariant _ContentHeader oldWidget) { 
     super.didUpdateWidget(oldWidget); 
     _checkAndInitTrailer(); 
@@ -809,6 +818,19 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         }
       }
     });
+
+    // Revelado temprano (paridad con Móvil): en cuanto hay detalle o fuentes
+    // se muestra la pantalla con botones de acción; solo lo pendiente usa
+    // skeleton. Sin esto se esperaba el pageLoadTimeout completo (20s).
+    final dataReady =
+        detailState.detail.hasValue || detailState.allSources.isNotEmpty;
+    if (dataReady && !_showContent) {
+      _loadTimer?.cancel();
+      _loadTimer = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _showContent = true);
+      });
+    }
 
     if (!_showContent) return Scaffold(backgroundColor: const Color(0xFF0B0B0D), body: _buildPageSkeleton(context));
 

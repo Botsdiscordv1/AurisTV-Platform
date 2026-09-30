@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
 
 class ProfileSelectionScreen extends ConsumerStatefulWidget {
@@ -11,13 +13,16 @@ class ProfileSelectionScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen> {
-  bool _isEditMode = false;
+  bool? _isEditModeOverride;
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider);
     const primaryColor = Color(0xFFEF7A1E);
     const backgroundColor = Color(0xFF0B0B0D);
+
+    final bool initialEdit = GoRouterState.of(context).uri.queryParameters['edit'] == 'true';
+    final bool _isEditMode = _isEditModeOverride ?? initialEdit;
 
     if (user == null) {
       return const Scaffold(
@@ -32,13 +37,12 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        centerTitle: true,
-        leading: Navigator.canPop(context) ? const BackButton(color: Colors.white70) : null,
-        title: Image.asset(
-          'assets/icons/auris-tv-icon.png',
-          height: 30,
-          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-        ),
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70),
+                onPressed: () => context.pop(),
+              )
+            : null,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -49,30 +53,33 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
                 _isEditMode ? 'Administrar perfiles' : '¿Quién está viendo ahora?',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 28,
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 60),
+              const SizedBox(height: 50),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 900),
+                constraints: const BoxConstraints(maxWidth: 1000),
                 child: Wrap(
-                  spacing: 40,
+                  spacing: 48,
                   runSpacing: 40,
                   alignment: WrapAlignment.center,
                   children: [
-                    ...user.profiles.map((profile) {
+                    ...user.profiles.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final profile = entry.value;
                       return _ProfileItem(
                         key: ValueKey('profile_${profile.id}'),
                         name: profile.name,
                         photoUrl: profile.photoUrl,
                         isEditMode: _isEditMode,
                         isMain: profile.isMain,
+                        autofocus: index == 0,
                         onTap: () {
                           if (_isEditMode) {
                             ref.read(authProvider.notifier).switchProfile(profile.id);
-                            context.go('/settings/avatar');
+                            context.push('/edit-profile/${profile.id}');
                           } else {
                             ref.read(authProvider.notifier).switchProfile(profile.id);
                             context.go('/');
@@ -83,32 +90,21 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
                     }),
                     if (user.profiles.length < 5 && !_isEditMode)
                       _AddProfileItem(
-                        onTap: () => _showAddProfileDialog(context, ref),
+                        onTap: () => context.push('/add-profile'),
                       ),
                   ],
                 ),
               ),
-              const SizedBox(height: 80),
-              // Botón Administrar perfiles (Control Central)
-              OutlinedButton(
+              const SizedBox(height: 70),
+              // Botón Administrar perfiles / Editar perfil
+              _FocusableAdminButton(
+                isEditMode: _isEditMode,
+                primaryColor: primaryColor,
                 onPressed: () {
                   setState(() {
-                    _isEditMode = !_isEditMode;
+                    _isEditModeOverride = !_isEditMode;
                   });
                 },
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: _isEditMode ? primaryColor : Colors.white38),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: Text(
-                  _isEditMode ? 'LISTO' : 'ADMINISTRAR PERFILES',
-                  style: TextStyle(
-                    color: _isEditMode ? primaryColor : Colors.white70, 
-                    fontSize: 13, 
-                    letterSpacing: 1,
-                    fontWeight: _isEditMode ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
               ),
             ],
           ),
@@ -137,41 +133,6 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
       ),
     );
   }
-
-  void _showAddProfileDialog(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Nuevo Perfil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Nombre',
-            hintStyle: TextStyle(color: Colors.white24),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFEF7A1E))),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
-          TextButton(
-            onPressed: () {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                ref.read(authProvider.notifier).addProfile(name, null);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('CREAR', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _ProfileItem extends StatefulWidget {
@@ -179,6 +140,7 @@ class _ProfileItem extends StatefulWidget {
   final String? photoUrl;
   final bool isEditMode;
   final bool isMain;
+  final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
@@ -188,6 +150,7 @@ class _ProfileItem extends StatefulWidget {
     this.photoUrl,
     required this.isEditMode,
     required this.isMain,
+    this.autofocus = false,
     required this.onTap,
     required this.onDelete,
   });
@@ -197,88 +160,104 @@ class _ProfileItem extends StatefulWidget {
 }
 
 class _ProfileItemState extends State<_ProfileItem> {
-  bool _isHovered = false;
+  bool _hasFocus = false;
 
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFFEF7A1E);
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+    return Focus(
+      autofocus: widget.autofocus,
+      onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.select ||
+             event.logicalKey == LogicalKeyboardKey.enter ||
+             event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
       child: GestureDetector(
         onTap: widget.onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              alignment: Alignment.topRight,
+        child: AnimatedScale(
+          scale: _hasFocus ? 1.08 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: SizedBox(
+            width: 140,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedScale(
-                  duration: const Duration(milliseconds: 200),
-                  scale: _isHovered ? 1.05 : 1.0,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _isHovered ? Colors.white : Colors.transparent,
-                            width: 3,
-                          ),
-                          image: widget.photoUrl != null
-                              ? DecorationImage(
-                                  image: widget.photoUrl!.startsWith('assets/')
-                                      ? AssetImage(widget.photoUrl!) as ImageProvider
-                                      : NetworkImage(widget.photoUrl!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                          color: const Color(0xFF1A1D24),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 130,
+                      height: 130,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _hasFocus ? primaryColor : Colors.transparent,
+                          width: 4,
                         ),
-                        child: widget.photoUrl == null
-                            ? const Icon(Icons.person, size: 60, color: Colors.white24)
-                            : null,
+                        boxShadow: _hasFocus
+                            ? [BoxShadow(color: primaryColor.withValues(alpha: 0.4), blurRadius: 16, spreadRadius: 2)]
+                            : [],
                       ),
-                      if (widget.isEditMode)
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.black.withValues(alpha: 0.5),
-                          ),
-                          child: const Icon(Icons.edit, color: Colors.white, size: 40),
+                      child: ClipOval(
+                        child: widget.photoUrl != null
+                            ? (widget.photoUrl!.startsWith('assets/')
+                                ? Image.asset(widget.photoUrl!, fit: BoxFit.cover)
+                                : CachedNetworkImage(imageUrl: widget.photoUrl!, fit: BoxFit.cover))
+                            : Container(
+                                color: Colors.white10,
+                                child: const Icon(Icons.person, color: Colors.white70, size: 65),
+                              ),
+                      ),
+                    ),
+                    if (widget.isEditMode)
+                      Container(
+                        width: 130,
+                        height: 130,
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
                         ),
-                    ],
+                        child: const Icon(Icons.edit, color: Colors.white, size: 42),
+                      ),
+                    if (widget.isEditMode && !widget.isMain)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: widget.onDelete,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Colors.redAccent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close, color: Colors.white, size: 18),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  widget.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _hasFocus || widget.isEditMode ? Colors.white : Colors.white60,
+                    fontSize: 18,
+                    fontWeight: _hasFocus || widget.isEditMode ? FontWeight.bold : FontWeight.w500,
                   ),
                 ),
-                // Botón de eliminar (Solo en modo edición y si no es el principal)
-                if (widget.isEditMode && !widget.isMain)
-                  GestureDetector(
-                    onTap: widget.onDelete,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
-                    ),
-                  ),
               ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              widget.name,
-              style: TextStyle(
-                color: _isHovered || widget.isEditMode ? Colors.white : Colors.white60,
-                fontSize: 18,
-                fontWeight: _isHovered || widget.isEditMode ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -294,45 +273,111 @@ class _AddProfileItem extends StatefulWidget {
 }
 
 class _AddProfileItemState extends State<_AddProfileItem> {
-  bool _isHovered = false;
+  bool _hasFocus = false;
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+    const primaryColor = Color(0xFFEF7A1E);
+    return Focus(
+      onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.select ||
+             event.logicalKey == LogicalKeyboardKey.enter ||
+             event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onTap();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
       child: GestureDetector(
         onTap: widget.onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _isHovered ? Colors.white : Colors.white10,
-                  width: 2,
+        child: AnimatedScale(
+          scale: _hasFocus ? 1.08 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: SizedBox(
+            width: 140,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white10,
+                    border: Border.all(
+                      color: _hasFocus ? primaryColor : Colors.transparent,
+                      width: 4,
+                    ),
+                    boxShadow: _hasFocus
+                        ? [BoxShadow(color: primaryColor.withValues(alpha: 0.4), blurRadius: 16, spreadRadius: 2)]
+                        : [],
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white70, size: 60),
                 ),
-                color: Colors.white.withValues(alpha: _isHovered ? 0.1 : 0.05),
-              ),
-              child: Icon(
-                Icons.add, 
-                size: 50, 
-                color: _isHovered ? Colors.white : Colors.white38
-              ),
+                const SizedBox(height: 14),
+                Text(
+                  'Añadir perfil',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _hasFocus ? Colors.white : Colors.white60,
+                    fontSize: 18,
+                    fontWeight: _hasFocus ? FontWeight.bold : FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Añadir',
-              style: TextStyle(
-                color: _isHovered ? Colors.white : Colors.white60,
-                fontSize: 18,
-              ),
-            ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FocusableAdminButton extends StatefulWidget {
+  final bool isEditMode;
+  final Color primaryColor;
+  final VoidCallback onPressed;
+
+  const _FocusableAdminButton({
+    required this.isEditMode,
+    required this.primaryColor,
+    required this.onPressed,
+  });
+
+  @override
+  State<_FocusableAdminButton> createState() => _FocusableAdminButtonState();
+}
+
+class _FocusableAdminButtonState extends State<_FocusableAdminButton> {
+  bool _hasFocus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
+      child: OutlinedButton(
+        onPressed: widget.onPressed,
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(
+            color: _hasFocus ? Colors.white : (widget.isEditMode ? widget.primaryColor : Colors.white38),
+            width: _hasFocus ? 2 : 1.5,
+          ),
+          backgroundColor: _hasFocus ? widget.primaryColor.withValues(alpha: 0.2) : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        ),
+        child: Text(
+          widget.isEditMode ? 'LISTO' : 'ADMINISTRAR PERFILES',
+          style: TextStyle(
+            color: _hasFocus ? Colors.white : (widget.isEditMode ? widget.primaryColor : Colors.white70),
+            fontSize: 14,
+            letterSpacing: 1.5,
+            fontWeight: widget.isEditMode || _hasFocus ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );

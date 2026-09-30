@@ -15,7 +15,10 @@ import '../../features/auth/presentation/connections_screen.dart';
 import '../../features/avatar/presentation/avatar_selector_screen.dart';
 import '../../features/avatar/presentation/profile_selection_screen.dart';
 import '../../features/avatar/presentation/profile_setup_screen.dart';
+import '../../features/avatar/presentation/profile_add_screen.dart';
 import '../../features/intro/presentation/splash_screen.dart';
+import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/avatar/presentation/profile_edit_screen.dart';
 import '../../shared/widgets/main_navigation_wrapper.dart';
 
 /// Observador global para detectar cambios de ruta y gestionar estados de widgets (ej: trailers)
@@ -153,22 +156,12 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
-        // Rama 3: Ajustes (Perfil)
+        // Rama 3: Perfil
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: '/settings',
-              builder: (context, state) => const SettingsScreen(),
-              routes: [
-                GoRoute(
-                  path: 'library', // Esto será /settings/library
-                  builder: (context, state) => const LibraryScreen(),
-                ),
-                GoRoute(
-                  path: 'avatar', // Esto será /settings/avatar
-                  builder: (context, state) => const AvatarSelectorScreen(),
-                ),
-              ],
+              path: '/profile',
+              builder: (context, state) => const ProfileScreen(),
             ),
           ],
         ),
@@ -177,8 +170,33 @@ final GoRouter appRouter = GoRouter(
 
     // Rutas fuera del Shell (Full screen)
     GoRoute(
+      path: '/settings',
+      builder: (context, state) => const SettingsScreen(),
+      routes: [
+        GoRoute(
+          path: 'library',
+          builder: (context, state) => const LibraryScreen(),
+        ),
+        GoRoute(
+          path: 'avatar',
+          builder: (context, state) => const AvatarSelectorScreen(),
+        ),
+      ],
+    ),
+    GoRoute(
       path: '/select-profile',
       builder: (context, state) => const ProfileSelectionScreen(),
+    ),
+    GoRoute(
+      path: '/add-profile',
+      builder: (context, state) => const ProfileAddScreen(),
+    ),
+    GoRoute(
+      path: '/edit-profile/:profileId',
+      builder: (context, state) {
+        final profileId = state.pathParameters['profileId']!;
+        return ProfileEditScreen(profileId: profileId);
+      },
     ),
     GoRoute(
       path: '/profile-setup',

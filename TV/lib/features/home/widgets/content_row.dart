@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
 import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
+import '../../../shared/widgets/tv_scroll.dart';
 
 class ContentRow extends StatefulWidget {
   final String title;
@@ -136,13 +137,15 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                     ],
                   ),
                 ),
-                const SizedBox(height: 4), // Gap reducido
+                const SizedBox(height: 16), // Gap ampliado: deja respirar el pop-out del póster enfocado
               ],
             ),
           ),          MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
             child: Stack(
+              // Sin recorte: el pop-out del póster enfocado sobresale de la ranura.
+              clipBehavior: Clip.none,
               children: [
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -156,6 +159,14 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                         child: Focus(
                           canRequestFocus: false, // La lista no atrapa el foco
                           // skipTraversal eliminado para permitir que el motor vea los posters internos
+                          // Foco entra a la sección -> anclarla debajo del
+                          // topbar. this.context = la fila (título incluido);
+                          // el context del builder sería el LayoutBuilder.
+                          onFocusChange: (focused) {
+                            if (focused && mounted) {
+                              TvScroll.anchorSectionBelowTopbar(this.context);
+                            }
+                          },
                           child: ListView.separated(
                             controller: _scrollController,
                             physics: const ClampingScrollPhysics(),
@@ -188,46 +199,53 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                   }
                 ),
                 
-                // Flecha Izquierda
+                // Flecha Izquierda (excluida del D-pad cuando está oculta:
+                // invisible + enfocable = trampa de foco, igual que en el hero)
                 if (!isMobile)
                   Positioned(
-                    left: horizontalPadding - 25, 
+                    left: horizontalPadding - 25,
                     top: 10,
                     bottom: 60, // Ajustado para nuevo posterHeight
-                    child: AnimatedOpacity(
-                      opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: IgnorePointer(
-                        ignoring: !(_isHovered && _canScrollLeft),
-                        child: Center(
-                          child: NavArrow(
-                            icon: Icons.arrow_back_ios_new,
-                            useBackground: true,
-                            enableScale: false,
-                            onTap: () => _scroll(-600),
+                    child: ExcludeFocus(
+                      excluding: !(_isHovered && _canScrollLeft),
+                      child: AnimatedOpacity(
+                        opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 300),
+                        child: IgnorePointer(
+                          ignoring: !(_isHovered && _canScrollLeft),
+                          child: Center(
+                            child: NavArrow(
+                              icon: Icons.arrow_back_ios_new,
+                              useBackground: true,
+                              enableScale: false,
+                              onTap: () => _scroll(-600),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
 
-                // Flecha Derecha
+                // Flecha Derecha (excluida del D-pad cuando está oculta)
                 if (!isMobile)
                   Positioned(
                     right: horizontalPadding - 25,
                     top: 10,
                     bottom: 60, // Ajustado para nuevo posterHeight
-                    child: AnimatedOpacity(
-                      opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: IgnorePointer(
-                        ignoring: !(_isHovered && _canScrollRight),
-                        child: Center(
-                          child: NavArrow(
-                            icon: Icons.arrow_forward_ios,
-                            useBackground: true,
-                            enableScale: false,
-                            onTap: () => _scroll(600),
+                    child: ExcludeFocus(
+                      excluding: !(_isHovered && _canScrollRight),
+                      child: AnimatedOpacity(
+                        opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 300),
+                        child: IgnorePointer(
+                          ignoring: !(_isHovered && _canScrollRight),
+                          child: Center(
+                            child: NavArrow(
+                              icon: Icons.arrow_forward_ios,
+                              useBackground: true,
+                              enableScale: false,
+                              onTap: () => _scroll(600),
+                            ),
                           ),
                         ),
                       ),

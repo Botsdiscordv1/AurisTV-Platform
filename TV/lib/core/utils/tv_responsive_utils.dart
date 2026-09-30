@@ -19,23 +19,37 @@ class TVResponsiveUtils {
   /// Margen horizontal estándar para televisores (Safe Area optimizado)
   static double horizontalPadding(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    // Reducido al 2.2% (aprox la mitad del estándar previo) para aprovechar mejor los bordes
-    return (width * 0.022).clamp(20.0, 50.0);
+    // Margen adaptativo según la resolución para aprovechar mejor los bordes sin desbordar
+    if (width <= 1280) return 24.0;
+    if (width <= 1920) return 36.0;
+    return (width * 0.022).clamp(40.0, 64.0);
   }
+
+  /// Altura del topbar fijo (misma fórmula que usa el home para su navbar):
+  /// es la referencia para anclar las secciones justo debajo al navegar.
+  static double topBarHeight(BuildContext context) => sp(context, 72);
 
   /// Escalado de fuentes y componentes para TV (10ft UI)
-  /// Optimizado para legibilidad a 3 metros de distancia.
+  /// Optimizado con resolución por buckets (720p, 1080p, 4K) para evitar elementos gigantes.
   static double sp(BuildContext context, double size) {
     final double width = MediaQuery.of(context).size.width;
-    // Base de cálculo para TV: 960dp (estándar Android TV 1080p)
-    final double tvScale = (width / 960.0).clamp(0.9, 1.2);
-    return size * 1.25 * tvScale;
+    double tvScale;
+    if (width <= 1280) {
+      tvScale = 0.85; // 720p
+    } else if (width <= 1920) {
+      tvScale = 1.0;  // 1080p estándar
+    } else {
+      tvScale = 1.15; // 4K / UHD (controlado)
+    }
+    return size * tvScale;
   }
 
-  /// Ancho de póster optimizado para la densidad de TV
+  /// Ancho de póster optimizado y adaptativo según la densidad y resolución de TV
   static double posterWidth(BuildContext context) {
-    // Reducido de 165 a 140 para que entren casi 6 posters en 960dp (Standard TV)
-    return 140.0;
+    final double width = MediaQuery.of(context).size.width;
+    if (width <= 1280) return 120.0; // Compacto en 720p
+    if (width <= 1920) return 140.0; // Estándar en 1080p (~6 posters por fila)
+    return 165.0;                   // Ampliado en 4K
   }
 
   /// Altura proporcional (2:3)
@@ -50,28 +64,33 @@ class TVResponsiveUtils {
     return posterH + 55.0;
   }
 
-  /// Ancho de banners (16:9) optimizado para TV
+  /// Ancho de banners (16:9) optimizado y adaptativo para TV
   static double bannerWidth(BuildContext context) {
-    return 310.0;
+    final double width = MediaQuery.of(context).size.width;
+    if (width <= 1280) return 280.0;
+    if (width <= 1920) return 330.0;
+    return 380.0;
   }
 
   /// Altura de banner
   static double bannerHeight(BuildContext context) {
-    return (bannerWidth(context) / 1.77).roundToDouble();
+    return (bannerWidth(context) / (16 / 9)).roundToDouble();
   }
 
   /// Altura de la fila de banners
-  /// [subtitleLines] - 2 cuando hay segunda línea ("Quedan: X" bajo "T1:E7 . Título").
-  static double bannerRowHeight(BuildContext context, {int subtitleLines = 1}) {
-    return bannerHeight(context) +
-        sp(context, 42) +
-        28.0 +
-        (subtitleLines > 1 ? (4 + sp(context, 20)) : 0);
+  /// [hasSubtitle] - Si es true, reserva espacio para texto inferior.
+  /// [subtitleLines] - 2 cuando hay segunda línea ("Quedan X" bajo "T1:E7 . Título").
+  static double bannerRowHeight(BuildContext context,
+      {bool hasSubtitle = true, int subtitleLines = 1}) {
+    final double extraSpace = hasSubtitle
+        ? sp(context, 20) + (subtitleLines > 1 ? (4 + sp(context, 20)) : 0)
+        : 0;
+    return bannerHeight(context) + extraSpace + 32.0; // Búfer amplio para dar aire y eliminar overflow por completo
   }
 
   /// Títulos de secciones
   static double rowTitleFontSize(BuildContext context) {
-    return 22.0;
+    return sp(context, 17.0);
   }
 
   /// Títulos dentro de tarjetas

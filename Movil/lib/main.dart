@@ -137,19 +137,43 @@ class GlobalMiniPlayerOverlay extends ConsumerStatefulWidget {
   ConsumerState<GlobalMiniPlayerOverlay> createState() => _GlobalMiniPlayerOverlayState();
 }
 
-class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverlay> {
+class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverlay>
+    with WidgetsBindingObserver {
   final GlobalKey _key = GlobalKey();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Tracking continuo de la forma de la ventana para el retorno de PiP
+    // (adaptativo vertical/horizontal). En PiP se ignora (congelado).
+    PipService.noteWindowMetrics();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // PiP solo con sesión activa (mini/full + item + url): sin esto el PiP
+    // nativo se armaba también sin nada reproduciendo (p. ej. tras stop/X,
+    // donde uiState vuelve a none pero el flag nativo seguía en true).
+    // La condición vive en _syncPipState.
     ref.listen(activePlayerProvider, (previous, next) {
-      final hasItem = next.currentItem != null;
-      _updatePipRect(hasItem);
+      _syncPipState(next);
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = ref.read(activePlayerProvider);
-      _updatePipRect(state.currentItem != null);
+      _syncPipState(state);
+      PipService.noteWindowMetrics();
     });
 
     return KeyedSubtree(
@@ -184,6 +208,13 @@ class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverla
           }
         },
         onEnterPip: () async {
+          // Guard: sin sesión activa no hay nada que mandar a PiP nativo.
+          final s = ref.read(activePlayerProvider);
+          final hasSession = (s.uiState == PlayerUIState.mini ||
+                  s.uiState == PlayerUIState.full) &&
+              s.currentItem != null &&
+              (s.url ?? '').isNotEmpty;
+          if (!hasSession) return;
           // Entrada manual a PiP + verificación del permiso del SO: si el
           // sistema lo revocó, enterPictureInPictureMode falla en silencio.
           final permitted = await PipService.isPipPermitted();
@@ -213,8 +244,13 @@ class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverla
     );
   }
 
-  void _updatePipRect(bool allowed) {
-    PipService.setPipAllowed(allowed);
+  void _syncPipState(ActivePlayerState s) {
+    PipService.setPipAllowed(
+      (s.uiState == PlayerUIState.mini ||
+              s.uiState == PlayerUIState.full) &&
+          s.currentItem != null &&
+          (s.url ?? '').isNotEmpty,
+    );
   }
 }
 

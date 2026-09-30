@@ -3,9 +3,15 @@ import '../../features/player/presentation/player_screen.dart';
 
 /// Utilidades senior para URLs ultra-limpias, comprimidas y compartibles.
 class UrlUtils {
+  /// Señal global: cada apertura del player la incrementa. Las pantallas con
+  /// tráiler inline (content) la escuchan para pausar aunque el player no
+  /// abra por su propio _openPlayer (mini, control remoto, notificaciones).
+  static final ValueNotifier<int> playerOpenedTick = ValueNotifier<int>(0);
+
   /// Abre el reproductor como un diálogo a pantalla completa
-  static void openPlayer(BuildContext context, PlayerScreen player) {
-    showGeneralDialog(
+  static Future<T?> openPlayer<T>(BuildContext context, PlayerScreen player) {
+    playerOpenedTick.value++;
+    return showGeneralDialog<T>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black,

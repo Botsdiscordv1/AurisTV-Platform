@@ -171,20 +171,12 @@ class MainActivity: FlutterActivity() {
             flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
                 MethodChannel(messenger, PIP_CHANNEL).invokeMethod("prepareForPip", null)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                // Re-afirmar auto-enter aqui mismo: si un setPipAllowed(false)
-                // tardio (p. ej. dispose en pleno minimize) gano la carrera,
-                // el Home no entraria a PiP.
-                try {
-                    val autoParams = PictureInPictureParams.Builder()
-                        .setAutoEnterEnabled(true)
-                        .setAspectRatio(Rational(currentAspectRatioWidth, currentAspectRatioHeight))
-                        .build()
-                    setPictureInPictureParams(autoParams)
-                } catch (e: Exception) {
-                    android.util.Log.d("AurisPip", "re-assert auto-enter failed: ${e.message}")
-                }
-            }
+            // Sin re-afirmación forzada a true: el flag isPipAllowed ya lo
+            // gobierna Dart (overlay pipReady: mini/full + item + url).
+            // Re-afirmar true aquí resucitaba PiP vacío tras un stop/X
+            // legítimo (setPipAllowed(false) en vuelo + Home inmediato).
+            // El dispose del fullscreen ya no toca allowed, así que la
+            // carrera contraria (mini sin PiP) no existe.
             // Entrada manual en TODAS las APIs: el auto-enter de Android 12+
             // (setAutoEnterEnabled) falla en varios OEMs; el manual es no-op
             // si el sistema ya esta entrando.

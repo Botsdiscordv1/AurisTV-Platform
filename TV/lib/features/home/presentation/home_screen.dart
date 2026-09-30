@@ -89,6 +89,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolled = false;
   bool _splashRemoved = false;
+  bool _isTopBarFocused = false;
+
+  // Nodos de foco de las cápsulas del topbar (uno por categoría): el hero los
+  // usa para subir con D-pad arriba directo a la cápsula activa.
+  final Map<String, FocusNode> _pillFocusNodes = {
+    'inicio': FocusNode(),
+    'animes': FocusNode(),
+    'películas': FocusNode(),
+    'series': FocusNode(),
+    'kdrama': FocusNode(),
+  };
 
   @override
   void initState() {
@@ -107,6 +118,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    for (final node in _pillFocusNodes.values) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -260,6 +274,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   WideContentItem _wideItemFromMedia(MediaItem m, {Widget? badgeOverlay}) {
     final bool isMovieish = m.type == MediaType.movie || m.card?.kind == 'movie_anime';
+    final String? rawSub = m.subtitle;
+    final bool isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
+    final String? effectiveSubtitle = isJustYear ? null : rawSub;
+
     return WideContentItem(
       id: m.id,
       title: m.title,
@@ -268,7 +286,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: m.logoUrl,
-      subtitle: m.subtitle,
+      subtitle: effectiveSubtitle,
       rating: formatRating(m.rating),
       badgeOverlay: badgeOverlay,
       originalItem: m,
@@ -296,8 +314,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       });
     }
 
-    // Senior TV Tuning: La altura del Navbar en TV es fija y más compacta
-    final navHeight = TVResponsiveUtils.sp(context, 52); // Reducido de 60 para ganar espacio vertical
+    // Senior TV Tuning: La altura del Navbar en TV adaptada a un tamaño estándar y cómodo
+    final navHeight = TVResponsiveUtils.topBarHeight(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
@@ -323,6 +341,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         autofocus: true,
                         items: displayItems,
                         currentCategory: currentCategory,
+                        // D-pad arriba desde el hero -> cápsula activa del topbar.
+                        pillFocusNode: _pillFocusNodes[currentCategory] ?? _pillFocusNodes['inicio'],
                         onFocused: () {
                           // Senior Fix: Centrar hero suavemente al enfocarlo
                           _scrollController.animateTo(
@@ -412,61 +432,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildTopNavContent(BuildContext context, WidgetRef ref, String currentCategory, double navHeight) {
     final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
-    final logoHeight = TVResponsiveUtils.sp(context, 22);
+    final logoHeight = TVResponsiveUtils.sp(context, 32);
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: _isScrolled ? 20.0 : 0.0, sigmaY: _isScrolled ? 20.0 : 0.0),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          height: navHeight,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0B0B0D).withOpacity(_isScrolled ? 0.9 : 0.4),
-            border: Border(
-              bottom: BorderSide(
-                color: _isScrolled ? Colors.white.withOpacity(0.1) : Colors.transparent,
-                width: 0.5,
-              ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      height: navHeight,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0B0B0D), // Fondo sólido sin blur
+      ),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+        child: Row(
+          children: [
+            _buildUserAvatar(context),
+            SizedBox(width: TVResponsiveUtils.sp(context, 6)), 
+            const Icon(Icons.arrow_drop_down, color: Colors.white60, size: 16), 
+            SizedBox(width: TVResponsiveUtils.sp(context, 14)), 
+            _FocusIconButton(
+              icon: Icons.search,
+              size: TVResponsiveUtils.sp(context, 22),
+              onPressed: () => context.go('/search'),
             ),
-          ),
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Row(
-              children: [
-                _buildUserAvatar(context),
-                SizedBox(width: TVResponsiveUtils.sp(context, 4)), 
-                const Icon(Icons.arrow_drop_down, color: Colors.white60, size: 14), 
-                SizedBox(width: TVResponsiveUtils.sp(context, 10)), 
-                _FocusIconButton(
-                  icon: Icons.search,
-                  size: TVResponsiveUtils.sp(context, 18),
-                  onPressed: () => context.go('/search'),
-                ),
-                
-                const Spacer(),
-                
-                _PillNavBar(
+            
+            const Spacer(),
+            
+            Focus(
+              onFocusChange: (focused) {
+                if (mounted && _isTopBarFocused != focused) {
+                  setState(() => _isTopBarFocused = focused);
+                }
+              },
+              child: AnimatedScale(
+                scale: _isTopBarFocused ? 1.0 : 0.95,
+                alignment: Alignment.center,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                child: _PillNavBar(
                   currentCategory: currentCategory,
                   onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
+                  focusNodes: _pillFocusNodes,
                 ),
-                
-                const Spacer(),
-                
-                _FocusIconButton(
-                  icon: Icons.grid_view_rounded,
-                  size: TVResponsiveUtils.sp(context, 18),
-                  onPressed: () => context.push('/schedule'),
-                ),
-                SizedBox(width: TVResponsiveUtils.sp(context, 10)), 
-                
-                SvgPicture.asset(
-                  'assets/icons/auris-tv-icon.svg',
-                  height: logoHeight,
-                  colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
-                ),
-              ],
+              ),
             ),
-          ),
+            
+            const Spacer(),
+            
+            _FocusIconButton(
+              icon: Icons.grid_view_rounded,
+              size: TVResponsiveUtils.sp(context, 22),
+              onPressed: () => context.push('/schedule'),
+            ),
+            SizedBox(width: TVResponsiveUtils.sp(context, 14)), 
+            
+            SvgPicture.asset(
+              'assets/icons/auris-tv-icon.svg',
+              height: logoHeight,
+              colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+            ),
+          ],
         ),
       ),
     );
@@ -479,19 +502,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (user == null) {
           return _FocusIconButton(
             icon: Icons.person_outline_rounded,
-            size: TVResponsiveUtils.sp(context, 18), // Reducido de 20
-            onPressed: () => context.go('/settings'),
+            size: TVResponsiveUtils.sp(context, 22),
+            onPressed: () => context.go('/profile'),
           );
         }
 
         return _FocusIconButton(
-          onPressed: () => context.go('/settings'),
+          onPressed: () => context.go('/profile'),
           child: Container(
-            width: TVResponsiveUtils.sp(context, 24), // Reducido de 28
-            height: TVResponsiveUtils.sp(context, 24), // Reducido de 28
+            width: TVResponsiveUtils.sp(context, 36),
+            height: TVResponsiveUtils.sp(context, 36),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white24, width: 1.2), // Reducido width de 1.5
+              border: Border.all(color: Colors.white24, width: 1.5),
               image: user.photoUrl != null
                   ? DecorationImage(
                       image: user.photoUrl!.startsWith('assets/')
@@ -502,7 +525,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   : null,
             ),
             child: user.photoUrl == null
-                ? Icon(Icons.person, size: TVResponsiveUtils.sp(context, 14), color: Colors.white70) // Reducido de 16
+                ? Icon(Icons.person, size: TVResponsiveUtils.sp(context, 18), color: Colors.white70)
                 : null,
           ),
         );
@@ -514,10 +537,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _PillNavBar extends StatelessWidget {
   final String currentCategory;
   final ValueChanged<String> onCategoryChanged;
+  final Map<String, FocusNode>? focusNodes;
 
   const _PillNavBar({
     required this.currentCategory,
     required this.onCategoryChanged,
+    this.focusNodes,
   });
 
   @override
@@ -530,8 +555,8 @@ class _PillNavBar extends StatelessWidget {
       {'id': 'kdrama', 'label': 'KDramas'},
     ];
 
-    final double hPadding = TVResponsiveUtils.sp(context, 20);
-    final double spacing = TVResponsiveUtils.sp(context, 2);
+    final double hPadding = TVResponsiveUtils.sp(context, 16);
+    final double spacing = 8.0; // Separación estándar de 8 px
     
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -546,6 +571,7 @@ class _PillNavBar extends StatelessWidget {
             isActive: isSelected,
             onTap: () => onCategoryChanged(id),
             hPadding: hPadding,
+            focusNode: focusNodes?[id],
           ),
         );
       }).toList(),
@@ -558,6 +584,7 @@ class _PillNavItem extends StatefulWidget {
   final bool isActive;
   final VoidCallback onTap;
   final double hPadding;
+  final FocusNode? focusNode;
 
   const _PillNavItem({
     super.key,
@@ -565,6 +592,7 @@ class _PillNavItem extends StatefulWidget {
     required this.isActive,
     required this.onTap,
     required this.hPadding,
+    this.focusNode,
   });
 
   @override
@@ -578,7 +606,8 @@ class _PillNavItemState extends State<_PillNavItem> {
   Widget build(BuildContext context) {
     return Focus(
       // Senior Fix: Desactivado autofocus inicial para permitir que el Hero tome el mando al cargar la App
-      autofocus: false, 
+      autofocus: false,
+      focusNode: widget.focusNode,
       onFocusChange: (f) => setState(() => _focused = f),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent) {
@@ -595,21 +624,23 @@ class _PillNavItemState extends State<_PillNavItem> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
-          padding: EdgeInsets.symmetric(horizontal: widget.hPadding / 2, vertical: 6),
+          height: 32.0, // Altura reducida a 32 px para mayor estilización
+          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16.0), // Radio de 16 px (mitad de 32px para píldora perfecta)
             // Senior Logic: Blanco si tiene el foco, Gris (#2D2D2D) si es la categoría activa sin foco
             color: _focused 
                 ? Colors.white 
                 : (widget.isActive ? const Color(0xFF2D2D2D) : Colors.transparent),
-            border: _focused ? Border.all(color: Colors.white, width: 1.2) : null,
+            border: _focused ? Border.all(color: Colors.white, width: 1.5) : null,
           ),
           child: Text(
             widget.label,
             style: GoogleFonts.poppins(
               // Texto negro solo cuando la cápsula es blanca (está enfocada)
               color: _focused ? Colors.black : Colors.white,
-              fontSize: TVResponsiveUtils.sp(context, 10.5),
+              fontSize: TVResponsiveUtils.sp(context, 12.5), // Ajustado ligeramente para armonizar con 32px
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -809,11 +840,15 @@ class _TrendingSection extends ConsumerWidget {
         if (isWide) {
           return WideContentRow(
             title: title,
-            items: items.map((m) => WideContentItem(
-              id: m.id, title: m.title, imageUrl: m.bannerUrl ?? m.posterUrl,
-              logoUrl: m.logoUrl,
-              subtitle: m.subtitle, rating: formatRating(m.rating), originalItem: m,
-            )).toList(),
+            items: items.map((m) {
+              final rawSub = m.subtitle;
+              final isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
+              return WideContentItem(
+                id: m.id, title: m.title, imageUrl: m.bannerUrl ?? m.posterUrl,
+                logoUrl: m.logoUrl,
+                subtitle: isJustYear ? null : rawSub, rating: formatRating(m.rating), originalItem: m,
+              );
+            }).toList(),
             onItemTap: (wide) => openTVDetails(context, wide.originalItem as MediaItem, category),
           );
         }
@@ -841,13 +876,17 @@ class _RecentEpisodesSection extends ConsumerWidget {
     return asyncData.when(
       data: (items) => WideContentRow(
         title: title,
-        items: items.map((m) => WideContentItem(
-          id: m.id, title: m.title, imageUrl: m.bannerUrl ?? m.posterUrl,
-          logoUrl: m.logoUrl,
-          subtitle: m.subtitle, rating: formatRating(m.rating),
-          badgeOverlay: m.airingAt != null ? AiringCountdownBadge(airingAt: m.airingAt!, aired: m.aired) : null,
-          originalItem: m,
-        )).toList(),
+        items: items.map((m) {
+          final rawSub = m.subtitle;
+          final isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
+          return WideContentItem(
+            id: m.id, title: m.title, imageUrl: m.bannerUrl ?? m.posterUrl,
+            logoUrl: m.logoUrl,
+            subtitle: isJustYear ? null : rawSub, rating: formatRating(m.rating),
+            badgeOverlay: m.airingAt != null ? AiringCountdownBadge(airingAt: m.airingAt!, aired: m.aired) : null,
+            originalItem: m,
+          );
+        }).toList(),
         onItemTap: (wide) => openTVScheduleItem(context, wide.originalItem as MediaItem),
       ),
       loading: () => const RowSkeleton(isWide: true),

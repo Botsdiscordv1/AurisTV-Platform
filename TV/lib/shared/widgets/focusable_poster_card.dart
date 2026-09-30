@@ -4,6 +4,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart' hide MarqueeText;
 import 'marquee_text.dart';
+import 'tv_focus_wrapper.dart';
+import 'tv_scroll.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 Color _colorFromString(String s) {
@@ -61,6 +63,10 @@ class FocusablePosterCard extends StatefulWidget {
   final Color? activeBorderColor;
   final double aspectRatio;
   final Widget? airingOverlay; // Senior Fix: Slot para esquina superior izquierda
+  /// Ancho de lo que precede al póster dentro de su elemento de fila (p. ej.
+  /// el número gigante del Top10): el scroll lo ancla al INICIO del elemento
+  /// para que el número y su tarjeta se vean siempre juntos.
+  final double anchorInset;
 
   const FocusablePosterCard({
     super.key,
@@ -77,6 +83,7 @@ class FocusablePosterCard extends StatefulWidget {
     this.activeBorderColor,
     this.aspectRatio = 2 / 3,
     this.airingOverlay,
+    this.anchorInset = 0.0,
   });
 
   @override
@@ -101,11 +108,12 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
         onFocusChange: (focused) {
           setState(() => _focused = focused);
           if (focused) {
-            Scrollable.ensureVisible(
+            // Ancla en la ranura inicial del carrusel (misma posición que la
+            // primera tarjeta de la fila); en rejillas verticales centra.
+            // anchorInset respeta el prefijo del elemento (número Top10).
+            TvScroll.ensureCardVisible(
               context,
-              alignment: 0.5,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
+              leadingInset: widget.anchorInset,
             );
           }
         },
@@ -116,6 +124,13 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                 event.logicalKey == LogicalKeyboardKey.space) {
               SafeTap.run(widget.onTap);
               return KeyEventResult.handled;
+            }
+            // D-pad arriba con la fila de arriba vacía en esta columna: saltar
+            // al primero de esa fila. Si hay algo alineado, no interviene.
+            if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+              if (TvDirectionalFocus.focusFirstAboveIfEmpty()) {
+                return KeyEventResult.handled;
+              }
             }
           }
           return KeyEventResult.ignored;
@@ -128,11 +143,19 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
             children: [
               AspectRatio(
                 aspectRatio: widget.aspectRatio,
-                child: Container(
+                // Pop-out: el marco ENTERO (imagen + borde + sombra) crece
+                // fuera de su ranura al enfocar, estilo Netflix. Sincronizado
+                // con el scroll ancla (250ms). Las filas usan Clip.none para
+                // que el crecimiento no se recorte.
+                child: AnimatedScale(
+                  scale: _isActive ? 1.10 : 1.0,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: _isActive
-                        ? [BoxShadow(color: (widget.activeBorderColor ?? Colors.white).withOpacity(0.12), blurRadius: 12, spreadRadius: 1)]
+                        ? []
                         : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
                   ),
                   child: Stack(
@@ -142,29 +165,24 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         clipBehavior: Clip.antiAliasWithSaveLayer,
-                        child: AnimatedScale(
-                          scale: _isActive ? 1.12 : 1.0,
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeOutCubic,
-                          child: Builder(
-                            builder: (context) {
-                              final dpr = MediaQuery.of(context).devicePixelRatio;
-                              final targetWidth = (normalWidth * dpr).round();
-                              final targetHeight = (targetWidth * 1.5).round();
+                        child: Builder(
+                          builder: (context) {
+                            final dpr = MediaQuery.of(context).devicePixelRatio;
+                            final targetWidth = (normalWidth * dpr).round();
+                            final targetHeight = (targetWidth * 1.5).round();
 
-                              return CachedNetworkImage(
-                                imageUrl: ApiEndpoints.proxyImage(
-                                  widget.posterUrl,
-                                  policy: ImageSize.poster,
-                                ),
-                                fit: BoxFit.cover,
-                                memCacheWidth: targetWidth.clamp(1, 2048),
-                                filterQuality: FilterQuality.medium,
-                                placeholder: (context, url) => _letterPlaceholder(widget.title),
-                                errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
-                              );
-                            }
-                          ),
+                            return CachedNetworkImage(
+                              imageUrl: ApiEndpoints.proxyImage(
+                                widget.posterUrl,
+                                policy: ImageSize.poster,
+                              ),
+                              fit: BoxFit.cover,
+                              memCacheWidth: targetWidth.clamp(1, 2048),
+                              filterQuality: FilterQuality.medium,
+                              placeholder: (context, url) => _letterPlaceholder(widget.title),
+                              errorWidget: (context, url, error) => _letterPlaceholder(widget.title),
+                            );
+                          }
                         ),
                       ),
 
@@ -259,13 +277,14 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: _isActive ? (widget.activeBorderColor ?? Colors.white) : Colors.white12,
-                              width: _isActive ? 2.0 : 1.0,
+                              color: _isActive ? (widget.activeBorderColor ?? Colors.white) : Colors.transparent,
+                              width: _isActive ? 2.0 : 0.0,
                             ),
                           ),
                         ),
                       ),
                     ],
+                  ),
                   ),
                 ),
               ),

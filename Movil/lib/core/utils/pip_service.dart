@@ -6,9 +6,13 @@ class PipService {
   static const MethodChannel _channel = MethodChannel('auristv/pip');
   static final ValueNotifier<bool> isPipMode = ValueNotifier<bool>(false);
 
-  /// Orientación real justo antes de entrar a PiP (el mini es vertical, pero
-  /// se puede entrar desde el player horizontal). Al volver se restaura ESTA,
-  /// no lo que diga el sensor en ese momento.
+  /// Forma de la ventana ANTES de entrar a PiP (true = horizontal).
+  /// Se registra de forma CONTINUA mientras la app está en primer plano (ver
+  /// noteWindowMetrics) y se congela al entrar a PiP: muestrear justo en
+  /// prepareForPip es frágil porque la ventana puede estar a medio rotar o ya
+  /// encogida al 16:9 del PiP. Adaptativo: vertical -> vuelve vertical,
+  /// horizontal (tablet) -> vuelve horizontal.
+  static bool lastKnownLandscape = false;
   static bool prePipWasLandscape = false;
 
   /// Si el sistema nunca confirma la entrada (onPipChanged true), se revierte
@@ -18,12 +22,25 @@ class PipService {
   /// Retorno del árbol completo tras salir de PiP (ver onPipChanged).
   static Timer? _exitRevertTimer;
 
-  static void _recordPrePipOrientation() {
+  /// Registra la forma actual de la ventana. Llamar en cada cambio de
+  /// métricas (y post-frame inicial). Se ignora en modo PiP para congelar el
+  /// valor previo a entrar: rotar el dispositivo con el PiP arriba no cambia
+  /// el destino al volver.
+  static void noteWindowMetrics() {
+    if (isPipMode.value) return;
     try {
       final view = WidgetsBinding.instance.platformDispatcher.views.first;
       final size = view.physicalSize / view.devicePixelRatio;
-      prePipWasLandscape = size.width > size.height;
+      if (size.width > 100 && size.height > 100) {
+        lastKnownLandscape = size.width > size.height;
+      }
     } catch (_) {}
+  }
+
+  static void _recordPrePipOrientation() {
+    // Congela el último valor estable (no muestrea: la ventana ya puede estar
+    // en transición). Doble invocación (Home + enter manual) es idempotente.
+    prePipWasLandscape = lastKnownLandscape;
   }
 
   static void initialize() {
@@ -58,8 +75,9 @@ class PipService {
         }
 
         if (!inPip) {
-          // Volver a la orientación previa al PiP (flujo mini: vertical).
-          // Determinista: el nativo ya no resetea a UNSPECIFIED al salir.
+          // Volver a la forma previa al PiP (adaptativo: mini vertical ->
+          // portrait, mini horizontal de tablet -> landscape, fullscreen ->
+          // landscape). Determinista: el nativo ya no resetea a UNSPECIFIED.
           if (prePipWasLandscape) {
             SystemChrome.setPreferredOrientations([
               DeviceOrientation.landscapeLeft,
