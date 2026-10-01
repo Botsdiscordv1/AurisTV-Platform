@@ -1021,6 +1021,9 @@ class AurisRepositoryImpl implements AurisRepository {
     int? year,
     bool fast = false,
   }) async {
+    if (source == 'YouTube' || url.contains('youtube.com') || url.contains('youtu.be')) {
+      return EpisodesResponse(episodes: const [], source: source, url: url, total: 0);
+    }
     // Senior Fix: Si el cliente no pasó season, intentamos inferirlo de la URL 
     // antes de enviar la petición al servidor para ayudar al IdentityResolver.
     final int? effectiveSeason = season ?? extractSeason(url);

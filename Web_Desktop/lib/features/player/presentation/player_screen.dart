@@ -4342,7 +4342,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Autoplay Shield: Verificar si existe un siguiente episodio
     // Senior Fix (Issue #4): Usar consolidated provider
     final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
-    final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
+    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
+        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+        : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
       title: widget.title,
@@ -4805,7 +4807,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Fix (Issue #4): Usar consolidated provider
     final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
     final bool hasPrevious = currentNum > 1;
-    final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
+    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
+        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+        : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
       title: widget.title,
@@ -5314,7 +5318,9 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
     // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
     final bool useMobileLayout = isMobile || screenHeight < 500;
 
-    final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
+    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
+        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+        : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
       title: widget.title,
