@@ -668,11 +668,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     }
 
-    if (!isResumingSession) {
-      try { ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full); } catch (_) {}
-    } else {
-      try { ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full); } catch (_) {}
-    }
+    Future.microtask(() {
+      if (mounted) {
+        try { ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full); } catch (_) {}
+      }
+    });
 
     // Senior Restoration Logic: Sincronizar con el Player Global de forma segura (Post Frame)
     WidgetsBinding.instance.addPostFrameCallback((_) {
