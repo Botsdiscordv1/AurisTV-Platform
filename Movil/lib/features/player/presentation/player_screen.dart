@@ -2736,16 +2736,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_player != null) {
       _player!.pause();
     }
-    _ytController = YoutubePlayerController.fromVideoId(
-      videoId: videoId,
-      autoPlay: true,
-      params: const YoutubePlayerParams(
-        showControls: true,
-        showFullscreenButton: true,
-        mute: false,
-        playsInline: true,
-      ),
-    );
+    _ytController?.close();
+    _ytController = null;
+
+    final embedUrl = 'https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&controls=1&rel=0&modestbranding=1&enablejsapi=1';
+
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setUserAgent('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36')
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (request) {
+            final requestUrl = request.url;
+            if (requestUrl.contains('youtube.com') || requestUrl.contains('googlevideo.com') || requestUrl.startsWith('about:') || requestUrl.startsWith('data:')) {
+              return NavigationDecision.navigate;
+            }
+            return NavigationDecision.prevent;
+          },
+        ),
+      )
+      ..loadRequest(
+        Uri.parse(embedUrl),
+        headers: const {
+          'Referer': 'https://www.youtube.com/',
+        },
+      );
+
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -3777,17 +3794,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _playerView({List<VideoTrackOption> tracks = const [], required UserSettings settings}) {
-    if (_ytController != null) {
+    if (_ytController != null || (_webViewController != null && (_isTrailer || _currentSource == 'YouTube' || widget.source == 'YouTube'))) {
       return Stack(
         fit: StackFit.expand,
         children: [
           Container(color: Colors.black),
-          Center(
-            child: YoutubePlayer(
-              controller: _ytController!,
-              aspectRatio: 16 / 9,
-            ),
-          ),
+          if (_ytController != null)
+            Center(
+              child: YoutubePlayer(
+                controller: _ytController!,
+                aspectRatio: 16 / 9,
+              ),
+            )
+          else if (_webViewController != null)
+            WebViewWidget(controller: _webViewController!),
           Positioned(
             top: 16,
             left: 16,
