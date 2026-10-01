@@ -241,7 +241,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         params: yt.YoutubePlayerParams(
           showControls: false, showFullscreenButton: false, mute: ref.read(heroBannerMutedProvider),
           loop: false, showVideoAnnotations: false, playsInline: true, strictRelatedVideos: true, enableKeyboard: false,
-          origin: 'https://www.youtube.com',
           userAgent: 'Mozilla/5.0 (Android 13; Mobile; rv:125.0) Gecko/125.0 Firefox/125.0',
         ),
       );

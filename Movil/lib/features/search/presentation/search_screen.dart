@@ -177,26 +177,28 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 decoration: InputDecoration(
                   hintText: _dynamicPlaceholder,
                   hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
-                  prefixIcon: IconButton(
-                    icon: AurisIcon(
-                      _isFocused ? AurisIcons.chevronLeft : AurisIcons.search,
-                      color: _isFocused ? Colors.white70 : Colors.white24,
-                      size: _isFocused ? 18 : 16,
-                    ),
-                    onPressed: () {
-                      if (_isFocused) {
-                        if (_currentQuery.isNotEmpty || _selectedGenre != null) {
-                          _clearSearch();
-                        } else if (_focusNode.hasFocus) {
-                          _focusNode.unfocus();
-                        } else {
-                          context.pop();
-                        }
-                      } else {
-                        _focusNode.requestFocus();
-                      }
-                    },
-                  ),
+                  prefixIcon: _isFocused
+                      ? IconButton(
+                          icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white70, size: 18),
+                          onPressed: () {
+                            if (_currentQuery.isNotEmpty || _selectedGenre != null) {
+                              _clearSearch();
+                            } else if (_focusNode.hasFocus) {
+                              _focusNode.unfocus();
+                            } else {
+                              context.pop();
+                            }
+                          },
+                        )
+                      : SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Center(
+                            child: AurisIcon(AurisIcons.search,
+                                color: Colors.white24,
+                                size: 16),
+                          ),
+                        ),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,

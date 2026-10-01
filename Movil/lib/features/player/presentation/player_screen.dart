@@ -2744,7 +2744,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         showFullscreenButton: true,
         mute: false,
         playsInline: true,
-        origin: 'https://www.youtube.com',
       ),
     );
     if (mounted) {
@@ -3797,6 +3796,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 30),
                 onPressed: _exitPlayer,
                 style: IconButton.styleFrom(backgroundColor: Colors.black45),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 16,
+            right: 16,
+            child: SafeArea(
+              child: TextButton.icon(
+                icon: const Icon(Icons.open_in_new_rounded, color: Colors.white, size: 18),
+                label: const Text('Abrir en YouTube', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.black45,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                onPressed: () {
+                  final ytId = _extractYoutubeId(widget.sourceUrl) ?? widget.sourceUrl;
+                  final url = ytId.startsWith('http') ? ytId : 'https://www.youtube.com/watch?v=$ytId';
+                  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                },
               ),
             ),
           ),
