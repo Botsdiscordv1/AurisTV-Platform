@@ -434,7 +434,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         color: Colors.white.withOpacity(0.1),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                                      child: const AurisIcon(AurisIcons.close, color: Colors.white, size: 18),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -496,7 +496,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const Spacer(),
                 const SizedBox(width: 4),
                 _FocusIconButton(
-                  icon: Icons.search,
+                  icon: AurisIcons.search,
                   size: isUltraCompact ? 20 : (isCompactDesktop ? 22 : 26),
                   onPressed: () => context.go('/catalogo'),
                 ),
@@ -506,7 +506,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 // Senior: Ocultamos el grid en ultra-compacto (iPad Vertical) para priorizar la navegación
                 if (!isUltraCompact) ...[
                   _FocusIconButton(
-                    icon: Icons.grid_view_rounded,
+                    icon: AurisIcons.grid,
                     size: isCompactDesktop ? 22 : 26,
                     onPressed: () => context.push('/horario'),
                   ),
@@ -536,7 +536,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final user = ref.watch(authProvider);
         if (user == null) {
           return _FocusIconButton(
-            icon: Icons.person_outline_rounded,
+            icon: AurisIcons.user,
             size: isUltra ? 20 : (isCompact ? 20 : 22),
             onPressed: () => context.go('/settings'),
           );
@@ -560,8 +560,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   : null,
             ),
             child: user.photoUrl == null 
-                ? Icon(
-                    Icons.person, 
+                ? AurisIcon(
+                    AurisIcons.user, 
                     size: isUltra ? 14 : (isCompact ? 16 : 18), 
                     color: isSelected ? Colors.black87 : Colors.white70
                   ) 
@@ -759,7 +759,7 @@ class _PillNavItemState extends State<_PillNavItem> {
 }
 
 class _FocusIconButton extends StatefulWidget {
-  final IconData? icon;
+  final Object? icon;
   final Widget Function(BuildContext context, bool isSelected)? builder;
   final Widget? child;
   final VoidCallback onPressed;
@@ -791,7 +791,9 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
             decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? Colors.white : Colors.transparent),
             child: widget.builder != null 
                 ? widget.builder!(context, isSelected)
-                : (widget.child ?? Icon(widget.icon, color: isSelected ? Colors.black : Colors.white, size: widget.size)),
+                : (widget.child ?? (widget.icon is String 
+                    ? AurisIcon(widget.icon as String, color: isSelected ? Colors.black : Colors.white, size: widget.size)
+                    : Icon(widget.icon as IconData?, color: isSelected ? Colors.black : Colors.white, size: widget.size))),
           ),
         ),
       ),
@@ -885,8 +887,8 @@ class _LanguageButtonState extends State<_LanguageButton> {
                 )
               ),
               const SizedBox(width: 4),
-              Icon(
-                Icons.keyboard_arrow_down, 
+              AurisIcon(
+                AurisIcons.chevronDown, 
                 color: isSelected ? Colors.black : Colors.white, 
                 size: 16
               ),

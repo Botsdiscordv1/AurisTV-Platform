@@ -524,15 +524,15 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     return Row(
       mainAxisSize: MainAxisSize.min, 
       children: [
-        _DetailIconButton(icon: Icons.thumb_down_off_alt, label: 'No es para mí', onPressed: () {}, size: size, iconSize: iconSize), 
+        _DetailIconButton(icon: AurisIcons.dislike, label: 'No es para mí', onPressed: () {}, size: size, iconSize: iconSize), 
         SizedBox(width: spacing),
-        _DetailIconButton(icon: Icons.thumb_up_off_alt, label: 'Me gusta', onPressed: () {}, size: size, iconSize: iconSize), 
+        _DetailIconButton(icon: AurisIcons.like, label: 'Me gusta', onPressed: () {}, size: size, iconSize: iconSize), 
         SizedBox(width: spacing),
-        _DetailIconButton(icon: Icons.heart_broken_outlined, label: 'Me encanta', onPressed: () {}, size: size, iconSize: iconSize),
+        _DetailIconButton(icon: AurisIcons.star, label: 'Me encanta', onPressed: () {}, size: size, iconSize: iconSize),
         if (_trailerController != null && _showPlayer) ...[
           SizedBox(width: spacing),
           _DetailIconButton(
-            icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, 
+            icon: _isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp, 
             label: _isMuted ? 'Activar audio' : 'Silenciar', 
             onPressed: () { 
               setState(() { 
@@ -576,7 +576,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 else if (widget.totalSeasons > 1) ...[ Text('${widget.totalSeasons} Temporadas') ] 
                 else if (detail?.episodes != null) ...[ Text('${detail.episodes} Episodios') ],
                 if (genres.isNotEmpty) ...genres.take(2).map((g) => _buildBadge(context, g.toUpperCase(), small: true)),
-                if (r != null && r > 0) Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.star_rounded, color: Colors.amber, size: 16), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A')]),
+                if (r != null && r > 0) Row(mainAxisSize: MainAxisSize.min, children: [AurisIcon(AurisIcons.star, color: Colors.amber, size: 16), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A')]),
               ],
             ],
           ),
@@ -608,7 +608,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _NetflixListButton(
-            icon: Icons.play_arrow,
+            icon: AurisIcons.play3Filled,
             label: (latestHistory != null && !latestHistory.isFinished) 
               ? (latestHistory.season != null ? 'Reanudar T${latestHistory.season}:EP ${latestHistory.episode}' : 'Reanudar Episodio ${latestHistory.episode}')
               : 'Reproducir',
@@ -622,19 +622,19 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           // sentido ofrecer "desde el inicio".
           if (latestHistory != null &&
               latestHistory.positionInMilliseconds > 3000) ...[
-            _NetflixListButton(icon: Icons.replay, label: 'Reproducir desde el inicio', onPressed: widget.onPlay),
+            _NetflixListButton(icon: AurisIcons.restart, label: 'Reproducir desde el inicio', onPressed: widget.onPlay),
             const SizedBox(height: 6),
           ],
           if (_lastTrailerKey != null) ...[
-            _NetflixListButton(icon: Icons.movie_outlined, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true)),
+            _NetflixListButton(icon: AurisIcons.trailer, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true)),
             const SizedBox(height: 6),
           ],
           if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime')) ...[
-            _NetflixListButton(icon: Icons.layers_outlined, label: 'Episodios y más', onPressed: () => widget.onShowEpisodes?.call()),
+            _NetflixListButton(icon: AurisIcons.episodes, label: 'Episodios y más', onPressed: () => widget.onShowEpisodes?.call()),
             const SizedBox(height: 6),
           ],
           _NetflixListButton(
-            icon: isFav ? Icons.check : Icons.add,
+            icon: isFav ? AurisIcons.verify : AurisIcons.add,
             label: isFav ? 'En mi lista' : 'Añadir a mi lista',
             onPressed: () {
               final user = ref.read(authProvider);
@@ -676,7 +676,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 }
 
 class _DetailIconButton extends StatefulWidget {
-  final IconData icon; final VoidCallback onPressed; final String label; final double? size; final double? iconSize; final Color? color;
+  final Object icon; final VoidCallback onPressed; final String label; final double? size; final double? iconSize; final Color? color;
   const _DetailIconButton({required this.icon, required this.onPressed, required this.label, this.size, this.iconSize, this.color});
   @override State<_DetailIconButton> createState() => _DetailIconButtonState();
 }
@@ -705,7 +705,9 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
             child: IconButton(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               constraints: const BoxConstraints(),
-              icon: Icon(widget.icon, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)), 
+              icon: widget.icon is String
+                  ? AurisIcon(widget.icon as String, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24))
+                  : Icon(widget.icon as IconData?, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)), 
               onPressed: widget.onPressed,
             )
           )
@@ -716,7 +718,7 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
 }
 
 class _NetflixListButton extends StatefulWidget {
-  final IconData icon; final String label; final VoidCallback onPressed; final double? progress; final bool isPrimary; final bool autofocus;
+  final Object icon; final String label; final VoidCallback onPressed; final double? progress; final bool isPrimary; final bool autofocus;
   const _NetflixListButton({required this.icon, required this.label, required this.onPressed, this.progress, this.isPrimary = false, this.autofocus = false});
   @override State<_NetflixListButton> createState() => _NetflixListButtonState();
 }
@@ -751,7 +753,9 @@ class _NetflixListButtonState extends State<_NetflixListButton> {
                 padding: const EdgeInsets.symmetric(horizontal: 10), 
                 child: Row(
                   children: [
-                    Icon(widget.icon, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: widget.icon == Icons.play_arrow ? 26 : 22), 
+                    widget.icon is String
+                        ? AurisIcon(widget.icon as String, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 22)
+                        : Icon(widget.icon as IconData?, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 22), 
                     const SizedBox(width: 8), 
                     Expanded(
                       child: Text(

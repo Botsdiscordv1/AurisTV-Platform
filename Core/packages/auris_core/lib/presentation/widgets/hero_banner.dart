@@ -1118,7 +1118,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                   .watch(favoritesProvider)
                   .any((f) => f.id == item.id);
               return _BannerIconButton(
-                icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.addCircleOutline,
+                icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.add,
                 label: isFav ? 'En mi lista' : 'Mi lista',
                 onPressed: () {
                   final user = ref.read(authProvider);

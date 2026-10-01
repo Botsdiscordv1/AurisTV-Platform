@@ -56,7 +56,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             filter: ImageFilter.blur(sigmaX: _isScrolled ? 20 : 0, sigmaY: _isScrolled ? 20 : 0),
             child: AppBar(
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 24),
                 onPressed: () {
                   if (context.canPop()) {
                     context.pop();
@@ -168,7 +168,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 message: _activeFilter == 'todos' 
                     ? 'Tu lista está vacía' 
                     : 'No tienes $_activeFilter en tu lista',
-                icon: Icons.favorite_border_rounded,
+                icon: AurisIcons.bookmarkOutline,
               ),
             )
           else
@@ -282,7 +282,7 @@ class _CategoryFilters extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final String message;
-  final IconData icon;
+  final Object icon;
   const _EmptyState({required this.message, required this.icon});
 
   @override
@@ -290,7 +290,9 @@ class _EmptyState extends StatelessWidget {
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 64, color: Colors.white10),
+        icon is String 
+            ? AurisIcon(icon as String, size: 64, color: Colors.white10)
+            : Icon(icon as IconData?, size: 64, color: Colors.white10),
         const SizedBox(height: 16),
         Text(message, style: const TextStyle(color: Colors.white24, fontSize: 16)),
       ],
@@ -394,7 +396,7 @@ class _HistoryCard extends StatelessWidget {
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white.withOpacity(0.1)),
                             ),
-                            child: const Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                            child: AurisIcon(AurisIcons.close, color: Colors.white70, size: 16),
                           ),
                         ),
                       ),
@@ -469,7 +471,7 @@ class _LibraryMediaCard extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.info_outline, color: Colors.white70),
+              leading: AurisIcon(AurisIcons.info, color: Colors.white70, size: 24),
               title: const Text('Ver detalles', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -477,7 +479,7 @@ class _LibraryMediaCard extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.close_rounded, color: Colors.redAccent),
+              leading: AurisIcon(AurisIcons.close, color: Colors.redAccent, size: 24),
               title: const Text('Quitar de Mi lista', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600)),
               onTap: () {
                 Navigator.pop(ctx);

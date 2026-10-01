@@ -283,13 +283,22 @@ class _ProfileItemState extends State<_ProfileItem> {
               ],
             ),
             const SizedBox(height: 16),
-            Text(
-              widget.name,
-              style: TextStyle(
-                color: _isHovered || widget.isEditMode ? Colors.white : Colors.white60,
-                fontSize: 18,
-                fontWeight: _isHovered || widget.isEditMode ? FontWeight.bold : FontWeight.normal,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.name,
+                  style: TextStyle(
+                    color: _isHovered || widget.isEditMode ? Colors.white : Colors.white60,
+                    fontSize: 18,
+                    fontWeight: _isHovered || widget.isEditMode ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                if (widget.isMain) ...[
+                  const SizedBox(width: 6),
+                  AurisIcon(AurisIcons.verify, color: Color(0xFFEF7A1E), size: 16),
+                ],
+              ],
             ),
           ],
         ),

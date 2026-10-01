@@ -39,7 +39,7 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
         elevation: 0,
         leading: Navigator.canPop(context)
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70),
+                icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white70, size: 24),
                 onPressed: () => context.pop(),
               )
             : null,
@@ -211,7 +211,7 @@ class _ProfileItemState extends State<_ProfileItem> {
                                 : CachedNetworkImage(imageUrl: widget.photoUrl!, fit: BoxFit.cover))
                             : Container(
                                 color: Colors.white10,
-                                child: const Icon(Icons.person, color: Colors.white70, size: 65),
+                                child: AurisIcon(AurisIcons.user, color: Colors.white70, size: 65),
                               ),
                       ),
                     ),
@@ -223,7 +223,7 @@ class _ProfileItemState extends State<_ProfileItem> {
                           color: Colors.black54,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.edit, color: Colors.white, size: 42),
+                        child: AurisIcon(AurisIcons.settings, color: Colors.white, size: 42),
                       ),
                     if (widget.isEditMode && !widget.isMain)
                       Positioned(
@@ -237,7 +237,7 @@ class _ProfileItemState extends State<_ProfileItem> {
                               color: Colors.redAccent,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.close, color: Colors.white, size: 18),
+                            child: AurisIcon(AurisIcons.close, color: Colors.white, size: 18),
                           ),
                         ),
                       ),
@@ -314,7 +314,7 @@ class _AddProfileItemState extends State<_AddProfileItem> {
                         ? [BoxShadow(color: primaryColor.withValues(alpha: 0.4), blurRadius: 16, spreadRadius: 2)]
                         : [],
                   ),
-                  child: const Icon(Icons.add, color: Colors.white70, size: 60),
+                  child: AurisIcon(AurisIcons.add, color: Colors.white70, size: 60),
                 ),
                 const SizedBox(height: 14),
                 Text(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../auris_core.dart';
 import 'season_selector_data.dart';
 
 /// A shared season selector widget for all platforms.
@@ -130,11 +131,10 @@ class _SeasonSelectorState extends State<SeasonSelector> {
                       ),
                     ),
                     SizedBox(width: _sp(context, 12)),
-                    Icon(
-                      Icons.keyboard_arrow_down,
+                    AurisIcon(
+                      AurisIcons.chevronDown,
                       size: widget.data.compact ? 20 : 24,
                       color: Colors.white,
-                      weight: 700,
                     ),
                   ],
                 ),

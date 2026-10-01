@@ -48,7 +48,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+            icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 24),
             onPressed: () {
               if (context.canPop()) {
                 context.pop();
@@ -63,12 +63,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.search_rounded, color: Colors.white, size: 28),
+              icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 28),
               onPressed: () => context.push('/search'),
             ),
             const SizedBox(width: 12),
             IconButton(
-              icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 28),
+              icon: AurisIcon(AurisIcons.settings, color: Colors.white, size: 28),
               onPressed: () => context.push('/settings'),
             ),
             const SizedBox(width: 24),
@@ -105,7 +105,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           const Text('MENÚ PRINCIPAL', style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
                           const SizedBox(height: 12),
                           _QuickActionTile(
-                            icon: Icons.download_rounded,
+                            icon: AurisIcons.download,
                             iconBgColor: Colors.blueAccent,
                             title: 'Descargas y Mi Espacio',
                             subtitle: 'Favoritos e historial guardado',
@@ -274,7 +274,7 @@ class _FocusableAvatarWidgetState extends State<_FocusableAvatarWidget> {
                       color: Colors.white10,
                     ),
                     child: (widget.user?.photoUrl == null)
-                        ? const Icon(Icons.person_rounded, color: Colors.white70, size: 75)
+                        ? AurisIcon(AurisIcons.user, color: Colors.white70, size: 75)
                         : null,
                   ),
                   Container(
@@ -283,7 +283,7 @@ class _FocusableAvatarWidgetState extends State<_FocusableAvatarWidget> {
                       color: widget.primaryColor,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.edit, size: 16, color: Colors.black),
+                    child: AurisIcon(AurisIcons.settings, size: 16, color: Colors.black),
                   ),
                 ],
               ),
@@ -393,7 +393,7 @@ class _FocusableNameSelectorState extends State<_FocusableNameSelector> {
                     children: [
                       _MenuOption(
                         focusNode: _firstOptionFocusNode,
-                        icon: Icons.manage_accounts_rounded,
+                        icon: AurisIcons.user,
                         label: 'Administrar perfiles',
                         onArrowUp: _closeMenu,
                         onBack: _closeMenu,
@@ -403,7 +403,7 @@ class _FocusableNameSelectorState extends State<_FocusableNameSelector> {
                         },
                       ),
                       _MenuOption(
-                        icon: Icons.person_add_rounded,
+                        icon: AurisIcons.add,
                         label: 'Añadir perfil',
                         onBack: _closeMenu,
                         onTap: () {
@@ -412,7 +412,7 @@ class _FocusableNameSelectorState extends State<_FocusableNameSelector> {
                         },
                       ),
                       _MenuOption(
-                        icon: Icons.switch_account_rounded,
+                        icon: AurisIcons.user,
                         label: 'Cambiar de perfil',
                         onBack: _closeMenu,
                         onTap: () {
@@ -484,7 +484,7 @@ class _FocusableNameSelectorState extends State<_FocusableNameSelector> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 24),
+                  AurisIcon(AurisIcons.chevronDown, color: Colors.white70, size: 24),
                 ],
               ),
             ),
@@ -496,7 +496,7 @@ class _FocusableNameSelectorState extends State<_FocusableNameSelector> {
 }
 
 class _MenuOption extends StatefulWidget {
-  final IconData icon;
+  final Object icon;
   final String label;
   final VoidCallback onTap;
   final VoidCallback? onArrowUp;
@@ -561,7 +561,9 @@ class _MenuOptionState extends State<_MenuOption> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Icon(widget.icon, color: _hasFocus ? primaryColor : Colors.white70, size: 22),
+              widget.icon is String
+                  ? AurisIcon(widget.icon as String, color: _hasFocus ? primaryColor : Colors.white70, size: 22)
+                  : Icon(widget.icon as IconData?, color: _hasFocus ? primaryColor : Colors.white70, size: 22),
               const SizedBox(width: 12),
               Text(
                 widget.label,
@@ -580,7 +582,7 @@ class _MenuOptionState extends State<_MenuOption> {
 }
 
 class _QuickActionTile extends StatefulWidget {
-  final IconData icon;
+  final Object icon;
   final Color iconBgColor;
   final String title;
   final String subtitle;
@@ -630,7 +632,9 @@ class _QuickActionTileState extends State<_QuickActionTile> {
                       color: widget.iconBgColor,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(widget.icon, color: Colors.white, size: 24),
+                    child: widget.icon is String
+                        ? AurisIcon(widget.icon as String, color: Colors.white, size: 24)
+                        : Icon(widget.icon as IconData?, color: Colors.white, size: 24),
                   ),
                   const SizedBox(width: 20),
                   Expanded(
@@ -643,7 +647,7 @@ class _QuickActionTileState extends State<_QuickActionTile> {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.white54, size: 28),
+                  AurisIcon(AurisIcons.chevronRight, color: Colors.white54, size: 28),
                 ],
               ),
             ),

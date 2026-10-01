@@ -379,25 +379,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final activeTargetId = remoteState.activeTargetDeviceId;
     final isCasting = activeTargetId != null;
     
-    IconData castIcon = Symbols.devices;
     Color iconColor = color ?? Colors.white;
-
     if (isCasting) {
       iconColor = const Color(0xFFEF7A1E);
-      final targetDevice = remoteState.availableDevices.firstWhereOrNull((d) => d.id == activeTargetId);
-      if (targetDevice != null) {
-        switch (targetDevice.type) {
-          case RemoteDeviceType.web: castIcon = Symbols.desktop_windows; break;
-          case RemoteDeviceType.android: castIcon = Symbols.airplay; break;
-          case RemoteDeviceType.windows: castIcon = Symbols.desktop_windows; break;
-          case RemoteDeviceType.ios: castIcon = Symbols.phone_iphone; break;
-          default: castIcon = Symbols.devices_other;
-        }
-      }
     }
 
     return _buildCircularButton(
-      icon: castIcon,
+      icon: AurisIcons.cast,
       onTap: _showDeviceSelector,
       size: _isMobileDevice ? iconSize + 16 : 44, // Senior Fix: Unificado a 44px con Play
       fill: isCasting,
@@ -1200,10 +1188,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final bool isBoost = _volume > 1.0;
     final int displayPercent = (_volume * 100).round();
     
-    IconData volIcon = Symbols.volume_up;
-    if (_volume == 0) volIcon = Symbols.volume_off;
-    else if (_volume <= 0.5) volIcon = Symbols.volume_down;
-    else if (isBoost) volIcon = Symbols.bolt;
+    String volIcon = AurisIcons.volumeHigh;
+    if (_volume <= 0.01) volIcon = AurisIcons.volumeCross;
+    else if (_volume <= 0.5) volIcon = AurisIcons.volumeDown;
+    else if (isBoost) volIcon = AurisIcons.boltFilled;
 
     return MouseRegion(
       onEnter: (_) {
@@ -1239,7 +1227,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 SizedBox(
                   width: 36, height: 36,
                   child: Center(
-                    child: Icon(volIcon, color: isBoost ? const Color(0xFFEF7A1E) : Colors.white, size: 24),
+                    child: AurisIcon(volIcon, color: isBoost ? const Color(0xFFEF7A1E) : Colors.white, size: 24),
                   ),
                 ),
                 if (_isVolumePillHovered) ...[
@@ -2058,7 +2046,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Future<void> _initPlayer(String videoUrl, [Map<String, String> headers = const {}]) async {
     // Senior Youtube Fix: Detectar URLs de YouTube para usar el player especializado
     // y evitar errores del motor nativo (MPV) sin yt-dlp.
-    if (videoUrl.contains('youtube.com') || videoUrl.contains('youtu.be')) {
+    if (videoUrl.contains('youtube.com') || videoUrl.contains('youtu.be') || _currentSource == 'YouTube' || widget.source == 'YouTube') {
       final id = _extractYoutubeId(videoUrl);
       if (id != null) {
         _initYoutubePlayer(id);
@@ -2756,6 +2744,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         showFullscreenButton: true,
         mute: false,
         playsInline: true,
+        origin: 'https://www.youtube.com',
       ),
     );
     if (mounted) {
@@ -3343,7 +3332,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             ),
                           );
                         },
-                        icon: const Icon(Icons.cast_connected_rounded, size: 16),
+                        icon: AurisIcon(AurisIcons.cast, color: Colors.redAccent, size: 16),
                         label: const Text('DETENER TRANSMISIÓN', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                         style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
                       ),
@@ -3378,7 +3367,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 18),
+                AurisIcon(AurisIcons.cast, color: Color(0xFFEF7A1E), size: 18),
                 const SizedBox(width: 10),
                 Text(
                   target.name.toUpperCase(),
@@ -3497,7 +3486,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           const SizedBox(height: 32),
           Row(
             children: [
-              const Icon(Symbols.volume_down, color: Colors.white54, size: 20),
+              AurisIcon(AurisIcons.volumeDown, color: Colors.white54, size: 20),
               Expanded(
                 child: Slider(
                   value: target.volume.clamp(0.0, 1.0),
@@ -3506,7 +3495,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   onChanged: (v) => _sendRemoteAction(target, RemoteAction.setVolume, {'volume': v}),
                 ),
               ),
-              const Icon(Symbols.volume_up, color: Colors.white54, size: 20),
+              AurisIcon(AurisIcons.volumeUp, color: Colors.white54, size: 20),
             ],
           ),
         ],
@@ -3857,9 +3846,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildGestureIndicator(bool isBrightness, double value) {
     final bool isBoost = !isBrightness && value > 1.0;
-    final IconData icon = isBrightness 
-        ? (value > 0.7 ? Icons.brightness_7_rounded : (value > 0.3 ? Icons.brightness_6_rounded : Icons.brightness_2_rounded))
-        : (value > 1.0 ? Icons.bolt_rounded : (value > 0.5 ? Icons.volume_up_rounded : (value > 0 ? Icons.volume_down_rounded : Icons.volume_off_rounded)));
+    final String volIcon = value == 0 
+        ? AurisIcons.volumeCross 
+        : (value <= 0.5 ? AurisIcons.volumeDown : AurisIcons.volumeHigh);
+    final IconData brightnessIcon = value > 0.7 ? Icons.brightness_7_rounded : (value > 0.3 ? Icons.brightness_6_rounded : Icons.brightness_2_rounded);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -3871,7 +3861,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: isBoost ? Colors.orangeAccent : Colors.white, size: 18),
+          isBrightness
+              ? Icon(brightnessIcon, color: Colors.white, size: 18)
+              : AurisIcon(isBoost ? AurisIcons.boltFilled : volIcon, color: isBoost ? Colors.orangeAccent : Colors.white, size: 18),
           const SizedBox(width: 12),
           Container(
             width: 100,
@@ -4431,7 +4423,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                    child: Column(
                      mainAxisSize: MainAxisSize.min,
                      children: [
-                       const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 64),
+                       AurisIcon(AurisIcons.cast, color: Color(0xFFEF7A1E), size: 64),
                        const SizedBox(height: 24),
                        const Text(
                          'SINCROIZACIÓN REMOTA',
@@ -4779,7 +4771,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       if (targetDevice != null)
                         Row(
                           children: [
-                            const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 14),
+                            AurisIcon(AurisIcons.cast, color: Color(0xFFEF7A1E), size: 14),
                             const SizedBox(width: 6),
                             Text(
                               'Reproduciendo en ${targetDevice.name}',
@@ -4889,7 +4881,7 @@ Builder(
   }
 
   Widget _buildCircularButton({
-    required IconData icon, 
+    required Object icon, 
     required VoidCallback onTap, 
     required double size,
     bool fill = false,
@@ -4897,6 +4889,22 @@ Builder(
     double? iconSize,
     Color? iconColor,
   }) {
+    Widget iconWidget;
+    if (icon is String) {
+      iconWidget = AurisIcon(
+        icon,
+        color: iconColor ?? Colors.white,
+        size: iconSize ?? (size * 0.55),
+      );
+    } else {
+      iconWidget = Icon(
+        icon as IconData, 
+        color: iconColor ?? Colors.white, 
+        size: iconSize ?? (size * 0.55), 
+        fill: fill ? 1.0 : 0.0
+      );
+    }
+
     return Container(
       width: size, height: size,
       decoration: BoxDecoration(
@@ -4912,12 +4920,7 @@ Builder(
           hoverColor: Colors.white.withValues(alpha: 0.12),
           splashColor: Colors.white.withValues(alpha: 0.08),
           child: Center(
-            child: Icon(
-              icon, 
-              color: iconColor ?? Colors.white, 
-              size: iconSize ?? (size * 0.55), 
-              fill: fill ? 1.0 : 0.0
-            ),
+            child: iconWidget,
           ),
         ),
       ),
@@ -4925,13 +4928,24 @@ Builder(
   }
 
   Widget _buildCapsuleIconButton({
-    required IconData icon, 
+    required Object icon, 
     required VoidCallback onTap, 
     double size = 24, 
     bool fill = false,
     double minWidth = 48,
     double weight = 300.0, // Peso por defecto consistente
   }) {
+    Widget iconWidget;
+    if (icon is String) {
+      iconWidget = AurisIcon(
+        icon,
+        color: Colors.white,
+        size: size,
+      );
+    } else {
+      iconWidget = Icon(icon as IconData, color: Colors.white, size: size, fill: fill ? 1.0 : 0.0, weight: weight);
+    }
+
     return Container(
       width: minWidth, height: 44, // Unificado a 44px
       padding: const EdgeInsets.all(4), // Inset de 4px para forma de cápsula interna
@@ -4943,7 +4957,7 @@ Builder(
           hoverColor: Colors.white.withValues(alpha: 0.12),
           splashColor: Colors.white.withValues(alpha: 0.08),
           child: Center(
-            child: Icon(icon, color: Colors.white, size: size, fill: fill ? 1.0 : 0.0, weight: weight),
+            child: iconWidget,
           ),
         ),
       ),
@@ -4969,7 +4983,7 @@ Builder(
           const SizedBox(width: 6),
           // Rotar (Visualmente tiende a verse grande, bajamos un poco)
           _buildCapsuleIconButton(
-            icon: Symbols.screen_rotation,
+            icon: AurisIcons.phoneRotate,
             onTap: () {
               setState(() {
                 _isLandscapeOnly = !_isLandscapeOnly;
@@ -4986,7 +5000,7 @@ Builder(
           // Anterior (Sólido suele verse pequeño, subimos un poco)
           if (hasPrevious)
             _buildCapsuleIconButton(
-              icon: Symbols.skip_previous,
+              icon: AurisIcons.backwardStep,
               onTap: () => _navigateToEpisode(false),
               size: baseIconSize + 2,
               fill: true,
@@ -4996,7 +5010,7 @@ Builder(
           // Siguiente (Sólido suele verse pequeño, subimos un poco)
           if (hasNext)
             _buildCapsuleIconButton(
-              icon: Symbols.skip_next,
+              icon: AurisIcons.forwardStep,
               onTap: () => _navigateToEpisode(true),
               size: baseIconSize + 2,
               fill: true,
@@ -5025,7 +5039,7 @@ Builder(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Symbols.speed, color: Colors.white, size: baseIconSize - 1, weight: iconWeight),
+                    AurisIcon(AurisIcons.speedometer, color: Colors.white, size: baseIconSize - 1),
                     const SizedBox(width: 4),
                     Text(
                       '${_playbackSpeed.toStringAsFixed(1)}x', 
@@ -5047,7 +5061,7 @@ Builder(
           // Servidor
           if (!_isOpEd)
             _buildCapsuleIconButton(
-              icon: Symbols.dns,
+              icon: AurisIcons.server,
               onTap: _showServerSelector,
               size: baseIconSize - 2,
               minWidth: 40,
@@ -5057,7 +5071,7 @@ Builder(
           if (!_isOpEd && !_isTrailer) ...[
             if (!_isOpEd) Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
             _buildCapsuleIconButton(
-              icon: Symbols.subtitles,
+              icon: AurisIcons.subtitles,
               onTap: _showLanguageSelector,
               size: baseIconSize - 2,
               minWidth: 40,
@@ -5080,14 +5094,14 @@ Builder(
         children: [
           const SizedBox(width: 2), // Margen de seguridad inicial
           _buildCapsuleIconButton(
-            icon: Symbols.replay_10,
+            icon: AurisIcons.backward10,
             onTap: _skipBackward,
             size: 18, // Reducido adicionalmente para mejor jerarquía visual
             minWidth: 48,
           ),
           Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.05)),
           _buildCapsuleIconButton(
-            icon: Symbols.forward_10,
+            icon: AurisIcons.forward10,
             onTap: _skipForward,
             size: 18, // Reducido adicionalmente para mejor jerarquía visual
             minWidth: 48,
@@ -5110,7 +5124,7 @@ Builder(
           const SizedBox(width: 2),
           if (hasPrevious)
             _buildCapsuleIconButton(
-              icon: Symbols.skip_previous,
+              icon: AurisIcons.backwardStep,
               onTap: () => _navigateToEpisode(false),
               size: 30, // Unificado a 30px
               fill: true,
@@ -5120,7 +5134,7 @@ Builder(
             Container(width: 1, height: 16, color: Colors.white.withValues(alpha: 0.05)),
           if (hasNext)
             _buildCapsuleIconButton(
-              icon: Symbols.skip_next,
+              icon: AurisIcons.forwardStep,
               onTap: () => _navigateToEpisode(true),
               size: 30, // Unificado a 30px
               fill: true,
@@ -5254,12 +5268,14 @@ Builder(
                       children: [
                         IconButton(
                           iconSize: iconSize,
-                          icon: Icon(
+                          icon: AurisIcon(
                             _useVideoFitCycle 
-                              ? (_videoFit == BoxFit.contain ? Symbols.aspect_ratio : (_videoFit == BoxFit.fill ? Symbols.fit_screen : Symbols.fullscreen))
-                              : (_isFullscreen ? Symbols.close_fullscreen : Symbols.open_in_full),
+                              ? (_videoFit == BoxFit.contain
+                                  ? AurisIcons.aspectRatioSquare
+                                  : (_videoFit == BoxFit.fill ? AurisIcons.expand : AurisIcons.exitFullscreen))
+                              : (_isFullscreen ? AurisIcons.exitFullscreen : AurisIcons.expand),
                             color: Colors.white,
-                            weight: 300,
+                            size: iconSize ?? 24,
                           ),
                           onPressed: _toggleFullscreen,
                         ),
@@ -5298,14 +5314,14 @@ Builder(
                         if (!_isOpEd && !_isMovie && !_isTrailer)
                         IconButton(
                           iconSize: iconSize, 
-                          icon: const Icon(Symbols.video_library, color: Colors.white), 
+                          icon: AurisIcon(AurisIcons.videoLib, color: Colors.white, size: iconSize),
                           onPressed: _showEpisodesCarousel
                         ),
                         SizedBox(width: spacing),
                         _buildCastIcon(iconSize),
                         if (!_isOpEd && !_isMovie && !_isTrailer) ...[
                           SizedBox(width: spacing),
-                          _PlayerTextButton(onPressed: _skipOpEd, icon: Symbols.fast_forward, label: 'OP / ED', useBackground: true),
+                          _PlayerTextButton(onPressed: _skipOpEd, icon: AurisIcons.fastForward, label: 'OP / ED', useBackground: true),
                         ],
                       ],
                     ),
@@ -5486,7 +5502,7 @@ Builder(
       top: isLandscape ? 45 : 60, 
       right: 16, 
       child: IconButton(
-        icon: Icon(_isLocked ? Icons.lock : Icons.lock_open, color: Colors.white), 
+        icon: AurisIcon(_isLocked ? AurisIcons.lockClosed : AurisIcons.lockOpen, color: Colors.white, size: 24),
         onPressed: () { 
           setState(() { 
             _isLocked = !_isLocked; 
@@ -5500,7 +5516,7 @@ Builder(
 }
 
 class _PlayerTextButton extends StatefulWidget {
-  final VoidCallback onPressed; final IconData icon; final String label; final bool isBold; final bool useBackground;
+  final VoidCallback onPressed; final Object icon; final String label; final bool isBold; final bool useBackground;
   const _PlayerTextButton({required this.onPressed, required this.icon, required this.label, this.isBold = false, this.useBackground = false});
   @override State<_PlayerTextButton> createState() => _PlayerTextButtonState();
 }
@@ -5515,6 +5531,13 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
 
     final double fontSize = useMobileLayout ? (isLandscape ? 12 : 12) : 16;
     final double iconSize = useMobileLayout ? (isLandscape ? 20 : 20) : 30;
+
+    Widget iconWidget;
+    if (widget.icon is String) {
+      iconWidget = AurisIcon(widget.icon as String, color: Colors.white, size: iconSize);
+    } else {
+      iconWidget = Icon(widget.icon as IconData, color: Colors.white, size: iconSize);
+    }
 
     return MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
@@ -5534,7 +5557,7 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
                         color: widget.useBackground ? (_isHovered ? Colors.white24 : Colors.white10) : (_isHovered ? Colors.white10 : Colors.transparent),
                         borderRadius: BorderRadius.circular(8)),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(widget.icon, color: Colors.white, size: iconSize),
+                      iconWidget,
                       if (widget.label.isNotEmpty) ...[
                         SizedBox(width: useMobileLayout ? 4 : 8),
                         Text(widget.label, style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: widget.isBold ? FontWeight.w900 : FontWeight.bold)),

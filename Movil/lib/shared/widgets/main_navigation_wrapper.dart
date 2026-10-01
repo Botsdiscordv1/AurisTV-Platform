@@ -161,7 +161,7 @@ class _RemoteMiniPlayer extends ConsumerWidget {
                   ),
                   Row(
                     children: [
-                      const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 10),
+                      AurisIcon(AurisIcons.cast, color: Color(0xFFEF7A1E), size: 10),
                       const SizedBox(width: 4),
                       Text(
                         'EN ${target.name.toUpperCase()}',

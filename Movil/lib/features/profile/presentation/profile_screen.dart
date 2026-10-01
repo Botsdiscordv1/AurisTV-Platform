@@ -28,7 +28,7 @@ class ProfileScreen extends ConsumerWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.cast_rounded, color: Colors.white, size: 22),
+            icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
             onPressed: () {
               // Conexión / Cast si está disponible
               ScaffoldMessenger.of(context).showSnackBar(
@@ -37,7 +37,7 @@ class ProfileScreen extends ConsumerWidget {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.search_rounded, color: Colors.white, size: 24),
+            icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 24),
             onPressed: () => context.push('/search'),
           ),
           IconButton(

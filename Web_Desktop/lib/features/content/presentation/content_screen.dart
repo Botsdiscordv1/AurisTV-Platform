@@ -195,7 +195,7 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
                       style: TextStyle(color: Colors.white, fontSize: widget.fontSize ?? 18, fontWeight: FontWeight.bold)
                     )
                   ), 
-                  Icon(Icons.dns_rounded, size: widget.compact ? 18 : 24, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))
+                  AurisIcon(AurisIcons.server, size: widget.compact ? 18 : 24, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))
                 ]
               )
             )
@@ -292,7 +292,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
                           color: Colors.white10,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.person, color: Colors.white24, size: 40),
+                        child: const AurisIcon(AurisIcons.user, color: Colors.white24, size: 40),
                       ),
                     ),
                   ),
@@ -1073,7 +1073,7 @@ class _ThemeCardState extends State<_ThemeCard> {
                         shape: BoxShape.circle,
                         boxShadow: isSelected ? [BoxShadow(color: (widget.isOP ? Colors.blueAccent : Colors.pinkAccent).withOpacity(0.5), blurRadius: 10)] : [],
                       ), 
-                      child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: isMobile ? 24 : 32)
+                      child: AurisIcon(AurisIcons.play3, color: Colors.white, size: isMobile ? 24 : 32)
                     ),
                     const SizedBox(height: 12), 
                     Padding(
@@ -1128,7 +1128,7 @@ class _ExpandableTextState extends State<_ExpandableText> {
 
 
 class _DetailIconButton extends StatefulWidget {
-  final IconData icon; final VoidCallback onPressed; final String label; final bool isMobile; final double? size; final double? iconSize; final Color? color;
+  final Object icon; final VoidCallback onPressed; final String label; final bool isMobile; final double? size; final double? iconSize; final Color? color;
   final bool isLoading;
   const _DetailIconButton({required this.icon, required this.onPressed, required this.label, this.isMobile = false, this.size, this.iconSize, this.color, this.isLoading = false});
   @override State<_DetailIconButton> createState() => _DetailIconButtonState();
@@ -1157,7 +1157,9 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: widget.color ?? Colors.white),
                 )
               else
-                Icon(widget.icon, color: widget.color ?? Colors.white, size: 20),
+                (widget.icon is String 
+                    ? AurisIcon(widget.icon as String, color: widget.color ?? Colors.white, size: 20)
+                    : Icon(widget.icon as IconData, color: widget.color ?? Colors.white, size: 20)),
               const SizedBox(width: 8),
               Text(
                 widget.isLoading ? 'Cargando...' : widget.label,
@@ -1199,7 +1201,9 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
             child: widget.isLoading
               ? Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: widget.color ?? Colors.white)))
               : IconButton(
-                  icon: Icon(widget.icon, color: widget.color ?? Colors.white, size: widget.iconSize ?? 28),
+                  icon: widget.icon is String 
+                      ? AurisIcon(widget.icon as String, color: widget.color ?? Colors.white, size: widget.iconSize ?? 28)
+                      : Icon(widget.icon as IconData, color: widget.color ?? Colors.white, size: widget.iconSize ?? 28),
                   onPressed: widget.onPressed
                 )
           )
@@ -2491,7 +2495,7 @@ void _openPlayer(PlayerScreen player) {
           child: Row(
             mainAxisAlignment: hasProgress ? MainAxisAlignment.start : MainAxisAlignment.center,
             children: [
-              const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 36),
+              const AurisIcon(AurisIcons.play3, color: Colors.black, size: 36),
               const SizedBox(width: 8),
               Text(label, style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
               if (hasProgress) ...[
@@ -2526,7 +2530,7 @@ void _openPlayer(PlayerScreen player) {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(Icons.play_arrow_rounded, color: Colors.black, size: iconSize),
+            AurisIcon(AurisIcons.play3, color: Colors.black, size: iconSize),
             const SizedBox(width: 8),
             Text(
               label.toUpperCase(),
@@ -2606,7 +2610,7 @@ void _openPlayer(PlayerScreen player) {
       children: [
         if (_lastTrailerKey != null) ...[
           _DetailIconButton(
-            icon: (isMobile || !_showPlayer) ? Icons.movie_outlined : Icons.videocam_off_outlined,
+            icon: (isMobile || !_showPlayer) ? AurisIcons.trailer : AurisIcons.settings,
             label: (isMobile || !_showPlayer) ? 'Ver tráiler' : 'Quitar tráiler',
             isLoading: _isTrailerLoading,
             onPressed: () async {
@@ -2647,7 +2651,7 @@ void _openPlayer(PlayerScreen player) {
           SizedBox(width: spacing),
           if (!isMobile && _showPlayer) ...[
             _DetailIconButton(
-              icon: _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              icon: _isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp,
               label: _isMuted ? 'Activar audio' : 'Silenciar',
               onPressed: () {
                 setState(() {
@@ -2664,7 +2668,7 @@ void _openPlayer(PlayerScreen player) {
         ],
 
         _DetailIconButton(
-          icon: isFav ? Icons.check : Icons.add,
+          icon: isFav ? AurisIcons.verify : AurisIcons.add,
           label: isMobile ? 'Mi lista' : (isFav ? 'En mi lista' : 'Mi lista'),
           onPressed: () {
             final item = FavoriteItem(
@@ -2692,7 +2696,7 @@ void _openPlayer(PlayerScreen player) {
         SizedBox(width: spacing),
 
         _DetailIconButton(
-          icon: Icons.thumb_up_off_alt,
+          icon: AurisIcons.like,
           label: isMobile ? 'Me gusta' : 'Me gusta',
           onPressed: () {},
           isMobile: isMobile, size: size, iconSize: iconSize,
@@ -2700,7 +2704,7 @@ void _openPlayer(PlayerScreen player) {
         SizedBox(width: spacing),
 
         _DetailIconButton(
-          icon: Icons.thumb_down_off_alt,
+          icon: AurisIcons.dislike,
           label: isMobile ? 'Dislike' : 'No es para mí',
           onPressed: () {},
           isMobile: isMobile, size: size, iconSize: iconSize,
@@ -2709,7 +2713,7 @@ void _openPlayer(PlayerScreen player) {
         if (isMobile) ...[
           SizedBox(width: spacing),
           _DetailIconButton(
-            icon: Icons.share_outlined,
+            icon: AurisIcons.share,
             label: 'Compartir',
             onPressed: () {},
             isMobile: true,
@@ -2732,7 +2736,7 @@ void _openPlayer(PlayerScreen player) {
           left: isMobile ? 15 : 60,
           child: PointerInterceptor(
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28, shadows: [Shadow(color: Colors.black45, blurRadius: 8)]),
+              icon: const AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 28, shadows: [Shadow(color: Colors.black45, blurRadius: 8)]),
               onPressed: () {
                 if (mounted) {
                   if (context.canPop()) {
@@ -2753,7 +2757,7 @@ void _openPlayer(PlayerScreen player) {
             right: 15,
             child: PointerInterceptor(
               child: IconButton(
-                icon: const Icon(Icons.cast, color: Colors.white, size: 24, shadows: [Shadow(color: Colors.black45, blurRadius: 8)]),
+                icon: const AurisIcon(AurisIcons.cast, color: Colors.white, size: 24, shadows: [Shadow(color: Colors.black45, blurRadius: 8)]),
                 onPressed: () {}
               ),
             ),
@@ -3379,7 +3383,7 @@ void _openPlayer(PlayerScreen player) {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                  const AurisIcon(AurisIcons.info, color: Colors.redAccent, size: 48),
                   const SizedBox(height: 16),
                   Text('Error al cargar detalle: $e', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
@@ -4469,7 +4473,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                     duration: const Duration(milliseconds: 300),
                     child: IgnorePointer(
                       ignoring: !(_isHovered && _canScrollLeft),
-                      child: Center(child: NavArrow(icon: Icons.arrow_back_ios_new, useBackground: true, onTap: () => _scroll(-cardWidth * 3))),
+                      child: Center(child: NavArrow(icon: AurisIcons.chevronLeft, useBackground: true, onTap: () => _scroll(-cardWidth * 3))),
                     ),
                   ),
                 ),
@@ -4482,7 +4486,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                     duration: const Duration(milliseconds: 300),
                     child: IgnorePointer(
                       ignoring: !(_isHovered && _canScrollRight),
-                      child: Center(child: NavArrow(icon: Icons.arrow_forward_ios, useBackground: true, onTap: () => _scroll(cardWidth * 3))),
+                      child: Center(child: NavArrow(icon: AurisIcons.chevronRight, useBackground: true, onTap: () => _scroll(cardWidth * 3))),
                     ),
                   ),
                 ),
@@ -4532,7 +4536,7 @@ class _InfoCard extends StatelessWidget {
                 height: double.infinity,
                 errorWidget: (_, __, ___) => Container(
                   color: Colors.white10,
-                  child: Icon(Icons.person, color: Colors.white24, size: width * 0.35),
+                  child: AurisIcon(AurisIcons.user, color: Colors.white24, size: width * 0.35),
                 ),
               ),
             ),
@@ -4677,7 +4681,7 @@ class _HorizontalInfoCarouselState<T> extends State<_HorizontalInfoCarousel<T>> 
                 child: AnimatedOpacity(
                   opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 300),
-                  child: NavArrow(icon: Icons.arrow_back_ios_new, useBackground: true, onTap: () => _scroll(-cardWidth * 3)),
+                  child: NavArrow(icon: AurisIcons.chevronLeft, useBackground: true, onTap: () => _scroll(-cardWidth * 3)),
                 ),
               ),
             ),
@@ -4687,7 +4691,7 @@ class _HorizontalInfoCarouselState<T> extends State<_HorizontalInfoCarousel<T>> 
                 child: AnimatedOpacity(
                   opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 300),
-                  child: NavArrow(icon: Icons.arrow_forward_ios, useBackground: true, onTap: () => _scroll(cardWidth * 3)),
+                  child: NavArrow(icon: AurisIcons.chevronRight, useBackground: true, onTap: () => _scroll(cardWidth * 3)),
                 ),
               ),
             ),

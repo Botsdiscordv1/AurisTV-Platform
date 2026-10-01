@@ -270,9 +270,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
                       decoration: InputDecoration(
                         hintText: _dynamicPlaceholder,
                         hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontSize: 14),
-                        prefixIcon: Icon(Icons.search_rounded, 
-                            color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
-                            size: 20),
+                        prefixIcon: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 14, right: 6),
+                            child: AurisIcon(AurisIcons.search, 
+                                color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
+                                size: 16),
+                          ),
+                        ),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,

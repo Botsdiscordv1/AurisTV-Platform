@@ -114,23 +114,35 @@ class AurisDetailHeader extends StatelessWidget {
                       duration: const Duration(milliseconds: 1200),
                       curve: Curves.easeInOut,
                       opacity: revealed ? 1.0 : 0.0,
-                      child: HeroTitle(
-                        title: title ?? '',
-                        logo: logoUrl,
-                        logoReady: revealed,
-                        maxWidth: double.infinity,
-                        maxHeight: 80,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          height: 1.1,
-                          letterSpacing: 4,
-                          shadows: [
-                            Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4),
-                            Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10),
-                          ],
-                        ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: HeroTitle(
+                              title: title ?? '',
+                              logo: logoUrl,
+                              logoReady: revealed,
+                              maxWidth: double.infinity,
+                              maxHeight: 80,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                height: 1.1,
+                                letterSpacing: 4,
+                                shadows: [
+                                  Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 4),
+                                  Shadow(color: Colors.black54, offset: Offset(2, 2), blurRadius: 10),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: AurisIcon(AurisIcons.verify, color: const Color(0xFFEF7A1E), size: 20),
+                          ),
+                        ],
                       ),
                     ),
                   ),

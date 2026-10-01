@@ -177,22 +177,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 decoration: InputDecoration(
                   hintText: _dynamicPlaceholder,
                   hintStyle: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 14),
-                  prefixIcon: _isFocused
-                      ? IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
-                          onPressed: () {
-                            if (_currentQuery.isNotEmpty || _selectedGenre != null) {
-                              _clearSearch();
-                            } else if (_focusNode.hasFocus) {
-                              _focusNode.unfocus();
-                            } else {
-                              context.pop();
-                            }
-                          },
-                        )
-                      : Icon(Icons.search_rounded, 
-                          color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
-                          size: 20),
+                  prefixIcon: IconButton(
+                    icon: AurisIcon(
+                      _isFocused ? AurisIcons.chevronLeft : AurisIcons.search,
+                      color: _isFocused ? Colors.white70 : Colors.white24,
+                      size: _isFocused ? 18 : 16,
+                    ),
+                    onPressed: () {
+                      if (_isFocused) {
+                        if (_currentQuery.isNotEmpty || _selectedGenre != null) {
+                          _clearSearch();
+                        } else if (_focusNode.hasFocus) {
+                          _focusNode.unfocus();
+                        } else {
+                          context.pop();
+                        }
+                      } else {
+                        _focusNode.requestFocus();
+                      }
+                    },
+                  ),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
@@ -201,7 +205,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   contentPadding: EdgeInsets.zero,
                   suffixIcon: (_searchController.text.isNotEmpty)
                       ? IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
+                          icon: AurisIcon(AurisIcons.close, color: Colors.white38, size: 18),
                           onPressed: _clearSearch,
                         )
                       : null,

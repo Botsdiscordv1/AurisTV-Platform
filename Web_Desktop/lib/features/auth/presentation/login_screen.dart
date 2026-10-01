@@ -36,7 +36,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: const AurisIcon(AurisIcons.close, color: Colors.white),
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -147,7 +147,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   height: 50,
                   child: ElevatedButton.icon(
                     onPressed: () => ref.read(authProvider.notifier).signInWithGoogle(),
-                    icon: Image.network('https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg', height: 20, errorBuilder: (_, __, ___) => const Icon(Icons.login)),
+                    icon: Image.network('https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg', height: 20, errorBuilder: (_, __, ___) => const AurisIcon(AurisIcons.user)),
                     label: const Text('GOOGLE'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,

@@ -270,7 +270,7 @@ class _ServerSelectorState extends ConsumerState<_ServerSelector> {
                       style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
                     )
                   ), 
-                  Icon(Icons.dns_rounded, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA))
+                  AurisIcon(AurisIcons.server, color: _isHovered ? Colors.white : const Color(0xFFA5A5AA), size: 20)
                 ]
               )
             )
@@ -764,7 +764,7 @@ class _ThemeCardState extends State<_ThemeCard> {
                         shape: BoxShape.circle,
                         boxShadow: isSelected ? [BoxShadow(color: (widget.isOP ? Colors.blueAccent : Colors.pinkAccent).withOpacity(0.5), blurRadius: 10)] : [],
                       ), 
-                      child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: isMobile ? 24 : 32)
+                      child: AurisIcon(AurisIcons.playFilled, color: Colors.white, size: 20)
                     ),
                     const SizedBox(height: 12), 
                     Padding(
@@ -891,7 +891,7 @@ class _DetailButton extends StatelessWidget {
 }
 
 class _DetailIconButton extends StatefulWidget {
-  final IconData icon; final VoidCallback onPressed; final String label; final bool isMobile; final double? size; final double? iconSize; final Color? color;
+  final Object icon; final VoidCallback onPressed; final String label; final bool isMobile; final double? size; final double? iconSize; final Color? color;
   final bool isLoading;
   const _DetailIconButton({required this.icon, required this.onPressed, required this.label, this.isMobile = false, this.size, this.iconSize, this.color, this.isLoading = false});
   @override State<_DetailIconButton> createState() => _DetailIconButtonState();
@@ -900,6 +900,20 @@ class _DetailIconButton extends StatefulWidget {
 class _DetailIconButtonState extends State<_DetailIconButton> {
   bool _isHovered = false;
   @override Widget build(BuildContext context) {
+    Widget iconWidget;
+    if (widget.icon is String) {
+      iconWidget = AurisIcon(widget.icon as String, color: widget.color ?? Colors.white, size: 20);
+    } else {
+      iconWidget = Icon(widget.icon as IconData, color: widget.color ?? Colors.white, size: 20);
+    }
+
+    Widget largeIconWidget;
+    if (widget.icon is String) {
+      largeIconWidget = AurisIcon(widget.icon as String, color: widget.color ?? Colors.white, size: widget.iconSize ?? 28);
+    } else {
+      largeIconWidget = Icon(widget.icon as IconData, color: widget.color ?? Colors.white, size: widget.iconSize ?? 28);
+    }
+
     if (widget.isMobile) {
       return InkWell(
         onTap: widget.isLoading ? null : widget.onPressed,
@@ -920,7 +934,7 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: widget.color ?? Colors.white),
                 )
               else
-                Icon(widget.icon, color: widget.color ?? Colors.white, size: 20),
+                iconWidget,
               const SizedBox(width: 8),
               Text(
                 widget.isLoading ? 'Cargando...' : widget.label,
@@ -954,7 +968,7 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
             child: widget.isLoading
               ? Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: widget.color ?? Colors.white)))
               : IconButton(
-                  icon: Icon(widget.icon, color: widget.color ?? Colors.white, size: widget.iconSize ?? 28),
+                  icon: largeIconWidget,
                   onPressed: widget.onPressed
                 )
           )
@@ -1008,7 +1022,7 @@ class _CastCreditsModal extends ConsumerWidget {
                         : null,
                     backgroundColor: Colors.white10,
                     child: person.profile == null || person.profile!.isEmpty
-                        ? const Icon(Icons.person, color: Colors.white24)
+                        ? AurisIcon(AurisIcons.user, color: Colors.white24, size: 24)
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -1037,7 +1051,7 @@ class _CastCreditsModal extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                    icon: AurisIcon(AurisIcons.close, color: Colors.white54, size: 22),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -1504,7 +1518,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               const _SkeletonBox(width: 40, height: 18),
             ] else ...[
               if (r != null && r > 0) ...[
-                const Icon(Icons.star, color: Color(0xFFFFC107), size: 18),
+                AurisIcon(AurisIcons.star, color: const Color(0xFFFFC107), size: 18),
                 const SizedBox(width: 6),
                 Text(rating ?? 'N/A', style: const TextStyle(color: Color(0xFFFFC107), fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(width: 16),
@@ -1530,7 +1544,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final String label = hasHistory
         ? (epNum != null ? 'Continuar viendo Ep $epNum' : 'Continuar viendo')
         : 'Reproducir ahora';
-    final IconData icon = Icons.play_arrow_rounded;
+    final String icon = AurisIcons.playFilled;
 
     final double? progress = hasHistory ? latestHistory.progress : null;
     final bool hasProgress = progress != null && progress > 0.02;
@@ -1558,7 +1572,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               return Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, color: Colors.black, size: 32),
+                  AurisIcon(icon, color: Colors.black, size: 20),
                   const SizedBox(width: 8),
                   // Solo el texto es flexible (ellipsis): la barra conserva
                   // su tamaño original al lado y nunca desborda.
@@ -1624,28 +1638,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       children: [
       if (_lastTrailerKey != null) ...[
         _DetailIconButton(
-          icon: Icons.movie_outlined,
+          icon: AurisIcons.trailer,
           label: 'Ver tráiler',
           isLoading: _isTrailerLoading,
-          onPressed: () async {
-            if (_isTrailerLoading) return;
-            setState(() => _isTrailerLoading = true);
-            try {
-              final directUrl = await YoutubeResolver.getDirectStreamUrl(_lastTrailerKey!);
-              if (directUrl != null && context.mounted) {
-                final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(poster ?? '')}&bannerUrl=${Uri.encodeComponent(banner ?? '')}';
-                context.push('/player/${Uri.encodeComponent(widget.title)}?source=YouTube&url=${Uri.encodeComponent(directUrl)}&episode=Trailer&serverName=YouTube&totalEpisodes=1$posterParam');
-              }
-            } finally {
-              if (mounted) setState(() => _isTrailerLoading = false);
-            }
+          onPressed: () {
+            if (_lastTrailerKey == null || _lastTrailerKey!.isEmpty) return;
+            final youtubeUrl = _lastTrailerKey!.startsWith('http')
+                ? _lastTrailerKey!
+                : 'https://www.youtube.com/watch?v=$_lastTrailerKey';
+            final posterParam = '&title=${Uri.encodeComponent(widget.title)}&posterUrl=${Uri.encodeComponent(poster ?? '')}&bannerUrl=${Uri.encodeComponent(banner ?? '')}';
+            context.push('/player/${Uri.encodeComponent(widget.title)}?source=YouTube&url=${Uri.encodeComponent(youtubeUrl)}&episode=Trailer&serverName=YouTube&totalEpisodes=1$posterParam');
           },
           isMobile: isMobile,
         ),
         const SizedBox(width: 8),
       ],
       _DetailIconButton(
-        icon: isFav ? Icons.check : Icons.add,
+        icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.add,
         label: isFav ? 'En mi lista' : 'Mi lista',
         onPressed: () {
           final user = ref.read(authProvider);
@@ -1673,21 +1682,21 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       ),
       const SizedBox(width: 8),
       _DetailIconButton(
-        icon: Icons.thumb_up_off_alt,
+        icon: AurisIcons.like,
         label: 'Me gusta',
         onPressed: () {},
         isMobile: isMobile,
       ),
       const SizedBox(width: 8),
       _DetailIconButton(
-        icon: Icons.thumb_down_off_alt,
+        icon: AurisIcons.dislike,
         label: 'No me gusta',
         onPressed: () {},
         isMobile: isMobile,
       ),
       const SizedBox(width: 8),
       _DetailIconButton(
-        icon: Icons.share_outlined,
+        icon: AurisIcons.share,
         label: 'Compartir',
         onPressed: () {},
         isMobile: isMobile,
@@ -1890,7 +1899,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ) : null,
           topBar: Stack(children: [
             Positioned(top: 12, left: 15, child: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28), onPressed: () => Navigator.of(context).pop())),
-            Positioned(top: 12, right: 15, child: IconButton(icon: const Icon(Icons.cast, color: Colors.white, size: 24), onPressed: () {})),
+            Positioned(top: 12, right: 15, child: IconButton(icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 24), onPressed: () {})),
           ]),
           backdrop: DetailBackdrop(
             imageUrl: heroBanner,
@@ -2686,7 +2695,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                       duration: const Duration(milliseconds: 300),
                       child: IgnorePointer(
                         ignoring: !(_isHovered && _canScrollLeft),
-                        child: Center(child: NavArrow(icon: Icons.arrow_back_ios_new, useBackground: true, onTap: () => _scroll(-cardWidth * 3))),
+                        child: Center(child: NavArrow(icon: AurisIcons.chevronLeft, useBackground: true, onTap: () => _scroll(-cardWidth * 3))),
                       ),
                     ),
                   ),
@@ -2699,7 +2708,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                       duration: const Duration(milliseconds: 300),
                       child: IgnorePointer(
                         ignoring: !(_isHovered && _canScrollRight),
-                        child: Center(child: NavArrow(icon: Icons.arrow_forward_ios, useBackground: true, onTap: () => _scroll(cardWidth * 3))),
+                        child: Center(child: NavArrow(icon: AurisIcons.chevronRight, useBackground: true, onTap: () => _scroll(cardWidth * 3))),
                       ),
                     ),
                   ),
@@ -2817,7 +2826,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
                         color: Colors.white10,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.person, color: Colors.white24, size: 32),
+                      child: Center(child: AurisIcon(AurisIcons.user, color: Colors.white24, size: 32)),
                     ),
                   ),
                 ),

@@ -38,7 +38,7 @@ class _ProfileAddScreenState extends ConsumerState<ProfileAddScreen> {
         backgroundColor: backgroundColor,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+          icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 24),
           onPressed: () => context.pop(),
         ),
         title: const Text('Editar perfil', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
@@ -61,7 +61,7 @@ class _ProfileAddScreenState extends ConsumerState<ProfileAddScreen> {
                     border: Border.all(color: Colors.white24, width: 2.5),
                     color: cardColor,
                   ),
-                  child: const Icon(Icons.person_rounded, color: Colors.white70, size: 50),
+                  child: AurisIcon(AurisIcons.user, color: Colors.white70, size: 50),
                 ),
                 const SizedBox(height: 32),
 

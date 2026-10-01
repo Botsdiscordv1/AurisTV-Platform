@@ -231,8 +231,8 @@ class _SectionGridExplorerState extends ConsumerState<SectionGridExplorer> {
       backgroundColor: const Color(0xFF0B0B0D), // Fondo unificado con search
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
+          icon: AurisIcon(
+            AurisIcons.chevronLeft,
             color: Colors.white,
             size: 20,
           ),

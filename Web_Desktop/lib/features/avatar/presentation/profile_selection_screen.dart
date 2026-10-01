@@ -241,7 +241,7 @@ class _ProfileItemState extends State<_ProfileItem> {
                           color: const Color(0xFF1A1D24),
                         ),
                         child: widget.photoUrl == null
-                            ? const Icon(Icons.person, size: 60, color: Colors.white24)
+                            ? const AurisIcon(AurisIcons.user, size: 60, color: Colors.white24)
                             : null,
                       ),
                       if (widget.isEditMode)
@@ -252,7 +252,7 @@ class _ProfileItemState extends State<_ProfileItem> {
                             borderRadius: BorderRadius.circular(12),
                             color: Colors.black.withOpacity(0.5),
                           ),
-                          child: const Icon(Icons.edit, color: Colors.white, size: 40),
+                          child: const AurisIcon(AurisIcons.settings, color: Colors.white, size: 40),
                         ),
                     ],
                   ),
@@ -264,7 +264,7 @@ class _ProfileItemState extends State<_ProfileItem> {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white),
+                      child: const AurisIcon(AurisIcons.close, size: 16, color: Colors.white),
                     ),
                   ),
               ],
@@ -318,8 +318,8 @@ class _AddProfileItemState extends State<_AddProfileItem> {
                 ),
                 color: Colors.white.withOpacity(_isHovered ? 0.1 : 0.05),
               ),
-              child: Icon(
-                Icons.add, 
+              child: AurisIcon(
+                AurisIcons.add, 
                 size: 50, 
                 color: _isHovered ? Colors.white : Colors.white38
               ),

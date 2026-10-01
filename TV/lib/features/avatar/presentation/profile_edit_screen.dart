@@ -151,7 +151,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           backgroundColor: backgroundColor,
           surfaceTintColor: Colors.transparent,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 24),
             onPressed: () => context.pop(),
           ),
           title: const Text('Editar perfil', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
@@ -224,7 +224,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                         color: cardColor,
                                       ),
                                       child: (profile?.photoUrl == null)
-                                          ? const Icon(Icons.person_rounded, color: Colors.white70, size: 70)
+                                          ? AurisIcon(AurisIcons.user, color: Colors.white70, size: 70)
                                           : null,
                                     ),
                                     Container(
@@ -233,7 +233,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                         color: primaryColor,
                                         shape: BoxShape.circle,
                                       ),
-                                      child: const Icon(Icons.edit, size: 16, color: Colors.black),
+                                      child: AurisIcon(AurisIcons.settings, size: 16, color: Colors.black),
                                     ),
                                   ],
                                 ),
@@ -563,7 +563,7 @@ class _TVMenuSelectorState extends State<_TVMenuSelector> {
                     widget.value,
                     style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
                   ),
-                  const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 22),
+                  AurisIcon(AurisIcons.chevronDown, color: Colors.white70, size: 22),
                 ],
               ),
             ),
@@ -640,11 +640,9 @@ class _TVSubMenuOptionState extends State<_TVSubMenuOption> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Icon(
-                widget.isSelected ? Icons.check_rounded : Icons.circle_outlined,
-                color: _hasFocus ? primaryColor : (widget.isSelected ? Colors.white70 : Colors.transparent),
-                size: 18,
-              ),
+              widget.isSelected 
+                  ? AurisIcon(AurisIcons.verify, color: _hasFocus ? primaryColor : Colors.white70, size: 18)
+                  : AurisIcon(AurisIcons.add, color: _hasFocus ? primaryColor : Colors.transparent, size: 18),
               const SizedBox(width: 12),
               Text(
                 widget.label,
@@ -724,7 +722,7 @@ class _TVCheckboxTileState extends State<_TVCheckboxTile> {
                   color: widget.value ? primaryColor : Colors.transparent,
                 ),
                 child: widget.value
-                    ? const Icon(Icons.check, size: 16, color: Colors.black)
+                    ? AurisIcon(AurisIcons.verify, size: 16, color: Colors.black)
                     : null,
               ),
               const SizedBox(width: 14),
@@ -882,7 +880,7 @@ class _SettingsShortcutButtonState extends State<_SettingsShortcutButton> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+              AurisIcon(AurisIcons.chevronRight, color: Colors.white70, size: 16),
             ],
           ),
         ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../../auris_core.dart';
 import 'package:auris_core/core/utils/source_utils.dart';
 
 /// Badge que muestra el servidor activo y el idioma/calidad actual del track.
@@ -50,7 +50,7 @@ class ActiveSourceBadge extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 12),
-          const Icon(Icons.dns, color: Colors.white70, size: 18),
+          AurisIcon(AurisIcons.settings, color: Colors.white70, size: 18),
         ],
       ),
     );

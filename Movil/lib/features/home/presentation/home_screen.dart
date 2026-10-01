@@ -443,22 +443,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     currentCategory: currentCategory,
                     onPlay: (item) => _openDetails(context, item, currentCategory),
                     onDetails: (item) => _openDetails(context, item, currentCategory),
-                    onTrailer: (item) async {
-                      // Senior Fix: Extraer Stream Directo para el Player Nativo
-                      final directUrl = await YoutubeResolver.getDirectStreamUrl(item.trailerKey!);
-                      if (directUrl != null && context.mounted) {
-                        final posterParam = '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? '')}&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? '')}';
-                        final uri = '/player/${Uri.encodeComponent(item.title)}'
-                            '?source=YouTube'
-                            '&url=${Uri.encodeComponent(directUrl)}'
-                            '&episode=Trailer'
-                            '&serverName=YouTube'
-                            '&language=Trailer'
-                            '&totalEpisodes=1'
-                            '&category=${item.type.name}'
-                            '$posterParam';
-                        context.push(uri);
-                      }
+                    onTrailer: (item) {
+                      if (item.trailerKey == null || item.trailerKey!.isEmpty) return;
+                      final youtubeUrl = item.trailerKey!.startsWith('http')
+                          ? item.trailerKey!
+                          : 'https://www.youtube.com/watch?v=${item.trailerKey}';
+                      final posterParam = '&posterUrl=${Uri.encodeComponent(item.posterUrl ?? '')}&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? '')}';
+                      final uri = '/player/${Uri.encodeComponent(item.title)}'
+                          '?source=YouTube'
+                          '&url=${Uri.encodeComponent(youtubeUrl)}'
+                          '&episode=Trailer'
+                          '&serverName=YouTube'
+                          '&language=Trailer'
+                          '&totalEpisodes=1'
+                          '&category=${item.type.name}'
+                          '$posterParam';
+                      context.push(uri);
                     },
                   ),
                 ),

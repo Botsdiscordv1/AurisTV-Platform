@@ -171,11 +171,14 @@ class ExploreScreen extends ConsumerWidget {
                             onChanged: (val) => ref.read(_exploreSearchQueryProvider.notifier).state = val,
                             textAlignVertical: TextAlignVertical.center,
                             style: const TextStyle(color: Colors.white, fontSize: 16),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               isDense: true,
                               hintText: 'Buscar...',
                               hintStyle: TextStyle(color: Colors.white38),
-                              prefixIcon: Icon(Icons.search, color: Colors.white38),
+                              prefixIcon: Padding(
+                                padding: EdgeInsets.all(12),
+                                child: AurisIcon(AurisIcons.search, color: Colors.white38, size: 20),
+                              ),
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.zero,
                             ),

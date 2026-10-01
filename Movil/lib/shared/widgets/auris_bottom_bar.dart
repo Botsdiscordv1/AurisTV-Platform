@@ -23,9 +23,9 @@ class AurisBottomBar extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          _buildNavItem(context, ref, 0, Icons.home_outlined, Icons.home, 'Inicio'),
-          _buildNavItem(context, ref, 1, Icons.search_rounded, Icons.search_rounded, 'Buscar'),
-          _buildNavItem(context, ref, 2, Icons.explore_outlined, Icons.explore, 'Explorar'),
+          _buildNavItem(context, ref, 0, AurisIcons.homeOutline, AurisIcons.homeFilled, 'Inicio'),
+          _buildNavItem(context, ref, 1, AurisIcons.searchOutline, null, 'Buscar'),
+          _buildNavItem(context, ref, 2, AurisIcons.compassOutline, null, 'Explorar'),
           _buildNavItem(context, ref, 3, null, null, 'Perfil', isProfile: true),
         ],
       ),
@@ -36,8 +36,8 @@ class AurisBottomBar extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     int index,
-    IconData? icon,
-    IconData? activeIcon,
+    String? icon,
+    String? activeIcon,
     String label,
     {bool isProfile = false}
   ) {
@@ -54,9 +54,9 @@ class AurisBottomBar extends ConsumerWidget {
             const SizedBox(height: 8),
             if (isProfile)
               _buildProfileIcon(ref, isActive)
-            else
-              Icon(
-                isActive ? activeIcon : icon,
+            else if (icon != null)
+              AurisIcon(
+                isActive ? (activeIcon ?? icon) : icon,
                 color: isActive ? Colors.white : Colors.white70,
                 size: 24,
               ),
@@ -80,8 +80,8 @@ class AurisBottomBar extends ConsumerWidget {
     final String? photoUrl = user?.photoUrl;
 
     if (photoUrl == null) {
-      return Icon(
-        isActive ? Icons.person : Icons.person_outline,
+      return AurisIcon(
+        isActive ? AurisIcons.userFilled : AurisIcons.userOutline,
         color: isActive ? Colors.white : Colors.white70,
         size: 24,
       );

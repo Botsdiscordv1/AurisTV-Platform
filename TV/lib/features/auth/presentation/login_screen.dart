@@ -85,7 +85,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   color: Colors.white.withOpacity(0.1),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                  icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 24),
                   onPressed: () => context.pop(),
                 ),
               ),
@@ -476,9 +476,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               alignment: Alignment.center,
               child: label == 'del' 
-                ? Icon(Icons.backspace_outlined, color: isFocused ? Colors.black : Colors.white, size: 16)
+                ? AurisIcon(AurisIcons.close, color: isFocused ? Colors.black : Colors.white, size: 16)
                 : label == 'shift'
-                ? Icon(Icons.arrow_upward_rounded, color: isFocused ? Colors.black : Colors.white, size: 16)
+                ? AurisIcon(AurisIcons.chevronUp, color: isFocused ? Colors.black : Colors.white, size: 16)
                 : Text(
                     label,
                     style: TextStyle(
@@ -631,7 +631,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   borderRadius: BorderRadius.circular(4),
                   border: isFocused ? Border.all(color: Colors.white, width: 2) : null,
                 ),
-                child: const Icon(Icons.check, color: Colors.white, size: 18),
+                child: AurisIcon(AurisIcons.verify, color: Colors.white, size: 18),
               ),
               const SizedBox(width: 12),
               Text(

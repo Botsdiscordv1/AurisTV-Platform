@@ -353,9 +353,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         },
                         onPlay: (item) => openTVDetails(context, item, currentCategory),
                         onDetails: (item) => openTVDetails(context, item, currentCategory),
-                        onTrailer: (item) async {
-                          final directUrl = await YoutubeResolver.getDirectStreamUrl(item.trailerKey!);
-                          if (directUrl != null && context.mounted) {
+                        onTrailer: (item) {
+                          if (item.trailerKey == null || item.trailerKey!.isEmpty) return;
+                          final youtubeUrl = item.trailerKey!.startsWith('http')
+                              ? item.trailerKey!
+                              : 'https://www.youtube.com/watch?v=${item.trailerKey}';
+                          if (context.mounted) {
                             final uri = '/player/${Uri.encodeComponent(item.id)}'
                                 '?url=${Uri.encodeComponent(directUrl)}'
                                 '&source=YouTube'
@@ -446,10 +449,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             _buildUserAvatar(context),
             SizedBox(width: TVResponsiveUtils.sp(context, 6)), 
-            const Icon(Icons.arrow_drop_down, color: Colors.white60, size: 16), 
+            AurisIcon(AurisIcons.chevronDown, color: Colors.white60, size: 16), 
             SizedBox(width: TVResponsiveUtils.sp(context, 14)), 
             _FocusIconButton(
-              icon: Icons.search,
+              icon: AurisIcons.search,
               size: TVResponsiveUtils.sp(context, 22),
               onPressed: () => context.go('/search'),
             ),
@@ -478,7 +481,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const Spacer(),
             
             _FocusIconButton(
-              icon: Icons.grid_view_rounded,
+              icon: AurisIcons.grid,
               size: TVResponsiveUtils.sp(context, 22),
               onPressed: () => context.push('/schedule'),
             ),
@@ -501,7 +504,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final user = ref.watch(authProvider);
         if (user == null) {
           return _FocusIconButton(
-            icon: Icons.person_outline_rounded,
+            icon: AurisIcons.userOutline,
             size: TVResponsiveUtils.sp(context, 22),
             onPressed: () => context.go('/profile'),
           );
@@ -525,7 +528,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   : null,
             ),
             child: user.photoUrl == null
-                ? Icon(Icons.person, size: TVResponsiveUtils.sp(context, 18), color: Colors.white70)
+                ? AurisIcon(AurisIcons.user, size: TVResponsiveUtils.sp(context, 18), color: Colors.white70)
                 : null,
           ),
         );
@@ -651,7 +654,7 @@ class _PillNavItemState extends State<_PillNavItem> {
 }
 
 class _FocusIconButton extends StatefulWidget {
-  final IconData? icon;
+  final Object? icon;
   final Widget? child;
   final VoidCallback onPressed;
   final double size;
@@ -696,12 +699,18 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
             // Senior Fix: Relleno blanco sólido cuando tiene el foco (según captura 2)
             color: _focused ? Colors.white : Colors.transparent,
           ),
-          child: widget.child ?? Icon(
-            widget.icon,
-            // Senior Fix: Icono negro sobre fondo blanco cuando está enfocado
-            color: _focused ? Colors.black : Colors.white,
-            size: widget.size,
-          ),
+          child: widget.child ?? (widget.icon is String
+              ? AurisIcon(
+                  widget.icon as String,
+                  color: _focused ? Colors.black : Colors.white,
+                  size: widget.size,
+                )
+              : Icon(
+                  widget.icon as IconData?,
+                  // Senior Fix: Icono negro sobre fondo blanco cuando está enfocado
+                  color: _focused ? Colors.black : Colors.white,
+                  size: widget.size,
+                )),
         ),
       ),
     );
