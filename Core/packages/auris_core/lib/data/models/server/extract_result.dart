@@ -1,4 +1,4 @@
-﻿import '../../core/api/api_endpoints.dart';
+﻿import '../../../core/api/api_endpoints.dart';
 
 class QualityOption {
   final String key;
@@ -104,3 +104,4 @@ class ExtractResult {
     );
   }
 }
+
