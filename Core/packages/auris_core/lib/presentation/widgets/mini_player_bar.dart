@@ -422,7 +422,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: const Icon(Icons.close_rounded,
+                                        icon: AurisIcon(AurisIcons.close,
                                             color: Colors.white, size: 28),
                                         onPressed: () => ref
                                             .read(activePlayerProvider.notifier)
@@ -433,8 +433,8 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(
-                                                Icons.replay_rounded,
+                                            icon: AurisIcon(
+                                                AurisIcons.restart,
                                                 color: Color(0xFFEF7A1E),
                                                 size: 44),
                                             onPressed: _replayMini,
@@ -448,8 +448,8 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                                       ),
                                       const SizedBox(width: 16),
                                       IconButton(
-                                        icon: const Icon(
-                                            Icons.open_in_full_rounded,
+                                        icon: AurisIcon(
+                                            AurisIcons.grid,
                                             color: Colors.white,
                                             size: 28),
                                         onPressed: widget.onExpand,
@@ -527,7 +527,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                   top: 10, left: 10,
                   child: GestureDetector(
                     onTap: widget.onExpand,
-                    child: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 24),
+                    child: AurisIcon(AurisIcons.toPip, color: Colors.white, size: 24),
                   ),
                 ),
                 
@@ -536,7 +536,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                   top: 10, right: 10,
                   child: GestureDetector(
                     onTap: () => ref.read(activePlayerProvider.notifier).stop(),
-                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
+                    child: AurisIcon(AurisIcons.close, color: Colors.white, size: 26),
                   ),
                 ),
                 
@@ -549,8 +549,8 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                       initialData: state.player?.state.playing ?? false,
                       builder: (context, snapshot) {
                         final playing = snapshot.data ?? false;
-                        return Icon(
-                          playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        return AurisIcon(
+                          playing ? AurisIcons.pause : AurisIcons.play,
                           color: Colors.white,
                           size: 64,
                         );
@@ -587,7 +587,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
               child: IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                icon: AurisIcon(AurisIcons.close, color: Colors.white, size: 20),
                 onPressed: () => ref.read(activePlayerProvider.notifier).stop(),
               ),
             ),
@@ -601,8 +601,8 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                   return IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    icon: Icon(
-                      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    icon: AurisIcon(
+                      playing ? AurisIcons.pause : AurisIcons.play,
                       color: Colors.white.withOpacity(0.9),
                       size: 20,
                     ),
@@ -620,7 +620,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
               child: IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: const Icon(Icons.open_in_full_rounded, color: Colors.white, size: 20),
+                icon: AurisIcon(AurisIcons.grid, color: Colors.white, size: 20),
                 onPressed: () {
                   widget.onExpand();
                   _keepControlsVisible();
@@ -755,7 +755,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                   customBorder: const CircleBorder(),
                   child: Padding(
                     padding: const EdgeInsets.all(6.0),
-                    child: Icon(_isExpandedList ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: Colors.white.withOpacity(0.9), size: 24),
+                    child: AurisIcon(_isExpandedList ? AurisIcons.chevronUp : AurisIcons.chevronDown, color: Colors.white.withOpacity(0.9), size: 24),
                   ),
                 ),
               ),
@@ -1030,7 +1030,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                 ],
               ),
             ),
-            if (isCurrent) const Icon(Icons.play_arrow_rounded, color: Color(0xFFEF7A1E), size: 16),
+            if (isCurrent) AurisIcon(AurisIcons.play, color: Color(0xFFEF7A1E), size: 16),
           ],
         ),
       ),

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../auris_core.dart';
 
 class NavArrow extends StatefulWidget {
-  final IconData icon;
+  final Object icon; // Supports String (SVG) or IconData (Material)
   final VoidCallback onTap;
   final double size;
   final bool useBackground;
@@ -25,6 +26,21 @@ class _NavArrowState extends State<NavArrow> {
 
   @override
   Widget build(BuildContext context) {
+    Widget iconWidget;
+    if (widget.icon is String) {
+      iconWidget = AurisIcon(
+        widget.icon as String,
+        color: Colors.white,
+        size: widget.size,
+      );
+    } else {
+      iconWidget = Icon(
+        widget.icon as IconData,
+        color: Colors.white,
+        size: widget.size,
+      );
+    }
+
     Widget arrow = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.all(12),
@@ -39,11 +55,7 @@ class _NavArrowState extends State<NavArrow> {
           )
         ] : [],
       ),
-      child: Icon(
-        widget.icon,
-        color: Colors.white,
-        size: widget.size,
-      ),
+      child: iconWidget,
     );
 
     if (widget.enableScale) {

@@ -841,7 +841,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                       const SizedBox(width: 6),
                     ],
                     if (item.rating != null && item.rating! > 0) ...[
-                      const Icon(Icons.star_rounded, color: Color(0xFFEF7A1E), size: 14),
+                      AurisIcon(AurisIcons.star, color: Color(0xFFEF7A1E), size: 14),
                       const SizedBox(width: 2),
                       Text(item.rating!.toStringAsFixed(1), style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 12), fontWeight: FontWeight.bold)),
                     ],
@@ -900,14 +900,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             children: [
               _BannerButton(
                 onPressed: () => SafeTap.run(() => widget.onPlay(item)),
-                icon: Icons.play_arrow,
+                icon: AurisIcons.play,
                 label: 'Reproducir',
                 isPrimary: true,
                 isCompact: true,
               ),
               const SizedBox(width: 10),
               _BannerIconButton(
-                icon: Icons.info_outline,
+                icon: AurisIcons.info,
                 label: 'Info',
                 onPressed: () => SafeTap.run(() => widget.onDetails(item)),
                 isCompact: true,
@@ -915,7 +915,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               if (item.trailerKey != null) ...[
                 const SizedBox(width: 10),
                 _BannerIconButton(
-                  icon: Icons.movie_outlined,
+                  icon: AurisIcons.trailer,
                   label: 'Tráiler',
                   onPressed: () async {
                     if (_isTrailerLoading) return;
@@ -1034,7 +1034,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             ],
             
             if (item.rating != null && item.rating! > 0) ...[
-              Icon(Icons.star_rounded, color: const Color(0xFFEF7A1E), size: isIntermediate ? 14 : 18),
+              AurisIcon(AurisIcons.star, color: const Color(0xFFEF7A1E), size: isIntermediate ? 14 : 18),
               const SizedBox(width: 4),
               Text(
                 item.rating!.toStringAsFixed(1), 
@@ -1107,7 +1107,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           children: [
             _BannerButton(
               onPressed: () => SafeTap.run(() => widget.onPlay(item)), 
-              icon: Icons.play_arrow, 
+              icon: AurisIcons.play, 
               label: 'Reproducir', 
               isPrimary: true,
               isCompact: isIntermediate,
@@ -1118,7 +1118,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                   .watch(favoritesProvider)
                   .any((f) => f.id == item.id);
               return _BannerIconButton(
-                icon: isFav ? Icons.check : Icons.add,
+                icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.addCircleOutline,
                 label: isFav ? 'En mi lista' : 'Mi lista',
                 onPressed: () {
                   final user = ref.read(authProvider);
@@ -1132,7 +1132,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             }),
             const SizedBox(width: 12),
             _BannerIconButton(
-              icon: Icons.info_outline, 
+              icon: AurisIcons.info, 
               label: 'Detalles', 
               onPressed: () => SafeTap.run(() => widget.onDetails(item)),
               isCompact: isIntermediate,
@@ -1140,7 +1140,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             if (item.trailerKey != null) ...[
               const SizedBox(width: 12),
               _BannerIconButton(
-                icon: (kIsWeb && _showTrailerLayer) ? Icons.videocam_off_outlined : Icons.movie_outlined,
+                icon: (kIsWeb && _showTrailerLayer) ? AurisIcons.close : AurisIcons.trailer,
                 label: 'Tráiler',
                 isLoading: _isTrailerLoading,
                 isCompact: isIntermediate,
@@ -1170,7 +1170,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               Consumer(builder: (context, ref, _) {
                 final isMuted = ref.watch(heroBannerMutedProvider);
                 return _BannerIconButton(
-                  icon: isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  icon: isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp,
                   label: isMuted ? 'Activar audio' : 'Silenciar',
                   isCompact: isIntermediate,
                   onPressed: () => ref.read(heroBannerMutedProvider.notifier).state = !isMuted,
@@ -1187,8 +1187,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   Widget _buildNavArrows() {
     return Stack(
       children: [
-        Positioned(left: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: Icons.arrow_back_ios_new, useBackground: false, onTap: _previousPage))),
-        Positioned(right: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: Icons.arrow_forward_ios, useBackground: false, onTap: _nextPage))),
+        Positioned(left: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: AurisIcons.chevronLeft, useBackground: false, onTap: _previousPage))),
+        Positioned(right: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: AurisIcons.chevronRight, useBackground: false, onTap: _nextPage))),
       ],
     );
   }
@@ -1214,7 +1214,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
 class _BannerButton extends StatelessWidget {
   final VoidCallback onPressed;
-  final IconData icon;
+  final String icon;
   final String label;
   final bool isPrimary;
   final bool isCompact;
@@ -1231,7 +1231,7 @@ class _BannerButton extends StatelessWidget {
     final double height = isCompact ? 44 : 54;
     return ElevatedButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, size: isCompact ? 24 : 32, color: isPrimary ? Colors.black : Colors.white),
+      icon: AurisIcon(icon, size: isCompact ? 24 : 32, color: isPrimary ? Colors.black : Colors.white),
       label: Text(
         label, 
         style: TextStyle(
@@ -1255,7 +1255,7 @@ class _BannerButton extends StatelessWidget {
 }
 
 class _BannerIconButton extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String label;
   final VoidCallback onPressed;
   final bool isCompact;
@@ -1289,7 +1289,7 @@ class _BannerIconButton extends StatelessWidget {
                   height: isCompact ? 20 : 24, 
                   child: const CircularProgressIndicator(strokeWidth: 3, color: Colors.white)
                 )
-              : Icon(icon, size: isCompact ? 22 : 26, color: Colors.white),
+              : AurisIcon(icon, size: isCompact ? 22 : 26, color: Colors.white),
           ),
         ),
       ),

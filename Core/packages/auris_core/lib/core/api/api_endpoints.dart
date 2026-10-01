@@ -101,6 +101,7 @@ class ApiEndpoints {
     'katanime',
     'animegratis',
     'animeflv',
+    'telegram',
   ];
   static const List<String> movieSourceHints = [
     'gnula',

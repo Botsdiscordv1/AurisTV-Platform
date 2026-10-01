@@ -101,14 +101,14 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white70),
+                        icon: AurisIcon(AurisIcons.close, color: Colors.white70, size: 24),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
                   ),
                   const Divider(color: Colors.white12, height: 24),
                   ListTile(
-                    leading: const Icon(Icons.info_outline, color: Colors.white),
+                    leading: AurisIcon(AurisIcons.info, color: Colors.white, size: 24),
                     title: Text('Ver detalles y más', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
@@ -117,7 +117,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.download_rounded, color: Colors.white),
+                    leading: AurisIcon(AurisIcons.download, color: Colors.white, size: 24),
                     title: Text('Descargar', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
@@ -128,7 +128,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.thumb_down_outlined, color: Colors.white),
+                    leading: AurisIcon(AurisIcons.close, color: Colors.white, size: 24),
                     title: Text('No es para mí', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
@@ -140,11 +140,12 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                   ),
                   if (widget.favoriteItem != null)
                     ListTile(
-                      leading: Icon(
+                      leading: AurisIcon(
                         ref.watch(favoritesProvider).any((f) => f.id == widget.favoriteItem!.id)
-                            ? Icons.check
-                            : Icons.add_rounded,
+                            ? AurisIcons.bookmarkFilled
+                            : AurisIcons.addCircleOutline,
                         color: Colors.white,
+                        size: 24,
                       ),
                       title: Text(
                         ref.watch(favoritesProvider).any((f) => f.id == widget.favoriteItem!.id)
@@ -166,7 +167,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                   if (widget.onDelete != null) ...[
                     const Divider(color: Colors.white12, height: 16),
                     ListTile(
-                      leading: const Icon(Icons.close_rounded, color: Colors.white),
+                      leading: AurisIcon(AurisIcons.close, color: Colors.white, size: 24),
                       title: Text('Quitar de la fila', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
@@ -206,7 +207,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
           value: 'details',
           child: Row(
             children: [
-              const Icon(Icons.info_outline, color: Colors.white70, size: 20),
+              AurisIcon(AurisIcons.info, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
               Text('Ver detalles y más', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
             ],
@@ -216,7 +217,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
           value: 'download',
           child: Row(
             children: [
-              const Icon(Icons.download_rounded, color: Colors.white70, size: 20),
+              AurisIcon(AurisIcons.download, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
               Text('Descargar', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
             ],
@@ -226,7 +227,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
           value: 'not_for_me',
           child: Row(
             children: [
-              const Icon(Icons.thumb_down_outlined, color: Colors.white70, size: 20),
+              AurisIcon(AurisIcons.close, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
               Text('No es para mí', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
             ],
@@ -237,7 +238,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
             value: 'mylist',
             child: Row(
               children: [
-                const Icon(Icons.add_rounded, color: Colors.white70, size: 20),
+                AurisIcon(AurisIcons.addCircleOutline, color: Colors.white70, size: 20),
                 const SizedBox(width: 12),
                 Text('Mi lista', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
               ],
@@ -248,7 +249,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
             value: 'delete',
             child: Row(
               children: [
-                const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                AurisIcon(AurisIcons.close, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
                 Text('Quitar de la fila', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
               ],
@@ -342,7 +343,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                   fit: BoxFit.cover,
                                   filterQuality: FilterQuality.medium,
                                   placeholder: (context, url) => Container(color: Colors.white10),
-                                  errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+                                  errorWidget: (context, url, error) => Center(child: AurisIcon(AurisIcons.trailer, color: Colors.white24, size: 24)),
                                 ),                                Positioned.fill(
                                   child: IgnorePointer(
                                     child: DecoratedBox(

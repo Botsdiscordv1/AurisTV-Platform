@@ -84,6 +84,7 @@ MediaType mediaTypeFromCategory(String? category) {
 }
 
 String simplifySourceName(String name) {  final l = name.toLowerCase();
+  if (l.contains('telegram')) return 'TLG';
   if (l.contains('av1')) return 'AV1';
   if (l.contains('jkanime')) return 'JKA';
   if (l.contains('animed23')) return 'A23';
@@ -98,6 +99,7 @@ String simplifySourceName(String name) {  final l = name.toLowerCase();
 }
 
 const Map<String, int> _sourceDisplayOrder = {
+  'TLG': 1,
   'AV1': 2,
   'AJR': 3,
   'A23': 4,

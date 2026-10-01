@@ -79,14 +79,14 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white70),
+                      icon: AurisIcon(AurisIcons.close, color: Colors.white70, size: 24),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
                 const Divider(color: Colors.white12, height: 24),
                 ListTile(
-                  leading: const Icon(Icons.info_outline, color: Colors.white),
+                  leading: AurisIcon(AurisIcons.info, color: Colors.white, size: 24),
                   title: const Text('Ver detalles y más', style: TextStyle(color: Colors.white, fontSize: 15)),
                   contentPadding: EdgeInsets.zero,
                   onTap: () {
@@ -95,7 +95,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.download_rounded, color: Colors.white),
+                  leading: AurisIcon(AurisIcons.download, color: Colors.white, size: 24),
                   title: const Text('Descargar', style: TextStyle(color: Colors.white, fontSize: 15)),
                   contentPadding: EdgeInsets.zero,
                   onTap: () {
@@ -106,7 +106,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.thumb_down_outlined, color: Colors.white),
+                  leading: AurisIcon(AurisIcons.close, color: Colors.white, size: 24),
                   title: const Text('No es para mí', style: TextStyle(color: Colors.white, fontSize: 15)),
                   contentPadding: EdgeInsets.zero,
                   onTap: () {
@@ -117,7 +117,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.add_rounded, color: Colors.white),
+                  leading: AurisIcon(AurisIcons.addCircleOutline, color: Colors.white, size: 24),
                   title: const Text('Mi lista', style: TextStyle(color: Colors.white, fontSize: 15)),
                   contentPadding: EdgeInsets.zero,
                   onTap: () {
@@ -130,7 +130,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                 if (widget.onDelete != null) ...[
                   const Divider(color: Colors.white12, height: 16),
                   ListTile(
-                    leading: const Icon(Icons.close_rounded, color: Colors.white),
+                    leading: AurisIcon(AurisIcons.close, color: Colors.white, size: 24),
                     title: const Text('Quitar de la fila', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
@@ -170,7 +170,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
           value: 'details',
           child: Row(
             children: [
-              const Icon(Icons.info_outline, color: Colors.white70, size: 20),
+              AurisIcon(AurisIcons.info, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
               const Text('Ver detalles y más', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
@@ -180,7 +180,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
           value: 'download',
           child: Row(
             children: [
-              const Icon(Icons.download_rounded, color: Colors.white70, size: 20),
+              AurisIcon(AurisIcons.download, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
               const Text('Descargar', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
@@ -190,7 +190,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
           value: 'not_for_me',
           child: Row(
             children: [
-              const Icon(Icons.thumb_down_outlined, color: Colors.white70, size: 20),
+              AurisIcon(AurisIcons.close, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
               const Text('No es para mí', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
@@ -200,7 +200,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
           value: 'mylist',
           child: Row(
             children: [
-              const Icon(Icons.add_rounded, color: Colors.white70, size: 20),
+              AurisIcon(AurisIcons.addCircleOutline, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
               const Text('Mi lista', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
@@ -211,7 +211,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
             value: 'delete',
             child: Row(
               children: [
-                const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                AurisIcon(AurisIcons.close, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
                 const Text('Quitar de la fila', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
               ],
@@ -315,10 +315,10 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                                     ),
                                     fit: BoxFit.cover,
                                     placeholder: (context, url) => Container(color: Colors.white10),
-                                    errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+                                    errorWidget: (context, url, error) => Center(child: AurisIcon(AurisIcons.trailer, color: Colors.white24, size: 24)),
                                   )
                                 else
-                                  const Center(child: Icon(Icons.movie, color: Colors.white24)),
+                                  Center(child: AurisIcon(AurisIcons.trailer, color: Colors.white24, size: 24)),
 
                                 Positioned.fill(
                                   child: IgnorePointer(
