@@ -393,6 +393,78 @@ class ProgressiveContentState {
 }
 
 class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> {
+  static final Map<String, Map<int, EpisodeInfo>> _seriesMetadataCache = {};
+
+  String _getSeriesKey() {
+    final title = (_params.metadataTitle ?? _params.title).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    return '$title:s${_params.season}';
+  }
+
+  List<EpisodeInfo> _applyMetadataInheritance(List<EpisodeInfo> episodes) {
+    final key = _getSeriesKey();
+    final cachedMap = _seriesMetadataCache[key];
+    if (cachedMap == null || cachedMap.isEmpty) return episodes;
+
+    return episodes.map((ep) {
+      final cached = cachedMap[ep.number];
+      if (cached == null) return ep;
+
+      final title = (ep.title.isNotEmpty && !ep.title.toLowerCase().startsWith('episodio '))
+          ? ep.title
+          : (cached.title.isNotEmpty ? cached.title : ep.title);
+      final thumbnail = ep.thumbnail.isNotEmpty ? ep.thumbnail : cached.thumbnail;
+      final description = ep.description.isNotEmpty ? ep.description : cached.description;
+      final airDate = ep.airDate ?? cached.airDate;
+      final duration = ep.duration ?? cached.duration;
+      final runtime = ep.runtime ?? cached.runtime;
+
+      return EpisodeInfo(
+        number: ep.number,
+        id: ep.id,
+        url: ep.url,
+        title: title,
+        thumbnail: thumbnail,
+        description: description,
+        airDate: airDate,
+        duration: duration,
+        runtime: runtime,
+        quality: ep.quality,
+        episodeType: ep.episodeType,
+        tmdbSpecialNumber: ep.tmdbSpecialNumber,
+        needsTranslation: ep.needsTranslation,
+      );
+    }).toList();
+  }
+
+  void _saveMetadataToCache(List<EpisodeInfo> episodes) {
+    if (episodes.isEmpty) return;
+    final key = _getSeriesKey();
+    _seriesMetadataCache.putIfAbsent(key, () => {});
+    final map = _seriesMetadataCache[key]!;
+
+    for (final ep in episodes) {
+      final existing = map[ep.number];
+      if (existing == null) {
+        map[ep.number] = ep;
+      } else {
+        map[ep.number] = EpisodeInfo(
+          number: ep.number,
+          id: ep.id != 0 ? ep.id : existing.id,
+          url: ep.url.isNotEmpty ? ep.url : existing.url,
+          title: ep.title.isNotEmpty && !ep.title.toLowerCase().startsWith('episodio ') ? ep.title : existing.title,
+          thumbnail: ep.thumbnail.isNotEmpty ? ep.thumbnail : existing.thumbnail,
+          description: ep.description.isNotEmpty ? ep.description : existing.description,
+          airDate: ep.airDate ?? existing.airDate,
+          duration: ep.duration ?? existing.duration,
+          runtime: ep.runtime ?? existing.runtime,
+          quality: ep.quality,
+          episodeType: ep.episodeType,
+          tmdbSpecialNumber: ep.tmdbSpecialNumber,
+          needsTranslation: ep.needsTranslation,
+        );
+      }
+    }
+  }
   final Ref _ref;
   final ProgressiveParams _params;
 
@@ -449,7 +521,7 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
 
     if (!mounted) return;
 
-    final initialEpisodes = fastRes.episodes.map((ep) {
+    final rawInitialEpisodes = fastRes.episodes.map((ep) {
       // Sin fabricar "Episodio N": un título genérico inventado aquí bloquea
       // el gap-fill desde full en el merge (cuenta como "título en ES") y el
       // real nunca aparece. El display ya pone fallback (rows, subtítulos).
@@ -469,6 +541,9 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
         needsTranslation: ep.needsTranslation,
       );
     }).toList();
+
+    final initialEpisodes = _applyMetadataInheritance(rawInitialEpisodes);
+    _saveMetadataToCache(initialEpisodes);
 
     final selected = SearchResult(
       title: _params.title,
@@ -496,6 +571,7 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       initialResponse.tmdbId ?? _params.tmdbId,
       _params.season,
     );
+    _saveMetadataToCache(initialForEmit);
     final initialBundle = GroupedEpisodesResult(
       response: EpisodesResponse(
         source: initialResponse.source,
@@ -621,11 +697,13 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
           }).toList();
 
           final mergeTmdbId = fullRes.tmdbId ?? currentBundle.response.tmdbId;
+          final mergedEpisodesInherited = _applyMetadataInheritance(mergedEpisodes);
           final mergedForEmit = await _overlayCachedEs(
-            mergedEpisodes,
+            mergedEpisodesInherited,
             mergeTmdbId,
             _params.season,
           );
+          _saveMetadataToCache(mergedForEmit);
 
           final mergedResponse = EpisodesResponse(
             source: currentBundle.response.source,
