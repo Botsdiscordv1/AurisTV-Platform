@@ -1,4 +1,4 @@
-import '../../../core/api/api_endpoints.dart';
+﻿import '../../../core/api/api_endpoints.dart';
 import 'package:flutter/foundation.dart';
 import 'search_result.dart';
 import 'detail_params.dart';
@@ -24,7 +24,7 @@ class EpisodesResponse {
   final String? releaseTimestamp;
 
   /// Indica que la temporada pedida no existe en esta fuente (p.ej. AnimeD23
-  /// solo tiene S3 y se pidió S1/S2). Lo usa el core para no listar la fuente
+  /// solo tiene S3 y se pidiÃ³ S1/S2). Lo usa el core para no listar la fuente
   /// en temporadas que no tiene.
   final bool? seasonNotAvailable;
   final String? error;
@@ -55,7 +55,7 @@ class EpisodesResponse {
     }
     return EpisodesResponse(
       source: json['source'] as String? ?? '',
-      url: json['url'] as String? ?? '',
+      url: ApiEndpoints.fixUrl(json['url'] as String? ?? ''),
       slug: json['slug'] as String? ?? '',
       total: json['total'] as int? ?? 0,
       fullTitle: json['fullTitle'] as String?,
@@ -93,7 +93,7 @@ class RelatedInfo {
   final String slug;
   final String cover;
   final String relation;
-  final String? category; // Senior Fix: Clasificación servida por el VPS (franquicia | relacionado)
+  final String? category; // Senior Fix: ClasificaciÃ³n servida por el VPS (franquicia | relacionado)
   final String? source;
   final String? kind; // movie | serie | anime | null
   final int? year;
@@ -132,7 +132,7 @@ class RelatedInfo {
     final rawUrl = json['url'] as String? ?? '';
     final rawSlug = json['slug'] as String? ?? '';
 
-    // Senior Fix: Parsear año de num/String, e inferirlo del título ("(2009)") o URL/slug ("-2009") si es nulo
+    // Senior Fix: Parsear aÃ±o de num/String, e inferirlo del tÃ­tulo ("(2009)") o URL/slug ("-2009") si es nulo
     int? parsedYear = int.tryParse(json['year']?.toString() ?? '');
     if (parsedYear == null) {
       final titleMatch = RegExp(r'[\(\[]?((?:19|20)\d{2})[\)\]]?').firstMatch(rawTitle);
@@ -303,7 +303,7 @@ class EpisodeInfo {
     return EpisodeInfo(
       number: int.tryParse(json['number']?.toString() ?? '') ?? 0,
       id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
-      url: json['url'] as String? ?? '',
+      url: ApiEndpoints.fixUrl(json['url'] as String? ?? ''),
       title: json['title'] as String?,
       thumbnail: ApiEndpoints.proxyImage(
         json['thumbnail'] as String? ?? 
@@ -321,3 +321,4 @@ class EpisodeInfo {
     );
   }
 }
+

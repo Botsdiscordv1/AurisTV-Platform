@@ -1,3 +1,5 @@
+﻿import '../../core/api/api_endpoints.dart';
+
 class QualityOption {
   final String key;
   final String label;
@@ -16,10 +18,11 @@ class QualityOption {
   });
 
   factory QualityOption.fromJson(Map<String, dynamic> json) {
+    final rawUrl = json['url'] as String? ?? '';
     return QualityOption(
       key: json['key'] as String? ?? '',
       label: json['label'] as String? ?? '',
-      url: json['url'] as String? ?? '',
+      url: ApiEndpoints.fixUrl(rawUrl),
       headers: (json['headers'] as Map<String, dynamic>?)
               ?.map((k, v) => MapEntry(k, v.toString())) ??
           {},
@@ -51,9 +54,10 @@ class VideoTrackOption {
   });
 
   factory VideoTrackOption.fromJson(Map<String, dynamic> json) {
+    final rawUrl = json['url'] as String? ?? '';
     return VideoTrackOption(
       label: json['label'] as String? ?? '',
-      url: json['url'] as String? ?? '',
+      url: ApiEndpoints.fixUrl(rawUrl),
       isEmbed: json['isEmbed'] as bool? ?? false,
       isDownload: json['isDownload'] as bool? ?? false,
       headers: (json['headers'] as Map<String, dynamic>?)
@@ -83,8 +87,9 @@ class ExtractResult {
   });
 
   factory ExtractResult.fromJson(Map<String, dynamic> json) {
+    final rawUrl = json['url'] as String? ?? '';
     return ExtractResult(
-      url: json['url'] as String? ?? '',
+      url: ApiEndpoints.fixUrl(rawUrl),
       headers: (json['headers'] as Map<String, dynamic>?)
               ?.map((k, v) => MapEntry(k, v.toString())) ??
           {},

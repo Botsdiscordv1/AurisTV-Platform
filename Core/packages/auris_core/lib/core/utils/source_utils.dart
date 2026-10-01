@@ -1,4 +1,4 @@
-import '../../data/models/server/search_result.dart';
+﻿import '../../data/models/server/search_result.dart';
 import '../../data/models/media_item.dart';
 
 
@@ -19,7 +19,7 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
     final slug = parts.isNotEmpty ? parts.last : 'anime';
     return 'https://animejara.com/episode/$slug-${season}x$episode/';
   } else if (s.contains('jkanime')) {
-    // Senior Fix: Si la URL ya termina en un número (es un episodio), reemplazamos el segmento
+    // Senior Fix: Si la URL ya termina en un nÃºmero (es un episodio), reemplazamos el segmento
     final parts = trimmed.split('/');
     if (parts.isNotEmpty && int.tryParse(parts.last) != null) {
       parts.removeLast();
@@ -27,6 +27,8 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
     } else {
       pathUrl = '$trimmed/$episode/';
     }
+  } else if (s.contains('telegram')) {
+    pathUrl = path;
   } else if (s.contains('animed23')) {
     final parts = path.split('/');
     final slug = parts.last;
@@ -34,8 +36,8 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
     pathUrl = '$domain/capitulo/$slug-ep-$episode/';
   } else {
     // URLs que ya codifican temporada/episodio (p. ej. unlimplay
-    // /f/embed/tv/<id>/<S>/<E>): reemplazar el último segmento numérico en
-    // vez de anexar otro (…/2/5 + 6 → …/2/6, no …/2/5/6).
+    // /f/embed/tv/<id>/<S>/<E>): reemplazar el Ãºltimo segmento numÃ©rico en
+    // vez de anexar otro (â€¦/2/5 + 6 â†’ â€¦/2/6, no â€¦/2/5/6).
     if (RegExp(r'/\d+/?$').hasMatch(path)) {
       pathUrl = '${path.replaceAll(RegExp(r'/\d+/?$'), '')}/$episode/';
     } else {
@@ -46,7 +48,7 @@ String buildEpisodeUrl(String baseUrl, String source, int episode) {
 }
 
 /// Match tolerante de fuente por nombre (case/espacios). El match exacto
-/// fallaba tras renombrados (p. ej. "Player"→proveedor real) y la navegación
+/// fallaba tras renombrados (p. ej. "Player"â†’proveedor real) y la navegaciÃ³n
 /// al siguiente episodio reusaba la URL del anterior (reiniciaba el previo).
 /// Retorna null si no hay match (el llamador decide fallback).
 SearchResult? findSourceByName(List<SearchResult> sources, String? name) {
@@ -59,9 +61,9 @@ SearchResult? findSourceByName(List<SearchResult> sources, String? name) {
   return null;
 }
 
-/// true si es URL http(s) real. El historial a veces guarda el título en
-/// `url` (detailUrl null + id=título) y eso rompía el seed de continuar-viendo
-/// (episodes con url=título → el server lo rechaza).
+/// true si es URL http(s) real. El historial a veces guarda el tÃ­tulo en
+/// `url` (detailUrl null + id=tÃ­tulo) y eso rompÃ­a el seed de continuar-viendo
+/// (episodes con url=tÃ­tulo â†’ el server lo rechaza).
 bool isHttpUrl(String? s) {
   if (s == null || s.isEmpty) return false;
   final u = Uri.tryParse(s.trim());
@@ -70,8 +72,8 @@ bool isHttpUrl(String? s) {
       u.host.isNotEmpty;
 }
 
-/// MediaType fiel desde la categoría (antes: todo lo no-movie era anime,
-/// y las series del servidor de películas se guardaban como 'anime').
+/// MediaType fiel desde la categorÃ­a (antes: todo lo no-movie era anime,
+/// y las series del servidor de pelÃ­culas se guardaban como 'anime').
 MediaType mediaTypeFromCategory(String? category) {
   final c = (category ?? '').toLowerCase();
   if (c.contains('movie') || c.contains('pelic')) return MediaType.movie;
@@ -134,26 +136,26 @@ String cleanQuality(String quality) {
       .trim();
 }
 
-/// Mapa de códigos de idioma → bandera (emoji). El servidor envía calidad en
+/// Mapa de cÃ³digos de idioma â†’ bandera (emoji). El servidor envÃ­a calidad en
 /// formato `TIPO-IDIOMA` (p.ej. `SUB-EN`, `DUB-MX`, `CAST-ES`, `SUB-ES`).
 const Map<String, String> _langFlags = {
-  'MX': '🇲🇽', // Latino (español latinoamericano)
-  'ES': '🇪🇸', // Castellano (español de España)
-  'EN': '🇬🇧', // Inglés (audio original con subtítulos)
-  'US': '🇺🇸',
-  'JP': '🇯🇵',
-  'KO': '🇰🇷',
-  'PT': '🇵🇹',
-  'BR': '🇧🇷',
-  'FR': '🇫🇷',
-  'IT': '🇮🇹',
-  'DE': '🇩🇪',
-  'CN': '🇨🇳',
-  'RU': '🇷🇺',
+  'MX': 'ðŸ‡²ðŸ‡½', // Latino (espaÃ±ol latinoamericano)
+  'ES': 'ðŸ‡ªðŸ‡¸', // Castellano (espaÃ±ol de EspaÃ±a)
+  'EN': 'ðŸ‡¬ðŸ‡§', // InglÃ©s (audio original con subtÃ­tulos)
+  'US': 'ðŸ‡ºðŸ‡¸',
+  'JP': 'ðŸ‡¯ðŸ‡µ',
+  'KO': 'ðŸ‡°ðŸ‡·',
+  'PT': 'ðŸ‡µðŸ‡¹',
+  'BR': 'ðŸ‡§ðŸ‡·',
+  'FR': 'ðŸ‡«ðŸ‡·',
+  'IT': 'ðŸ‡®ðŸ‡¹',
+  'DE': 'ðŸ‡©ðŸ‡ª',
+  'CN': 'ðŸ‡¨ðŸ‡³',
+  'RU': 'ðŸ‡·ðŸ‡º',
 };
 
-/// Tipo de pista según la calidad: 'DUB' (doblaje), 'CAST' (castellano),
-/// 'SUB' (subtitulado) o '' si es resolución/desconocido.
+/// Tipo de pista segÃºn la calidad: 'DUB' (doblaje), 'CAST' (castellano),
+/// 'SUB' (subtitulado) o '' si es resoluciÃ³n/desconocido.
 String trackQualityType(String quality) {
   final up = quality.toUpperCase();
   if (up.contains('CAST')) return 'CAST';
@@ -162,7 +164,7 @@ String trackQualityType(String quality) {
   return '';
 }
 
-/// Idioma (código ISO-ish) inferido de la calidad, p.ej. `SUB-EN` → 'EN'.
+/// Idioma (cÃ³digo ISO-ish) inferido de la calidad, p.ej. `SUB-EN` â†’ 'EN'.
 String trackQualityLang(String quality) {
   final up = quality.toUpperCase();
   final parts = up.split('-');
@@ -182,9 +184,9 @@ String trackQualityShortLabel(String quality) {
   return type.isNotEmpty ? type : cleanQuality(quality);
 }
 
-/// Código de idioma en TEXTO para la UI (estilo Netflix, sin banderas).
+/// CÃ³digo de idioma en TEXTO para la UI (estilo Netflix, sin banderas).
 /// p.ej. `SUB-ES` -> 'ES', `DUB-MX` -> 'MX', `SUB-EN` -> 'EN', `SUB-JP` -> 'JP'.
-/// Si no hay código de idioma, cae al tipo: 'SUB'/'CAST'/'LAT'.
+/// Si no hay cÃ³digo de idioma, cae al tipo: 'SUB'/'CAST'/'LAT'.
 String languageCodeText(String quality) {
   final lang = trackQualityLang(quality);
   if (lang.isNotEmpty) return lang;
@@ -198,16 +200,16 @@ String languageCodeText(String quality) {
 String cleanTitleForDisplay(String title) {
   if (title.isEmpty) return title;
   
-  // 1. Limpieza de estados al final: (En emisión), (Finalizado), etc.
-  final statusPattern = RegExp(r'\s*\((?:En emisi[oó]n|Finalizado|Finalizada)\)\s*$', caseSensitive: false);
+  // 1. Limpieza de estados al final: (En emisiÃ³n), (Finalizado), etc.
+  final statusPattern = RegExp(r'\s*\((?:En emisi[oÃ³]n|Finalizado|Finalizada)\)\s*$', caseSensitive: false);
   
-  // 2. Limpieza de año al final: buscamos un año de 4 dígitos (19xx o 20xx)
-  // precedido por espacio y opcionalmente entre paréntesis/corchetes.
+  // 2. Limpieza de aÃ±o al final: buscamos un aÃ±o de 4 dÃ­gitos (19xx o 20xx)
+  // precedido por espacio y opcionalmente entre parÃ©ntesis/corchetes.
   // Evitamos \b para prevenir problemas con caracteres unicode adyacentes.
   final yearPattern = RegExp(r'[\s\(\[]+(?:19|20)\d{2}[\)\]]?\s*$', caseSensitive: false);
 
-  // 3. Limpieza de etiquetas de idioma/audio al final (ej. "Latino", "Castellano", "Sub Español", "Audio Latino", etc.)
-  final languagePattern = RegExp(r'\s*[\-–—:\(\[]+\s*(?:audio\s+latino|latino|espa[nñ]ol|castellano|sub\s+espa[nñ]ol|subbed|vose|doblado)\s*[\)\]]?\s*$|\s+(?:audio\s+latino|latino|espa[nñ]ol|castellano|sub\s+espa[nñ]ol|subbed|vose|doblado)\s*$', caseSensitive: false);
+  // 3. Limpieza de etiquetas de idioma/audio al final (ej. "Latino", "Castellano", "Sub EspaÃ±ol", "Audio Latino", etc.)
+  final languagePattern = RegExp(r'\s*[\-â€“â€”:\(\[]+\s*(?:audio\s+latino|latino|espa[nÃ±]ol|castellano|sub\s+espa[nÃ±]ol|subbed|vose|doblado)\s*[\)\]]?\s*$|\s+(?:audio\s+latino|latino|espa[nÃ±]ol|castellano|sub\s+espa[nÃ±]ol|subbed|vose|doblado)\s*$', caseSensitive: false);
 
   String cleaned = title.replaceAll(statusPattern, '');
   cleaned = cleaned.replaceAll(yearPattern, '');
@@ -215,14 +217,14 @@ String cleanTitleForDisplay(String title) {
   
   cleaned = cleaned.trim();
 
-  // Si después de limpiar el año quedó vacío (era solo el año), devolvemos el original.
+  // Si despuÃ©s de limpiar el aÃ±o quedÃ³ vacÃ­o (era solo el aÃ±o), devolvemos el original.
   return cleaned.isEmpty ? title : cleaned;
 }
 
 String cleanTitleForMatching(String title) {
   final base = title.toLowerCase()
-      .replaceAll('×', 'x')
-      .replaceAll('½', '1/2')
+      .replaceAll('Ã—', 'x')
+      .replaceAll('Â½', '1/2')
       .replaceAll(RegExp(r'\b1st season|first season|season 1\b', caseSensitive: false), '1')
       .replaceAll(RegExp(r'\b2nd season|second season|season 2\b', caseSensitive: false), '2')
       .replaceAll(RegExp(r'\b3rd season|third season|season 3\b', caseSensitive: false), '3')
@@ -234,20 +236,20 @@ String cleanTitleForMatching(String title) {
       .replaceAll(RegExp(r'\bv\b', caseSensitive: false), '5')
       .replaceAll(RegExp(r'\bmovie|pelicula|film\b', caseSensitive: false), '')
       .replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '')
-      .replaceAll(RegExp(r'audio latino|latino|sub español|subbed|vose|doblado', caseSensitive: false), '')
+      .replaceAll(RegExp(r'audio latino|latino|sub espaÃ±ol|subbed|vose|doblado', caseSensitive: false), '')
       .replaceAll(RegExp(r'season \d+|temporada \d+|part \d+|parte \d+|cour \d+', caseSensitive: false), '');
   
   final buffer = StringBuffer();
   for (final r in base.runes) {
-    // Permitir letras latinas (incluyendo bloques de acentos), números y CJK.
+    // Permitir letras latinas (incluyendo bloques de acentos), nÃºmeros y CJK.
     final isAlphanumeric = (r >= 0x30 && r <= 0x39) || // 0-9
                            (r >= 0x61 && r <= 0x7A) || // a-z
-                           (r >= 0xC0 && r <= 0x24F);  // Latin-1 Supp + Latin Extended A/B (áéíóúüñ...)
+                           (r >= 0xC0 && r <= 0x24F);  // Latin-1 Supp + Latin Extended A/B (Ã¡Ã©Ã­Ã³ÃºÃ¼Ã±...)
     
     final isCJK = (r >= 0x3040 && r <= 0x30FF) || // Kana
                   (r >= 0x3400 && r <= 0x9FFF);   // Kanji
                   
-    // Para matching estricto removemos espacios, pero preservamos el carácter semántico.
+    // Para matching estricto removemos espacios, pero preservamos el carÃ¡cter semÃ¡ntico.
     if (isAlphanumeric || isCJK) {
       buffer.writeCharCode(r);
     }
@@ -284,3 +286,4 @@ List<LanguageOption> buildLanguageOptions({
   }
   return sourceOptions;
 }
+
