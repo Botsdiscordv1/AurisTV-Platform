@@ -400,6 +400,14 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
     return '$title:s${_params.season}';
   }
 
+  bool _hasValue(String? str) => str != null && str.trim().isNotEmpty;
+
+  bool _isGenericTitle(String? str) {
+    if (str == null || str.trim().isEmpty) return true;
+    final lower = str.trim().toLowerCase();
+    return lower.startsWith('episodio ') || lower == 'episodio';
+  }
+
   List<EpisodeInfo> _applyMetadataInheritance(List<EpisodeInfo> episodes) {
     final key = _getSeriesKey();
     final cachedMap = _seriesMetadataCache[key];
@@ -409,11 +417,14 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       final cached = cachedMap[ep.number];
       if (cached == null) return ep;
 
-      final title = (ep.title.isNotEmpty && !ep.title.toLowerCase().startsWith('episodio '))
-          ? ep.title
-          : (cached.title.isNotEmpty ? cached.title : ep.title);
-      final thumbnail = ep.thumbnail.isNotEmpty ? ep.thumbnail : cached.thumbnail;
-      final description = ep.description.isNotEmpty ? ep.description : cached.description;
+      final epTitle = ep.title;
+      final cachedTitle = cached.title;
+      final title = (!_isGenericTitle(epTitle))
+          ? epTitle
+          : (!_isGenericTitle(cachedTitle) ? cachedTitle : epTitle);
+
+      final thumbnail = _hasValue(ep.thumbnail) ? ep.thumbnail : cached.thumbnail;
+      final description = _hasValue(ep.description) ? ep.description : cached.description;
       final airDate = ep.airDate ?? cached.airDate;
       final duration = ep.duration ?? cached.duration;
       final runtime = ep.runtime ?? cached.runtime;
@@ -447,13 +458,17 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       if (existing == null) {
         map[ep.number] = ep;
       } else {
+        final epTitle = ep.title;
+        final existingTitle = existing.title;
+        final title = (!_isGenericTitle(epTitle)) ? epTitle : existingTitle;
+
         map[ep.number] = EpisodeInfo(
           number: ep.number,
           id: ep.id != 0 ? ep.id : existing.id,
-          url: ep.url.isNotEmpty ? ep.url : existing.url,
-          title: ep.title.isNotEmpty && !ep.title.toLowerCase().startsWith('episodio ') ? ep.title : existing.title,
-          thumbnail: ep.thumbnail.isNotEmpty ? ep.thumbnail : existing.thumbnail,
-          description: ep.description.isNotEmpty ? ep.description : existing.description,
+          url: _hasValue(ep.url) ? ep.url : existing.url,
+          title: title,
+          thumbnail: _hasValue(ep.thumbnail) ? ep.thumbnail : existing.thumbnail,
+          description: _hasValue(ep.description) ? ep.description : existing.description,
           airDate: ep.airDate ?? existing.airDate,
           duration: ep.duration ?? existing.duration,
           runtime: ep.runtime ?? existing.runtime,
