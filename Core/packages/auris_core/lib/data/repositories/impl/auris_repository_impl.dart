@@ -1022,7 +1022,7 @@ class AurisRepositoryImpl implements AurisRepository {
     bool fast = false,
   }) async {
     if (source == 'YouTube' || url.contains('youtube.com') || url.contains('youtu.be')) {
-      return EpisodesResponse(episodes: const [], source: source, url: url, total: 0);
+      return EpisodesResponse(episodes: const [], source: source, url: url, slug: '', total: 0);
     }
     // Senior Fix: Si el cliente no pasó season, intentamos inferirlo de la URL 
     // antes de enviar la petición al servidor para ayudar al IdentityResolver.

@@ -433,7 +433,7 @@ final omdbSeasonProvider = FutureProvider.family<List<OmdbEpisode>, OmdbSeasonPa
 
 final AutoDisposeFutureProviderFamily<EpisodesResponse?, EpisodesParams> episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, EpisodesParams>((AutoDisposeFutureProviderRef<EpisodesResponse?> ref, EpisodesParams params) async {
   if (params.url.isEmpty || params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
-    return const EpisodesResponse(episodes: []);
+    return EpisodesResponse(episodes: const [], source: params.source, url: params.url, slug: '', total: 0);
   }
   
   final cache = ref.read(_sharedEpisodeCacheProvider);

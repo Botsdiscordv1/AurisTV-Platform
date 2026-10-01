@@ -223,7 +223,7 @@ class ExtractParams {
 final extractProvider =
     FutureProvider.autoDispose.family<ExtractResult, ExtractParams>((ref, params) async {
   if (params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
-    return ExtractResult(url: params.url, source: 'YouTube', quality: 'HD');
+    return ExtractResult(url: params.url, headers: const {});
   }
   final CancelToken cancelToken = CancelToken();
   ref.onDispose(() => cancelToken.cancel('Provider disposed'));

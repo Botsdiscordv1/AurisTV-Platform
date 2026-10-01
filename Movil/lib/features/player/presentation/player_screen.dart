@@ -3177,8 +3177,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     )));
 
     // Senior Session Sync: Sincronizar lista de episodios con el provider global
-    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
-        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
+        ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
@@ -4641,8 +4641,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final String label = _isAutoplayResume ? 'Reanudar' : 'Siguiente episodio';
 
     // Senior Autoplay Shield: Verificar si existe un siguiente episodio para evitar el popup en el final
-    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
-        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
+        ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
@@ -5268,8 +5268,8 @@ Builder(
     final double playSize = useMobileLayout ? 28 : 44; 
 
     // Senior Navigation Shield: Verificar si existen episodios anterior/siguiente
-    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
-        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
+        ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
@@ -5685,8 +5685,8 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
     // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
     final bool useMobileLayout = isMobile || screenHeight < 500;
     
-    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
-        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
+        ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,

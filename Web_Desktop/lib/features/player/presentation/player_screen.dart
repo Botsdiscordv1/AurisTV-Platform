@@ -4342,8 +4342,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Autoplay Shield: Verificar si existe un siguiente episodio
     // Senior Fix (Issue #4): Usar consolidated provider
     final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
-    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
-        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
+        ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
@@ -4807,8 +4807,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Fix (Issue #4): Usar consolidated provider
     final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
     final bool hasPrevious = currentNum > 1;
-    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
-        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
+        ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
@@ -5318,8 +5318,8 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
     // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
     final bool useMobileLayout = isMobile || screenHeight < 500;
 
-    final episodesAsync = (_isTrailer || _isOpEd || _currentSource == 'YouTube' || widget.source == 'YouTube')
-        ? const AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: []))
+    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
+        ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
