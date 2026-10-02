@@ -178,7 +178,7 @@ class ExploreScreen extends ConsumerWidget {
                             onChanged: (val) => ref.read(_exploreSearchQueryProvider.notifier).state = val,
                             textAlignVertical: TextAlignVertical.center, // Senior Fix: Centrado vertical real
                             style: const TextStyle(color: Colors.white, fontSize: 16),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               isDense: true, // Senior Fix: Mejor centrado
                               hintText: 'Buscar...',
                               hintStyle: TextStyle(color: Colors.white38),

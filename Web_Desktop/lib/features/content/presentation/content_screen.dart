@@ -2495,7 +2495,7 @@ void _openPlayer(PlayerScreen player) {
           child: Row(
             mainAxisAlignment: hasProgress ? MainAxisAlignment.start : MainAxisAlignment.center,
             children: [
-              const AurisIcon(AurisIcons.play, color: Colors.black, size: 36),
+              AurisIcon(AurisIcons.play, color: Colors.black, size: 36),
               const SizedBox(width: 8),
               Text(label, style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
               if (hasProgress) ...[

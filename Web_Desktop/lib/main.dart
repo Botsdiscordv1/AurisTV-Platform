@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart'; 
+import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart'; 
 import 'package:flutter/foundation.dart'; // Para kIsWeb
 import 'package:flutter/services.dart'; // Para SystemChrome
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +18,7 @@ import 'features/remote_control/presentation/providers/remote_control_provider.d
 import 'features/remote_control/data/models/remote_device.dart';
 
 Future<void> main() async {
+  usePathUrlStrategy(); // Usa URLs limpias sin # para web
   WidgetsFlutterBinding.ensureInitialized();
 
   // Configuración de la interfaz del sistema (Edge-to-Edge)

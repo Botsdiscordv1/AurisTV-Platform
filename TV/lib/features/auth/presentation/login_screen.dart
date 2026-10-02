@@ -223,32 +223,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       ],
                     ),
 
-                    const Spacer(flex: 2),
-
-                    // Step content with slide+fade transition
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 320),
-                      switchInCurve: Curves.easeOut,
-                      switchOutCurve: Curves.easeIn,
-                      transitionBuilder: (child, anim) {
-                        return FadeTransition(
-                          opacity: anim,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.07),
-                              end: Offset.zero,
-                            ).animate(CurvedAnimation(
-                              parent: anim,
-                              curve: Curves.easeOut,
-                            )),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: _buildStepContent(),
+                    // Content area: Expanded so layout never shifts due to AnimatedSwitcher size changes
+                    Expanded(
+                      child: Align(
+                        alignment: const Alignment(-1, -0.15),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 260),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeOut,
+                          transitionBuilder: (child, anim) {
+                            return FadeTransition(
+                              opacity: anim,
+                              child: child,
+                            );
+                          },
+                          layoutBuilder: (currentChild, previousChildren) {
+                            return Stack(
+                              alignment: Alignment.topLeft,
+                              clipBehavior: Clip.none,
+                              children: <Widget>[
+                                // Previous children rendered with overflow, no effect on layout
+                                ...previousChildren.map((child) => Positioned(
+                                  top: 0, left: 0,
+                                  child: IgnorePointer(child: child),
+                                )),
+                                if (currentChild != null) currentChild,
+                              ],
+                            );
+                          },
+                          child: _buildStepContent(),
+                        ),
+                      ),
                     ),
-
-                    const Spacer(flex: 3),
 
                     // Legal footer
                     Padding(
@@ -256,7 +262,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       child: Text(
                         'Al usar AurisTV aceptas nuestros Terminos de Uso y Politica de Privacidad.',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.26),
+                          color: Colors.white,
                           fontSize: 12,
                           height: 1.55,
                         ),
@@ -702,8 +708,8 @@ class _CircleBackButtonState extends State<_CircleBackButton> {
         onTap: widget.onPressed,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          width: 48,
-          height: 48,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: _focused
@@ -716,7 +722,7 @@ class _CircleBackButtonState extends State<_CircleBackButton> {
           ),
           child: Center(
             child: AurisIcon(AurisIcons.chevronLeft,
-                color: Colors.white, size: 22),
+                color: Colors.white, size: 16),
           ),
         ),
       ),
@@ -1098,11 +1104,11 @@ class _TVCleanTextFieldState extends State<_TVCleanTextField> {
         duration: const Duration(milliseconds: 140),
         height: 48,
         decoration: BoxDecoration(
-          color: _focused ? const Color(0xFF2C3246) : const Color(0xFF1E2230),
+          color: _focused ? const Color(0xFF272E42) : const Color(0xFF191B26),
           borderRadius: BorderRadius.zero,
           border: Border.all(
-            color: _focused ? Colors.white : Colors.transparent,
-            width: _focused ? 2.5 : 1.5,
+            color: _focused ? AppTheme.brand : Colors.white12,
+            width: _focused ? 3.2 : 1.0,
           ),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1231,8 +1237,8 @@ class _EyeToggleButtonState extends State<_EyeToggleButton> {
             color: _focused ? const Color(0xFF2C3246) : const Color(0xFF1E2230),
             borderRadius: BorderRadius.zero,
             border: Border.all(
-              color: _focused ? Colors.white : Colors.transparent,
-              width: _focused ? 2.5 : 1.5,
+              color: _focused ? AppTheme.brand : Colors.white12,
+              width: _focused ? 3.2 : 1.0,
             ),
           ),
           child: Icon(
