@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../../core/utils/responsive_utils.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -13,7 +11,6 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider);
     final favorites = ref.watch(favoritesProvider);
-    final historyAsync = ref.watch(playbackHistoryStateProvider);
     const primaryColor = Color(0xFFEF7A1E);
 
     return Scaffold(
@@ -41,8 +38,8 @@ class ProfileScreen extends ConsumerWidget {
             onPressed: () => context.push('/search'),
           ),
           IconButton(
-            icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 26),
-            onPressed: () => _showProfileMenu(context, ref),
+            icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 24),
+            onPressed: () => context.push('/settings'),
           ),
           const SizedBox(width: 8),
         ],
@@ -293,160 +290,10 @@ void _showFavoriteMenu(
   );
 }
 
-void _showProfileMenu(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF2D2D2D),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: const Icon(Icons.edit_outlined, color: Colors.white70),
-                title: const Text('Administrar perfiles', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/select-profile?edit=true');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings_outlined, color: Colors.white70),
-                title: const Text('Configuración de la app', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/settings');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.person_outline, color: Colors.white70),
-                title: const Text('Cuenta', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showAccountDialog(context, ref);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.help_outline, color: Colors.white70),
-                title: const Text('Ayuda', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showHelpDialog(context);
-                },
-              ),
-              const Divider(color: Colors.white10, height: 16),
-              ListTile(
-                leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-                title: const Text('Cerrar sesión', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w500)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showLogoutDialog(context, ref);
-                },
-              ),
-              const SizedBox(height: 8),
-              FutureBuilder<PackageInfo>(
-                future: PackageInfo.fromPlatform(),
-                builder: (context, snapshot) {
-                  final version = snapshot.hasData ? snapshot.data!.version : '8.86.0';
-                  final build = snapshot.hasData ? snapshot.data!.buildNumber : '6';
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      'Version: $version build $build',
-                      style: const TextStyle(color: Colors.white38, fontSize: 12),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showAccountDialog(BuildContext context, WidgetRef ref) {
-    final user = ref.read(authProvider);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        title: const Text('Cuenta de Usuario', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Email: ${user?.email ?? "Invitado"}', style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 8),
-            Text('Nombre: ${user?.displayName ?? "Sin nombre"}', style: const TextStyle(color: Colors.white70)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar', style: TextStyle(color: Color(0xFFEF7A1E))),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showHelpDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        title: const Text('Ayuda y Soporte', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'AurisTV es tu centro multimedia definitivo. Si experimentas problemas de reproducción, verifica tu conexión a internet o limpia el caché en los ajustes de la app.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Entendido', style: TextStyle(color: Color(0xFFEF7A1E))),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        title: const Text('Cerrar sesión', style: TextStyle(color: Colors.white)),
-        content: const Text('¿Estás seguro de que quieres cerrar tu sesión de AurisTV?', style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ref.read(authProvider.notifier).signOut();
-            },
-            child: const Text('Cerrar sesión', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _QuickActionTile extends StatelessWidget {
+
   final IconData icon;
   final Color iconBgColor;
   final String title;

@@ -497,20 +497,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const SizedBox(width: 4),
                 _FocusIconButton(
                   icon: AurisIcons.search,
-                  size: isUltraCompact ? 20 : (isCompactDesktop ? 22 : 26),
+                  size: isUltraCompact ? 13 : (isCompactDesktop ? 13 : 14),
                   onPressed: () => context.go('/catalogo'),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 const _LanguageSelector(),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 // Senior: Ocultamos el grid en ultra-compacto (iPad Vertical) para priorizar la navegación
                 if (!isUltraCompact) ...[
                   _FocusIconButton(
                     icon: AurisIcons.grid,
-                    size: isCompactDesktop ? 22 : 26,
+                    size: isCompactDesktop ? 13 : 14,
                     onPressed: () => context.push('/horario'),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                 ],
                 _buildUserAvatar(context, isUltraCompact ? true : isCompactDesktop),
                 SizedBox(width: isCompactDesktop ? 0 : 4), // Senior Fix: Eliminamos espacio extra a la derecha del perfil
@@ -537,7 +537,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (user == null) {
           return _FocusIconButton(
             icon: AurisIcons.user,
-            size: isUltra ? 20 : (isCompact ? 20 : 22),
+            size: isUltra ? 13 : (isCompact ? 13 : 14),
             onPressed: () => context.go('/settings'),
           );
         }
@@ -787,13 +787,13 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
           overlayColor: WidgetStateProperty.all(Colors.transparent),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: 42, height: 42,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? Colors.white : Colors.transparent),
+            width: 32, height: 32,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? Colors.white.withOpacity(0.1) : Colors.transparent),
             child: widget.builder != null 
                 ? widget.builder!(context, isSelected)
                 : (widget.child ?? (widget.icon is String 
-                    ? AurisIcon(widget.icon as String, color: isSelected ? Colors.black : Colors.white, size: widget.size)
-                    : Icon(widget.icon as IconData?, color: isSelected ? Colors.black : Colors.white, size: widget.size))),
+                    ? AurisIcon(widget.icon as String, color: Colors.white, size: widget.size)
+                    : Icon(widget.icon as IconData?, color: Colors.white, size: widget.size))),
           ),
         ),
       ),
@@ -869,11 +869,11 @@ class _LanguageButtonState extends State<_LanguageButton> {
         onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _hovered = false); }); },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          height: 42,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 32,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12), 
-            color: isSelected ? Colors.white : Colors.transparent
+            borderRadius: BorderRadius.circular(16), 
+            color: isSelected ? Colors.white.withOpacity(0.1) : Colors.transparent
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -881,16 +881,16 @@ class _LanguageButtonState extends State<_LanguageButton> {
               Text(
                 'ES', 
                 style: GoogleFonts.poppins(
-                  color: isSelected ? Colors.black : Colors.white, 
-                  fontSize: 13, 
+                  color: Colors.white, 
+                  fontSize: 12, 
                   fontWeight: FontWeight.w700
                 )
               ),
               const SizedBox(width: 4),
               AurisIcon(
                 AurisIcons.chevronDown, 
-                color: isSelected ? Colors.black : Colors.white, 
-                size: 16
+                color: Colors.white, 
+                size: 14
               ),
             ],
           ),

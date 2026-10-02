@@ -527,7 +527,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                   top: 10, left: 10,
                   child: GestureDetector(
                     onTap: widget.onExpand,
-                    child: AurisIcon(AurisIcons.toPip, color: Colors.white, size: 24),
+                    child: AurisIcon(AurisIcons.exitPip, color: Colors.white, size: 24),
                   ),
                 ),
                 

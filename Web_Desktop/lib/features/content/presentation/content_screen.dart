@@ -1073,7 +1073,7 @@ class _ThemeCardState extends State<_ThemeCard> {
                         shape: BoxShape.circle,
                         boxShadow: isSelected ? [BoxShadow(color: (widget.isOP ? Colors.blueAccent : Colors.pinkAccent).withOpacity(0.5), blurRadius: 10)] : [],
                       ), 
-                      child: AurisIcon(AurisIcons.play, color: Colors.white, size: isMobile ? 24 : 32)
+                      child: AurisIcon(AurisIcons.playFilled, color: Colors.white, size: isMobile ? 24 : 32)
                     ),
                     const SizedBox(height: 12), 
                     Padding(
@@ -2495,7 +2495,7 @@ void _openPlayer(PlayerScreen player) {
           child: Row(
             mainAxisAlignment: hasProgress ? MainAxisAlignment.start : MainAxisAlignment.center,
             children: [
-              AurisIcon(AurisIcons.play, color: Colors.black, size: 36),
+              AurisIcon(AurisIcons.playFilled, color: Colors.black, size: 36),
               const SizedBox(width: 8),
               Text(label, style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600)),
               if (hasProgress) ...[
@@ -2530,7 +2530,7 @@ void _openPlayer(PlayerScreen player) {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            AurisIcon(AurisIcons.play, color: Colors.black, size: iconSize),
+            AurisIcon(AurisIcons.playFilled, color: Colors.black, size: iconSize),
             const SizedBox(width: 8),
             Text(
               label.toUpperCase(),
@@ -2610,7 +2610,7 @@ void _openPlayer(PlayerScreen player) {
       children: [
         if (_lastTrailerKey != null) ...[
           _DetailIconButton(
-            icon: (isMobile || !_showPlayer) ? AurisIcons.trailer : AurisIcons.settings,
+            icon: (isMobile || !_showPlayer) ? AurisIcons.trailer : AurisIcons.close,
             label: (isMobile || !_showPlayer) ? 'Ver tráiler' : 'Quitar tráiler',
             isLoading: _isTrailerLoading,
             onPressed: () async {

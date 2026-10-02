@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
@@ -17,11 +17,11 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     
-    // Senior Note: En Web, la intro del index.html ya se está reproduciendo.
-    // Una vez que Flutter carga, mostramos la versión nativa (AurisSplashLogo)
-    // para asegurar una transición perfecta hacia el Home.
+    // Senior Note: En Web, la intro del index.html ya se esta reproduciendo.
+    // Una vez que Flutter carga, mostramos la version nativa (AurisSplashLogo)
+    // para asegurar una transicion perfecta hacia el Home.
     if (kIsWeb) {
-      // Pequeño delay para sincronizar con la intro nativa del navegador
+      // Pequeno delay para sincronizar con la intro nativa del navegador
       Future.delayed(const Duration(milliseconds: 500), () {
         WebUtils.removeSplashScreen();
       });
@@ -41,13 +41,28 @@ class _SplashScreenState extends State<SplashScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF050505),
-      body: Center(
-        child: Transform.scale(
-          scale: isDesktop ? 1.5 : 1.0, // Escalar la intro en pantallas grandes
-          child: AurisSplashLogo(
-            onFinished: _onAnimationFinished,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Fondo: panel manga monocromo de alto contraste
+          Image.asset(
+            'assets/images/manga_panel_bg.png',
+            fit: BoxFit.cover,
           ),
-        ),
+          // Overlay oscuro para que la animacion del logo resalte
+          Container(
+            color: const Color(0xCC000000), // negro al 80%
+          ),
+          // Logo animado centrado
+          Center(
+            child: Transform.scale(
+              scale: isDesktop ? 1.5 : 1.0, // Escalar la intro en pantallas grandes
+              child: AurisSplashLogo(
+                onFinished: _onAnimationFinished,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

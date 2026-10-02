@@ -1,32 +1,30 @@
-# 🚀 AurisTV v1.0.0 - Lanzamiento Oficial & Mejoras Multiplataforma
+# 🚀 AurisTV v1.0.0 - Lanzamiento Oficial & Actualización Multiplataforma
 
-¡Nos complace anunciar el lanzamiento oficial de **AurisTV v1.0.0** con importantes mejoras, correcciones y optimizaciones en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
+¡Nos complace anunciar una nueva actualización mayor de **AurisTV v1.0.0** con importantes mejoras, nuevas pantallas y optimizaciones en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
 
 ---
 
 ## ✨ Novedades y Características Principales
 
-- **Gestión Avanzada de Perfiles y Avatares en Android TV:**
-  - Pantalla completa de selección de perfiles.
-  - Creación y edición de perfiles adaptada para control remoto.
-  - Selector de avatares personalizados.
-- **Reproductor de YouTube & Trailers Mejorado (Multiplataforma):**
-  - Reemplazo del wrapper de iframe por un `WebViewController` directo con User-Agent de Chrome para solucionar errores de reproducción en trailers (Error 152-4).
-  - Eliminación de parámetros problemáticos de origen y adición del botón de respaldo "Abrir en YouTube".
-- **Mejoras en Providers y Ciclo de Vida (Riverpod):**
-  - Ajustes en la inicialización de estados (`Future.microtask` en `initState`) para evitar modificaciones durante la construcción de widgets.
-  - Corrección en constructores y *getters* de `ExtractResult` y `EpisodesResponse`.
-- **Navegación y UI Optimizada para TV:**
-  - Componentes de desplazamiento y enfoque mejorados (`tv_scroll`, `tv_focus_wrapper`).
-  - Filas de contenido, atajos de categorías y banners rediseñados (`category_shortcuts_row`, `editorial_content_row`, `focusable_poster_card`).
+- **Renovación del Sistema de Autenticación & Login:**
+  - Nueva interfaz en `login_screen` con integración de nuevos recursos gráficos (fondos verticales/horizontales, logotipo de Google, mascota de AurisTV y diseño visual optimizado).
+  - Mejoras en la autenticación y gestión de sesiones de usuario.
+- **Pantalla de Inicio / Splash & Intro Optimizada:**
+  - Actualización del flujo de animación en `splash_screen` y soporte mejorado para la intro HTML (`auristv_intro_slower.html`).
+- **Mejoras en Búsqueda y Exploración (`Search` & `Explore`):**
+  - Filtrado de contenido más rápido y fluido en `search_screen` y `explore_screen` en todas las plataformas.
+- **Actualizaciones en el Reproductor y Mini Player Bar:**
+  - Mejoras en la barra del mini reproductor (`mini_player_bar`) y controles multimedia avanzados en `player_screen`.
+- **Soporte Multiplataforma Unificado:**
+  - Actualizaciones de dependencias (`pubspec.yaml` y `pubspec.lock`), nuevas utilidades de URL y optimización de layout en Móvil, TV y Web/Desktop.
 
 ---
 
-## 🛠️ Correcciones de Errores y Optimizaciones Técnicas
+## 🛠️ Correcciones de Errores y Mejoras de Rendimiento
 
-- **Estabilidad General:** Corrección de errores de compilación y sincronización de estado en el núcleo compartido (`auris_core`).
-- **Control Nativo:** Optimización de canales nativos para control de brillo y volumen en Android.
-- **Empaquetado Multiplataforma:** Sincronización de versiones (`1.0.0+1`) y automatización limpia para APKs de Móvil, TV y binario ZIP de Windows Desktop.
+- **Gestión de Recursos Gráficos:** Integración de nuevos fondos, avatares y paneles manga de alta resolución (`manga_panel_bg.png`) tanto en el paquete core como en los módulos de cliente.
+- **Estabilidad de Providers:** Ajustes en `remote_control_provider` y gestión de estados en vistas de perfil y contenido.
+- **Empaquetado y Release:** Automatización limpia de compilación de APKs (Móvil y TV) e instalador de Windows.
 
 ---
 

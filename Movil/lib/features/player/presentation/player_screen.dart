@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:ui' as ui;
@@ -3555,7 +3555,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _showRemoteLanguageSelector(RemoteDevice target) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: const Color(0xFF0F0F12),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => SafeArea(
         child: Column(
@@ -3608,7 +3608,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _showRemoteEpisodesSelector(RemoteDevice target) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
+      backgroundColor: const Color(0xFF0F0F12),
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -6043,6 +6043,8 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
   }
 }
 
+// -- YouTube-style compact settings panel
+// Alineado abajo-derecha, ancho reducido, filas compactas, sin padding excesivo.
 class _PlayerSidePanel extends StatelessWidget {
   final String title;
   final Widget child;
@@ -6053,83 +6055,85 @@ class _PlayerSidePanel extends StatelessWidget {
     required this.title,
     required this.child,
     required this.onClose,
-    this.width = 450,
+    this.width = 300,
   });
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
     final isMobile = ResponsiveUtils.isMobile(context);
-    final screenHeight = MediaQuery.of(context).size.height;
     final bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final bool useMobileLayout = isMobile || screenHeight < 500;
-    
-    // Senior UI Adaptive logic:
-    // En móvil landscape reducimos a 320. En móvil portrait ~85% del ancho. En desktop 450.
-    final double panelWidth = useMobileLayout 
-        ? (isLandscape ? 280.0 : MediaQuery.of(context).size.width * 0.85) 
-        : width;
-    final double padding = useMobileLayout ? (isLandscape ? 8.0 : 12.0) : 24.0;
+    final bool useMobileLayout = isMobile || size.height < 500;
+
+    final double panelWidth = useMobileLayout
+        ? (isLandscape ? 260.0 : size.width * 0.78)
+        : width.clamp(240.0, 340.0);
+
+    final double maxHeight = size.height * (useMobileLayout ? 0.55 : 0.50);
 
     return Align(
-      alignment: Alignment.centerRight,
+      alignment: Alignment.bottomRight,
       child: Padding(
-        padding: EdgeInsets.all(padding),
+        padding: const EdgeInsets.only(right: 12, bottom: 64),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(useMobileLayout ? 12 : 32),
+          borderRadius: BorderRadius.circular(12),
           child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Material(
-              color: const Color(0xCC16161C), 
-              elevation: 0, 
-              child: Container(
-                width: panelWidth,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(useMobileLayout ? 12 : 32),
-                  border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withOpacity(0.05),
-                      Colors.transparent,
-                    ],
-                  ),
+              color: const Color(0xF00F0F12),
+              elevation: 8,
+              shadowColor: Colors.black54,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: panelWidth,
+                  maxHeight: maxHeight,
                 ),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min, 
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Header compacto
                     Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        useMobileLayout ? 16 : 32, 
-                        useMobileLayout ? (isLandscape ? 12 : 24) : 32, 
-                        12, 
-                        useMobileLayout ? 4 : 12
-                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            title.toUpperCase(),
-                            style: GoogleFonts.poppins(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: useMobileLayout ? (isLandscape ? 10 : 13) : 15,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          IconButton(
-                            onPressed: onClose,
-                            icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.4), size: useMobileLayout ? 18 : 26),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: onClose,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.07),
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white54,
+                                size: 15,
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const Divider(color: Colors.white10, height: 1, indent: 16, endIndent: 16),
+                    const Divider(color: Colors.white12, height: 1),
+                    // Lista de opciones
                     Flexible(child: child),
-                    SizedBox(height: useMobileLayout ? 4 : 12),
+                    const SizedBox(height: 4),
                   ],
                 ),
               ),
@@ -6140,7 +6144,6 @@ class _PlayerSidePanel extends StatelessWidget {
     );
   }
 }
-
 class _NetflixProgressBar extends StatefulWidget {
   const _NetflixProgressBar({super.key});
   @override

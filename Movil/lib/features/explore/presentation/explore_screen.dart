@@ -1,3 +1,5 @@
+﻿import '../../../core/utils/url_utils.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,7 +25,9 @@ final _exploreContentProvider = FutureProvider<List<MediaItem>>((ref) async {
 
   List<MediaItem> results = [];
 
+  // Obtenemos la lista base según el filtro (Sin llamar a búsqueda completa de API)
   if (filter == 'En Emisión') {
+    // Para "En Emisión" buscamos en TODO el calendario semanal disponible
     final schedule = await ref.watch(scheduleProvider.future);
     results = schedule.days.expand((d) => d.items).where((item) => item.sourceAvailable).map((item) {
       final ep = item.episode ?? 0;
@@ -60,6 +64,7 @@ final _exploreContentProvider = FutureProvider<List<MediaItem>>((ref) async {
     results = List.from(list);
   }
 
+  // Filtrado LOCAL: solo sobre lo que el filtro actual ofrece
   if (query.isNotEmpty) {
     results = results.where((item) {
       final t = item.title.toLowerCase();
@@ -69,6 +74,7 @@ final _exploreContentProvider = FutureProvider<List<MediaItem>>((ref) async {
     }).toList();
   }
 
+  // Aplicar ordenamiento
   switch (sort) {
     case ExploreSort.recent:
       results.sort((a, b) => (b.year ?? 0).compareTo(a.year ?? 0));
@@ -92,19 +98,20 @@ class ExploreScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isMobile = ResponsiveUtils.isMobile(context);
+    final isMobile = context.isMobile;
     final width = MediaQuery.of(context).size.width;
-    final hPadding = isMobile ? 16.0 : (width - 1000).clamp(32.0, double.infinity) / 2;
+    final hPadding = isMobile ? 16.0 : (width - 1024).clamp(32.0, double.infinity) / 2;
     final selectedFilter = ref.watch(_exploreFilterProvider);
     final contentAsync = ref.watch(_exploreContentProvider);
     final scheduleAsync = ref.watch(scheduleProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF0B0B0D), // Color de fondo de la app
       body: SafeArea(
         child: CustomScrollView(
           physics: const ClampingScrollPhysics(),
           slivers: [
+            // Barra superior de filtros
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -154,6 +161,7 @@ class ExploreScreen extends ConsumerWidget {
               ),
             ),
 
+            // Buscador y botón de filtro (Solo si no es Calendario)
             if (selectedFilter != 'Calendario')
               SliverToBoxAdapter(
                 child: Padding(
@@ -169,18 +177,15 @@ class ExploreScreen extends ConsumerWidget {
                           ),
                           child: TextField(
                             onChanged: (val) => ref.read(_exploreSearchQueryProvider.notifier).state = val,
-                            textAlignVertical: TextAlignVertical.center,
+                            textAlignVertical: TextAlignVertical.center, // Senior Fix: Centrado vertical real
                             style: const TextStyle(color: Colors.white, fontSize: 16),
                             decoration: InputDecoration(
-                              isDense: true,
+                              isDense: true, // Senior Fix: Mejor centrado
                               hintText: 'Buscar...',
                               hintStyle: TextStyle(color: Colors.white38),
-                              prefixIcon: Padding(
-                                padding: EdgeInsets.all(12),
-                                child: AurisIcon(AurisIcons.search, color: Colors.white38, size: 20),
-                              ),
+                              prefixIcon: AurisIcon(AurisIcons.search, color: Colors.white38),
                               border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
+                              contentPadding: EdgeInsets.zero, // Eliminamos padding manual que causa desfase
                             ),
                           ),
                         ),
@@ -211,7 +216,7 @@ class ExploreScreen extends ConsumerWidget {
                               color: const Color(0xFF1A1D23),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.filter_list, color: Color(0xFFEF7A1E)),
+                            child: AurisIcon(AurisIcons.grid, color: Color(0xFFEF7A1E)),
                           ),
                         ),
                       ),
@@ -220,6 +225,7 @@ class ExploreScreen extends ConsumerWidget {
                 ),
               ),
 
+            // Grid de contenido o Calendario
             if (selectedFilter == 'Calendario')
               ...[
                 scheduleAsync.when(
@@ -236,56 +242,115 @@ class ExploreScreen extends ConsumerWidget {
               SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: hPadding),
                 sliver: contentAsync.when(
-                  data: (items) => SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: isMobile ? 3 : 5,
-                      mainAxisSpacing: isMobile ? 12 : 24,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 0.55,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = items[index];
-                        final historyAsync = ref.watch(playbackHistoryStateProvider);
-                        double? progress;
-                        historyAsync.whenData((historyItems) {
-                          final match = historyItems.firstWhereOrNull((h) => h.contentId == item.id);
-                          if (match != null) progress = match.progress;
-                        });
+                  data: (items) {
+                    final b = context.breakpoint;
+                    final int crossAxisCount = switch (b) {
+                      Breakpoint.base => 3,
+                      Breakpoint.sm => 4,
+                      Breakpoint.md => 5,
+                      Breakpoint.lg => 6,
+                      Breakpoint.xl => 7,
+                      Breakpoint.xxl => 8,
+                    };
 
-                        return FocusablePosterCard(
-                          title: item.title,
-                          posterUrl: item.posterUrl,
-                          badgeOverlay: (item.airingAt != null && selectedFilter != 'En Emisión')
-                              ? AiringCountdownBadge(airingAt: item.airingAt!, aired: item.aired)
-                              : null,
-                          subtitle: item.subtitle,
-                          rating: formatRating(item.rating),
-                          showInfo: true,
-                          progress: progress,
-                          onTap: () {
-                            final metaTitle = item.romaji ?? item.english ?? item.title;
-                            final typeVal = item.card?.type ?? item.card?.kind ?? item.type.name;
-                            context.push(
-                              '/content/${Uri.encodeComponent(item.title)}'
-                              '?source=${Uri.encodeComponent(item.source)}'
-                              '&category=${item.type.name}'
-                              '&url=${Uri.encodeComponent(item.id)}'
-                              '&metadataTitle=${Uri.encodeComponent(metaTitle)}'
-                              '&banner=${Uri.encodeComponent(item.bannerUrl ?? '')}'
-                              '&year=${item.year ?? ''}'
-                              '&type=${Uri.encodeComponent(typeVal)}',
-                              extra: item.toContentSeed(),
-                            );
-                          },
-                        );
-                      },
-                      childCount: items.length,
-                    ),
-                  ),
-                  loading: () => const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
+                    return SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        mainAxisSpacing: b < Breakpoint.md ? 12 : 24, 
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.55, 
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final item = items[index];
+
+                          // Senior Fix: Obtener el progreso del historial si existe
+                          final historyAsync = ref.watch(playbackHistoryStateProvider);
+                          double? progress;
+                          historyAsync.whenData((items) {
+                            final match = items.firstWhereOrNull((h) => h.contentId == item.id);
+                            if (match != null) progress = match.progress;
+                          });
+
+                          return FocusablePosterCard(
+                            title: item.title,
+                            posterUrl: item.posterUrl,
+                            badgeOverlay: (item.airingAt != null && selectedFilter != 'En Emisión')
+                                ? AiringCountdownBadge(airingAt: item.airingAt!, aired: item.aired)
+                                : null,
+                            subtitle: item.subtitle,
+                            rating: formatRating(item.rating),
+                            showInfo: true,
+                            progress: progress, // Senior Fix: Mostrar progreso en el grid de explorar
+                            onTap: () {
+                              final uri = UrlUtils.buildShareableUri(
+                                title: item.title,
+                                source: item.source,
+                                url: item.id,
+                                category: item.type.name,
+                                year: item.year,
+                                type: item.card?.type ?? item.card?.kind ?? item.type.name,
+                                from: '/explore',
+                              );
+                              context.push(uri, extra: item.toContentSeed());
+                            },
+                          );
+                        },
+                        childCount: items.length,
+                      ),
+                    );
+                  },
+                  loading: () {
+                    final double hPadding = ResponsiveUtils.horizontalPadding(context);
+                    final b = context.breakpoint;
+                    final int crossAxisCount = switch (b) {
+                      Breakpoint.base => 3,
+                      Breakpoint.sm => 4,
+                      Breakpoint.md => 5,
+                      Breakpoint.lg => 6,
+                      Breakpoint.xl => 7,
+                      Breakpoint.xxl => 8,
+                    };
+                    return Skeletonizer.sliver(
+                      enabled: true,
+                      effect: ShimmerEffect(
+                        baseColor: Colors.white.withOpacity(0.05),
+                        highlightColor: Colors.white.withOpacity(0.15),
+                        duration: const Duration(milliseconds: 1200),
+                      ),
+                      child: SliverPadding(
+                        padding: EdgeInsets.symmetric(horizontal: hPadding),
+                        sliver: SliverGrid(
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            childAspectRatio: 0.7,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white10,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(height: 14, width: 100, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
+                                const SizedBox(height: 4),
+                                Container(height: 10, width: 60, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
+                              ],
+                            ),
+                            childCount: crossAxisCount * 3,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                   error: (err, _) => SliverFillRemaining(
                     child: Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white54))),
                   ),
@@ -293,7 +358,7 @@ class ExploreScreen extends ConsumerWidget {
               ),
             
             if (selectedFilter != 'Calendario')
-              const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
+              const SliverPadding(padding: EdgeInsets.only(bottom: 24)), // Solo aire al final si es el Grid
           ],
         ),
       ),
@@ -379,3 +444,5 @@ class _FilterButton extends StatelessWidget {
     );
   }
 }
+
+

@@ -1,3 +1,4 @@
+﻿import 'package:skeletonizer/skeletonizer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -261,52 +262,100 @@ class ExploreScreen extends ConsumerWidget {
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                        final item = items[index];
+                          final item = items[index];
 
-                        // Senior Fix: Obtener el progreso del historial si existe
-                        final historyAsync = ref.watch(playbackHistoryStateProvider);
-                        double? progress;
-                        historyAsync.whenData((items) {
-                          final match = items.firstWhereOrNull((h) => h.contentId == item.id);
-                          if (match != null) progress = match.progress;
-                        });
+                          // Senior Fix: Obtener el progreso del historial si existe
+                          final historyAsync = ref.watch(playbackHistoryStateProvider);
+                          double? progress;
+                          historyAsync.whenData((items) {
+                            final match = items.firstWhereOrNull((h) => h.contentId == item.id);
+                            if (match != null) progress = match.progress;
+                          });
 
-                        return FocusablePosterCard(
-                          title: item.title,
-                          posterUrl: item.posterUrl,
-                          badgeOverlay: (item.airingAt != null && selectedFilter != 'En Emisión')
-                              ? AiringCountdownBadge(airingAt: item.airingAt!, aired: item.aired)
-                              : null,
-                          subtitle: item.subtitle,
-                          rating: formatRating(item.rating),
-                          showInfo: true,
-                          progress: progress, // Senior Fix: Mostrar progreso en el grid de explorar
-                          onTap: () {
-                            final uri = UrlUtils.buildShareableUri(
-                              title: item.title,
-                              source: item.source,
-                              url: item.id,
-                              category: item.type.name,
-                              year: item.year,
-                              type: item.card?.type ?? item.card?.kind ?? item.type.name,
-                              from: '/explore',
-                            );
-                            context.push(uri, extra: item.toContentSeed());
-                          },
-                        );
-                      },
-                      childCount: items.length,
-                    ),
-                  );
-                },
-                loading: () => const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (err, _) => SliverFillRemaining(
-                  child: Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white54))),
+                          return FocusablePosterCard(
+                            title: item.title,
+                            posterUrl: item.posterUrl,
+                            badgeOverlay: (item.airingAt != null && selectedFilter != 'En Emisión')
+                                ? AiringCountdownBadge(airingAt: item.airingAt!, aired: item.aired)
+                                : null,
+                            subtitle: item.subtitle,
+                            rating: formatRating(item.rating),
+                            showInfo: true,
+                            progress: progress, // Senior Fix: Mostrar progreso en el grid de explorar
+                            onTap: () {
+                              final uri = UrlUtils.buildShareableUri(
+                                title: item.title,
+                                source: item.source,
+                                url: item.id,
+                                category: item.type.name,
+                                year: item.year,
+                                type: item.card?.type ?? item.card?.kind ?? item.type.name,
+                                from: '/explore',
+                              );
+                              context.push(uri, extra: item.toContentSeed());
+                            },
+                          );
+                        },
+                        childCount: items.length,
+                      ),
+                    );
+                  },
+                  loading: () {
+                    final double hPadding = ResponsiveUtils.horizontalPadding(context);
+                    final b = context.breakpoint;
+                    final int crossAxisCount = switch (b) {
+                      Breakpoint.base => 3,
+                      Breakpoint.sm => 4,
+                      Breakpoint.md => 5,
+                      Breakpoint.lg => 6,
+                      Breakpoint.xl => 7,
+                      Breakpoint.xxl => 8,
+                    };
+                    return Skeletonizer.sliver(
+                      enabled: true,
+                      effect: ShimmerEffect(
+                        baseColor: Colors.white.withOpacity(0.05),
+                        highlightColor: Colors.white.withOpacity(0.15),
+                        duration: const Duration(milliseconds: 1200),
+                      ),
+                      child: SliverPadding(
+                        padding: EdgeInsets.symmetric(horizontal: hPadding),
+                        sliver: SliverGrid(
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            childAspectRatio: 0.7,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white10,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(height: 14, width: 100, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
+                                const SizedBox(height: 4),
+                                Container(height: 10, width: 60, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
+                              ],
+                            ),
+                            childCount: crossAxisCount * 3,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  error: (err, _) => SliverFillRemaining(
+                    child: Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white54))),
+                  ),
                 ),
               ),
-            ),
             
             if (selectedFilter != 'Calendario')
               const SliverPadding(padding: EdgeInsets.only(bottom: 24)), // Solo aire al final si es el Grid

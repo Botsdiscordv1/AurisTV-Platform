@@ -1,32 +1,31 @@
-import '../../features/auth/presentation/activate_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../features/intro/presentation/splash_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
-import '../../features/content/presentation/content_screen.dart';
-import '../../features/explore/presentation/explore_screen.dart';
-import '../../features/library/presentation/library_screen.dart';
-import '../../features/player/presentation/player_screen.dart';
-import '../../features/schedule/presentation/schedule_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
+import '../../features/explore/presentation/explore_screen.dart';
+import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/content/presentation/content_screen.dart';
+import '../../features/player/presentation/player_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
-import '../../features/settings/presentation/storage_screen.dart';
+import '../../features/auth/presentation/activate_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/connections_screen.dart';
-import '../../features/avatar/presentation/avatar_selector_screen.dart';
+import '../../features/schedule/presentation/schedule_screen.dart';
 import '../../features/avatar/presentation/profile_selection_screen.dart';
-import '../../features/avatar/presentation/profile_setup_screen.dart';
-import '../../features/intro/presentation/splash_screen.dart';
-import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/avatar/presentation/profile_edit_screen.dart';
+import '../../features/avatar/presentation/profile_setup_screen.dart';
+import '../../features/auth/presentation/screens/avatar_selector_screen.dart';
+import '../../features/library/presentation/library_screen.dart';
+import '../../features/settings/presentation/storage_screen.dart';
 import '../../shared/widgets/main_navigation_wrapper.dart';
 import '../../shared/widgets/auris_bottom_bar.dart';
 
-/// Observador global para detectar cambios de ruta y gestionar estados de widgets (ej: trailers)
-final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
 
-/// Clave global para el Navigator Raíz (Senior Fix: Necesario para pre-fetching)
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final GoRouter appRouter = GoRouter(
@@ -124,6 +123,8 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,
       path: '/activate',
@@ -131,8 +132,6 @@ final GoRouter appRouter = GoRouter(
         final code = state.uri.queryParameters['code'] ?? '';
         return ActivateScreen(initialCode: code);
       },
-    ),
-      builder: (context, state) => const LoginScreen(),
     ),
     GoRoute(
       path: '/connections',
@@ -159,8 +158,6 @@ final GoRouter appRouter = GoRouter(
         final totalSeasons =
             int.tryParse(state.uri.queryParameters['totalSeasons'] ?? '');
         final sectionId = state.uri.queryParameters['sectionId'];
-        final extraResult =
-            state.extra is SearchResult ? state.extra as SearchResult : null;
         return ContentScreen(
           title: title,
           source: source,
@@ -175,7 +172,6 @@ final GoRouter appRouter = GoRouter(
           kind: kind,
           totalSeasons: totalSeasons,
           sectionId: sectionId,
-          result: extraResult,
         );
       },
     ),
@@ -200,8 +196,6 @@ final GoRouter appRouter = GoRouter(
         final posterUrl = state.uri.queryParameters['posterUrl'];
         final bannerUrl = state.uri.queryParameters['bannerUrl'];
         final logoUrl = state.uri.queryParameters['logoUrl'];
-        // Kind/year para guardar historial fiel (si no, el re-tap re-deriva
-        // mal el servidor: serie animada en OnlyPelis quedaba kind=anime).
         final kind = state.uri.queryParameters['kind'];
         final year = int.tryParse(state.uri.queryParameters['year'] ?? '');
 
@@ -258,6 +252,3 @@ class ProfileWithNavScreen extends ConsumerWidget {
     );
   }
 }
-
-
-

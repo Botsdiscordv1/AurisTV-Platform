@@ -147,7 +147,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   height: 50,
                   child: ElevatedButton.icon(
                     onPressed: () => ref.read(authProvider.notifier).signInWithGoogle(),
-                    icon: Image.network('https://svgl.app/library/google.svg', height: 22, filterQuality: FilterQuality.high, errorBuilder: (_, __, ___) => const Text('G', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),
+                    icon: SvgPicture.asset('assets/icons/google_logo.svg', height: 22),
                     label: const Text('GOOGLE'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,

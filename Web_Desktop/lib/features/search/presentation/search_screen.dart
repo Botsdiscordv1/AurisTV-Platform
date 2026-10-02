@@ -1,3 +1,4 @@
+﻿import 'package:skeletonizer/skeletonizer.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -580,7 +581,54 @@ class _SearchResultsGrid extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+      loading: () {
+        final double hPadding = ResponsiveUtils.horizontalPadding(context);
+        final b = context.breakpoint;
+        final int crossAxisCount = switch (b) {
+          Breakpoint.base => 3,
+          Breakpoint.sm => 4,
+          Breakpoint.md => 5,
+          Breakpoint.lg => 6,
+          Breakpoint.xl => 7,
+          Breakpoint.xxl => 8,
+        };
+        return Skeletonizer(
+        enabled: true,
+        effect: ShimmerEffect(
+          baseColor: Colors.white.withOpacity(0.05),
+          highlightColor: Colors.white.withOpacity(0.15),
+          duration: const Duration(milliseconds: 1200),
+        ),
+        child: GridView.builder(
+          padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: 16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: 0.7,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+          ),
+          itemCount: crossAxisCount * 3,
+          itemBuilder: (context, index) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white10,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(height: 14, width: 100, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
+              const SizedBox(height: 4),
+              Container(height: 10, width: 60, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4))),
+            ],
+          ),
+        ),
+      
+        );
+      },
       error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white54))),
     );
   }

@@ -191,7 +191,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
   }
 
   Future<void> _registerDevice() async {
-    if (state.currentDevice == null) return;
+    if (state.currentDevice == null || state.currentDevice!.userId == 'guest_user') return;
     try {
       await _supabase.from('remote_sessions').upsert(
         state.currentDevice!.toJson(),
@@ -205,7 +205,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
-      if (state.currentDevice == null) return;
+      if (state.currentDevice == null || state.currentDevice!.userId == 'guest_user') return;
       try {
         await _supabase.from('remote_sessions').update({
           'last_seen': DateTime.now().toIso8601String(),
