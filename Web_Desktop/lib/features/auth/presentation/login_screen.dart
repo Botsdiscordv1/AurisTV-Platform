@@ -36,7 +36,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const AurisIcon(AurisIcons.close, color: Colors.white),
+          icon: AurisIcon(AurisIcons.close, color: Colors.white),
           onPressed: () {
             if (context.canPop()) {
               context.pop();

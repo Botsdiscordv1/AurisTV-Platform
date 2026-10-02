@@ -77,7 +77,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
                               : null,
                         ),
                         child: _selectedUrl == null
-                            ? const AurisIcon(AurisIcons.user, size: 80, color: Colors.white24)
+                            ? AurisIcon(AurisIcons.user, size: 80, color: Colors.white24)
                             : null,
                       ),
                       Container(
@@ -86,7 +86,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
                           color: primaryColor,
                           shape: BoxShape.circle,
                         ),
-                        child: const AurisIcon(AurisIcons.settings, size: 20, color: Colors.black),
+                        child: AurisIcon(AurisIcons.settings, size: 20, color: Colors.black),
                       ),
                     ],
                   ),
@@ -164,7 +164,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
                             imageUrl: mockUrl,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Container(color: surfaceColor),
-                            errorWidget: (context, url, error) => const AurisIcon(AurisIcons.info),
+                            errorWidget: (context, url, error) => AurisIcon(AurisIcons.info),
                           ),
                         ),
                       ),

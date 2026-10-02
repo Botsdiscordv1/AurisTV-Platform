@@ -107,7 +107,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             filter: ImageFilter.blur(sigmaX: _isScrolled ? 20 : 0, sigmaY: _isScrolled ? 20 : 0),
             child: AppBar(
               leading: IconButton(
-                icon: const AurisIcon(AurisIcons.chevronLeft),
+                icon: AurisIcon(AurisIcons.chevronLeft),
                 onPressed: () {
                   if (context.canPop()) {
                     context.pop();
@@ -360,7 +360,7 @@ class _LibraryMediaCard extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const AurisIcon(AurisIcons.info, color: Colors.white70),
+              leading: AurisIcon(AurisIcons.info, color: Colors.white70),
               title: const Text('Ver detalles', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -368,7 +368,7 @@ class _LibraryMediaCard extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: const AurisIcon(AurisIcons.close, color: Colors.redAccent),
+              leading: AurisIcon(AurisIcons.close, color: Colors.redAccent),
               title: const Text('Quitar de Mi lista', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600)),
               onTap: () {
                 Navigator.pop(ctx);

@@ -215,7 +215,7 @@ class ExploreScreen extends ConsumerWidget {
                               color: const Color(0xFF1A1D23),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const AurisIcon(AurisIcons.grid, color: Color(0xFFEF7A1E)),
+                            child: AurisIcon(AurisIcons.grid, color: Color(0xFFEF7A1E)),
                           ),
                         ),
                       ),

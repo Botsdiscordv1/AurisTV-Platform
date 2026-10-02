@@ -434,7 +434,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         color: Colors.white.withOpacity(0.1),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: const AurisIcon(AurisIcons.close, color: Colors.white, size: 18),
+                                      child: AurisIcon(AurisIcons.close, color: Colors.white, size: 18),
                                     ),
                                   ),
                                   const SizedBox(width: 12),

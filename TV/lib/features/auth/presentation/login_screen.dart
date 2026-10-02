@@ -1,3 +1,4 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,6 +38,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   final FocusNode _loginBtnFocus  = FocusNode();
   final FocusNode _remoteBtnFocus = FocusNode();
   final FocusNode _backBtnFocus   = FocusNode();
+  final FocusNode _emailInputFocus = FocusNode();
+  final FocusNode _passInputFocus  = FocusNode();
+  final FocusNode _eyeBtnFocus     = FocusNode();
+  final FocusNode _submitBtnFocus  = FocusNode();
+  bool _showPassword = false;
 
   // Page-level animation
   late final AnimationController _fadeCtrl;
@@ -67,6 +73,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _loginBtnFocus.dispose();
     _remoteBtnFocus.dispose();
     _backBtnFocus.dispose();
+    _emailInputFocus.dispose();
+    _passInputFocus.dispose();
+    _eyeBtnFocus.dispose();
+    _submitBtnFocus.dispose();
     super.dispose();
   }
 
@@ -111,7 +121,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _backBtnFocus.requestFocus();
+      if (mounted) {
+        if (step == _LoginStep.remote) {
+          _emailInputFocus.requestFocus();
+        } else if (step == _LoginStep.qrPhone) {
+          _backBtnFocus.requestFocus();
+        }
+      }
     });
   }
 
@@ -348,13 +364,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x55EF7A1E),
-                    blurRadius: 22,
-                    spreadRadius: 2,
-                  ),
-                ],
               ),
               child: QrImageView(
                 data: activateUrl,
@@ -424,7 +433,47 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
-  // ── REMOTE / KEYBOARD ─────────────────────
+  Future<void> _performManualLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor ingresa tu correo y contraseña.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Sesión iniciada con éxito!'),
+            backgroundColor: Color(0xFFEF7A1E),
+          ),
+        );
+        context.go('/home');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error de autenticación: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  // ── REMOTE / MANUAL LOGIN (Crunchyroll Clean Transparent Style) ─────────────────────
   Widget _buildRemoteStep() {
     return Column(
       key: const ValueKey('remote'),
@@ -432,7 +481,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          'Iniciar sesion',
+          'Iniciar sesión en AurisTV',
           style: TextStyle(
             color: Colors.white,
             fontSize: 26,
@@ -442,46 +491,72 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 24),
 
-        // Email
-        _TVInputField(
-          label: 'Correo electronico',
+        // Email Address Label
+        const Text(
+          'Correo electrónico',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _TVCleanTextField(
+          focusNode: _emailInputFocus,
           controller: _emailController,
-          icon: Icons.email_outlined,
-          isActive: _activeController == _emailController,
-          onFocused: () =>
-              setState(() => _activeController = _emailController),
+          hintText: 'ejemplo@auristv.com',
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          nextFocus: _passInputFocus,
+          prevFocus: _backBtnFocus,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 20),
 
-        // Password
-        _TVInputField(
-          label: 'Contrasena',
-          controller: _passwordController,
-          icon: Icons.lock_outline_rounded,
-          isPassword: true,
-          isActive: _activeController == _passwordController,
-          onFocused: () =>
-              setState(() => _activeController = _passwordController),
+        // Password Label
+        const Text(
+          'Contraseña',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _TVCleanTextField(
+                focusNode: _passInputFocus,
+                controller: _passwordController,
+                hintText: '••••••••',
+                obscureText: !_showPassword,
+                textInputAction: TextInputAction.done,
+                prevFocus: _emailInputFocus,
+                nextFocus: _submitBtnFocus,
+                rightFocus: _eyeBtnFocus,
+                onSubmitted: (_) => _performManualLogin(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            _EyeToggleButton(
+              focusNode: _eyeBtnFocus,
+              showPassword: _showPassword,
+              leftFocus: _passInputFocus,
+              prevFocus: _emailInputFocus,
+              nextFocus: _submitBtnFocus,
+              onToggle: () => setState(() => _showPassword = !_showPassword),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
 
-        // Keyboard
-        _TVKeyboard(
-          onKey: (k) {
-            setState(() {
-              final ctrl = _activeController!;
-              if (k == '⌫') {
-                if (ctrl.text.isNotEmpty) {
-                  ctrl.text = ctrl.text.substring(0, ctrl.text.length - 1);
-                }
-              } else {
-                ctrl.text += k;
-              }
-            });
-          },
-          onConfirm: () {
-            // TODO: call auth provider login
-          },
+        // LOG IN Button
+        _BigButton(
+          focusNode: _submitBtnFocus,
+          label: 'INICIAR SESIÓN',
+          filled: true,
+          prevFocus: _passInputFocus,
+          onPressed: _performManualLogin,
         ),
       ],
     );
@@ -739,14 +814,14 @@ class _TVInputFieldState extends State<_TVInputField> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        height: 52,
+        height: 44,
         decoration: BoxDecoration(
           color: _focused
               ? Colors.white.withOpacity(0.10)
               : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: _focused ? AppTheme.brand : Colors.white24,
+            color: _focused ? Colors.white : Colors.transparent,
             width: _focused ? 2.0 : 1.0,
           ),
         ),
@@ -811,7 +886,7 @@ class _TVKeyboardState extends State<_TVKeyboard> {
       mainAxisSize: MainAxisSize.min,
       children: _rows.map((row) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 5),
+          padding: const EdgeInsets.only(bottom: 4),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: row.map((k) {
@@ -898,17 +973,17 @@ class _KeyState extends State<_Key> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 110),
           width: w,
-          height: 36,
+          height: 32,
           decoration: BoxDecoration(
             color: widget.isOk
                 ? (_focused ? AppTheme.brandLight : AppTheme.brand)
                 : _focused
                     ? Colors.white
-                    : Colors.white.withOpacity(0.09),
-            borderRadius: BorderRadius.circular(5),
+                    : const Color(0x17FFFFFF),
+            borderRadius: BorderRadius.circular(4),
             border: Border.all(
-              color: _focused ? Colors.white : Colors.white.withOpacity(0.18),
-              width: 1.0,
+              color: _focused ? AppTheme.brand : const Color(0x2EFFFFFF),
+              width: _focused ? 2.0 : 1.0,
             ),
           ),
           alignment: Alignment.center,
@@ -916,11 +991,254 @@ class _KeyState extends State<_Key> {
             widget.label,
             style: TextStyle(
               color: widget.isOk
-                  ? Colors.white
-                  : _focused ? Colors.black : Colors.white70,
+                  ? (_focused ? Colors.black : Colors.white)
+                  : (_focused ? Colors.black : Colors.white70),
               fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: _focused ? FontWeight.w900 : FontWeight.w600,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Clean TV Text Field (Crunchyroll Style)
+// ─────────────────────────────────────────────
+class _TVCleanTextField extends StatefulWidget {
+  final FocusNode focusNode;
+  final TextEditingController controller;
+  final String hintText;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final FocusNode? nextFocus;
+  final FocusNode? prevFocus;
+  final FocusNode? rightFocus;
+  final FocusNode? leftFocus;
+  final ValueChanged<String>? onSubmitted;
+
+  const _TVCleanTextField({
+    required this.focusNode,
+    required this.controller,
+    required this.hintText,
+    this.obscureText = false,
+    this.keyboardType,
+    this.textInputAction,
+    this.nextFocus,
+    this.prevFocus,
+    this.rightFocus,
+    this.leftFocus,
+    this.onSubmitted,
+  });
+
+  @override
+  State<_TVCleanTextField> createState() => _TVCleanTextFieldState();
+}
+
+class _TVCleanTextFieldState extends State<_TVCleanTextField> {
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_handleFocusChange);
+    _focused = widget.focusNode.hasFocus;
+  }
+
+  @override
+  void didUpdateWidget(covariant _TVCleanTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(_handleFocusChange);
+      widget.focusNode.addListener(_handleFocusChange);
+      _focused = widget.focusNode.hasFocus;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_handleFocusChange);
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (mounted && _focused != widget.focusNode.hasFocus) {
+      setState(() => _focused = widget.focusNode.hasFocus);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.arrowDown && widget.nextFocus != null) {
+            widget.nextFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowUp && widget.prevFocus != null) {
+            widget.prevFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowRight && widget.rightFocus != null) {
+            widget.rightFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowLeft && widget.leftFocus != null) {
+            widget.leftFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        height: 48,
+        decoration: BoxDecoration(
+          color: _focused ? const Color(0xFF2C3246) : const Color(0xFF1E2230),
+          borderRadius: BorderRadius.zero,
+          border: Border.all(
+            color: _focused ? Colors.white : Colors.transparent,
+            width: _focused ? 2.5 : 1.5,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Center(
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              inputDecorationTheme: const InputDecorationTheme(
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                filled: false,
+                fillColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+              ),
+            ),
+            child: TextField(
+              controller: widget.controller,
+              focusNode: widget.focusNode,
+              obscureText: widget.obscureText,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              cursorColor: AppTheme.brand,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                hintStyle: const TextStyle(color: Colors.white38, fontSize: 15),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                filled: false,
+                fillColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onSubmitted: (val) {
+                if (widget.nextFocus != null) {
+                  widget.nextFocus!.requestFocus();
+                } else if (widget.onSubmitted != null) {
+                  widget.onSubmitted!(val);
+                }
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Eye Password Toggle Button
+// ─────────────────────────────────────────────
+class _EyeToggleButton extends StatefulWidget {
+  final FocusNode focusNode;
+  final bool showPassword;
+  final VoidCallback onToggle;
+  final FocusNode? leftFocus;
+  final FocusNode? prevFocus;
+  final FocusNode? nextFocus;
+
+  const _EyeToggleButton({
+    required this.focusNode,
+    required this.showPassword,
+    required this.onToggle,
+    this.leftFocus,
+    this.prevFocus,
+    this.nextFocus,
+  });
+
+  @override
+  State<_EyeToggleButton> createState() => _EyeToggleButtonState();
+}
+
+class _EyeToggleButtonState extends State<_EyeToggleButton> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _focused = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.space) {
+            widget.onToggle();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowLeft && widget.leftFocus != null) {
+            widget.leftFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowUp && widget.prevFocus != null) {
+            widget.prevFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowDown && widget.nextFocus != null) {
+            widget.nextFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onToggle,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: _focused ? const Color(0xFF2C3246) : const Color(0xFF1E2230),
+            borderRadius: BorderRadius.zero,
+            border: Border.all(
+              color: _focused ? Colors.white : Colors.transparent,
+              width: _focused ? 2.5 : 1.5,
+            ),
+          ),
+          child: Icon(
+            widget.showPassword ? Icons.visibility_off : Icons.visibility,
+            color: _focused ? AppTheme.brand : Colors.white70,
+            size: 22,
           ),
         ),
       ),

@@ -292,7 +292,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
                           color: Colors.white10,
                           shape: BoxShape.circle,
                         ),
-                        child: const AurisIcon(AurisIcons.user, color: Colors.white24, size: 40),
+                        child: AurisIcon(AurisIcons.user, color: Colors.white24, size: 40),
                       ),
                     ),
                   ),
@@ -2736,7 +2736,7 @@ void _openPlayer(PlayerScreen player) {
           left: isMobile ? 15 : 60,
           child: PointerInterceptor(
             child: IconButton(
-              icon: const AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 28, shadows: [Shadow(color: Colors.black45, blurRadius: 8)]),
+              icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 28),
               onPressed: () {
                 if (mounted) {
                   if (context.canPop()) {
@@ -2757,7 +2757,7 @@ void _openPlayer(PlayerScreen player) {
             right: 15,
             child: PointerInterceptor(
               child: IconButton(
-                icon: const AurisIcon(AurisIcons.cast, color: Colors.white, size: 24, shadows: [Shadow(color: Colors.black45, blurRadius: 8)]),
+                icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 24),
                 onPressed: () {}
               ),
             ),
@@ -3383,7 +3383,7 @@ void _openPlayer(PlayerScreen player) {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const AurisIcon(AurisIcons.info, color: Colors.redAccent, size: 48),
+                  AurisIcon(AurisIcons.info, color: Colors.redAccent, size: 48),
                   const SizedBox(height: 16),
                   Text('Error al cargar detalle: $e', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),

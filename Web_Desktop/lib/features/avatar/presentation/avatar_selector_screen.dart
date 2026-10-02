@@ -54,7 +54,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
       backgroundColor: backgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const AurisIcon(AurisIcons.chevronLeft),
+          icon: AurisIcon(AurisIcons.chevronLeft),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text('Editar Perfil'),
@@ -155,7 +155,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const AurisIcon(AurisIcons.info,
+                          AurisIcon(AurisIcons.info,
                               size: 48, color: Colors.white24),
                           const SizedBox(height: 12),
                           const Text('No se pudo cargar el catálogo de avatares',
@@ -189,7 +189,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const AurisIcon(AurisIcons.settings,
+                                  AurisIcon(AurisIcons.settings,
                                       size: 64, color: Colors.white10),
                                   const SizedBox(height: 16),
                                   Text(
@@ -281,7 +281,7 @@ class _PreviewAvatar extends StatelessWidget {
                   : null,
             ),
             child: selectedPath == null
-                ? const AurisIcon(AurisIcons.user, size: 80, color: Colors.white24)
+                ? AurisIcon(AurisIcons.user, size: 80, color: Colors.white24)
                 : null,
           ),
         ],
@@ -350,7 +350,7 @@ class _AvatarItem extends StatelessWidget {
                           )
                         ],
                       ),
-                      child: const AurisIcon(AurisIcons.settings,
+                      child: AurisIcon(AurisIcons.settings,
                           size: 14, color: Colors.black),
                     ),
                   ),
@@ -417,11 +417,11 @@ class _AvatarCircle extends StatelessWidget {
                 assetPath!,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stack) =>
-                    Container(color: surfaceColor, child: const AurisIcon(AurisIcons.user, color: Colors.white24)),
+                    Container(color: surfaceColor, child: AurisIcon(AurisIcons.user, color: Colors.white24)),
               )
             : Container(
                 color: surfaceColor,
-                child: const AurisIcon(AurisIcons.user, color: Colors.white24),
+                child: AurisIcon(AurisIcons.user, color: Colors.white24),
               ),
       ),
     );
