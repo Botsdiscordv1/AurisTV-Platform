@@ -608,7 +608,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _NetflixListButton(
-            icon: AurisIcons.play3Filled,
+            icon: AurisIcons.play,
             label: (latestHistory != null && !latestHistory.isFinished) 
               ? (latestHistory.season != null ? 'Reanudar T${latestHistory.season}:EP ${latestHistory.episode}' : 'Reanudar Episodio ${latestHistory.episode}')
               : 'Reproducir',
@@ -755,7 +755,7 @@ class _NetflixListButtonState extends State<_NetflixListButton> {
                   children: [
                     widget.icon is String
                         ? AurisIcon(widget.icon as String, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 22)
-                        : Icon(widget.icon as IconData?, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 22), 
+                        : Icon(widget.icon as IconData?, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 22),
                     const SizedBox(width: 8), 
                     Expanded(
                       child: Text(

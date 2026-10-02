@@ -1,3 +1,4 @@
+import '../../features/auth/presentation/activate_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -123,6 +124,14 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/login',
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/activate',
+      builder: (context, state) {
+        final code = state.uri.queryParameters['code'] ?? '';
+        return ActivateScreen(initialCode: code);
+      },
+    ),
       builder: (context, state) => const LoginScreen(),
     ),
     GoRoute(

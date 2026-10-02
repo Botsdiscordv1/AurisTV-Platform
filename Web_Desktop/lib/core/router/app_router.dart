@@ -1,3 +1,4 @@
+import '../../features/auth/presentation/activate_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
@@ -156,6 +157,14 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: rootNavigatorKey,
       path: '/settings/library',
       builder: (context, state) => const LibraryScreen(),
+    ),
+        GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/activate',
+      builder: (context, state) {
+        final code = state.uri.queryParameters['code'] ?? '';
+        return ActivateScreen(initialCode: code);
+      },
     ),
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,

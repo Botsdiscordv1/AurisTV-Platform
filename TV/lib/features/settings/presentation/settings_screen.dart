@@ -495,6 +495,16 @@ class _SettingsTVButtonState extends State<_SettingsTVButton> {
       padding: const EdgeInsets.only(bottom: 15),
       child: Focus(
         onFocusChange: (f) => setState(() => _focused = f),
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.select ||
+               event.logicalKey == LogicalKeyboardKey.enter ||
+               event.logicalKey == LogicalKeyboardKey.space)) {
+            widget.onTap();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
         child: GestureDetector(
           onTap: widget.onTap,
           child: AnimatedContainer(
@@ -566,7 +576,10 @@ class _SettingsTVSelectorState extends State<_SettingsTVSelector> {
       child: Focus(
         onFocusChange: (f) => setState(() => _focused = f),
         onKeyEvent: (node, event) {
-          if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.enter)) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.select ||
+               event.logicalKey == LogicalKeyboardKey.enter ||
+               event.logicalKey == LogicalKeyboardKey.space)) {
             _cycle();
             return KeyEventResult.handled;
           }
@@ -643,6 +656,16 @@ class _SettingsTVSwitchState extends State<_SettingsTVSwitch> {
       padding: const EdgeInsets.only(bottom: 20),
       child: Focus(
         onFocusChange: (f) => setState(() => _focused = f),
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.select ||
+               event.logicalKey == LogicalKeyboardKey.enter ||
+               event.logicalKey == LogicalKeyboardKey.space)) {
+            widget.onChanged(!widget.value);
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
         child: GestureDetector(
           onTap: () => widget.onChanged(!widget.value),
           child: Container(

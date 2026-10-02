@@ -67,6 +67,8 @@ class FocusablePosterCard extends StatefulWidget {
   /// el número gigante del Top10): el scroll lo ancla al INICIO del elemento
   /// para que el número y su tarjeta se vean siempre juntos.
   final double anchorInset;
+  final FocusNode? focusNode;
+  final FocusOnKeyEventCallback? onKeyEvent;
 
   const FocusablePosterCard({
     super.key,
@@ -84,6 +86,8 @@ class FocusablePosterCard extends StatefulWidget {
     this.aspectRatio = 2 / 3,
     this.airingOverlay,
     this.anchorInset = 0.0,
+    this.focusNode,
+    this.onKeyEvent,
   });
 
   @override
@@ -105,6 +109,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: Focus(
+        focusNode: widget.focusNode,
         onFocusChange: (focused) {
           setState(() => _focused = focused);
           if (focused) {
@@ -118,6 +123,10 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
           }
         },
         onKeyEvent: (node, event) {
+          if (widget.onKeyEvent != null) {
+            final res = widget.onKeyEvent!(node, event);
+            if (res != KeyEventResult.ignored) return res;
+          }
           if (event is KeyDownEvent) {
             if (event.logicalKey == LogicalKeyboardKey.enter || 
                 event.logicalKey == LogicalKeyboardKey.select ||

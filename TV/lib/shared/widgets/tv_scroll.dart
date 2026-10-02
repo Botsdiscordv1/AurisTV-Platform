@@ -25,9 +25,10 @@ class TvScroll {
   /// inicio del ELEMENTO, no el del póster: número y tarjeta siempre juntos.
   static bool ensureCardVisible(
     BuildContext context, {
-    Duration duration = const Duration(milliseconds: 250),
-    Curve curve = Curves.easeOutQuart,
+    Duration duration = const Duration(milliseconds: 320),
+    Curve curve = Curves.fastOutSlowIn,
     double leadingInset = 0,
+    double alignment = 0.0,
   }) {
     final RenderObject? object = context.findRenderObject();
     if (object is! RenderBox || !object.attached) return false;
@@ -39,12 +40,11 @@ class TvScroll {
     if (!position.hasContentDimensions) return false;
 
     if (position.axis != Axis.horizontal) {
-      Scrollable.ensureVisible(
-        context,
-        alignment: 0.5,
-        duration: duration,
-        curve: curve,
-      );
+      final double contentTop = viewport.getOffsetToReveal(object, 0.0).offset;
+      final double target = (contentTop - 24.0)
+          .clamp(position.minScrollExtent, position.maxScrollExtent);
+      if ((target - position.pixels).abs() < 1.0) return false;
+      position.animateTo(target, duration: duration, curve: curve);
       return true;
     }
 
