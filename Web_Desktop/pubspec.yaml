@@ -87,6 +87,10 @@ flutter:
     - assets/branding/
     - assets/data/
     - assets/avatars/
+    - assets/collage/Anime/
+    - assets/collage/Kdrama/
+    - assets/collage/Pelicula/
+    - assets/collage/Serie/
     - assets/avatars/animes/dandadan/
     - assets/avatars/animes/kusuriya_no_hitorigoto/
     - assets/avatars/animes/sakamoto_days/

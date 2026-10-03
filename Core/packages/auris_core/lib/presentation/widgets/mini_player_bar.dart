@@ -211,9 +211,25 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
   Offset _clampPosition(Offset p, double w) {
     final size = MediaQuery.of(context).size;
     final h = _totalHeightFor(w);
+
+    final minX = _edgeMargin;
+    final maxX = size.width > (w + _edgeMargin)
+        ? size.width - w - _edgeMargin
+        : minX;
+
+    final minY = _topOffset;
+    final maxY = size.height > (h + _topOffset + _bottomOffset)
+        ? size.height - h - _bottomOffset
+        : minY;
+
+    final safeMinX = minX <= maxX ? minX : maxX;
+    final safeMaxX = minX <= maxX ? maxX : minX;
+    final safeMinY = minY <= maxY ? minY : maxY;
+    final safeMaxY = minY <= maxY ? maxY : minY;
+
     return Offset(
-      p.dx.clamp(_edgeMargin, (size.width - w - _edgeMargin).clamp(_edgeMargin, size.width)),
-      p.dy.clamp(_topOffset, (size.height - h - _bottomOffset).clamp(_topOffset, size.height)),
+      p.dx.clamp(safeMinX, safeMaxX),
+      p.dy.clamp(safeMinY, safeMaxY),
     );
   }
 
