@@ -1000,7 +1000,7 @@ class _PosterGridBackground extends StatelessWidget {
             maxHeight: double.infinity,
             child: Transform(
               alignment: Alignment.center,
-              filterQuality: FilterQuality.medium,
+              filterQuality: FilterQuality.high,
               transform: Matrix4.identity()
                 ..setEntry(3, 2, 0.0006)
                 ..rotateZ(-0.14)
@@ -1078,13 +1078,13 @@ class _PosterGridBackground extends StatelessWidget {
                                 ? Image.network(
                                     item.path,
                                     fit: BoxFit.cover,
-                                    filterQuality: FilterQuality.medium,
+                                    filterQuality: FilterQuality.high,
                                     errorBuilder: (_, __, ___) => _buildPlaceholder(),
                                   )
                                 : Image.asset(
                                     item.path,
                                     fit: BoxFit.cover,
-                                    filterQuality: FilterQuality.medium,
+                                    filterQuality: FilterQuality.high,
                                     errorBuilder: (_, __, ___) => _buildPlaceholder(),
                                   ),
                           );
