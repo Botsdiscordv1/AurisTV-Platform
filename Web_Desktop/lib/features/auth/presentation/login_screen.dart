@@ -1000,6 +1000,7 @@ class _PosterGridBackground extends StatelessWidget {
             maxHeight: double.infinity,
             child: Transform(
               alignment: Alignment.center,
+              filterQuality: FilterQuality.medium,
               transform: Matrix4.identity()
                 ..setEntry(3, 2, 0.0006)
                 ..rotateZ(-0.14)
@@ -1066,21 +1067,24 @@ class _PosterGridBackground extends StatelessWidget {
                               boxShadow: const [
                                 BoxShadow(
                                   color: Colors.black54,
-                                  blurRadius: 8,
+                                  blurRadius: 12,
+                                  spreadRadius: 1,
                                   offset: Offset(0, 4),
                                 ),
                               ],
                             ),
-                            clipBehavior: Clip.antiAlias,
+                            clipBehavior: Clip.antiAliasWithSaveLayer,
                             child: item.path.startsWith('http')
                                 ? Image.network(
                                     item.path,
                                     fit: BoxFit.cover,
+                                    filterQuality: FilterQuality.medium,
                                     errorBuilder: (_, __, ___) => _buildPlaceholder(),
                                   )
                                 : Image.asset(
                                     item.path,
                                     fit: BoxFit.cover,
+                                    filterQuality: FilterQuality.medium,
                                     errorBuilder: (_, __, ___) => _buildPlaceholder(),
                                   ),
                           );
