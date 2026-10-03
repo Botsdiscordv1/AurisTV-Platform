@@ -1030,9 +1030,10 @@ class _PosterGridBackground extends StatelessWidget {
                   final double progress = (t * speedFactor) % 1.0;
 
                   // Offset animation over 1 singleWidth for seamless loop
+                  // Round to nearest pixel to eliminate sub-pixel rendering jitter
                   final double dx = goesLeft
-                      ? -(progress * singleWidth)
-                      : -((1.0 - progress) * singleWidth);
+                      ? (-(progress * singleWidth)).roundToDouble()
+                      : (-((1.0 - progress) * singleWidth)).roundToDouble();
 
                   // Repeat 6 times so row total width (~15,000px) easily covers
                   // rotated screen boundaries on left (-7500px) and right (+5000px)
@@ -1060,20 +1061,24 @@ class _PosterGridBackground extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: const Color(0xFF141418),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.07),
-                                width: 0.8,
-                              ),
+                              // No border — thin borders cause sub-pixel jitter during translation
+                              // Depth is provided by surrounding shadows instead
                               boxShadow: const [
                                 BoxShadow(
+                                  color: Colors.black87,
+                                  blurRadius: 6,
+                                  spreadRadius: 0,
+                                  offset: Offset(0, 2),
+                                ),
+                                BoxShadow(
                                   color: Colors.black54,
-                                  blurRadius: 12,
-                                  spreadRadius: 1,
-                                  offset: Offset(0, 4),
+                                  blurRadius: 16,
+                                  spreadRadius: 2,
+                                  offset: Offset(0, 6),
                                 ),
                               ],
                             ),
-                            clipBehavior: Clip.antiAliasWithSaveLayer,
+                            clipBehavior: Clip.antiAlias,
                             child: item.path.startsWith('http')
                                 ? Image.network(
                                     item.path,
