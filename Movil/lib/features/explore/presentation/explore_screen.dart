@@ -183,7 +183,13 @@ class ExploreScreen extends ConsumerWidget {
                               isDense: true, // Senior Fix: Mejor centrado
                               hintText: 'Buscar...',
                               hintStyle: TextStyle(color: Colors.white38),
-                              prefixIcon: AurisIcon(AurisIcons.search, color: Colors.white38),
+                              prefixIcon: SizedBox(
+                                width: 44,
+                                height: 50,
+                                child: Center(
+                                  child: AurisIcon(AurisIcons.search, color: Colors.white38, size: 18),
+                                ),
+                              ),
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.zero, // Eliminamos padding manual que causa desfase
                             ),
@@ -216,7 +222,13 @@ class ExploreScreen extends ConsumerWidget {
                               color: const Color(0xFF1A1D23),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: AurisIcon(AurisIcons.grid, color: Color(0xFFEF7A1E)),
+                            child: Center(
+                              child: AurisIcon(
+                                AurisIcons.filter,
+                                color: Color(0xFFEF7A1E),
+                                size: 20,
+                              ),
+                            ),
                           ),
                         ),
                       ),

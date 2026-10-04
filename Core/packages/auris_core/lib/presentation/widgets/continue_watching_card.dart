@@ -298,12 +298,12 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                           duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
                           curve: Curves.easeOutQuint,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(4),
                             boxShadow: [],
                             border: Border.all(color: isActive ? Colors.white : Colors.transparent, width: isActive ? 2.5 : 0.0),
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(4),
                             child: Stack(
                               fit: StackFit.expand,
                               children: [

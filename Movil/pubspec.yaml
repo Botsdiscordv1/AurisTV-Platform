@@ -41,6 +41,7 @@ dependencies:
   # UI e Iconos
   cupertino_icons: ^1.0.8
   url_launcher: ^6.3.2
+  app_links: ^7.2.1
   package_info_plus: ^10.2.1
   flutter_markdown: ^0.7.3
   google_fonts: ^6.2.1

@@ -143,6 +143,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _showRightSkip = false;
   // double _lastGestureValue = 0.0;
   bool? _isBrightnessGesture;
+  Timer? _holdTimer;
+  bool _isHolding2x = false;
+  double _preHoldSpeed = 1.0;
+  bool _wasPlayingBeforeHold = false;
   double _lastAppliedBrightness = -1.0;
   double _lastAppliedVolume = -1.0;
   bool _showSeekIndicator = false;
@@ -1722,12 +1726,53 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
+  void _togglePlayPause() {
+    final wasPlaying = _player?.state.playing ?? false;
+    if (wasPlaying) {
+      _userHasPaused = true;
+      _player?.pause();
+      final ms = _player?.state.position.inMilliseconds ?? 0;
+      final duration = _player?.state.duration.inMilliseconds ?? 0;
+      if (ms > 3000 && duration > 0) {
+        _updateHistory(
+          positionMs: ms,
+          durationMs: duration,
+          force: true,
+        );
+      }
+    } else {
+      _userHasPaused = false;
+      _player?.play();
+    }
+    _toggleControls();
+  }
+
+  void _setHold2x(bool holding) {
+    if (_isHolding2x == holding) return;
+    if (mounted) {
+      setState(() {
+        _isHolding2x = holding;
+        if (holding) {
+          _wasPlayingBeforeHold = _player?.state.playing ?? false;
+          _preHoldSpeed = _playbackSpeed;
+          if (!_wasPlayingBeforeHold) {
+            _player?.play();
+          }
+          _player?.setRate(2.0);
+        } else {
+          _player?.setRate(_playbackSpeed);
+          if (!_wasPlayingBeforeHold) {
+            _player?.pause();
+          }
+        }
+      });
+    }
+  }
+
   KeyEventResult _handleKeyEvent(KeyEvent event) {
     final key = event.logicalKey;
     final isVolumeKey = key == LogicalKeyboardKey.audioVolumeUp || key == LogicalKeyboardKey.audioVolumeDown;
     
-    // Senior Elite Shield: Para las teclas de volumen, interceptamos TODO el ciclo de vida
-    // (KeyDown, KeyRepeat, KeyUp) para garantizar que el sistema nunca vea el evento.
     if (isVolumeKey) {
       if (event is KeyDownEvent || event is KeyRepeatEvent) {
         _handleVolumeStep((key == LogicalKeyboardKey.audioVolumeUp) ? 0.05 : -0.05);
@@ -1735,28 +1780,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return KeyEventResult.handled;
     }
 
+    if (key == LogicalKeyboardKey.space) {
+      if (_isLocked) return KeyEventResult.ignored;
+      if (event is KeyDownEvent) {
+        _holdTimer?.cancel();
+        _holdTimer = Timer(const Duration(milliseconds: 250), () {
+          _setHold2x(true);
+        });
+        return KeyEventResult.handled;
+      } else if (event is KeyRepeatEvent) {
+        if (!_isHolding2x) {
+          _setHold2x(true);
+        }
+        return KeyEventResult.handled;
+      } else if (event is KeyUpEvent) {
+        _holdTimer?.cancel();
+        if (_isHolding2x) {
+          _setHold2x(false);
+        } else {
+          _togglePlayPause();
+        }
+        return KeyEventResult.handled;
+      }
+    }
+
     if (event is KeyDownEvent) {
       if (_isLocked) return KeyEventResult.ignored;
       
-      if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) {
-        final wasPlaying = _player?.state.playing ?? false;
-        if (wasPlaying) {
-          _userHasPaused = true;
-          _player?.pause();
-          final ms = _player?.state.position.inMilliseconds ?? 0;
-          final duration = _player?.state.duration.inMilliseconds ?? 0;
-          if (ms > 3000 && duration > 0) {
-            _updateHistory(
-              positionMs: ms,
-              durationMs: duration,
-              force: true,
-            );
-          }
-        } else {
-          _userHasPaused = false;
-          _player?.play();
-        }
-        _toggleControls();
+      if (key == LogicalKeyboardKey.keyK) {
+        _togglePlayPause();
         return KeyEventResult.handled;
       } else if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) {
         _skipForward();
@@ -3908,7 +3960,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           _toggleFullscreen();
                           Timer(const Duration(milliseconds: 300), () => _ignoreNextPop = false);
                         } 
+                        _holdTimer?.cancel();
+                        _holdTimer = Timer(const Duration(milliseconds: 250), () {
+                          _setHold2x(true);
+                        });
                       }, 
+                      onPointerUp: (event) {
+                        _holdTimer?.cancel();
+                        if (_isHolding2x) {
+                          _setHold2x(false);
+                        }
+                      },
+                      onPointerCancel: (event) {
+                        _holdTimer?.cancel();
+                        if (_isHolding2x) {
+                          _setHold2x(false);
+                        }
+                      },
                       child: GestureDetector(
                         onTap: () {
                           if (_isLocked) return;
@@ -4315,8 +4383,50 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                  ),
                ),
              ),
+           // 2x Hold Capsule Overlay
+           _build2xHoldCapsule(),
          ],
        ),
+    );
+  }
+
+  Widget _build2xHoldCapsule() {
+    if (!_isHolding2x) return const SizedBox.shrink();
+    return Positioned(
+      top: 36,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: IgnorePointer(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  '2x',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                SizedBox(width: 6),
+                Icon(
+                  Icons.fast_forward_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

@@ -95,6 +95,7 @@ class AurisIcons {
 
   // Sistema / TV D-Pad y Cierre
   static String get close => reiconSvg(Reicon.outline.x);
+  static String get filter => reiconSvg(Reicon.outline.filter);
   static String get info => reiconSvg(Reicon.outline.infoCircle);
   static String get chevronLeft => reiconSvg(Reicon.outline.chevronLeft);
   static String get chevronRight => reiconSvg(Reicon.outline.chevronRight);

@@ -105,36 +105,71 @@ class AurisApp extends StatelessWidget {
   }
 }
 
-class GlobalMiniPlayerOverlay extends ConsumerWidget {
+class GlobalMiniPlayerOverlay extends ConsumerStatefulWidget {
   const GlobalMiniPlayerOverlay({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GlobalMiniPlayerOverlay> createState() => _GlobalMiniPlayerOverlayState();
+}
+
+class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverlay> {
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKey);
+    super.dispose();
+  }
+
+  bool _handleKey(KeyEvent event) {
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyI) {
+      if (WidgetsBinding.instance.focusManager.primaryFocus?.context?.widget is EditableText) {
+        return false;
+      }
+
+      final state = ref.read(activePlayerProvider);
+      if (state.uiState == PlayerUIState.mini) {
+        _expandMiniPlayer();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _expandMiniPlayer() {
+    final state = ref.read(activePlayerProvider);
+    if (state.currentItem != null) {
+      final player = PlayerScreen(
+        contentId: state.currentItem!.id,
+        sourceUrl: state.url ?? '',
+        source: state.source ?? '',
+        episode: state.episode,
+        season: state.season,
+        title: state.currentItem!.title,
+        posterUrl: state.currentItem!.posterUrl,
+        bannerUrl: state.currentItem!.bannerUrl,
+        logoUrl: state.currentItem!.logoUrl,
+        category: state.currentItem!.type.name,
+        serverName: state.source != null ? simplifySourceName(state.source!) : null,
+        totalEpisodes: state.availableEpisodes.isNotEmpty ? state.availableEpisodes.length : null,
+      );
+      
+      final navContext = rootNavigatorKey.currentContext;
+      if (navContext != null) {
+        ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
+        UrlUtils.openPlayer(navContext, player);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MiniPlayerBar(
-      onExpand: () {
-        final state = ref.read(activePlayerProvider);
-        if (state.currentItem != null) {
-          final player = PlayerScreen(
-            contentId: state.currentItem!.id,
-            sourceUrl: state.url ?? '',
-            source: state.source ?? '',
-            episode: state.episode,
-            season: state.season,
-            title: state.currentItem!.title,
-            posterUrl: state.currentItem!.posterUrl,
-            bannerUrl: state.currentItem!.bannerUrl,
-            logoUrl: state.currentItem!.logoUrl,
-            category: state.currentItem!.type.name,
-            serverName: state.source != null ? simplifySourceName(state.source!) : null,
-            totalEpisodes: state.availableEpisodes.isNotEmpty ? state.availableEpisodes.length : null,
-          );
-          
-          final navContext = rootNavigatorKey.currentContext;
-          if (navContext != null) {
-            UrlUtils.openPlayer(navContext, player);
-          }
-        }
-      },
+      onExpand: _expandMiniPlayer,
     );
   }
 }

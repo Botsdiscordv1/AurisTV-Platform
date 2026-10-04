@@ -34,10 +34,6 @@ class ProfileScreen extends ConsumerWidget {
             },
           ),
           IconButton(
-            icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 24),
-            onPressed: () => context.push('/search'),
-          ),
-          IconButton(
             icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 24),
             onPressed: () => context.push('/settings'),
           ),

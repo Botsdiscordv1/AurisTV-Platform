@@ -2590,7 +2590,7 @@ void _openPlayer(PlayerScreen player) {
     final double spacing = isMobile ? 8.0 : (isCompactScreen ? 8.0 : (width * 0.007).clamp(8.0, 14.0));
 
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8, horizontal: isMobile ? 0 : 4),
+      padding: EdgeInsets.symmetric(vertical: 0, horizontal: isMobile ? 0 : 4),
       child: isMobile
         ? SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -3426,11 +3426,11 @@ void _openPlayer(PlayerScreen player) {
     final double topPadding = isCompactHeader 
         ? (headerH * 0.22).clamp(70.0, 105.0) 
         : (headerH * 0.16).clamp(65.0, 95.0);
-    final bool hasLogo = detailData?.logo != null && detailData!.logo!.isNotEmpty;
-    final double gapLogoToMeta = isCompactHeader ? 6.0 : (hasLogo ? 20.0 : 10.0);
-    final double gapMetaToSynopsis = isCompactHeader ? 4.0 : (hasLogo ? 12.0 : 8.0);
-    final double gapSynopsisToActions = isCompactHeader ? 4.0 : 16.0;
-    final double gapActionsToSelectors = isCompactHeader ? 2.0 : 12.0;
+    final double headerGap = isCompactHeader ? 8.0 : 18.0;
+    final double gapLogoToMeta = headerGap;
+    final double gapMetaToSynopsis = headerGap;
+    final double gapSynopsisToActions = headerGap;
+    final double gapActionsToSelectors = headerGap;
     final double selectorWidth = isCompactHeader ? 220.0 : 320.0;
     final double selectorH = isCompactHeader ? 36.0 : (width * 0.026).clamp(42.0, 48.0);
     final double selectorFontSize = isCompactHeader ? 13.5 : (width * 0.009).clamp(14.0, 16.0);
@@ -3701,6 +3701,7 @@ void _openPlayer(PlayerScreen player) {
                             Wrap(
                               spacing: 12,
                               runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 _buildMainActionButton(context, isCompact: isCompactHeader),
                                 _buildCircularActions(context, isCompact: isCompactHeader),

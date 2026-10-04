@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+﻿import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,9 +9,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/theme/app_theme.dart';
 
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 //  Screen entry point
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -20,9 +20,12 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 enum _LoginStep {
-  welcome,  // Crunchyroll-style landing
-  qrPhone,  // QR code flow
-  remote,   // D-PAD keyboard flow
+  welcome,        // Crunchyroll-style landing
+  scanQR,         // Scan QR Code
+  activateCode,   // Activate with Code
+  loginEmail,     // Log In with Email
+  createAccount,  // Create Account
+  forgotPassword, // Forgot Password?
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen>
@@ -35,13 +38,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   TextEditingController? _activeController;
 
   // Focus nodes for TV D-PAD navigation
-  final FocusNode _loginBtnFocus  = FocusNode();
-  final FocusNode _remoteBtnFocus = FocusNode();
-  final FocusNode _backBtnFocus   = FocusNode();
-  final FocusNode _emailInputFocus = FocusNode();
-  final FocusNode _passInputFocus  = FocusNode();
-  final FocusNode _eyeBtnFocus     = FocusNode();
-  final FocusNode _submitBtnFocus  = FocusNode();
+  final FocusNode _loginBtnFocus      = FocusNode();
+  final FocusNode _backBtnFocus       = FocusNode();
+  final FocusNode _scanQrFocus        = FocusNode();
+  final FocusNode _activateCodeFocus  = FocusNode();
+  final FocusNode _loginEmailFocus    = FocusNode();
+  final FocusNode _createAccountFocus = FocusNode();
+  final FocusNode _forgotPassFocus    = FocusNode();
+  final FocusNode _emailInputFocus    = FocusNode();
+  final FocusNode _passInputFocus     = FocusNode();
+  final FocusNode _eyeBtnFocus        = FocusNode();
+  final FocusNode _submitBtnFocus     = FocusNode();
   bool _showPassword = false;
 
   // Page-level animation
@@ -71,8 +78,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _emailController.dispose();
     _passwordController.dispose();
     _loginBtnFocus.dispose();
-    _remoteBtnFocus.dispose();
     _backBtnFocus.dispose();
+    _scanQrFocus.dispose();
+    _activateCodeFocus.dispose();
+    _loginEmailFocus.dispose();
+    _createAccountFocus.dispose();
+    _forgotPassFocus.dispose();
     _emailInputFocus.dispose();
     _passInputFocus.dispose();
     _eyeBtnFocus.dispose();
@@ -82,7 +93,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   void _startActivationPolling() {
     _pollTimer?.cancel();
-    // Refresh activation code on each step entry
     setState(() {
       _activationCode = DeviceActivationService.generateCode();
     });
@@ -95,7 +105,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         _pollTimer = null;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Dispositivo activado con éxito! Iniciando sesión...'),
+            content: Text('¡Dispositivo activado con éxito! Iniciando sesión...'),
             backgroundColor: Color(0xFFEF7A1E),
           ),
         );
@@ -109,12 +119,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _pollTimer = null;
   }
 
-  void _goToStep(_LoginStep step) {
+  void _enterSubMenu(_LoginStep step) {
     _fadeCtrl.reset();
     setState(() => _step = step);
     _fadeCtrl.forward();
 
-    if (step == _LoginStep.qrPhone) {
+    if (step == _LoginStep.scanQR || step == _LoginStep.activateCode) {
       _startActivationPolling();
     } else {
       _stopActivationPolling();
@@ -122,21 +132,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        if (step == _LoginStep.remote) {
-          _emailInputFocus.requestFocus();
-        } else if (step == _LoginStep.qrPhone) {
-          _backBtnFocus.requestFocus();
+        if (step == _LoginStep.scanQR) {
+          _scanQrFocus.requestFocus();
+        } else if (step == _LoginStep.activateCode) {
+          _activateCodeFocus.requestFocus();
+        } else if (step == _LoginStep.loginEmail) {
+          _loginEmailFocus.requestFocus();
+        } else if (step == _LoginStep.createAccount) {
+          _createAccountFocus.requestFocus();
+        } else if (step == _LoginStep.forgotPassword) {
+          _forgotPassFocus.requestFocus();
+        } else if (step == _LoginStep.welcome) {
+          _loginBtnFocus.requestFocus();
         }
       }
     });
   }
 
+  void _selectSubMenu(_LoginStep step) {
+    if (_step == step) return;
+    setState(() => _step = step);
+
+    if (step == _LoginStep.scanQR || step == _LoginStep.activateCode) {
+      _startActivationPolling();
+    } else {
+      _stopActivationPolling();
+    }
+  }
+
   void _goBack() {
     if (_step != _LoginStep.welcome) {
-      _goToStep(_LoginStep.welcome);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _loginBtnFocus.requestFocus();
-      });
+      _enterSubMenu(_LoginStep.welcome);
     } else {
       context.pop();
     }
@@ -156,144 +182,141 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         body: FadeTransition(
           opacity: _fadeAnim,
           child: Stack(
-          children: [
-            // Full screen background image
-            Positioned.fill(
-              child: Image.asset(
-                'assets/icons/login_bg.jpg',
-                fit: BoxFit.cover,
+            children: [
+              // Full screen background: Collage on welcome, solid black on sub-menus
+              Positioned.fill(
+                child: _step == _LoginStep.welcome
+                    ? const CollageGridBackground()
+                    : const ColoredBox(color: Color(0xFF000000)),
               ),
-            ),
 
-            // Subtle ambient shadow on left side only to ensure white text pops crisp
-            const Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    stops: [0.0, 0.45, 1.0],
-                    colors: [
-                      Color(0x990A0A0A),
-                      Color(0x330A0A0A),
-                      Colors.transparent,
-                    ],
+              // Subtle ambient shadow on left side
+              const Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      stops: [0.0, 0.45, 1.0],
+                      colors: [
+                        Color(0x990A0A0A),
+                        Color(0x330A0A0A),
+                        Colors.transparent,
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // Mascot PNG (transparent bg) right side
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              width: size.width * 0.52,
-              child: _MascotPanel(step: _step),
-            ),
+              if (_step == _LoginStep.welcome) ...[
+                // Mascot PNG (transparent bg) right side
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: size.width * 0.52,
+                  child: _MascotPanel(step: _step),
+                ),
 
-            // ── Content – left half ──
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: size.width * 0.58,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(64, 0, 24, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 52),
-
-                    // Header: Back Button (if active) + Logo
-                    Row(
+                // Content – left half
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: size.width * 0.58,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(64, 0, 24, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_step != _LoginStep.welcome) ...[
-                          _CircleBackButton(
-                            focusNode: _backBtnFocus,
-                            onPressed: _goBack,
-                          ),
-                          const SizedBox(width: 18),
-                        ],
+                        const SizedBox(height: 52),
                         SvgPicture.asset(
                           'assets/icons/auris-logo-web-flat.svg',
                           height: 38,
                           alignment: Alignment.centerLeft,
                         ),
+                        Expanded(
+                          child: Align(
+                            alignment: const Alignment(-1, -0.15),
+                            child: _buildWelcomeStep(),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 36),
+                          child: Text(
+                            'Al usar AurisTV aceptas nuestros Terminos de Uso y Politica de Privacidad.',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              height: 1.55,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-
-                    // Content area: Expanded so layout never shifts due to AnimatedSwitcher size changes
-                    Expanded(
-                      child: Align(
-                        alignment: const Alignment(-1, -0.15),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 260),
-                          switchInCurve: Curves.easeOut,
-                          switchOutCurve: Curves.easeOut,
-                          transitionBuilder: (child, anim) {
-                            return FadeTransition(
-                              opacity: anim,
-                              child: child,
-                            );
-                          },
-                          layoutBuilder: (currentChild, previousChildren) {
-                            return Stack(
-                              alignment: Alignment.topLeft,
-                              clipBehavior: Clip.none,
-                              children: <Widget>[
-                                // Previous children rendered with overflow, no effect on layout
-                                ...previousChildren.map((child) => Positioned(
-                                  top: 0, left: 0,
-                                  child: IgnorePointer(child: child),
-                                )),
-                                if (currentChild != null) currentChild,
-                              ],
-                            );
-                          },
-                          child: _buildStepContent(),
-                        ),
-                      ),
+                  ),
+                ),
+              ] else ...[
+                // Sub-menu layout: Left Sidebar + Right Content
+                Row(
+                  children: [
+                    _LoginSidebar(
+                      currentStep: _step,
+                      backFocus: _backBtnFocus,
+                      scanQrFocus: _scanQrFocus,
+                      activateCodeFocus: _activateCodeFocus,
+                      loginEmailFocus: _loginEmailFocus,
+                      createAccountFocus: _createAccountFocus,
+                      forgotPassFocus: _forgotPassFocus,
+                      onBack: _goBack,
+                      onSelectStep: _selectSubMenu,
                     ),
-
-                    // Legal footer
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 36),
-                      child: Text(
-                        'Al usar AurisTV aceptas nuestros Terminos de Uso y Politica de Privacidad.',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          height: 1.55,
+                    Expanded(
+                      child: Container(
+                        color: Colors.transparent,
+                        padding: const EdgeInsets.fromLTRB(64, 52, 64, 36),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Align(
+                                alignment: _step == _LoginStep.scanQR
+                                    ? const Alignment(0, -0.15)
+                                    : const Alignment(-1, -0.15),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 220),
+                                  switchInCurve: Curves.easeOut,
+                                  switchOutCurve: Curves.easeOut,
+                                  transitionBuilder: (child, anim) {
+                                    return FadeTransition(
+                                      opacity: anim,
+                                      child: child,
+                                    );
+                                  },
+                                  child: KeyedSubtree(
+                                    key: ValueKey(_step),
+                                    child: _buildSubMenuContent(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ),
-
-
-          ],
+              ],
+            ],
           ),
         ),
       ),
     );
   }
 
-  // ─────────────────────────────────────────
-  Widget _buildStepContent() {
-    switch (_step) {
-      case _LoginStep.welcome:
-        return _buildWelcomeStep();
-      case _LoginStep.qrPhone:
-        return _buildQRStep();
-      case _LoginStep.remote:
-        return _buildRemoteStep();
-    }
-  }
-
-  // ── WELCOME ───────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────────
+  //  Welcome Step
+  // ─────────────────────────────────────────────────────────────────────────────
   Widget _buildWelcomeStep() {
     return Column(
       key: const ValueKey('welcome'),
@@ -301,7 +324,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          'Bienvenido!',
+          '¡Bienvenido!',
           style: TextStyle(
             color: Colors.white,
             fontSize: 40,
@@ -320,39 +343,96 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 52),
 
-        // Primary – ACCEDER (QR)
+        // ACCEDER -> Opens Scan QR Code step
         _BigButton(
           focusNode: _loginBtnFocus,
           label: 'ACCEDER',
           filled: true,
-          nextFocus: _remoteBtnFocus,
-          onPressed: () => _goToStep(_LoginStep.qrPhone),
-        ),
-        const SizedBox(height: 10),
-
-        // Secondary – CONTROL REMOTO
-        _BigButton(
-          focusNode: _remoteBtnFocus,
-          label: 'USAR CONTROL REMOTO',
-          filled: false,
-          prevFocus: _loginBtnFocus,
-          onPressed: () => _goToStep(_LoginStep.remote),
+          onPressed: () => _enterSubMenu(_LoginStep.scanQR),
         ),
       ],
     );
   }
 
-  // ── QR / PHONE ────────────────────────────
-  Widget _buildQRStep() {
-    final activateUrl = 'https://auristv.dpdns.org/activate?code=$_activationCode';
+  // ─────────────────────────────────────────────────────────────────────────────
+  //  Sub-Menu Content Switcher
+  // ─────────────────────────────────────────────────────────────────────────────
+  Widget _buildSubMenuContent() {
+    switch (_step) {
+      case _LoginStep.scanQR:
+        return _buildScanQRStep();
+      case _LoginStep.activateCode:
+        return _buildActivateCodeStep();
+      case _LoginStep.loginEmail:
+        return _buildLoginEmailStep();
+      case _LoginStep.createAccount:
+        return _buildCreateAccountStep();
+      case _LoginStep.forgotPassword:
+        return _buildForgotPassStep();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // 1. Scan QR Code
+  Widget _buildScanQRStep() {
+    final qrDirectUrl = 'auristv://activate?code=$_activationCode';
 
     return Column(
-      key: const ValueKey('qr'),
+      key: const ValueKey('scan_qr'),
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Iniciar sesión en AurisTV',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 26,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 32),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: QrImageView(
+            data: qrDirectUrl,
+            version: QrVersions.auto,
+            size: 165,
+          ),
+        ),
+        const SizedBox(height: 32),
+        SizedBox(
+          width: 420,
+          child: Text(
+            'Escanea el código QR con la cámara de tu teléfono para iniciar sesión automáticamente.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.95),
+              fontSize: 16,
+              height: 1.45,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 2. Activate with Code
+  Widget _buildActivateCodeStep() {
+    return Column(
+      key: const ValueKey('activate_code'),
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          'Acceder a AurisTV',
+          'Iniciar sesión en AurisTV',
           style: TextStyle(
             color: Colors.white,
             fontSize: 28,
@@ -361,79 +441,185 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
         ),
         const SizedBox(height: 24),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // QR code - dynamic link to activate URL
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
+        const _StepRow(
+          n: '1',
+          text: 'Entra a: auristv.dpdns.org/activate',
+        ),
+        const SizedBox(height: 14),
+        const _StepRow(
+          n: '2',
+          text: 'Introduce este código:',
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.only(left: 38),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _activationCode.length == 6
+                  ? '${_activationCode.substring(0, 3)} - ${_activationCode.substring(3)}'
+                  : _activationCode,
+              style: const TextStyle(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: QrImageView(
-                data: activateUrl,
-                version: QrVersions.auto,
-                size: 165,
+                fontSize: 38,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 6,
               ),
             ),
-            const SizedBox(width: 32),
+          ),
+        ),
+        const SizedBox(height: 14),
+        const _StepRow(
+          n: '3',
+          text: 'Permanece en esta pantalla y la TV iniciará sesión automáticamente.',
+        ),
+      ],
+    );
+  }
 
-            // Instructions - Crunchyroll style activation flow
+  // 3. Log In with Email
+  Widget _buildLoginEmailStep() {
+    return Column(
+      key: const ValueKey('login_email'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Iniciar sesión en AurisTV',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Email Address Label
+        const Text(
+          'Correo electrónico',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _TVCleanTextField(
+          focusNode: _emailInputFocus,
+          controller: _emailController,
+          hintText: 'ejemplo@auristv.com',
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          nextFocus: _passInputFocus,
+          prevFocus: _loginEmailFocus,
+        ),
+        const SizedBox(height: 20),
+
+        // Password Label
+        const Text(
+          'Contraseña',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _StepRow(
-                    n: '1',
-                    text: 'Ingresa en tu navegador o escanea el QR a:',
-                  ),
-                  const SizedBox(height: 4),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 38),
-                    child: Text(
-                      'auristv.dpdns.org/activate',
-                      style: TextStyle(
-                        color: AppTheme.brand,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const _StepRow(
-                    n: '2',
-                    text: 'Introduce este codigo de activacion:',
-                  ),
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 38),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        _activationCode.length == 6
-                            ? '${_activationCode.substring(0, 3)} - ${_activationCode.substring(3)}'
-                            : _activationCode,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 38,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 6,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const _StepRow(
-                    n: '3',
-                    text: 'Permanece en esta pantalla y la TV iniciara sesion automaticamente.',
-                  ),
-                ],
+              child: _TVCleanTextField(
+                focusNode: _passInputFocus,
+                controller: _passwordController,
+                hintText: '••••••••',
+                obscureText: !_showPassword,
+                textInputAction: TextInputAction.done,
+                prevFocus: _emailInputFocus,
+                nextFocus: _submitBtnFocus,
+                rightFocus: _eyeBtnFocus,
+                onSubmitted: (_) => _performManualLogin(),
               ),
+            ),
+            const SizedBox(width: 12),
+            _EyeToggleButton(
+              focusNode: _eyeBtnFocus,
+              showPassword: _showPassword,
+              leftFocus: _passInputFocus,
+              prevFocus: _emailInputFocus,
+              nextFocus: _submitBtnFocus,
+              onToggle: () => setState(() => _showPassword = !_showPassword),
             ),
           ],
+        ),
+        const SizedBox(height: 28),
+
+        // LOG IN Button
+        _BigButton(
+          focusNode: _submitBtnFocus,
+          label: 'INICIAR SESIÓN',
+          filled: true,
+          prevFocus: _passInputFocus,
+          onPressed: _performManualLogin,
+        ),
+      ],
+    );
+  }
+
+  // 4. Create Account
+  Widget _buildCreateAccountStep() {
+    return Column(
+      key: const ValueKey('create_account'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Crear cuenta',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Visita auristv.dpdns.org/register para crear una cuenta nueva y disfrutar de todo el contenido de AurisTV en tu televisor.',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.85),
+            fontSize: 18,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 5. Forgot Password?
+  Widget _buildForgotPassStep() {
+    return Column(
+      key: const ValueKey('forgot_pass'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          '¿Olvidaste tu contraseña?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Visita auristv.dpdns.org/reset para restablecer tu contraseña y recuperar el acceso a tu cuenta.',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.85),
+            fontSize: 18,
+            height: 1.5,
+          ),
         ),
       ],
     );
@@ -478,122 +664,288 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       }
     }
   }
+}
 
-  // ── REMOTE / MANUAL LOGIN (Crunchyroll Clean Transparent Style) ─────────────────────
-  Widget _buildRemoteStep() {
-    return Column(
-      key: const ValueKey('remote'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text(
-          'Iniciar sesión en AurisTV',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 26,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.3,
+// ─────────────────────────────────────────────────────────────────────────────
+//  Sidebar Navigation Menu (Crunchyroll Style)
+// ─────────────────────────────────────────────────────────────────────────────
+class _LoginSidebar extends StatelessWidget {
+  final _LoginStep currentStep;
+  final FocusNode backFocus;
+  final FocusNode scanQrFocus;
+  final FocusNode activateCodeFocus;
+  final FocusNode loginEmailFocus;
+  final FocusNode createAccountFocus;
+  final FocusNode forgotPassFocus;
+  final VoidCallback onBack;
+  final ValueChanged<_LoginStep> onSelectStep;
+
+  const _LoginSidebar({
+    required this.currentStep,
+    required this.backFocus,
+    required this.scanQrFocus,
+    required this.activateCodeFocus,
+    required this.loginEmailFocus,
+    required this.createAccountFocus,
+    required this.forgotPassFocus,
+    required this.onBack,
+    required this.onSelectStep,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 380,
+      color: const Color(0xFF14141E),
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SidebarBackButton(
+            focusNode: backFocus,
+            onPressed: onBack,
+            nextFocus: scanQrFocus,
           ),
-        ),
-        const SizedBox(height: 24),
-
-        // Email Address Label
-        const Text(
-          'Correo electrónico',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
+          const SizedBox(height: 36),
+          _SidebarMenuItem(
+            focusNode: scanQrFocus,
+            label: 'Escanear código QR',
+            isSelected: currentStep == _LoginStep.scanQR,
+            prevFocus: backFocus,
+            nextFocus: activateCodeFocus,
+            onFocus: () => onSelectStep(_LoginStep.scanQR),
+            onPressed: () => onSelectStep(_LoginStep.scanQR),
           ),
-        ),
-        const SizedBox(height: 8),
-        _TVCleanTextField(
-          focusNode: _emailInputFocus,
-          controller: _emailController,
-          hintText: 'ejemplo@auristv.com',
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-          nextFocus: _passInputFocus,
-          prevFocus: _backBtnFocus,
-        ),
-        const SizedBox(height: 20),
-
-        // Password Label
-        const Text(
-          'Contraseña',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
+          const SizedBox(height: 12),
+          _SidebarMenuItem(
+            focusNode: activateCodeFocus,
+            label: 'Activar con código',
+            isSelected: currentStep == _LoginStep.activateCode,
+            prevFocus: scanQrFocus,
+            nextFocus: loginEmailFocus,
+            onFocus: () => onSelectStep(_LoginStep.activateCode),
+            onPressed: () => onSelectStep(_LoginStep.activateCode),
           ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _TVCleanTextField(
-                focusNode: _passInputFocus,
-                controller: _passwordController,
-                hintText: '••••••••',
-                obscureText: !_showPassword,
-                textInputAction: TextInputAction.done,
-                prevFocus: _emailInputFocus,
-                nextFocus: _submitBtnFocus,
-                rightFocus: _eyeBtnFocus,
-                onSubmitted: (_) => _performManualLogin(),
-              ),
-            ),
-            const SizedBox(width: 12),
-            _EyeToggleButton(
-              focusNode: _eyeBtnFocus,
-              showPassword: _showPassword,
-              leftFocus: _passInputFocus,
-              prevFocus: _emailInputFocus,
-              nextFocus: _submitBtnFocus,
-              onToggle: () => setState(() => _showPassword = !_showPassword),
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-
-        // LOG IN Button
-        _BigButton(
-          focusNode: _submitBtnFocus,
-          label: 'INICIAR SESIÓN',
-          filled: true,
-          prevFocus: _passInputFocus,
-          onPressed: _performManualLogin,
-        ),
-      ],
+          const SizedBox(height: 12),
+          _SidebarMenuItem(
+            focusNode: loginEmailFocus,
+            label: 'Iniciar sesión con email',
+            isSelected: currentStep == _LoginStep.loginEmail,
+            prevFocus: activateCodeFocus,
+            nextFocus: createAccountFocus,
+            onFocus: () => onSelectStep(_LoginStep.loginEmail),
+            onPressed: () => onSelectStep(_LoginStep.loginEmail),
+          ),
+          const SizedBox(height: 12),
+          _SidebarMenuItem(
+            focusNode: createAccountFocus,
+            label: 'Crear cuenta',
+            isSelected: currentStep == _LoginStep.createAccount,
+            prevFocus: loginEmailFocus,
+            nextFocus: forgotPassFocus,
+            onFocus: () => onSelectStep(_LoginStep.createAccount),
+            onPressed: () => onSelectStep(_LoginStep.createAccount),
+          ),
+          const SizedBox(height: 12),
+          _SidebarMenuItem(
+            focusNode: forgotPassFocus,
+            label: '¿Olvidaste tu contraseña?',
+            isSelected: currentStep == _LoginStep.forgotPassword,
+            prevFocus: createAccountFocus,
+            onFocus: () => onSelectStep(_LoginStep.forgotPassword),
+            onPressed: () => onSelectStep(_LoginStep.forgotPassword),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ─────────────────────────────────────────────
-//  Mascot panel (right side)
-// ─────────────────────────────────────────────
+class _SidebarBackButton extends StatefulWidget {
+  final FocusNode focusNode;
+  final VoidCallback onPressed;
+  final FocusNode? nextFocus;
+
+  const _SidebarBackButton({
+    required this.focusNode,
+    required this.onPressed,
+    this.nextFocus,
+  });
+
+  @override
+  State<_SidebarBackButton> createState() => _SidebarBackButtonState();
+}
+
+class _SidebarBackButtonState extends State<_SidebarBackButton> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _focused = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowDown && widget.nextFocus != null) {
+            widget.nextFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: _focused ? AppTheme.brand : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '← VOLVER',
+                style: TextStyle(
+                  color: _focused ? Colors.black : Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarMenuItem extends StatefulWidget {
+  final FocusNode focusNode;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onFocus;
+  final VoidCallback onPressed;
+  final FocusNode? prevFocus;
+  final FocusNode? nextFocus;
+
+  const _SidebarMenuItem({
+    required this.focusNode,
+    required this.label,
+    required this.isSelected,
+    required this.onFocus,
+    required this.onPressed,
+    this.prevFocus,
+    this.nextFocus,
+  });
+
+  @override
+  State<_SidebarMenuItem> createState() => _SidebarMenuItemState();
+}
+
+class _SidebarMenuItemState extends State<_SidebarMenuItem> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) {
+        setState(() => _focused = f);
+        if (f) {
+          widget.onFocus();
+        }
+      },
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowDown && widget.nextFocus != null) {
+            widget.nextFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowUp && widget.prevFocus != null) {
+            widget.prevFocus!.requestFocus();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: () {
+          widget.focusNode.requestFocus();
+          widget.onPressed();
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: _focused ? AppTheme.brand : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: _focused ? Colors.black : (widget.isSelected ? Colors.white : Colors.white70),
+              fontSize: 16,
+              fontWeight: widget.isSelected || _focused ? FontWeight.w900 : FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Mascot panel (right side in welcome step)
+// ─────────────────────────────────────────────────────────────────────────────
 class _MascotPanel extends StatelessWidget {
   final _LoginStep step;
   const _MascotPanel({required this.step});
 
   @override
   Widget build(BuildContext context) {
+    final isWelcome = step == _LoginStep.welcome;
     return AnimatedOpacity(
-      opacity: step == _LoginStep.welcome ? 1.0 : 0.25,
+      opacity: isWelcome ? 1.0 : 0.25,
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      child: Image.asset(
-        'assets/icons/login_mascot.png',
-        fit: BoxFit.contain,
+      child: Align(
         alignment: Alignment.bottomCenter,
+        child: AnimatedFractionallySizedBox(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+          heightFactor: isWelcome ? 0.8 : 1.0,
+          alignment: Alignment.bottomCenter,
+          child: Image.asset(
+            'assets/icons/login_mascot.png',
+            fit: BoxFit.contain,
+            alignment: Alignment.bottomCenter,
+          ),
+        ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────
-//  Big welcome button (ACCEDER / CONTROL REMOTO)
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  Big welcome / action button
+// ─────────────────────────────────────────────────────────────────────────────
 class _BigButton extends StatefulWidget {
   final FocusNode focusNode;
   final String label;
@@ -675,64 +1027,9 @@ class _BigButtonState extends State<_BigButton> {
   }
 }
 
-// ─────────────────────────────────────────────
-//  Circular back button
-// ─────────────────────────────────────────────
-class _CircleBackButton extends StatefulWidget {
-  final FocusNode focusNode;
-  final VoidCallback onPressed;
-  const _CircleBackButton({required this.focusNode, required this.onPressed});
-
-  @override
-  State<_CircleBackButton> createState() => _CircleBackButtonState();
-}
-
-class _CircleBackButtonState extends State<_CircleBackButton> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      focusNode: widget.focusNode,
-      onFocusChange: (f) => setState(() => _focused = f),
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.enter ||
-             event.logicalKey == LogicalKeyboardKey.select)) {
-          widget.onPressed();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: _focused
-                ? Colors.white.withOpacity(0.18)
-                : Colors.white.withOpacity(0.08),
-            border: Border.all(
-              color: _focused ? Colors.white : Colors.white24,
-              width: _focused ? 2 : 1.5,
-            ),
-          ),
-          child: Center(
-            child: AurisIcon(AurisIcons.chevronLeft,
-                color: Colors.white, size: 16),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  QR step row  (number + text)
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  QR step row (number + text)
+// ─────────────────────────────────────────────────────────────────────────────
 class _StepRow extends StatelessWidget {
   final String n;
   final String text;
@@ -744,33 +1041,33 @@ class _StepRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 26,
-          height: 26,
+          width: 30,
+          height: 30,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: AppTheme.brand.withOpacity(0.18),
-            border: Border.all(color: AppTheme.brand, width: 1.5),
+            border: Border.all(color: Colors.white, width: 2),
           ),
-          alignment: Alignment.center,
           child: Text(
             n,
-            style: TextStyle(
-              color: AppTheme.brand,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 14),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.only(top: 3),
+            padding: const EdgeInsets.only(top: 4),
             child: Text(
               text,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                height: 1.45,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
               ),
             ),
           ),
@@ -780,262 +1077,31 @@ class _StepRow extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────
-//  TV input field  (D-PAD selectable)
-// ─────────────────────────────────────────────
-class _TVInputField extends StatefulWidget {
-  final String label;
-  final TextEditingController controller;
-  final IconData icon;
-  final bool isPassword;
-  final bool isActive;
-  final VoidCallback onFocused;
-
-  const _TVInputField({
-    required this.label,
-    required this.controller,
-    required this.icon,
-    required this.isActive,
-    required this.onFocused,
-    this.isPassword = false,
-  });
-
-  @override
-  State<_TVInputField> createState() => _TVInputFieldState();
-}
-
-class _TVInputFieldState extends State<_TVInputField> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = widget.isPassword
-        ? '•' * widget.controller.text.length
-        : widget.controller.text;
-
-    return Focus(
-      onFocusChange: (f) {
-        setState(() => _focused = f);
-        if (f) widget.onFocused();
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        height: 44,
-        decoration: BoxDecoration(
-          color: _focused
-              ? Colors.white.withOpacity(0.10)
-              : Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: _focused ? Colors.white : Colors.transparent,
-            width: _focused ? 2.0 : 1.0,
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            Icon(widget.icon,
-                color: _focused ? AppTheme.brand : Colors.white38,
-                size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                text.isEmpty ? widget.label : text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: text.isEmpty ? Colors.white38 : Colors.white,
-                  fontSize: 15,
-                ),
-              ),
-            ),
-            // Active indicator
-            if (widget.isActive)
-              Container(
-                width: 2,
-                height: 18,
-                color: AppTheme.brand,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  TV on-screen keyboard
-// ─────────────────────────────────────────────
-class _TVKeyboard extends StatefulWidget {
-  final void Function(String key) onKey;
-  final VoidCallback onConfirm;
-  const _TVKeyboard({required this.onKey, required this.onConfirm});
-
-  @override
-  State<_TVKeyboard> createState() => _TVKeyboardState();
-}
-
-class _TVKeyboardState extends State<_TVKeyboard> {
-  bool _caps = false;
-
-  static const _rows = [
-    ['1','2','3','4','5','6','7','8','9','0'],
-    ['q','w','e','r','t','y','u','i','o','p'],
-    ['a','s','d','f','g','h','j','k','l','⌫'],
-    ['⇧','z','x','c','v','b','n','m','.','@'],
-    ['ESPACIO', 'ACEPTAR'],
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: _rows.map((row) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: row.map((k) {
-              final isBS     = k == '⌫';
-              final isCaps   = k == '⇧';
-              final isSpace  = k == 'ESPACIO';
-              final isOk     = k == 'ACEPTAR';
-              final label    = (!isBS && !isCaps && !isSpace && !isOk && _caps)
-                  ? k.toUpperCase() : k;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2.5),
-                child: _Key(
-                  label: label,
-                  isSpecial: isBS || isCaps,
-                  isOk: isOk,
-                  isSpace: isSpace,
-                  onPressed: () {
-                    if (isCaps) {
-                      setState(() => _caps = !_caps);
-                    } else if (isSpace) {
-                      widget.onKey(' ');
-                    } else if (isOk) {
-                      widget.onConfirm();
-                    } else {
-                      widget.onKey(_caps ? k.toUpperCase() : k);
-                    }
-                  },
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _Key extends StatefulWidget {
-  final String label;
-  final bool isSpecial;
-  final bool isOk;
-  final bool isSpace;
-  final VoidCallback onPressed;
-
-  const _Key({
-    required this.label,
-    required this.onPressed,
-    this.isSpecial = false,
-    this.isOk      = false,
-    this.isSpace    = false,
-  });
-
-  @override
-  State<_Key> createState() => _KeyState();
-}
-
-class _KeyState extends State<_Key> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final w = widget.isSpace
-        ? 130.0
-        : widget.isOk
-            ? 84.0
-            : widget.isSpecial
-                ? 46.0
-                : 36.0;
-
-    return Focus(
-      onFocusChange: (f) => setState(() => _focused = f),
-      onKeyEvent: (_, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.enter  ||
-             event.logicalKey == LogicalKeyboardKey.select ||
-             event.logicalKey == LogicalKeyboardKey.space)) {
-          widget.onPressed();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 110),
-          width: w,
-          height: 32,
-          decoration: BoxDecoration(
-            color: widget.isOk
-                ? (_focused ? AppTheme.brandLight : AppTheme.brand)
-                : _focused
-                    ? Colors.white
-                    : const Color(0x17FFFFFF),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: _focused ? AppTheme.brand : const Color(0x2EFFFFFF),
-              width: _focused ? 2.0 : 1.0,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              color: widget.isOk
-                  ? (_focused ? Colors.black : Colors.white)
-                  : (_focused ? Colors.black : Colors.white70),
-              fontSize: 13,
-              fontWeight: _focused ? FontWeight.w900 : FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  Clean TV Text Field (Crunchyroll Style)
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  Clean TV Text Field
+// ─────────────────────────────────────────────────────────────────────────────
 class _TVCleanTextField extends StatefulWidget {
   final FocusNode focusNode;
   final TextEditingController controller;
   final String hintText;
+  final TextInputType keyboardType;
+  final TextInputAction textInputAction;
   final bool obscureText;
-  final TextInputType? keyboardType;
-  final TextInputAction? textInputAction;
   final FocusNode? nextFocus;
   final FocusNode? prevFocus;
   final FocusNode? rightFocus;
-  final FocusNode? leftFocus;
   final ValueChanged<String>? onSubmitted;
 
   const _TVCleanTextField({
     required this.focusNode,
     required this.controller,
     required this.hintText,
+    this.keyboardType = TextInputType.text,
+    this.textInputAction = TextInputAction.next,
     this.obscureText = false,
-    this.keyboardType,
-    this.textInputAction,
     this.nextFocus,
     this.prevFocus,
     this.rightFocus,
-    this.leftFocus,
     this.onSubmitted,
   });
 
@@ -1047,37 +1113,10 @@ class _TVCleanTextFieldState extends State<_TVCleanTextField> {
   bool _focused = false;
 
   @override
-  void initState() {
-    super.initState();
-    widget.focusNode.addListener(_handleFocusChange);
-    _focused = widget.focusNode.hasFocus;
-  }
-
-  @override
-  void didUpdateWidget(covariant _TVCleanTextField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusNode != widget.focusNode) {
-      oldWidget.focusNode.removeListener(_handleFocusChange);
-      widget.focusNode.addListener(_handleFocusChange);
-      _focused = widget.focusNode.hasFocus;
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.focusNode.removeListener(_handleFocusChange);
-    super.dispose();
-  }
-
-  void _handleFocusChange() {
-    if (mounted && _focused != widget.focusNode.hasFocus) {
-      setState(() => _focused = widget.focusNode.hasFocus);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _focused = f),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent) {
           final key = event.logicalKey;
@@ -1093,87 +1132,52 @@ class _TVCleanTextFieldState extends State<_TVCleanTextField> {
             widget.rightFocus!.requestFocus();
             return KeyEventResult.handled;
           }
-          if (key == LogicalKeyboardKey.arrowLeft && widget.leftFocus != null) {
-            widget.leftFocus!.requestFocus();
-            return KeyEventResult.handled;
-          }
         }
         return KeyEventResult.ignored;
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
+        width: 420,
         height: 48,
         decoration: BoxDecoration(
-          color: _focused ? const Color(0xFF272E42) : const Color(0xFF191B26),
-          borderRadius: BorderRadius.zero,
+          color: Colors.white.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: _focused ? AppTheme.brand : Colors.white12,
-            width: _focused ? 3.2 : 1.0,
+            color: _focused ? AppTheme.brand : Colors.white24,
+            width: _focused ? 2.5 : 1.5,
           ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Center(
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              inputDecorationTheme: const InputDecorationTheme(
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
-                filled: false,
-                fillColor: Colors.transparent,
-                focusColor: Colors.transparent,
-                hoverColor: Colors.transparent,
-              ),
-            ),
-            child: TextField(
-              controller: widget.controller,
-              focusNode: widget.focusNode,
-              obscureText: widget.obscureText,
-              keyboardType: widget.keyboardType,
-              textInputAction: widget.textInputAction,
-              cursorColor: AppTheme.brand,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-              decoration: InputDecoration(
-                hintText: widget.hintText,
-                hintStyle: const TextStyle(color: Colors.white38, fontSize: 15),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
-                filled: false,
-                fillColor: Colors.transparent,
-                focusColor: Colors.transparent,
-                hoverColor: Colors.transparent,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-              onSubmitted: (val) {
-                if (widget.nextFocus != null) {
-                  widget.nextFocus!.requestFocus();
-                } else if (widget.onSubmitted != null) {
-                  widget.onSubmitted!(val);
-                }
-              },
-            ),
+        alignment: Alignment.centerLeft,
+        child: TextField(
+          controller: widget.controller,
+          focusNode: widget.focusNode,
+          keyboardType: widget.keyboardType,
+          textInputAction: widget.textInputAction,
+          obscureText: widget.obscureText,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
           ),
+          decoration: InputDecoration(
+            hintText: widget.hintText,
+            hintStyle: TextStyle(
+              color: Colors.white.withOpacity(0.35),
+              fontSize: 15,
+            ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          onSubmitted: widget.onSubmitted,
         ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────
-//  Eye Password Toggle Button
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  Eye Toggle Button for Password
+// ─────────────────────────────────────────────────────────────────────────────
 class _EyeToggleButton extends StatefulWidget {
   final FocusNode focusNode;
   final bool showPassword;
@@ -1234,17 +1238,19 @@ class _EyeToggleButtonState extends State<_EyeToggleButton> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: _focused ? const Color(0xFF2C3246) : const Color(0xFF1E2230),
-            borderRadius: BorderRadius.zero,
+            color: _focused ? AppTheme.brand : Colors.white.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: _focused ? AppTheme.brand : Colors.white12,
-              width: _focused ? 3.2 : 1.0,
+              color: _focused ? AppTheme.brand : Colors.white24,
+              width: 2,
             ),
           ),
-          child: Icon(
-            widget.showPassword ? Icons.visibility_off : Icons.visibility,
-            color: _focused ? AppTheme.brand : Colors.white70,
-            size: 22,
+          child: Center(
+            child: Icon(
+              widget.showPassword ? Icons.visibility_off : Icons.visibility,
+              color: _focused ? Colors.black : Colors.white,
+              size: 20,
+            ),
           ),
         ),
       ),
