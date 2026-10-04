@@ -162,7 +162,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                   curve: Curves.easeOutCubic,
                   child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(4),
                     boxShadow: _isActive
                         ? []
                         : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
@@ -172,7 +172,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                     children: [
                       // 1. EL PÓSTER (Base)
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(4),
                         clipBehavior: Clip.antiAliasWithSaveLayer,
                         child: Builder(
                           builder: (context) {
@@ -200,7 +200,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                         child: IgnorePointer(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(4),
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
@@ -214,7 +214,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
 
                       // 2. OVERLAYS (Clipeados individualmente o por el Stack)
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(4),
                         clipBehavior: Clip.antiAliasWithSaveLayer, // Senior Fix: Máxima calidad de recorte
                         child: Stack(
                           children: [
@@ -284,7 +284,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                       IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(4),
                             border: Border.all(
                               color: _isActive ? (widget.activeBorderColor ?? Colors.white) : Colors.transparent,
                               width: _isActive ? 2.0 : 0.0,

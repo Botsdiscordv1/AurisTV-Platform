@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:app_links/app_links.dart';
 import 'package:auris_core/auris_core.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -80,15 +81,17 @@ class AurisApp extends StatelessWidget {
 
             return NotificationInitializer(
               child: RemoteCommandListener(
-                child: MinWidthWrapper(
-                  minWidth: 360, // Sincronizado con Web para evitar inconsistencias en tablets
-                  child: Stack(
-                    fit: StackFit.expand, // Senior Fix: Garantiza que el contenido principal llene la pantalla
-                    children: [
-                      child,
-                      // Senior: Floating MiniPlayer (Global y Persistente)
-                      const GlobalMiniPlayerOverlay(),
-                    ],
+                child: DeepLinkHandler(
+                  child: MinWidthWrapper(
+                    minWidth: 360, // Sincronizado con Web para evitar inconsistencias en tablets
+                    child: Stack(
+                      fit: StackFit.expand, // Senior Fix: Garantiza que el contenido principal llene la pantalla
+                      children: [
+                        child,
+                        // Senior: Floating MiniPlayer (Global y Persistente)
+                        const GlobalMiniPlayerOverlay(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -311,3 +314,74 @@ class RemoteCommandListener extends ConsumerWidget {
     return child;
   }
 }
+
+class DeepLinkHandler extends ConsumerStatefulWidget {
+  final Widget child;
+  const DeepLinkHandler({super.key, required this.child});
+
+  @override
+  ConsumerState<DeepLinkHandler> createState() => _DeepLinkHandlerState();
+}
+
+class _DeepLinkHandlerState extends ConsumerState<DeepLinkHandler> {
+  final _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  Future<void> _initDeepLinks() async {
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        _handleUri(initialUri);
+      }
+    } catch (e) {
+      debugPrint('Error getting initial link: $e');
+    }
+
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      (uri) {
+        _handleUri(uri);
+      },
+      onError: (err) {
+        debugPrint('Error in uriLinkStream: $err');
+      },
+    );
+  }
+
+  void _handleUri(Uri uri) {
+    debugPrint('Deep link received: $uri');
+    if (uri.path.contains('activate') || uri.host == 'activate') {
+      final code = uri.queryParameters['code'] ?? '';
+      if (code.isNotEmpty) {
+        appRouter.go('/activate?code=$code');
+      } else {
+        final path = uri.path.startsWith('/') ? uri.path : '/${uri.path}';
+        final query = uri.hasQuery ? '?${uri.query}' : '';
+        appRouter.go('$path$query');
+      }
+    } else {
+      final path = uri.path.startsWith('/') ? uri.path : '/${uri.path}';
+      final query = uri.hasQuery ? '?${uri.query}' : '';
+      if (path.isNotEmpty && path != '/') {
+        appRouter.go('$path$query');
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
+  }
+}
+

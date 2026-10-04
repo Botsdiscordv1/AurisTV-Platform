@@ -129,12 +129,13 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                 children: [
                   AspectRatio(
                     aspectRatio: 2 / 3,
-                      child: AnimatedContainer(
-                        duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
-                        curve: Curves.easeOutQuint,
-                        transform: Matrix4.translationValues(0, isActive ? -6 : 0, 0),
+                      child: AnimatedScale(
+                        scale: isActive ? 1.10 : 1.0,
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        child: Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(4),
                           boxShadow: isActive
                               ? []
                               : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
@@ -143,13 +144,9 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                           fit: StackFit.expand,
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(4),
                               clipBehavior: Clip.antiAliasWithSaveLayer,
-                              child: AnimatedScale(
-                                scale: isActive ? 1.10 : 1.0,
-                                duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
-                                curve: Curves.easeOutQuint,
-                                child: Builder(
+                              child: Builder(
                                   builder: (context) {
                                     final dpr = MediaQuery.of(context).devicePixelRatio;
                                     final targetWidth = (normalWidth * dpr).round();
@@ -166,11 +163,10 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                                     );
                                   },
                                 ),
-                              ),
-                            ),
+                              ), // fin ClipRRect del póster base
 
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(4),
                               clipBehavior: Clip.antiAliasWithSaveLayer,
                               child: Stack(
                                 children: [
@@ -255,7 +251,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                             IgnorePointer(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(4),
                                   border: Border.all(
                                     color: isActive ? Colors.white : Colors.transparent,
                                     width: isActive ? 3.0 : 0.0,
@@ -267,6 +263,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                         ),
                       ),
                     ),
+                  ),
                   if (widget.showInfo) ...[
                     SizedBox(height: isMobile ? ResponsiveUtils.sp(context, 8) : 8),
                     SizedBox(

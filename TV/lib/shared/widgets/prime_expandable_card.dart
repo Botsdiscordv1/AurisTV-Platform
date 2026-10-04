@@ -77,7 +77,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
                   aspectRatio: 2 / 3,
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(4),
                       boxShadow: _isActive ? [BoxShadow(color: const Color(0xFF6C32FF).withOpacity(0.3), blurRadius: 15, spreadRadius: 1)] : [],
                     ),
                     child: Stack(
@@ -85,7 +85,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
                       clipBehavior: Clip.none,
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(4),
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
@@ -240,7 +240,7 @@ class _MythicBorder extends StatelessWidget {
               stops: [0.0, (animation.value - 0.2).clamp(0.0, 1.0), animation.value, (animation.value + 0.2).clamp(0.0, 1.0), 1.0],
             ).createShader(bounds);
           },
-          child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white, width: 2.0))),
+          child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.white, width: 2.0))),
         );
       },
     );

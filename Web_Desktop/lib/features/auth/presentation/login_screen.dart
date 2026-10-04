@@ -9,99 +9,6 @@ import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Posters usados en el grid de fondo (avatares disponibles en Core)
-// ─────────────────────────────────────────────────────────────────────────────
-class GridMediaItem {
-  final String path;
-  final bool isWide; // true para banner horizontal 16:9, false para póster vertical 2:3
-
-  const GridMediaItem(this.path, {this.isWide = false});
-}
-
-// Plantilla estilo Netflix con banners (16:9) y pósters (2:3) mezclados.
-// Puedes agregar o cambiar las rutas de tus imágenes locales o URLs aquí:
-const List<GridMediaItem> _kNetflixCollageItems = [
-  GridMediaItem('assets/collage/Anime/banner 1.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 1.webp', isWide: false),
-  GridMediaItem('assets/collage/Anime/banner 10.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 10.webp', isWide: false),
-  GridMediaItem('assets/collage/Anime/banner 2.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 2.webp', isWide: false),
-  GridMediaItem('assets/collage/Anime/banner 3.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 3.webp', isWide: false),
-  GridMediaItem('assets/collage/Anime/banner 4.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 4.webp', isWide: false),
-  GridMediaItem('assets/collage/Anime/banner 5.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 5.webp', isWide: false),
-  GridMediaItem('assets/collage/Anime/banner 6.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 6.webp', isWide: false),
-  GridMediaItem('assets/collage/Anime/banner 7.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 7.webp', isWide: false),
-  GridMediaItem('assets/collage/Anime/banner 8.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 8.webp', isWide: false),
-  GridMediaItem('assets/collage/Anime/banner 9.webp', isWide: true),
-  GridMediaItem('assets/collage/Anime/poster 9.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 1.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 1.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 10.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 10.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 2.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 2.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 3.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 3.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 4.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 4.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 5.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 5.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 6.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 6.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 7.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 7.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 8.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 8.webp', isWide: false),
-  GridMediaItem('assets/collage/Kdrama/banner 9.webp', isWide: true),
-  GridMediaItem('assets/collage/Kdrama/poster 9.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 1.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 1.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 10.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 10.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 2.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 2.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 3.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 3.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 4.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 4.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 5.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 5.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 6.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 6.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 7.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 7.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 8.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 8.webp', isWide: false),
-  GridMediaItem('assets/collage/Pelicula/banner 9.webp', isWide: true),
-  GridMediaItem('assets/collage/Pelicula/poster 9.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 1.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 1.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 10.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 10.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 2.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 2.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 3.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 3.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 4.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 4.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 5.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 5.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 6.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 6.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 7.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 7.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 8.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 8.webp', isWide: false),
-  GridMediaItem('assets/collage/Serie/banner 9.webp', isWide: true),
-  GridMediaItem('assets/collage/Serie/poster 9.webp', isWide: false),
-];
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Widget raiz: detecta si es desktop o mobile y muestra la pantalla correcta
@@ -134,14 +41,6 @@ class _MobileLoginScreen extends ConsumerStatefulWidget {
 
 class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
     with SingleTickerProviderStateMixin {
-  static const List<String> _bgImages = [
-    'assets/images/login_bg_collage.webp',
-    'assets/images/login_bg_netflix.jpg',
-    'assets/images/login_bg_hbomax.webp',
-  ];
-
-  int _currentBgIndex = 0;
-  Timer? _bgTimer;
   _MobileStep _step = _MobileStep.welcome;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -158,23 +57,10 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
       duration: const Duration(milliseconds: 350),
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
-    _currentBgIndex = Random().nextInt(_bgImages.length);
-    _startBgRotation();
-  }
-
-  void _startBgRotation() {
-    _bgTimer = Timer.periodic(const Duration(seconds: 6), (timer) {
-      if (mounted && _step == _MobileStep.welcome) {
-        setState(() {
-          _currentBgIndex = (_currentBgIndex + 1) % _bgImages.length;
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
-    _bgTimer?.cancel();
     _fadeCtrl.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -207,39 +93,20 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
           // 1. App Dark Base Background
           const Positioned.fill(child: ColoredBox(color: Color(0xFF0B0B0D))),
 
-          // 2. Dynamic Background Carousel (Welcome screen only)
+          // 2. Native collage grid background (Welcome screen only)
           AnimatedOpacity(
             opacity: isWelcome ? 1.0 : 0.0,
             duration: const Duration(milliseconds: 400),
             curve: Curves.easeInOut,
             child: Stack(
               children: [
-                Positioned(
+                const Positioned.fill(child: CollageGridBackground()),
+                const Positioned(
                   top: 0,
                   left: 0,
                   right: 0,
-                  height: size.height * 0.70,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 1400),
-                    switchInCurve: Curves.easeInOut,
-                    switchOutCurve: Curves.easeInOut,
-                    child: Image.asset(
-                      _bgImages[_currentBgIndex],
-                      key: ValueKey<String>(_bgImages[_currentBgIndex]),
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                      width: double.infinity,
-                      height: double.infinity,
-                      errorBuilder: (_, __, ___) => Container(color: Colors.black),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: size.height * 0.75,
-                  child: const DecoratedBox(
+                  bottom: 0,
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
@@ -691,10 +558,7 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
   final TextEditingController _passwordController = TextEditingController();
   bool _showPassword = false;
   bool _showPanel = false;
-  late final List<GridMediaItem> _items;
 
-  late final AnimationController _scrollCtrl;
-  late final Animation<double> _scrollAnim;
 
   late final AnimationController _panelCtrl;
   late final Animation<double> _panelFade;
@@ -703,11 +567,7 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
   @override
   void initState() {
     super.initState();
-    final rng = Random();
-    _items = List.from(_kNetflixCollageItems)..shuffle(rng);
 
-    _scrollCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 60))..repeat();
-    _scrollAnim = CurvedAnimation(parent: _scrollCtrl, curve: Curves.linear);
 
     _panelCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
     _panelFade = CurvedAnimation(parent: _panelCtrl, curve: Curves.easeOut);
@@ -717,7 +577,6 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
 
   @override
   void dispose() {
-    _scrollCtrl.dispose();
     _panelCtrl.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -737,7 +596,6 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -745,7 +603,7 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
         fit: StackFit.expand,
         children: [
           // Capa 1: Grid de posters en perspectiva
-          _PosterGridBackground(items: _items, scrollAnim: _scrollAnim, screenSize: size),
+          const CollageGridBackground(),
 
           // Capa 2: Gradiente izquierda -> derecha
           Container(
@@ -964,157 +822,6 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Grid de posters con perspectiva y scroll horizontal lento
-// ─────────────────────────────────────────────────────────────────────────────
-class _PosterGridBackground extends StatelessWidget {
-  final List<GridMediaItem> items;
-  final Animation<double> scrollAnim;
-  final Size screenSize;
-
-  const _PosterGridBackground({
-    required this.items,
-    required this.scrollAnim,
-    required this.screenSize,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Height set to 168px to preserve full natural 2:3 poster ratio and 16:9 banner ratio
-    const double cardHeight = 168.0;
-    const double gap = 12.0;
-    const double posterWidth = 112.0; // 2:3 ratio (112 x 168)
-    const double bannerWidth = 298.0; // 16:9 ratio (298 x 168)
-    const int numRows = 7;
-    final List<int> rowSizes = [11, 11, 11, 11, 11, 11, 14];
-
-    return AnimatedBuilder(
-      animation: scrollAnim,
-      builder: (context, _) {
-        final double t = scrollAnim.value; // 0.0 → 1.0 repeating
-        int currentStart = 0;
-
-        return ClipRect(
-          child: OverflowBox(
-            maxWidth: double.infinity,
-            maxHeight: double.infinity,
-            child: Transform(
-              alignment: Alignment.center,
-              filterQuality: FilterQuality.high,
-              transform: Matrix4.identity()
-                ..setEntry(3, 2, 0.0006)
-                ..rotateZ(-0.14)
-                ..rotateX(0.12)
-                ..scale(1.28),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(numRows, (rowIndex) {
-                  final int count = rowSizes[rowIndex % rowSizes.length];
-                  final int startIdx = currentStart;
-                  currentStart += count;
-
-                  // Unique partition of items per row (no image repeated across rows)
-                  final List<GridMediaItem> rowItems = List.generate(
-                    count,
-                    (i) => items[(startIdx + i) % items.length],
-                  );
-
-                  // Calculate exact width of 1 single copy of this row
-                  final double singleWidth = rowItems.fold(0.0, (sum, item) {
-                    return sum + (item.isWide ? bannerWidth : posterWidth) + gap;
-                  });
-
-                  // Speed & Direction per row
-                  final bool goesLeft = rowIndex.isEven;
-                  final double speedFactor = 0.85 + (rowIndex * 0.05); // 0.85..1.15
-                  final double progress = (t * speedFactor) % 1.0;
-
-                  // Offset animation over 1 singleWidth for seamless loop
-                  // Round to nearest pixel to eliminate sub-pixel rendering jitter
-                  final double dx = goesLeft
-                      ? (-(progress * singleWidth)).roundToDouble()
-                      : (-((1.0 - progress) * singleWidth)).roundToDouble();
-
-                  // Repeat 6 times so row total width (~15,000px) easily covers
-                  // rotated screen boundaries on left (-7500px) and right (+5000px)
-                  final List<GridMediaItem> repeated = [
-                    ...rowItems,
-                    ...rowItems,
-                    ...rowItems,
-                    ...rowItems,
-                    ...rowItems,
-                    ...rowItems,
-                  ];
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: gap),
-                    child: Transform.translate(
-                      offset: Offset(dx, 0),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: repeated.map((item) {
-                          final double w = item.isWide ? bannerWidth : posterWidth;
-                          return Container(
-                            width: w,
-                            height: cardHeight,
-                            margin: const EdgeInsets.only(right: gap),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF141418),
-                              borderRadius: BorderRadius.circular(6),
-                              // No border — thin borders cause sub-pixel jitter during translation
-                              // Depth is provided by surrounding shadows instead
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black87,
-                                  blurRadius: 6,
-                                  spreadRadius: 0,
-                                  offset: Offset(0, 2),
-                                ),
-                                BoxShadow(
-                                  color: Colors.black54,
-                                  blurRadius: 16,
-                                  spreadRadius: 2,
-                                  offset: Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: item.path.startsWith('http')
-                                ? Image.network(
-                                    item.path,
-                                    fit: BoxFit.cover,
-                                    filterQuality: FilterQuality.high,
-                                    errorBuilder: (_, __, ___) => _buildPlaceholder(),
-                                  )
-                                : Image.asset(
-                                    item.path,
-                                    fit: BoxFit.cover,
-                                    filterQuality: FilterQuality.high,
-                                    errorBuilder: (_, __, ___) => _buildPlaceholder(),
-                                  ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPlaceholder() {
-    return Container(
-      color: const Color(0xFF1B1C22),
-      child: const Center(
-        child: Icon(Icons.movie_outlined, color: Colors.white24, size: 28),
-      ),
-    );
-  }
-}
 
 //  Formulario email inline estilo Netflix
 // ─────────────────────────────────────────────────────────────────────────────

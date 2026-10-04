@@ -73,10 +73,10 @@ class RowSkeleton extends StatelessWidget {
                       height: cardHeight,
                       width: cardWidth,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(isWide ? 8 : 12),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                       clipBehavior: Clip.antiAlias,
-                      child: const SkeletonContainer(width: double.infinity, height: double.infinity),
+                      child: const SkeletonContainer(width: double.infinity, height: double.infinity, borderRadius: 4),
                     ),
                     // Título dinámico (Solo para filas Wide / Banners)
                     if (isWide) ...[

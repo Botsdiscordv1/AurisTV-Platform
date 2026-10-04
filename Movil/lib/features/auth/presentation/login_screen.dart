@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,14 +20,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen>
     with SingleTickerProviderStateMixin {
-  static const List<String> _bgImages = [
-    'assets/images/login_bg_collage.webp',
-    'assets/images/login_bg_netflix.jpg',
-    'assets/images/login_bg_hbomax.webp',
-  ];
-
-  int _currentBgIndex = 0;
-  Timer? _bgTimer;
   _LoginStep _step = _LoginStep.welcome;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -45,23 +36,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       duration: const Duration(milliseconds: 350),
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
-    _currentBgIndex = Random().nextInt(_bgImages.length);
-    _startBgRotation();
-  }
-
-  void _startBgRotation() {
-    _bgTimer = Timer.periodic(const Duration(seconds: 6), (timer) {
-      if (mounted && _step == _LoginStep.welcome) {
-        setState(() {
-          _currentBgIndex = (_currentBgIndex + 1) % _bgImages.length;
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
-    _bgTimer?.cancel();
     _fadeCtrl.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -101,7 +79,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             // 1. App Dark Base Background
             const Positioned.fill(child: ColoredBox(color: Color(0xFF0B0B0D))),
 
-            // 2. Dynamic Background Carousel (Welcome screen only)
+            // 2. Native collage grid background (Welcome screen only)
             AnimatedOpacity(
               opacity: isWelcome ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 400),
@@ -113,20 +91,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     left: 0,
                     right: 0,
                     height: size.height * 0.70,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 1400),
-                      switchInCurve: Curves.easeInOut,
-                      switchOutCurve: Curves.easeInOut,
-                      child: Image.asset(
-                        _bgImages[_currentBgIndex],
-                        key: ValueKey<String>(_bgImages[_currentBgIndex]),
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorBuilder: (_, __, ___) => Container(color: Colors.black),
-                      ),
-                    ),
+                    child: const CollageGridBackground(),
                   ),
                   Positioned(
                     top: 0,

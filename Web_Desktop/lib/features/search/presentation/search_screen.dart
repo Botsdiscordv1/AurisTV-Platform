@@ -44,6 +44,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
     _currentQuery = widget.initialQuery;
     _selectedCategory = widget.initialCategory;
     _searchController = TextEditingController(text: _currentQuery);
+    if (_currentQuery.isNotEmpty) {
+      _searchController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _currentQuery.length),
+      );
+    }
     
     _focusNode.addListener(_onFocusChange);
   }
@@ -96,6 +101,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
     if (widget.initialQuery != oldWidget.initialQuery && widget.initialQuery != _currentQuery) {
       _currentQuery = widget.initialQuery;
       _searchController.text = _currentQuery;
+      if (_currentQuery.isNotEmpty) {
+        _searchController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _currentQuery.length),
+        );
+      }
     }
     if (widget.initialCategory != oldWidget.initialCategory && widget.initialCategory != _selectedCategory) {
       _selectedCategory = widget.initialCategory;
@@ -179,6 +189,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
 
   void _performSearch(String query) {
     _searchController.text = query;
+    if (query.isNotEmpty) {
+      _searchController.selection = TextSelection.fromPosition(
+        TextPosition(offset: query.length),
+      );
+    }
     _onSearchSubmitted(query);
   }
 
@@ -271,13 +286,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
                       decoration: InputDecoration(
                         hintText: _dynamicPlaceholder,
                         hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontSize: 14),
-                        prefixIcon: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 14, right: 6),
-                            child: AurisIcon(AurisIcons.search, 
-                                color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
-                                size: 16),
+                        prefixIcon: SizedBox(
+                          width: 44,
+                          height: 52,
+                          child: Center(
+                            child: AurisIcon(
+                              AurisIcons.search, 
+                              color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
+                              size: 16,
+                            ),
                           ),
                         ),
                         border: InputBorder.none,
@@ -285,7 +302,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
                         focusedBorder: InputBorder.none,
                         filled: false,
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16), // Centrado perfecto para Container de 52px
+                        contentPadding: EdgeInsets.zero,
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
@@ -362,13 +379,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
                 children: [
                   const _ContinueWatchingSection(),
                   RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
-                  const SizedBox(height: 8),
-                  RepaintBoundary(
-                    child: SearchDiscoveryFeed(
-                      category: _selectedCategory,
-                      onContentTap: _onContentTap,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -393,13 +403,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
           const _ContinueWatchingSection(),
           RepaintBoundary(child: SearchHistorySection(onQueryTap: _performSearch)),
           RepaintBoundary(child: SearchGenresGrid(onGenreTap: _performSearch)),
-          const SizedBox(height: 8),
-          RepaintBoundary(
-            child: SearchDiscoveryFeed(
-              category: _selectedCategory,
-              onContentTap: _onContentTap,
-            ),
-          ),
         ],
       ),
     );

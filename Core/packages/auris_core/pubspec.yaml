@@ -61,3 +61,7 @@ flutter:
     - assets/avatars/animes/sakamoto_days/
     - assets/avatars/animes/seihantai_na_kimi_to_boku/
     - assets/avatars/animes/yofukashi_no_uta/
+    - assets/collage/Anime/
+    - assets/collage/Kdrama/
+    - assets/collage/Pelicula/
+    - assets/collage/Serie/

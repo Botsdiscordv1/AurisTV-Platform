@@ -156,6 +156,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   double _lastAppliedVolume = -1.0;
   bool _showSeekIndicator = false;
   bool _isLongPressSpeedActive = false;
+  bool _wasPlayingBeforeLongPress = false;
   bool _wasPlayingBeforeSeek = false;
   Duration _seekTargetDuration = Duration.zero;
   Duration _seekDiff = Duration.zero;
@@ -4166,9 +4167,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         },
                         behavior: HitTestBehavior.opaque, 
                         onLongPressStart: (_) {
-                          if (_isLocked || !(_player?.state.playing ?? false)) return;
+                          if (_isLocked) return;
                           
+                          _wasPlayingBeforeLongPress = _player?.state.playing ?? false;
                           _player?.setRate(2.0);
+                          if (!_wasPlayingBeforeLongPress) {
+                            _player?.play();
+                          }
                           setState(() {
                             _isLongPressSpeedActive = true;
                             _showControls = false;
@@ -4179,6 +4184,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           if (!_isLongPressSpeedActive) return;
                           
                           _player?.setRate(_playbackSpeed);
+                          if (!_wasPlayingBeforeLongPress) {
+                            _player?.pause();
+                          }
                           setState(() {
                             _isLongPressSpeedActive = false;
                           });
@@ -4187,6 +4195,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           if (!_isLongPressSpeedActive) return;
                           
                           _player?.setRate(_playbackSpeed);
+                          if (!_wasPlayingBeforeLongPress) {
+                            _player?.pause();
+                          }
                           setState(() {
                             _isLongPressSpeedActive = false;
                           });

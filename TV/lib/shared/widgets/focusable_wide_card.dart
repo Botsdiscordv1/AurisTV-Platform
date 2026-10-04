@@ -125,12 +125,12 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                     duration: const Duration(milliseconds: 400),
                     curve: Curves.easeOutCubic,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(4),
                       boxShadow: isSelected ? [] : [],
                       border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: isSelected ? 2.0 : 0.0),
                     ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(4),
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
