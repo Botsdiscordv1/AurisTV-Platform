@@ -183,39 +183,53 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           opacity: _fadeAnim,
           child: Stack(
             children: [
-              // Full screen background: Collage on welcome, solid black on sub-menus
+              // Full screen background: Collage on welcome with opacity/gradient overlays (Web Desktop style), solid black on sub-menus
               Positioned.fill(
                 child: _step == _LoginStep.welcome
-                    ? const CollageGridBackground()
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Capa 1: Grid de posters en perspectiva
+                          const CollageGridBackground(),
+
+                          // Capa 2: Gradiente izquierda -> derecha
+                          Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                stops: [0.0, 0.50, 1.0],
+                                colors: [Color(0xF2000000), Color(0xAA000000), Color(0x22000000)],
+                              ),
+                            ),
+                          ),
+                          // Capa 2b: Gradiente arriba/abajo
+                          Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                stops: [0.0, 0.12, 0.88, 1.0],
+                                colors: [Color(0xEE000000), Color(0x00000000), Color(0x00000000), Color(0xEE000000)],
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
                     : const ColoredBox(color: Color(0xFF000000)),
               ),
 
-              // Subtle ambient shadow on left side
-              const Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      stops: [0.0, 0.45, 1.0],
-                      colors: [
-                        Color(0x990A0A0A),
-                        Color(0x330A0A0A),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
               if (_step == _LoginStep.welcome) ...[
-                // Mascot PNG (transparent bg) right side
+                // Suspended Chibi Mascot at top right starting from top edge
                 Positioned(
                   right: 0,
                   top: 0,
-                  bottom: 0,
-                  width: size.width * 0.52,
-                  child: _MascotPanel(step: _step),
+                  child: Image.asset(
+                    'assets/icons/chibi_pelinaranja_suspendida.png',
+                    height: size.height * 0.52,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.topRight,
+                  ),
                 ),
 
                 // Content – left half
@@ -242,7 +256,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                         ),
                         const Padding(
-                          padding: EdgeInsets.only(bottom: 36),
+                          padding: EdgeInsets.only(bottom: 16),
                           child: Text(
                             'Al usar AurisTV aceptas nuestros Terminos de Uso y Politica de Privacidad.',
                             style: TextStyle(
@@ -333,15 +347,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             height: 1.1,
           ),
         ),
-        const SizedBox(height: 10),
-        Text(
-          'Elige como quieres acceder.',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.50),
-            fontSize: 17,
-          ),
-        ),
-        const SizedBox(height: 52),
+        const SizedBox(height: 40),
 
         // ACCEDER -> Opens Scan QR Code step
         _BigButton(
@@ -349,6 +355,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           label: 'ACCEDER',
           filled: true,
           onPressed: () => _enterSubMenu(_LoginStep.scanQR),
+        ),
+        const SizedBox(height: 18),
+        Image.asset(
+          'assets/icons/chibi_gatita_naranja.png',
+          height: 215,
+          alignment: Alignment.centerLeft,
+          fit: BoxFit.contain,
         ),
       ],
     );
@@ -911,37 +924,7 @@ class _SidebarMenuItemState extends State<_SidebarMenuItem> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Mascot panel (right side in welcome step)
-// ─────────────────────────────────────────────────────────────────────────────
-class _MascotPanel extends StatelessWidget {
-  final _LoginStep step;
-  const _MascotPanel({required this.step});
 
-  @override
-  Widget build(BuildContext context) {
-    final isWelcome = step == _LoginStep.welcome;
-    return AnimatedOpacity(
-      opacity: isWelcome ? 1.0 : 0.25,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: AnimatedFractionallySizedBox(
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-          heightFactor: isWelcome ? 0.8 : 1.0,
-          alignment: Alignment.bottomCenter,
-          child: Image.asset(
-            'assets/icons/login_mascot.png',
-            fit: BoxFit.contain,
-            alignment: Alignment.bottomCenter,
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Big welcome / action button
@@ -1007,7 +990,7 @@ class _BigButtonState extends State<_BigButton> {
             color: _focused ? AppTheme.brand : Colors.transparent,
             borderRadius: BorderRadius.zero,
             border: Border.all(
-              color: _focused ? AppTheme.brand : Colors.white,
+              color: Colors.white,
               width: 2.5,
             ),
           ),
