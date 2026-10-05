@@ -6,24 +6,24 @@
 
 ## ✨ Novedades y Características Principales
 
-- **Renovación del Sistema de Autenticación & Login:**
-  - Nueva interfaz en `login_screen` con integración de nuevos recursos gráficos (fondos verticales/horizontales, logotipo de Google, mascota de AurisTV y diseño visual optimizado).
-  - Mejoras en la autenticación y gestión de sesiones de usuario.
-- **Pantalla de Inicio / Splash & Intro Optimizada:**
-  - Actualización del flujo de animación en `splash_screen` y soporte mejorado para la intro HTML (`auristv_intro_slower.html`).
-- **Mejoras en Búsqueda y Exploración (`Search` & `Explore`):**
-  - Filtrado de contenido más rápido y fluido en `search_screen` y `explore_screen` en todas las plataformas.
-- **Actualizaciones en el Reproductor y Mini Player Bar:**
-  - Mejoras en la barra del mini reproductor (`mini_player_bar`) y controles multimedia avanzados en `player_screen`.
+- **Renovación del Sistema de Autenticación & Login (`login_screen`, `auth`):**
+  - Nueva interfaz de inicio de sesión con soporte mejorado para credenciales y OAuth, integración de nuevos recursos gráficos y diseño visual optimizado.
+  - Actualización en `AndroidManifest.xml` para esquemas de redirección de autenticación.
+- **Mejoras en Exploración y Búsqueda (`explore_screen`, `search_screen`):**
+  - Filtrado de contenido más rápido, fluido y adaptativo en todas las plataformas.
+- **Reproductor Multimedia y Perfiles (`player_screen`, `profile_screen`):**
+  - Optimizaciones en la reproducción de video, gestión de subtítulos, gestos y control de perfiles de usuario.
+- **Actualizaciones de la Aplicación y Main (`main.dart`):**
+  - Refactorización y mejoras en la inicialización de la app, inyección de dependencias y gestión de estado con Riverpod.
 - **Soporte Multiplataforma Unificado:**
-  - Actualizaciones de dependencias (`pubspec.yaml` y `pubspec.lock`), nuevas utilidades de URL y optimización de layout en Móvil, TV y Web/Desktop.
+  - Actualizaciones de dependencias (`pubspec.yaml` / `pubspec.lock`) y sincronización entre Móvil, TV y Web/Desktop.
 
 ---
 
 ## 🛠️ Correcciones de Errores y Mejoras de Rendimiento
 
-- **Gestión de Recursos Gráficos:** Integración de nuevos fondos, avatares y paneles manga de alta resolución (`manga_panel_bg.png`) tanto en el paquete core como en los módulos de cliente.
-- **Estabilidad de Providers:** Ajustes en `remote_control_provider` y gestión de estados en vistas de perfil y contenido.
+- **Estabilidad de Enrutamiento y Navegación:** Corrección de transiciones y manejo de rutas en todas las plataformas.
+- **Optimización de UI/UX:** Ajustes de diseño adaptativo para pantallas grandes y dispositivos móviles.
 - **Empaquetado y Release:** Automatización limpia de compilación de APKs (Móvil y TV) e instalador de Windows.
 
 ---
