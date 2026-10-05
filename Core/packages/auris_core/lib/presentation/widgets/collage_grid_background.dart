@@ -66,26 +66,32 @@ class _CollageGridBackgroundState extends State<CollageGridBackground>
     final bool isMobile = !isWebOrDesktop && screenWidth < 768;
     final bool isTV = !isWebOrDesktop && !isMobile;
 
-    // Tamaños base de las tarjetas adaptados a cada plataforma
-    final double cardHeight = isMobile ? 140.0 : (isTV ? 210.0 : 175.0);
-    final double gap = isMobile ? 8.0 : (isTV ? 14.0 : 12.0);
-    final double posterWidth = isMobile ? 90.0 : (isTV ? 130.0 : 100.0);
-    final double bannerWidth = isMobile ? 260.0 : (isTV ? 400.0 : 330.0);
-
-    // Escala adaptativa específica por plataforma
-    final double responsiveScale = isMobile
-        ? 0.95
-        : (isTV ? 1.75 : 1.0); // Web/Desktop usa 1.0 para verse proporcionado
-
+    // Factor de escala interno por dispositivo (TV usa 0.78 para tarjetas compactas)
+    final bool isMobileDevice = isMobile;
+    final double deviceScale = isMobileDevice ? 0.95 : (isTV ? 0.78 : 1.0);
     final double safeScaleFactor = (widget.scaleFactor.isFinite && widget.scaleFactor > 0)
         ? widget.scaleFactor
         : 1.0;
+    final double finalScale = deviceScale * safeScaleFactor;
 
-    final double collageScale = responsiveScale * safeScaleFactor;
+    // Tamaños base de las tarjetas
+    final double cardHeight = (isMobile ? 140.0 : 175.0) * finalScale;
+    
+    // Separación vertical entre filas
+    final double rowGap = (isMobile ? 8.0 : 12.0) * finalScale;
+    
+    // Separación horizontal aumentada ligeramente entre pósters y báneres (10px / 6px)
+    final double horizontalGap = (isMobile ? 6.0 : 10.0) * finalScale;
 
-    // Cobertura de filas
-    int numRows = ((screenHeight * (isTV ? 3.0 : 2.2) / (cardHeight + gap)) + (isTV ? 6 : 4)).ceil();
-    if (numRows <= 0 || !numRows.isFinite) numRows = 8;
+    final double posterWidth = (isMobile ? 110.0 : 125.0) * finalScale;
+    final double bannerWidth = (isMobile ? 260.0 : 330.0) * finalScale;
+
+    // Escala del Transform en 1.0
+    final double collageScale = 1.0;
+
+    // Cobertura de filas rellenando el 100% de la altura de pantalla
+    int numRows = ((screenHeight * 2.2 / (cardHeight + rowGap)) + 4).ceil();
+    if (numRows <= 0 || !numRows.isFinite) numRows = 12;
 
     // --- Master Pool de ítems locales (Anime, Kdrama, Película, Serie) ---
     final defaultItems = <GridMediaItem>[
@@ -122,8 +128,8 @@ class _CollageGridBackgroundState extends State<CollageGridBackground>
               filterQuality: FilterQuality.low,
               transform: Matrix4.identity()
                 ..setEntry(3, 2, 0.0006)
-                ..rotateZ(isTV ? -0.05 : -0.03)
-                ..rotateX(isTV ? 0.04 : 0.02)
+                ..rotateZ(-0.03)
+                ..rotateX(0.02)
                 ..scale(collageScale),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -139,7 +145,7 @@ class _CollageGridBackgroundState extends State<CollageGridBackground>
 
                   final double rawSingleWidth = rowItems.fold(0.0, (sum, item) {
                     return sum +
-                        (item.isWide ? bannerWidth : posterWidth) + gap;
+                        (item.isWide ? bannerWidth : posterWidth) + horizontalGap;
                   });
                   final double singleWidth = (rawSingleWidth.isFinite && rawSingleWidth > 0)
                       ? rawSingleWidth
@@ -169,7 +175,7 @@ class _CollageGridBackgroundState extends State<CollageGridBackground>
                   ];
 
                   return Padding(
-                    padding: EdgeInsets.only(bottom: gap),
+                    padding: EdgeInsets.only(bottom: rowGap),
                     child: Transform.translate(
                       offset: Offset(safeDx, 0),
                       child: Row(
@@ -180,7 +186,7 @@ class _CollageGridBackgroundState extends State<CollageGridBackground>
                           return Container(
                             width: w,
                             height: cardHeight,
-                            margin: EdgeInsets.only(right: gap),
+                            margin: EdgeInsets.only(right: horizontalGap),
                             decoration: BoxDecoration(
                               color: const Color(0xFF141418),
                               borderRadius: BorderRadius.circular(6),
