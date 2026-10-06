@@ -46,10 +46,10 @@ class HeroBanner extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<HeroBanner> createState() => _HeroBannerState();
+  ConsumerState<HeroBanner> createState() => HeroBannerState();
 }
 
-class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObserver {
+class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObserver {
   int _backgroundIndex = 0;
   int _contentIndex = 0;
   bool _isHovered = false;
@@ -64,6 +64,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   final FocusNode _playButtonFocusNode = FocusNode(); 
   final FocusNode _prevButtonFocusNode = FocusNode();
   final FocusNode _nextButtonFocusNode = FocusNode();
+
+  void requestPlayFocus() {
+    if (_playButtonFocusNode.canRequestFocus) {
+      _playButtonFocusNode.requestFocus();
+    }
+  }
 
   yt.YoutubePlayerController? _ytController;
   StreamSubscription? _ytSubscription;

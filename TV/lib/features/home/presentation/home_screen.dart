@@ -20,6 +20,8 @@ import '../widgets/wide_content_row.dart';
 import '../widgets/hero_banner.dart'; // Usar HeroBanner local optimizado para TV
 import '../../player/presentation/player_screen.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
+import '../../../core/router/app_router.dart';
+import '../../../core/focus/global_focus_nodes.dart';
 
 /// Senior TV Logic: Helpers de navegaciÃ³n globales para TV
 void openTVDetails(BuildContext context, MediaItem item, String uiCategory) {
@@ -89,8 +91,9 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey<HeroBannerState> _heroKey = GlobalKey<HeroBannerState>();
   bool _isScrolled = false;
   bool _splashRemoved = false;
   bool _isTopBarFocused = false;
@@ -109,20 +112,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   };
 
   @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-
-    // Senior Performance: Precarga escalonada
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) ref.read(homePrefetchProvider);
-      });
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
   }
 
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _scrollController.removeListener(_onScroll);
     _searchIconFocusNode.dispose();
     _overlaySearchFocusNode.dispose();
@@ -131,6 +128,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       node.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _heroKey.currentState?.requestPlayFocus();
+      }
+    });
   }
 
   void _onScroll() {
@@ -346,7 +353,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   return SliverToBoxAdapter(
                     child: RepaintBoundary(
                       child: HeroBanner(
-                        key: const ValueKey('hero_tv_main'), // Senior Fix: Clave estable para evitar recreaciÃ³n y crashes de foco
+                        key: _heroKey,
                         autofocus: true,
                         items: displayItems,
                         currentCategory: currentCategory,
@@ -530,15 +537,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           return _FocusIconButton(
             icon: AurisIcons.userOutline,
             size: TVResponsiveUtils.sp(context, 22),
+            focusNode: homeProfileIconFocusNode,
+            scaleOnFocus: true,
             onPressed: () => context.go('/profile'),
           );
         }
 
         return _FocusIconButton(
+          focusNode: homeProfileIconFocusNode,
           onPressed: () => context.go('/profile'),
+          scaleOnFocus: true,
           child: Container(
-            width: TVResponsiveUtils.sp(context, 36),
-            height: TVResponsiveUtils.sp(context, 36),
+            width: 32.0,
+            height: 32.0,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white24, width: 1.5),
@@ -721,6 +732,7 @@ class _FocusIconButton extends StatefulWidget {
   final FocusNode? focusNode;
   final FocusOnKeyEventCallback? onKeyEvent;
   final bool isActive;
+  final bool scaleOnFocus;
 
   const _FocusIconButton({
     this.icon,
@@ -730,6 +742,7 @@ class _FocusIconButton extends StatefulWidget {
     this.focusNode,
     this.onKeyEvent,
     this.isActive = false,
+    this.scaleOnFocus = false,
   });
 
   @override
@@ -761,30 +774,35 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
       },
       child: GestureDetector(
         onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: TVResponsiveUtils.sp(context, 32),
-          height: TVResponsiveUtils.sp(context, 32),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: _focused 
-                ? Colors.white 
-                : (widget.isActive ? const Color(0xFF2D2D2D) : Colors.transparent),
-            border: _focused ? Border.all(color: Colors.white, width: 1.5) : null,
+        child: AnimatedScale(
+          scale: (widget.scaleOnFocus && _focused) ? 1.10 : 1.0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 32.0,
+            height: 32.0,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _focused
+                  ? Colors.white
+                  : (widget.isActive ? const Color(0xFF2D2D2D) : Colors.transparent),
+              border: _focused ? Border.all(color: Colors.white, width: 1.5) : null,
+            ),
+            child: widget.child ?? (widget.icon is String
+                ? AurisIcon(
+                    widget.icon as String,
+                    color: _focused ? Colors.black : Colors.white,
+                    size: widget.size,
+                  )
+                : Icon(
+                    widget.icon as IconData?,
+                    // Senior Fix: Icono negro sobre fondo blanco cuando estÃ¡ enfocado
+                    color: _focused ? Colors.black : Colors.white,
+                    size: widget.size,
+                  )),
           ),
-          child: widget.child ?? (widget.icon is String
-              ? AurisIcon(
-                  widget.icon as String,
-                  color: _focused ? Colors.black : Colors.white,
-                  size: widget.size,
-                )
-              : Icon(
-                  widget.icon as IconData?,
-                  // Senior Fix: Icono negro sobre fondo blanco cuando estÃ¡ enfocado
-                  color: _focused ? Colors.black : Colors.white,
-                  size: widget.size,
-                )),
         ),
       ),
     );

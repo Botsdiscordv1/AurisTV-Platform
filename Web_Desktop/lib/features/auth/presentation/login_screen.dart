@@ -341,15 +341,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
         ),
         const SizedBox(height: 12),
 
-        Text(
-          'Al usar AurisTV aceptas nuestros Términos de Uso y Política de Privacidad.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.40),
-            fontSize: 11,
-            height: 1.4,
-          ),
-        ),
+        _LegalNotice(fontSize: 11, color: Colors.white.withOpacity(0.40)),
       ],
     );
   }
@@ -388,29 +380,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
 
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.60),
-                fontSize: 12,
-                height: 1.35,
-              ),
-              children: const [
-                TextSpan(text: 'Al iniciar sesión aceptas nuestros '),
-                TextSpan(
-                  text: 'Términos',
-                  style: TextStyle(color: Color(0xFFEF7A1E), fontWeight: FontWeight.bold),
-                ),
-                TextSpan(text: ' & '),
-                TextSpan(
-                  text: 'Política de Privacidad',
-                  style: TextStyle(color: Color(0xFFEF7A1E), fontWeight: FontWeight.bold),
-                ),
-                TextSpan(text: '.'),
-              ],
-            ),
-          ),
+          child: _LegalNotice(fontSize: 12, color: Colors.white.withOpacity(0.60)),
         ),
         const SizedBox(height: 20),
 
@@ -539,6 +509,35 @@ class _FooterLink extends StatelessWidget {
           letterSpacing: 0.5,
         ),
       ),
+    );
+  }
+}
+
+class _LegalNotice extends StatelessWidget {
+  final double fontSize;
+  final Color? color;
+
+  const _LegalNotice({this.fontSize = 11, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = color ?? Colors.white.withOpacity(0.40);
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text('Al usar AurisTV aceptas nuestros ', style: TextStyle(color: textColor, fontSize: fontSize, height: 1.4)),
+        GestureDetector(
+          onTap: () => context.go('/terms'),
+          child: Text('Términos de Uso', style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: fontSize, fontWeight: FontWeight.bold, height: 1.4)),
+        ),
+        Text(' y la ', style: TextStyle(color: textColor, fontSize: fontSize, height: 1.4)),
+        GestureDetector(
+          onTap: () => context.go('/privacy'),
+          child: Text('Política de Privacidad', style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: fontSize, fontWeight: FontWeight.bold, height: 1.4)),
+        ),
+        Text('.', style: TextStyle(color: textColor, fontSize: fontSize, height: 1.4)),
+      ],
     );
   }
 }
@@ -704,10 +703,7 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
                       // Inline email + botón estilo Netflix
                       _InlineEmailRow(emailController: _emailController, onAcceder: _openPanel),
                       const SizedBox(height: 14),
-                      Text(
-                        'Al acceder aceptas nuestros Terminos de Uso y Politica de Privacidad.',
-                        style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 12, height: 1.4),
-                      ),
+                      _LegalNotice(fontSize: 12, color: Colors.white.withOpacity(0.35)),
                     ],
                   ),
                 ),

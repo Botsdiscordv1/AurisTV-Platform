@@ -105,7 +105,18 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
       onExit: (_) { if (mounted) _hovered.value = false; },
       onHover: (_) { if (!_hovered.value && mounted) _hovered.value = true; },
       child: Focus(
-        onFocusChange: (focused) => setState(() => _focused = focused),
+        onFocusChange: (focused) {
+          if (!mounted) return;
+          if (focused) {
+            // Revela la tarjeta solo si no está totalmente visible
+            // (showOnScreen con clampOffset no hace scroll si ya se ve).
+            context.findRenderObject()?.showOnScreen(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
+            );
+          }
+          setState(() => _focused = focused);
+        },
         onKeyEvent: (node, event) {
           if (event is KeyDownEvent) {
             if (event.logicalKey == LogicalKeyboardKey.enter || 

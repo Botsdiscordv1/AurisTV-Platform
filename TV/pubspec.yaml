@@ -78,6 +78,7 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   build_runner: ^2.4.12
   hive_ce_generator: ^1.7.1
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -92,3 +93,17 @@ flutter:
     - assets/avatars/animes/sakamoto_days/
     - assets/avatars/animes/seihantai_na_kimi_to_boku/
     - assets/avatars/animes/yofukashi_no_uta/
+
+flutter_launcher_icons:
+  image_path: "assets/icons/icono_sobre_blanco.png"
+  android: "ic_launcher"
+  ios: true
+  web:
+    generate: true
+    image_path: "assets/icons/icono_sobre_blanco.png"
+  windows:
+    generate: true
+    image_path: "assets/icons/icono_sobre_blanco.png"
+  macos:
+    generate: true
+    image_path: "assets/icons/icono_sobre_blanco.png"

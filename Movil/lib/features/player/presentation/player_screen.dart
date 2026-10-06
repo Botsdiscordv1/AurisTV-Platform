@@ -20,7 +20,6 @@ import 'package:collection/collection.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:material_symbols_icons/material_symbols_icons.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
@@ -139,7 +138,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   String _selectedQuality = 'auto';
   bool _userHasPaused = false;
   bool _showCenterIndicator = false;
-  IconData _centerIndicatorIcon = Symbols.play_arrow;
+  String _centerIndicatorIcon = AurisIcons.playFilled;
   Timer? _centerIndicatorTimer;
   final GlobalKey _sliderKey = GlobalKey();
   final ValueNotifier<Offset?> _hoverInfoNotifier = ValueNotifier<Offset?>(null);
@@ -1012,11 +1011,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Center(
-                child: Icon(
-                  Symbols.dns, 
-                  color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white54, 
+                child: AurisIcon(
+                  AurisIcons.server,
+                  color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white54,
                   size: 16,
-                  fill: isCurrent ? 1 : 0,
                 ),
               ),
             ),
@@ -1036,8 +1034,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ),
             ),
             trailing: isCurrent 
-              ? Icon(Symbols.check_circle, color: const Color(0xFFEF7A1E), size: 18, fill: 1)
-              : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.1), size: 16),
+              ? AurisIcon(AurisIcons.checkCircleFilled, color: const Color(0xFFEF7A1E), size: 18)
+              : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.1), size: 16),
           ),
         );
       },
@@ -1140,11 +1138,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Icon(
-                isCurrent ? Symbols.check_circle : Symbols.hd,
+              child: AurisIcon(
+                isCurrent ? AurisIcons.checkCircleFilled : AurisIcons.hd,
                 color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white54 : Colors.white12),
                 size: 16,
-                fill: isCurrent ? 1 : 0,
               ),
             ),
             title: Text(
@@ -1426,8 +1423,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               maxLines: 1,
             ),
             trailing: isCurrent 
-              ? Icon(Symbols.check_circle, color: const Color(0xFFEF7A1E), size: 18, fill: 1)
-              : Icon(Symbols.chevron_right, color: Colors.white.withOpacity(0.1), size: 16),
+              ? AurisIcon(AurisIcons.checkCircleFilled, color: const Color(0xFFEF7A1E), size: 18)
+              : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.1), size: 16),
           ),
         );
       },
@@ -1925,7 +1922,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _showCentralIndicator(bool playing) {
     _centerIndicatorTimer?.cancel();
     setState(() {
-      _centerIndicatorIcon = playing ? Symbols.play_arrow : Symbols.pause;
+      _centerIndicatorIcon = playing ? AurisIcons.playFilled : AurisIcons.pause;
       _showCenterIndicator = true;
     });
     _centerIndicatorTimer = Timer(const Duration(milliseconds: 600), () {
@@ -3232,7 +3229,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         },
         loading: () => Stack(children: [
             const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Conectando con la fuente...', style: TextStyle(color: Colors.white54))])),
-            Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28), onPressed: _exitPlayer))),
+            Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 28), onPressed: _exitPlayer))),
           ]),
         error: (err, _) => Stack(children: [
             Center(
@@ -3241,7 +3238,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 child: Column(
                   mainAxisSize: MainAxisSize.min, 
                   children: [
-                    const Icon(Icons.error_outline, color: Color(0xFFFF5252), size: 64), 
+                    AurisIcon(AurisIcons.alertCircle, color: const Color(0xFFFF5252), size: 64), 
                     const SizedBox(height: 20), 
                     const Text('Enlace Caducado o Error de Servidor', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), 
                     const SizedBox(height: 12),
@@ -3256,7 +3253,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       children: [
                         OutlinedButton.icon(
                           onPressed: _exitPlayer, 
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                          icon: AurisIcon(AurisIcons.chevronLeft, color: const Color(0xFFEF7A1E), size: 24),
                           label: const Text('Volver'),
                         ),
                         const SizedBox(width: 16),
@@ -3265,7 +3262,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           onPressed: () {
                              Navigator.of(context).pop();
                           }, 
-                          icon: const Icon(Icons.search_rounded),
+                          icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 24),
                           label: const Text('Buscar Fuente Fresca'),
                         ),
                       ],
@@ -3274,7 +3271,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 ),
               ),
             ),
-            Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), onPressed: _exitPlayer))),
+            Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(          icon: AurisIcon(AurisIcons.arrowLeft, color: Colors.white, size: 28), onPressed: _exitPlayer))),
           ]),
       ) : const SizedBox.shrink(),
     );
@@ -3372,7 +3369,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28),
+            icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 28),
             onPressed: _exitPlayer,
           ),
           const Spacer(),
@@ -3457,14 +3454,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             if (!_isTrailer) ...[
               IconButton(
                 iconSize: 32,
-                icon: const Icon(Symbols.skip_previous, color: Colors.white70),
+                icon: AurisIcon(AurisIcons.skipPrev, color: Colors.white70, size: 32),
                 onPressed: () => _handleRemoteNavigation(false, target),
               ),
               const SizedBox(width: 16),
             ],
             IconButton(
               iconSize: 24,
-              icon: const Icon(Symbols.replay_10, color: Colors.white),
+              icon: AurisIcon(AurisIcons.backward10, color: Colors.white, size: 24),
               onPressed: () => _sendRemoteSeek(target, -10000),
             ),
             const SizedBox(width: 32),
@@ -3477,10 +3474,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ),
               child: IconButton(
                 iconSize: 44,
-                icon: Icon(
-                  target.isPlaying ? Symbols.pause : Symbols.play_arrow,
+                icon: AurisIcon(
+                  target.isPlaying ? AurisIcons.pause : AurisIcons.playFilled,
                   color: Colors.black,
-                  fill: 1.0,
+                  size: 44,
                 ),
                 onPressed: () => _sendRemoteAction(target, target.isPlaying ? RemoteAction.pause : RemoteAction.play),
               ),
@@ -3488,14 +3485,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             const SizedBox(width: 32),
             IconButton(
               iconSize: 24,
-              icon: const Icon(Symbols.forward_10, color: Colors.white),
+              icon: AurisIcon(AurisIcons.forward10, color: Colors.white, size: 24),
               onPressed: () => _sendRemoteSeek(target, 10000),
             ),
             if (!_isTrailer) ...[
               const SizedBox(width: 16),
               IconButton(
                 iconSize: 32,
-                icon: const Icon(Symbols.skip_next, color: Colors.white70),
+                icon: AurisIcon(AurisIcons.skipNext, color: Colors.white70, size: 32),
                 onPressed: () => _handleRemoteNavigation(true, target),
               ),
             ],
@@ -3527,14 +3524,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           children: [
             if (!_isOpEd)
               _RemoteMandoActionButton(
-                icon: Symbols.fast_forward,
+                icon: AurisIcons.fastForward,
                 label: 'SALTAR OP/ED',
                 onTap: () => _sendRemoteAction(target, RemoteAction.skipOpEd),
               ),
             if (!_isOpEd && target.availableTracks.length > 1) ...[
               const SizedBox(width: 16),
               _RemoteMandoActionButton(
-                icon: Symbols.subtitles,
+                icon: AurisIcons.subtitles,
                 label: 'IDIOMA',
                 onTap: () => _showRemoteLanguageSelector(target),
               ),
@@ -3542,7 +3539,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             if (!_isOpEd && !_isMovie) ...[
               const SizedBox(width: 16),
               _RemoteMandoActionButton(
-                icon: Symbols.video_library,
+                icon: AurisIcons.videoLib,
                 label: 'EPISODIOS',
                 onTap: () => _showRemoteEpisodesSelector(target),
               ),
@@ -3595,7 +3592,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       ),
                     ),
                     title: Text(label, style: TextStyle(color: isCurrent ? Colors.white : Colors.white70, fontWeight: isCurrent ? FontWeight.w900 : FontWeight.normal)),
-                    trailing: isCurrent ? const Icon(Icons.check_circle_rounded, color: Color(0xFFEF7A1E)) : null,
+                    trailing: isCurrent ? AurisIcon(AurisIcons.checkCircleFilled, color: const Color(0xFFEF7A1E)) : null,
                   );
                 },
               ),
@@ -3664,7 +3661,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             ),
                             title: Text(ep.title ?? 'Episodio ${ep.number}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isCurrent ? Colors.white : Colors.white70, fontWeight: isCurrent ? FontWeight.w900 : FontWeight.normal)),
                             subtitle: (ep.description != null && ep.description!.isNotEmpty) ? Text(ep.description!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)) : null,
-                            trailing: isCurrent ? const Icon(Icons.play_circle_fill_rounded, color: Color(0xFFEF7A1E)) : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white10, size: 14),
+                            trailing: isCurrent ? AurisIcon(AurisIcons.playCircleFilled, color: const Color(0xFFEF7A1E)) : AurisIcon(AurisIcons.chevronRight, color: Colors.white10, size: 14),
                           );
                         },
                       );
@@ -3816,7 +3813,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             left: 16,
             child: SafeArea(
               child: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 30),
+                icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 30),
                 onPressed: _exitPlayer,
                 style: IconButton.styleFrom(backgroundColor: Colors.black45),
               ),
@@ -3827,7 +3824,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             right: 16,
             child: SafeArea(
               child: TextButton.icon(
-                icon: const Icon(Icons.open_in_new_rounded, color: Colors.white, size: 18),
+                icon: AurisIcon(AurisIcons.export, color: Colors.white, size: 18),
                 label: const Text('Abrir en YouTube', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
                 style: TextButton.styleFrom(
                   backgroundColor: Colors.black45,
@@ -3857,7 +3854,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return Stack(fit: StackFit.expand, children: [
         if (_webViewController != null) WebViewWidget(controller: _webViewController!)
         else Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.open_in_browser, color: Colors.white70, size: 64),
+                  AurisIcon(AurisIcons.squareArrowUp, color: Colors.white70, size: 64),
                 const SizedBox(height: 16),
                 const Text('Reproducción externa iniciada', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 24),
@@ -3867,7 +3864,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     final currentTrack = playableTracks[_selectedTrackIndex < playableTracks.length ? _selectedTrackIndex : 0];
                     _launchExternal(currentTrack.url);
                   },
-                  icon: const Icon(Icons.launch, size: 16),
+                  icon: AurisIcon(AurisIcons.arrowUpRight, color: Colors.white, size: 16),
                   label: const Text('Reabrir navegador'),
                 ),
               ])),
@@ -3877,7 +3874,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           left: 16,
           child: SafeArea(
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 30),
+              icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 30),
               onPressed: _exitPlayer,
               style: IconButton.styleFrom(backgroundColor: Colors.black45),
             ),
@@ -3891,7 +3888,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final String volIcon = value == 0 
         ? AurisIcons.volumeCross 
         : (value <= 0.5 ? AurisIcons.volumeDown : AurisIcons.volumeHigh);
-    final IconData brightnessIcon = value > 0.7 ? Icons.brightness_7_rounded : (value > 0.3 ? Icons.brightness_6_rounded : Icons.brightness_2_rounded);
+    final String brightnessIcon = value > 0.7 ? AurisIcons.sunHigh : (value > 0.3 ? AurisIcons.sunMid : AurisIcons.sunLow);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -3904,7 +3901,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         mainAxisSize: MainAxisSize.min,
         children: [
           isBrightness
-              ? Icon(brightnessIcon, color: Colors.white, size: 18)
+              ? AurisIcon(brightnessIcon, color: Colors.white, size: 18)
               : AurisIcon(isBoost ? AurisIcons.boltFilled : volIcon, color: isBoost ? Colors.orangeAccent : Colors.white, size: 18),
           const SizedBox(width: 12),
           Container(
@@ -3969,7 +3966,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!isRight) const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 36),
+              if (!isRight) AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 36),
               const SizedBox(width: 4),
               Text(
                 '${isRight ? "+" : "-"}${_lastSkipValue}',
@@ -3981,7 +3978,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 ),
               ),
               const SizedBox(width: 4),
-              if (isRight) const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 36),
+              if (isRight) AurisIcon(AurisIcons.chevronRight, color: Colors.white, size: 36),
             ],
           ),
         ),
@@ -4008,7 +4005,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
           ),
           const SizedBox(width: 8),
-          const Icon(Icons.fast_forward_rounded, color: Colors.white, size: 20),
+          AurisIcon(AurisIcons.fastForward, color: Colors.white, size: 20),
         ],
       ),
     );
@@ -4033,8 +4030,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white10),
               ),
-              child: Icon(
-                isForward ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
+              child: AurisIcon(
+                isForward ? AurisIcons.fastForward : AurisIcons.rewind,
                 color: Colors.white,
                 size: isMobile ? 48 : 64,
               ),
@@ -4358,11 +4355,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                               color: Colors.black.withValues(alpha: 0.5),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(
+                            child: AurisIcon(
                               _centerIndicatorIcon,
                               color: Colors.white,
                               size: 60,
-                              fill: 1.0,
                             ),
                           ),
                         ),
@@ -4498,8 +4494,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                            setState(() => _webNeedsInteraction = false);
                            _player?.play();
                          },
-                         icon: const Icon(Icons.play_arrow_rounded, size: 28),
-                         label: const Text('REPRODUCIR AHORA', style: TextStyle(fontWeight: FontWeight.w900)),
+                          icon: AurisIcon(AurisIcons.playFilled, color: Colors.white, size: 28),
+                          label: const Text('REPRODUCIR AHORA', style: TextStyle(fontWeight: FontWeight.w900)),
                        ),
                      ],
                    ),
@@ -4607,7 +4603,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                        child: Column(
                          mainAxisSize: MainAxisSize.min, 
                          children: [
-                           const Icon(Icons.error_outline, color: Color(0xFFFF5252), size: 56),
+                           AurisIcon(AurisIcons.alertCircle, color: const Color(0xFFFF5252), size: 56),
                            const SizedBox(height: 16),
                            const Text('No se pudo reproducir', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                            const SizedBox(height: 8),
@@ -4731,7 +4727,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.play_arrow_rounded, color: Colors.black, size: isMobile ? 26 : 30),
+                              AurisIcon(AurisIcons.playFilled, color: Colors.black, size: isMobile ? 26 : 30),
                               SizedBox(width: isMobile ? 8 : 12),
                               Text(
                                 label,
@@ -4746,8 +4742,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                                     _autoplayTimer?.cancel();
                                     setState(() => _autoplayCountdown = -1);
                                   },
-                                  child: Icon(
-                                    _isAutoplayResume ? Icons.refresh_rounded : Icons.close_rounded,
+              child: AurisIcon(
+                                    _isAutoplayResume ? AurisIcons.restart : AurisIcons.close,
                                     color: Colors.black54,
                                     size: isMobile ? 20 : 22,
                                   ),
@@ -4792,13 +4788,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           children: [
             IconButton(
               iconSize: iconSize,
-              icon: const Icon(Symbols.arrow_back, color: Colors.white),
+              icon: AurisIcon(AurisIcons.arrowLeft, color: Colors.white, size: iconSize),
               onPressed: _exitPlayer, // Senior Fix: Volver a cerrar player por defecto
             ),
             SizedBox(width: spacing),
             IconButton(
               iconSize: iconSize,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 32),
+              icon: AurisIcon(AurisIcons.chevronDown, color: Colors.white, size: 32),
               onPressed: _minimizePlayer, // Botón dedicado para minimizar
             ),
             SizedBox(width: spacing),
@@ -4898,8 +4894,8 @@ Builder(
       builder: (context, snapshot) {
         final isPlaying = snapshot.data ?? initialPlay;
         
-        IconData iconData = isPlaying ? Symbols.pause : Symbols.play_arrow;
-        if (_isCompleted) iconData = Symbols.replay;
+        String iconData = isPlaying ? AurisIcons.pause : AurisIcons.playFilled;
+        if (_isCompleted) iconData = AurisIcons.restart;
 
         return _buildCircularButton(
           icon: iconData,
@@ -5243,17 +5239,17 @@ Builder(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center, 
         children: [
-          _buildCircularCenterAction(icon: Symbols.replay_10, size: iconSize, onTap: _skipBackward),
+          _buildCircularCenterAction(icon: AurisIcons.backward10, size: iconSize, onTap: _skipBackward),
           SizedBox(width: spacing), 
           _buildPlayPauseButton(size: playSize),
           SizedBox(width: spacing),
-          _buildCircularCenterAction(icon: Symbols.forward_10, size: iconSize, onTap: _skipForward),
+          _buildCircularCenterAction(icon: AurisIcons.forward10, size: iconSize, onTap: _skipForward),
         ]
       )
     );
   }
 
-  Widget _buildCircularCenterAction({required IconData icon, required double size, required VoidCallback onTap}) {
+  Widget _buildCircularCenterAction({required Object icon, required double size, required VoidCallback onTap}) {
     return _buildCircularButton(
       icon: icon,
       onTap: onTap,
@@ -5359,7 +5355,7 @@ Builder(
                         if (_hasQualityOptions) ...[
                           _PlayerTextButton(
                             onPressed: _showQualitySelector,
-                            icon: Symbols.hd,
+                            icon: AurisIcons.hd,
                             label: _selectedQuality == 'auto'
                                 ? 'Calidad'
                                 : (_qualityMenuOptions.firstWhereOrNull((o) => o['key'] == _selectedQuality)?['label'] as String? ?? 'Calidad'),
@@ -5759,7 +5755,7 @@ class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> 
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: Icon(Symbols.close, color: Colors.white, size: useMobileLayout ? (isLandscape ? 28 : 36) : 48),
+                  icon: AurisIcon(AurisIcons.close, color: Colors.white, size: useMobileLayout ? (isLandscape ? 28 : 36) : 48),
                   onPressed: widget.onClose,
                 ),
               ],
@@ -5884,8 +5880,8 @@ class _CarouselArrowState extends State<_CarouselArrow> {
               ),
             ),
             child: Center(
-              child: Icon(
-                widget.isRight ? Icons.arrow_forward_ios_rounded : Icons.arrow_back_ios_new_rounded,
+              child: AurisIcon(
+                widget.isRight ? AurisIcons.chevronRight : AurisIcons.chevronLeft,
                 color: Colors.white,
                 size: 40,
               ),
@@ -5983,7 +5979,7 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
                                 errorWidget: (context, url, error) => Container(color: Colors.black26),
                               )
                             else
-                              Container(color: Colors.white.withOpacity(0.05), child: Icon(Icons.movie_outlined, color: Colors.white10, size: useMobileLayout ? 48 : 72)),
+                              Container(color: Colors.white.withOpacity(0.05), child: AurisIcon(AurisIcons.film, color: Colors.white10, size: useMobileLayout ? 48 : 72)),
                             
                             if (widget.isCurrent)
                               Positioned.fill(
@@ -6131,8 +6127,8 @@ class _PlayerSidePanel extends StatelessWidget {
                                 shape: BoxShape.circle,
                                 color: Colors.white.withOpacity(0.07),
                               ),
-                              child: const Icon(
-                                Icons.close_rounded,
+                              child: AurisIcon(
+                                AurisIcons.close,
                                 color: Colors.white54,
                                 size: 15,
                               ),
@@ -6206,7 +6202,7 @@ class _NetflixProgressBarState extends State<_NetflixProgressBar> {
 }
 
 class _RemoteMandoActionButton extends StatelessWidget {
-  final IconData icon;
+  final Object icon;
   final String label;
   final VoidCallback onTap;
 
@@ -6231,7 +6227,9 @@ class _RemoteMandoActionButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white, size: 20),
+            icon is String
+                ? AurisIcon(icon as String, color: Colors.white, size: 20)
+                : Icon(icon as IconData, color: Colors.white, size: 20),
             const SizedBox(width: 10),
             Text(
               label,

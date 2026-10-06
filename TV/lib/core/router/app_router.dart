@@ -31,52 +31,88 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(deb
 
 /// Dispatcher de "atrás" personalizado para TV.
 ///
-/// - Si hay una ruta por encima de la raíz (detalle, reproductor, etc.),
-///   delegamos en [GoRouterDelegate.popRoute] para hacer pop normal.
-/// - Si estamos en la raíz (cualquier pestaña principal) y no hay nada que
-///   popear, NO dejamos que el sistema cierre la app: mostramos un diálogo de
-///   confirmación de salida. Así el botón "atrás" del mando nunca cierra la app
-///   por accidente.
+/// Todo el back del sistema (botón ATRÁS del mando) pasa por aquí y ejecuta
+/// [handleAppBack], la única lógica de retroceso de la app: pop respetando los
+/// `PopScope` (cierran paneles/menús antes de salir), volver a Inicio desde
+/// cualquier pestaña y, solo en Inicio, pedir confirmación para salir.
 class AppBackButtonDispatcher extends RootBackButtonDispatcher {
   final GoRouter router;
   AppBackButtonDispatcher(this.router);
 
   @override
-  Future<bool> invokeCallback(Future<bool> defaultValue) async {
-    // Si hay algo que popear (sub-pantalla, reproductor o sub-ruta de una
-    // pestaña del shell), delegamos en go_router / PopScope y NUNCA cerramos
-    // la app desde aquí. Esto cubre también el caso en que una ruta "trague"
-    // el back (p.ej. el reproductor cierra un panel antes de popear).
-    if (router.canPop()) {
-      await router.routerDelegate.popRoute();
-      return true;
-    }
+  Future<bool> invokeCallback(Future<bool> defaultValue) => handleAppBack(router);
+}
 
-    // En la raíz (pestaña principal). Si no estamos en Inicio, el "atrás"
-    // nos devuelve a Inicio en lugar de cerrar la app.
-    final String top = router.routerDelegate.currentConfiguration.uri.path;
-    if (top != '/') {
-      router.go('/');
-      return true;
-    }
+/// Lógica única del botón "atrás" de la app.
+///
+/// El dispatcher del sistema y los manejadores de teclado del mando deben
+/// llamar a esta función para que el botón ATRÁS del remoto se comporte
+/// siempre igual, sea cual sea la pantalla o el widget con el foco.
+Future<bool> handleAppBack(GoRouter router) async {
+  final GoRouterDelegate delegate = router.routerDelegate;
 
-    // Estamos en Inicio: en lugar de dejar que el sistema cierre la app,
-    // pedimos confirmación.
-    final BuildContext? context = rootNavigatorKey.currentContext;
-    if (context == null) return false;
+  // 1) Hay una ruta por encima de la raíz (detalle, reproductor, diálogo...):
+  //    pop normal. Los PopScope de la pantalla tienen prioridad: si tragan el
+  //    back (p.ej. el reproductor cierra un panel), aquí termina el proceso.
+  if (await delegate.popRoute()) return true;
+  // Si había rutas pero no se pudo popear (p.ej. un `onExit` lo bloquea),
+  // no forzamos la salida.
+  if (router.canPop()) return true;
 
-    final bool? shouldExit = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const _ExitConfirmationDialog(),
-    );
+  // 2) Estamos en una pestaña raíz: su ruta no se puede popear, pero sí
+  //    tiene PopScope (buscador de Home, menú de Perfil, desplegables...).
+  //    Sin este paso esos overlays nunca recibirían el "atrás" y la acción
+  //    dependería de qué widget tuviera el foco. Se lo preguntamos al
+  //    navigator de la pestaña para que el overlay se cierre primero.
+  if (await _popInShellRoutes(router)) return true;
 
-    if (shouldExit == true) {
-      await SystemNavigator.pop();
-    }
-    // En cualquier caso, ya gestionamos el "atrás" (sin cierre accidental).
+  // 3) En una pestaña que no es Inicio -> volver a Inicio.
+  final String top = delegate.currentConfiguration.uri.path;
+  if (top != '/') {
+    router.go('/');
     return true;
   }
+
+  // 4) Estamos en Inicio: en lugar de dejar que el sistema cierre la app,
+  // pedimos confirmación.
+  final BuildContext? context = rootNavigatorKey.currentContext;
+  if (context == null || !context.mounted) return false;
+
+  final bool? shouldExit = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => const _ExitConfirmationDialog(),
+  );
+
+  if (shouldExit == true) {
+    await SystemNavigator.pop();
+  }
+  // En cualquier caso, ya gestionamos el "atrás" (sin cierre accidental).
+  return true;
+}
+
+/// Intenta popear la ruta activa de cada pestaña del shell (de la más
+/// interna a la más externa). Devuelve `true` si algo la gestionó: que la
+/// ruta se popeara o que su `PopScope` hubiera interceptado el back.
+Future<bool> _popInShellRoutes(GoRouter router) async {
+  final List<ShellRouteMatch> shells = <ShellRouteMatch>[];
+  void collect(List<RouteMatchBase> matches) {
+    for (final RouteMatchBase match in matches) {
+      if (match is ShellRouteMatch) {
+        shells.add(match);
+        collect(match.matches);
+      }
+    }
+  }
+
+  collect(router.routerDelegate.currentConfiguration.matches);
+
+  for (final ShellRouteMatch shell in shells.reversed) {
+    final NavigatorState? navigator = shell.navigatorKey.currentState;
+    if (navigator == null) continue;
+    if (await navigator.maybePop()) return true;
+  }
+  return false;
 }
 
 class _ExitConfirmationDialog extends StatelessWidget {

@@ -8,6 +8,21 @@ class AurisIcons {
   static String get playFilled => reiconSvg(Reicon.filled.play);
   static String get play3 => reiconSvg(Reicon.outline.play3);
   static String get play3Filled => reiconSvg(Reicon.filled.play3);
+  static String get playCircleFilled => reiconSvg(Reicon.filled.playCircle);
+  static String get rewind => reiconSvg(Reicon.outline.rewind);
+  static String get sunHigh => reiconSvg(Reicon.outline.sun);
+  static String get sunMid => reiconSvg(Reicon.outline.sun2);
+  static String get sunLow => reiconSvg(Reicon.outline.sun4);
+  static String get autoBrightness => reiconSvg(Reicon.outline.autobrightness);
+  static String get autobrightness => reiconSvg(Reicon.outline.autobrightness);
+  static String get alertCircle => reiconSvg(Reicon.outline.alertCircle);
+  static String get checkCircleFilled => reiconSvg(Reicon.filled.checkCircle);
+  static String get hd => reiconSvg(Reicon.outline.hd);
+  static String get arrowLeft => reiconSvg(Reicon.outline.arrowLeft);
+  static String get export => reiconSvg(Reicon.outline.export);
+  static String get arrowUpRight => reiconSvg(Reicon.outline.arrowUpRight);
+  static String get squareArrowUp => reiconSvg(Reicon.outline.squareArrowUp);
+  static String get film => reiconSvg(Reicon.outline.film);
   static String get pause => reiconSvg(Reicon.outline.pause);
   static String get forwardStep => reiconSvg(Reicon.outline.forwardStep);
   static String get backwardStep => reiconSvg(Reicon.outline.backwardStep);
@@ -38,19 +53,27 @@ class AurisIcons {
   static String get bolt => reiconSvg(Reicon.outline.bolt);
   static String get boltFilled => reiconSvg(Reicon.filled.bolt);
 
-  static String get speedometer => reiconSvg(Reicon.outline.speedometer);
-  static String get speed => reiconSvg(Reicon.outline.speedometer);
+  static String get speedometer => reiconSvg(Reicon.outline.flash);
+  static String get speed => reiconSvg(Reicon.outline.flash);
+  static String get flash => reiconSvg(Reicon.outline.flash);
 
   // PiP (Picture in Picture), Cast, Rotación, Candados y Pantalla Completa
   static String get toPip => reiconSvg(Reicon.outline.toPip);
   static String get exitPip => reiconSvg(Reicon.outline.exitPip);
   static String get cast => reiconSvg(Reicon.outline.screencast);
+  static String get castTv => reiconSvg(Reicon.outline.screencast2);
+  static String get castDesktop => reiconSvg(Reicon.outline.desktop);
+  static String get castMobile => reiconSvg(Reicon.outline.mobile);
+  static String get tv => reiconSvg(Reicon.outline.screencast2);
+  static String get desktop => reiconSvg(Reicon.outline.desktop);
+  static String get mobile => reiconSvg(Reicon.outline.mobile);
   static String get phoneRotate => reiconSvg(Reicon.outline.phoneRotate2);
   static String get lockOpen => reiconSvg(Reicon.outline.lockKeyholeOpen);
   static String get lockClosed => reiconSvg(Reicon.outline.lockKeyhole);
   static String get aspectRatioSquare => reiconSvg(Reicon.outline.aspectRatioSquare);
   static String get expand => reiconSvg(Reicon.outline.expand);
-  static String get exitFullscreen => reiconSvg(Reicon.outline.exitFullscreen);
+  static String get exitFullscreen => reiconSvg(Reicon.outline.compress);
+  static String get compress => reiconSvg(Reicon.outline.compress);
   static String get maximize => reiconSvg(Reicon.outline.maximize);
   static String get minimize => reiconSvg(Reicon.outline.minimize);
 
@@ -86,6 +109,9 @@ class AurisIcons {
   static String get link => reiconSvg(Reicon.outline.link);
   static String get forwardRight => reiconSvg(Reicon.outline.forwardRight);
   static String get share => reiconSvg(Reicon.outline.forwardRight);
+  static String get check => reiconSvg(Reicon.outline.tickCircle);
+  static String get tickCircle => reiconSvg(Reicon.outline.tickCircle);
+  static String get checkCircle => reiconSvg(Reicon.outline.tickCircle);
   static String get verify => reiconSvg(Reicon.outline.verify);
   static String get verified => reiconSvg(Reicon.outline.verify);
   static String get like => reiconSvg(Reicon.outline.like);

@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:auris_core/auris_core.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -226,7 +227,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   top: 0,
                   child: Image.asset(
                     'assets/icons/chibi_pelinaranja_suspendida.png',
-                    height: size.height * 0.52,
+                    height: size.height * 0.42,
                     fit: BoxFit.contain,
                     alignment: Alignment.topRight,
                   ),
@@ -244,25 +245,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 52),
-                        SvgPicture.asset(
-                          'assets/icons/auris-logo-web-flat.svg',
-                          height: 38,
-                          alignment: Alignment.centerLeft,
-                        ),
                         Expanded(
                           child: Align(
-                            alignment: const Alignment(-1, -0.15),
-                            child: _buildWelcomeStep(),
+                            alignment: const Alignment(0, -0.32),
+                            child: Transform.translate(
+                              offset: const Offset(-22, 0),
+                              child: _buildWelcomeStep(),
+                            ),
                           ),
                         ),
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 16),
-                          child: Text(
-                            'Al usar AurisTV aceptas nuestros Terminos de Uso y Politica de Privacidad.',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              height: 1.55,
+                        Transform.translate(
+                          offset: const Offset(-22, 0),
+                          child: const Padding(
+                            padding: EdgeInsets.only(bottom: 16),
+                            child: SizedBox(
+                              width: 520,
+                              child: Text(
+                                'Al usar AurisTV muestras tu conformidad con nuestras\n'
+                                'Condiciones de Uso [auristv.dpdns.org/terms] y nuestra Política de\n'
+                                'Privacidad [auristv.dpdns.org/privacy], confirmando además que\n'
+                                'tienes 16 años o más.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 11.5,
+                                  height: 1.45,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -334,20 +343,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget _buildWelcomeStep() {
     return Column(
       key: const ValueKey('welcome'),
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          '¡Bienvenido!',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 40,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
-            height: 1.1,
-          ),
+        SvgPicture.asset(
+          'assets/icons/auris-logo-web-flat.svg',
+          width: 420,
+          height: 72,
+          alignment: Alignment.center,
+          fit: BoxFit.contain,
         ),
-        const SizedBox(height: 40),
+        const SizedBox(height: 28),
 
         // ACCEDER -> Opens Scan QR Code step
         _BigButton(
@@ -356,11 +362,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           filled: true,
           onPressed: () => _enterSubMenu(_LoginStep.scanQR),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
         Image.asset(
           'assets/icons/chibi_gatita_naranja.png',
-          height: 215,
-          alignment: Alignment.centerLeft,
+          height: 220,
+          alignment: Alignment.center,
           fit: BoxFit.contain,
         ),
       ],
@@ -984,10 +990,10 @@ class _BigButtonState extends State<_BigButton> {
         onTap: widget.onPressed,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          width: 310,
+          width: 260,
           height: isFilled ? 52 : 40,
           decoration: BoxDecoration(
-            color: _focused ? AppTheme.brand : Colors.transparent,
+            color: isFilled ? AppTheme.brand : Colors.transparent,
             borderRadius: BorderRadius.zero,
             border: Border.all(
               color: Colors.white,
@@ -997,10 +1003,10 @@ class _BigButtonState extends State<_BigButton> {
           alignment: Alignment.center,
           child: Text(
             widget.label,
-            style: TextStyle(
-              color: _focused ? Colors.black : Colors.white,
+            style: const TextStyle(
+              color: Color(0xFF2C0B00),
               fontSize: 15,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               letterSpacing: 1.5,
             ),
           ),

@@ -64,7 +64,11 @@ class _FullScreenViewerState extends State<FullScreenViewer> {
         if (event is KeyDownEvent) {
           if (event.logicalKey == LogicalKeyboardKey.arrowRight) _nextPage();
           if (event.logicalKey == LogicalKeyboardKey.arrowLeft) _previousPage();
-          if (event.logicalKey == LogicalKeyboardKey.escape) Navigator.of(context).pop();
+          if (event.logicalKey == LogicalKeyboardKey.escape ||
+              event.logicalKey == LogicalKeyboardKey.goBack ||
+              event.logicalKey == LogicalKeyboardKey.browserBack) {
+            Navigator.of(context).pop();
+          }
         }
       },
       child: Scaffold(
