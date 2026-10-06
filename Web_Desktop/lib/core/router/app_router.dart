@@ -16,6 +16,7 @@ import '../../features/auth/presentation/connections_screen.dart';
 import '../../features/avatar/presentation/avatar_selector_screen.dart';
 import '../../features/avatar/presentation/profile_selection_screen.dart';
 import '../../features/avatar/presentation/profile_setup_screen.dart';
+import '../../features/legal/presentation/legal_screen.dart';
 import '../../features/intro/presentation/splash_screen.dart';
 import '../../shared/widgets/main_navigation_wrapper.dart';
 
@@ -185,6 +186,16 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: rootNavigatorKey,
       path: '/horario',
       builder: (context, state) => const ScheduleScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/terms',
+      builder: (context, state) => const LegalScreen(isTerms: true),
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/privacy',
+      builder: (context, state) => const LegalScreen(isTerms: false),
     ),
   ],
 );

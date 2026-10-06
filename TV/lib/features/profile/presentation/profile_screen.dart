@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../../../core/utils/tv_responsive_utils.dart';
+import '../../../../core/router/app_router.dart';
+import '../../../../core/focus/global_focus_nodes.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -15,200 +15,50 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  final GlobalKey<_FocusableNameSelectorState> _nameMenuKey =
-      GlobalKey<_FocusableNameSelectorState>();
-
-  @override
-  Widget build(BuildContext context) {
-    final user = ref.watch(authProvider);
-    final favorites = ref.watch(favoritesProvider);
-    const primaryColor = Color(0xFFEF7A1E);
-
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        // Si el menú flotante está abierto, BACK solo lo cierra y devuelve
-        // el foco al nombre (en lugar de salir de la pantalla).
-        final menu = _nameMenuKey.currentState;
-        if (menu != null && menu.isMenuOpen) {
-          menu.closeMenu();
-          return;
-        }
-        if (context.canPop()) {
-          context.pop();
-        } else {
-          context.go('/');
-        }
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0B0B0D),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF0B0B0D),
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 24),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/');
-              }
-            },
-          ),
-          title: const Text(
-            'Mi Auris',
-            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
-          ),
-          actions: [
-            IconButton(
-              icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 28),
-              onPressed: () => context.push('/search'),
-            ),
-            const SizedBox(width: 12),
-            IconButton(
-              icon: AurisIcon(AurisIcons.settings, color: Colors.white, size: 28),
-              onPressed: () => context.push('/settings'),
-            ),
-            const SizedBox(width: 24),
-          ],
-        ),
-        body: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 140, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1100),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left Column: Two separate focusable targets (Avatar -> ProfileEditScreen, Name Selector -> Integrated Dropdown)
-                    Column(
-                      children: [
-                        _FocusableAvatarWidget(user: user, primaryColor: primaryColor),
-                        const SizedBox(height: 16),
-                        _FocusableNameSelector(
-                          key: _nameMenuKey,
-                          user: user,
-                          primaryColor: primaryColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 60),
-
-                    // Right Column: Quick actions & Favorites
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('MENÚ PRINCIPAL', style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                          const SizedBox(height: 12),
-                          _QuickActionTile(
-                            icon: AurisIcons.download,
-                            iconBgColor: Colors.blueAccent,
-                            title: 'Descargas y Mi Espacio',
-                            subtitle: 'Favoritos e historial guardado',
-                            onTap: () => context.push('/settings/library'),
-                          ),
-                          const Divider(color: Colors.white24, height: 40),
-
-                          const Text('Series y películas que te gustan', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 260,
-                            child: favorites.isEmpty
-                                ? Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                                      child: Text(
-                                        'Agrega contenido a tus favoritos para verlo aquí.',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 16),
-                                      ),
-                                    ),
-                                  )
-                                : ListView.builder(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: favorites.length,
-                                    itemBuilder: (context, index) {
-                                      final item = favorites[index];
-                                      return SizedBox(
-                                        width: 160,
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(right: 16),
-                                          child: FocusablePosterCard(
-                                            key: ValueKey(item.url),
-                                            title: item.title,
-                                            posterUrl: item.posterUrl,
-                                            showInfo: true,
-                                            onTap: () {
-                                              final uri = Uri(
-                                                path: '/content/${Uri.encodeComponent(item.title)}',
-                                                queryParameters: {
-                                                  'url': item.url,
-                                                  'source': item.source,
-                                                  'category': item.category,
-                                                  'banner': item.bannerUrl ?? '',
-                                                  'metadataTitle': item.title,
-                                                },
-                                              );
-                                              context.push(uri.toString());
-                                            },
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FocusableAvatarWidget extends StatefulWidget {
-  final dynamic user;
-  final Color primaryColor;
-
-  const _FocusableAvatarWidget({required this.user, required this.primaryColor});
-
-  @override
-  State<_FocusableAvatarWidget> createState() => _FocusableAvatarWidgetState();
-}
-
-class _FocusableAvatarWidgetState extends State<_FocusableAvatarWidget> {
-  bool _hasFocus = false;
-  late FocusNode _focusNode;
+  final FocusNode _heroFocusNode = FocusNode();
+  FocusScopeNode? _routeScope;
 
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_focusNode.canRequestFocus) {
-        _focusNode.requestFocus();
-      }
-    });
+    appRouter.routeInformationProvider.addListener(_handleRouteInformation);
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _restoreFocusIfOutside());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _routeScope = FocusScope.of(context);
   }
 
   @override
   void dispose() {
-    _focusNode.dispose();
+    appRouter.routeInformationProvider
+        .removeListener(_handleRouteInformation);
+    _heroFocusNode.dispose();
     super.dispose();
   }
 
-  void _navigateToEditProfile(BuildContext context) {
-    final profiles = widget.user?.profiles;
-    final activeId = widget.user?.activeProfileId;
+  void _handleRouteInformation() {
+    final String path = appRouter.routeInformationProvider.value.uri.path;
+    if (path != '/profile') return;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _restoreFocusIfOutside());
+  }
+
+  void _restoreFocusIfOutside() {
+    if (!mounted) return;
+    if (_routeScope?.hasFocus ?? false) return;
+    if (_heroFocusNode.canRequestFocus) {
+      _heroFocusNode.requestFocus();
+    }
+  }
+
+  void _navigateToEditProfile() {
+    final user = ref.read(authProvider);
+    final profiles = user?.profiles;
+    final activeId = user?.activeProfileId;
 
     String? profileId;
     if (activeId != null && activeId.isNotEmpty) {
@@ -224,353 +74,294 @@ class _FocusableAvatarWidgetState extends State<_FocusableAvatarWidget> {
     }
   }
 
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D24),
+        title: const Text('Cerrar sesión', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          '¿Estás seguro de que quieres cerrar tu sesión de AurisTV?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(authProvider.notifier).signOut();
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _restoreFocusIfOutside(),
+              );
+            },
+            child: const Text('Cerrar sesión', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(authProvider);
+    final bool isLoggedIn = user != null && user.email != null;
+
+    final String displayName = isLoggedIn
+        ? (user.displayName ?? user.email ?? 'INVITADO')
+        : 'Modo Invitado';
+    final String emailLine = isLoggedIn
+        ? (user.email ?? '')
+        : 'Inicia sesión para sincronizar favoritos e historial';
+
+    final List<Widget> badges = [
+      if (user?.activeProfileId != null)
+        const _Badge(label: 'PERFIL ACTIVO'),
+      if (user?.isAnilistConnected ?? false)
+        const _Badge(label: 'ANILIST'),
+    ];
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/');
+        }
+        // BACK desde el perfil: el foco vuelve al icono de perfil de la
+        // topbar de Home (el punto desde el que se abrió la pantalla).
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (appRouter.routeInformationProvider.value.uri.path == '/' &&
+              homeProfileIconFocusNode.context != null) {
+            homeProfileIconFocusNode.requestFocus();
+          }
+        });
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0B0B0D),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(120, 48, 120, 60),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'MI AURIS',
+                    style: TextStyle(
+                      color: Color(0xFFEF7A1E),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  _ProfileHero(
+                    focusNode: _heroFocusNode,
+                    name: displayName,
+                    email: emailLine,
+                    photoUrl: user?.photoUrl,
+                    badges: badges,
+                    onTap: _navigateToEditProfile,
+                  ),
+                  const SizedBox(height: 48),
+                  const _SectionLabel(title: 'Cuenta'),
+                  _ProfileRow(
+                    label: 'Añadir perfil',
+                    icon: Icons.person_add_alt_1_outlined,
+                    onTap: () => context.push('/add-profile'),
+                  ),
+                  _ProfileRow(
+                    label: 'Cambiar de perfil',
+                    icon: Icons.switch_account_outlined,
+                    onTap: () => context.push('/select-profile'),
+                  ),
+                  _ProfileRow(
+                    label: 'Administrar perfiles',
+                    icon: Icons.manage_accounts_outlined,
+                    onTap: () => context.push('/select-profile?edit=true'),
+                  ),
+                  const SizedBox(height: 32),
+                  const _SectionLabel(title: 'Contenido'),
+                  _ProfileRow(
+                    label: 'Mi Lista',
+                    icon: Icons.download_rounded,
+                    onTap: () => context.push('/settings/library'),
+                  ),
+                  const SizedBox(height: 32),
+                  Container(
+                    width: double.infinity,
+                    height: 1,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                  const SizedBox(height: 16),
+                  if (isLoggedIn)
+                    _ProfileRow(
+                      label: 'Cerrar sesión',
+                      icon: Icons.logout_rounded,
+                      color: Colors.redAccent,
+                      showChevron: false,
+                      onTap: _showLogoutDialog,
+                    )
+                  else
+                    _ProfileRow(
+                      label: 'Iniciar sesión',
+                      icon: Icons.login_rounded,
+                      primary: true,
+                      showChevron: false,
+                      onTap: () => context.push('/login'),
+                    ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileHero extends StatefulWidget {
+  final FocusNode focusNode;
+  final String name;
+  final String email;
+  final String? photoUrl;
+  final List<Widget> badges;
+  final VoidCallback onTap;
+
+  const _ProfileHero({
+    required this.focusNode,
+    required this.name,
+    required this.email,
+    required this.photoUrl,
+    required this.badges,
+    required this.onTap,
+  });
+
+  @override
+  State<_ProfileHero> createState() => _ProfileHeroState();
+}
+
+class _ProfileHeroState extends State<_ProfileHero> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const primaryColor = Color(0xFFEF7A1E);
+    final String? photo = widget.photoUrl;
+
     return Focus(
-      focusNode: _focusNode,
-      onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _focused = f),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
             (event.logicalKey == LogicalKeyboardKey.select ||
              event.logicalKey == LogicalKeyboardKey.enter ||
              event.logicalKey == LogicalKeyboardKey.space)) {
-          _navigateToEditProfile(context);
+          widget.onTap();
           return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: Builder(
-        builder: (context) {
-          return GestureDetector(
-            onTap: () => _navigateToEditProfile(context),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.zero,
-                border: Border.all(
-                  color: _hasFocus ? widget.primaryColor : Colors.transparent,
-                  width: _hasFocus ? 2.5 : 1.5,
-                ),
-              ),
-              child: Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  Container(
-                    width: 150,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white24, width: 2),
-                      image: (widget.user?.photoUrl != null)
-                          ? DecorationImage(
-                              image: widget.user!.photoUrl!.startsWith('assets/')
-                                  ? AssetImage(widget.user!.photoUrl!) as ImageProvider
-                                  : CachedNetworkImageProvider(widget.user!.photoUrl!),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                      color: Colors.white10,
-                    ),
-                    child: (widget.user?.photoUrl == null)
-                        ? AurisIcon(AurisIcons.user, color: Colors.white70, size: 75)
-                        : null,
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: widget.primaryColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: AurisIcon(AurisIcons.settings, size: 16, color: Colors.black),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _FocusableNameSelector extends StatefulWidget {
-  final dynamic user;
-  final Color primaryColor;
-
-  const _FocusableNameSelector({super.key, required this.user, required this.primaryColor});
-
-  @override
-  State<_FocusableNameSelector> createState() => _FocusableNameSelectorState();
-}
-
-class _FocusableNameSelectorState extends State<_FocusableNameSelector> {
-  bool _hasFocus = false;
-  OverlayEntry? _overlayEntry;
-  late FocusNode _nameButtonFocusNode;
-  late FocusNode _firstOptionFocusNode;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameButtonFocusNode = FocusNode();
-    _firstOptionFocusNode = FocusNode();
-  }
-
-  @override
-  void dispose() {
-    _closeMenu();
-    _nameButtonFocusNode.dispose();
-    _firstOptionFocusNode.dispose();
-    super.dispose();
-  }
-
-  /// true si el menú flotante está visible (usado por el PopScope de la pantalla).
-  bool get isMenuOpen => _overlayEntry != null;
-
-  /// Cierra el menú y devuelve el foco al nombre.
-  void closeMenu() => _closeMenu();
-
-  void _toggleMenu(BuildContext context) {
-    if (_overlayEntry != null) {
-      _closeMenu();
-    } else {
-      _openMenu(context);
-    }
-  }
-
-  void _closeMenu() {
-    if (_overlayEntry != null) {
-      _overlayEntry?.remove();
-      _overlayEntry = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _nameButtonFocusNode.canRequestFocus) {
-          _nameButtonFocusNode.requestFocus();
-        }
-      });
-    }
-  }
-
-  void _openMenu(BuildContext context) {
-    if (_overlayEntry != null) return;
-    final RenderBox renderBox = context.findRenderObject() as RenderBox;
-    final size = renderBox.size;
-    final offset = renderBox.localToGlobal(Offset.zero);
-
-    _overlayEntry = OverlayEntry(
-      builder: (context) => Stack(
-        children: [
-          ModalBarrier(
-            color: Colors.transparent,
-            dismissible: true,
-            onDismiss: _closeMenu,
-          ),
-          Positioned(
-            left: offset.dx,
-            top: offset.dy + size.height + 4,
-            width: size.width > 240 ? size.width : 240,
-            child: Focus(
-              onKeyEvent: (node, event) {
-                if (event is KeyDownEvent &&
-                    (event.logicalKey == LogicalKeyboardKey.escape ||
-                     event.logicalKey == LogicalKeyboardKey.goBack)) {
-                  _closeMenu();
-                  return KeyEventResult.handled;
-                }
-                return KeyEventResult.ignored;
-              },
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0B0B0D),
-                    borderRadius: BorderRadius.zero,
-                    border: Border.all(color: Colors.white38, width: 1.5),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _MenuOption(
-                        focusNode: _firstOptionFocusNode,
-                        icon: AurisIcons.user,
-                        label: 'Administrar perfiles',
-                        onArrowUp: _closeMenu,
-                        onBack: _closeMenu,
-                        onTap: () {
-                          _closeMenu();
-                          context.push('/select-profile?edit=true');
-                        },
-                      ),
-                      _MenuOption(
-                        icon: AurisIcons.add,
-                        label: 'Añadir perfil',
-                        onBack: _closeMenu,
-                        onTap: () {
-                          _closeMenu();
-                          context.push('/add-profile');
-                        },
-                      ),
-                      _MenuOption(
-                        icon: AurisIcons.user,
-                        label: 'Cambiar de perfil',
-                        onBack: _closeMenu,
-                        onTap: () {
-                          _closeMenu();
-                          context.push('/select-profile');
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    Overlay.of(context).insert(_overlayEntry!);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_firstOptionFocusNode.canRequestFocus) {
-        _firstOptionFocusNode.requestFocus();
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      focusNode: _nameButtonFocusNode,
-      onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.select ||
-              event.logicalKey == LogicalKeyboardKey.enter ||
-              event.logicalKey == LogicalKeyboardKey.space ||
-              event.logicalKey == LogicalKeyboardKey.arrowDown) {
-            _toggleMenu(context);
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
-      child: Builder(
-        builder: (context) {
-          return GestureDetector(
-            onTap: () => _toggleMenu(context),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.zero,
-                border: Border.all(
-                  color: _hasFocus ? widget.primaryColor : Colors.transparent,
-                  width: _hasFocus ? 2.5 : 1.5,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.user?.displayName?.toUpperCase() ?? widget.user?.email?.toUpperCase() ?? 'INVITADO',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  AurisIcon(AurisIcons.chevronDown, color: Colors.white70, size: 24),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _MenuOption extends StatefulWidget {
-  final Object icon;
-  final String label;
-  final VoidCallback onTap;
-  final VoidCallback? onArrowUp;
-  final VoidCallback? onBack;
-  final FocusNode? focusNode;
-
-  const _MenuOption({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.onArrowUp,
-    this.onBack,
-    this.focusNode,
-  });
-
-  @override
-  State<_MenuOption> createState() => _MenuOptionState();
-}
-
-class _MenuOptionState extends State<_MenuOption> {
-  bool _hasFocus = false;
-
-  @override
-  Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
-    return Focus(
-      focusNode: widget.focusNode,
-      onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          if (widget.onArrowUp != null && event.logicalKey == LogicalKeyboardKey.arrowUp) {
-            widget.onArrowUp!();
-            return KeyEventResult.handled;
-          }
-          if (widget.onBack != null &&
-              (event.logicalKey == LogicalKeyboardKey.escape ||
-               event.logicalKey == LogicalKeyboardKey.goBack)) {
-            widget.onBack!();
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.select ||
-              event.logicalKey == LogicalKeyboardKey.enter ||
-              event.logicalKey == LogicalKeyboardKey.space) {
-            widget.onTap();
-            return KeyEventResult.handled;
-          }
         }
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: _hasFocus ? primaryColor.withValues(alpha: 0.2) : Colors.transparent,
-            borderRadius: BorderRadius.zero,
-            border: Border.all(
-              color: _hasFocus ? primaryColor : Colors.transparent,
-              width: _hasFocus ? 2 : 1,
-            ),
+            color: _focused
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              widget.icon is String
-                  ? AurisIcon(widget.icon as String, color: _hasFocus ? primaryColor : Colors.white70, size: 22)
-                  : Icon(widget.icon as IconData?, color: _hasFocus ? primaryColor : Colors.white70, size: 22),
-              const SizedBox(width: 12),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: _hasFocus ? Colors.white : Colors.white70,
-                  fontSize: 15,
-                  fontWeight: _hasFocus ? FontWeight.bold : FontWeight.normal,
+              AnimatedScale(
+                scale: _focused ? 1.06 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 150,
+                      height: 150,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _focused ? primaryColor : Colors.white24,
+                          width: _focused ? 3 : 2,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 72,
+                        backgroundColor: Colors.white10,
+                        backgroundImage: photo != null
+                            ? (photo.startsWith('assets/')
+                                ? AssetImage(photo) as ImageProvider
+                                : CachedNetworkImageProvider(photo))
+                            : null,
+                        child: photo == null
+                            ? const Icon(Icons.person_rounded,
+                                color: Colors.white70, size: 64)
+                            : null,
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.edit_rounded,
+                            color: Colors.black, size: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 28),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 18,
+                      ),
+                    ),
+                    if (widget.badges.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Row(children: widget.badges),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -581,78 +372,159 @@ class _MenuOptionState extends State<_MenuOption> {
   }
 }
 
-class _QuickActionTile extends StatefulWidget {
-  final Object icon;
-  final Color iconBgColor;
-  final String title;
-  final String subtitle;
+class _ProfileRow extends StatefulWidget {
+  final String label;
+  final IconData icon;
   final VoidCallback onTap;
+  final Color? color;
+  final bool primary;
+  final bool showChevron;
 
-  const _QuickActionTile({
+  const _ProfileRow({
+    required this.label,
     required this.icon,
-    required this.iconBgColor,
-    required this.title,
-    required this.subtitle,
     required this.onTap,
+    this.color,
+    this.primary = false,
+    this.showChevron = true,
   });
 
   @override
-  State<_QuickActionTile> createState() => _QuickActionTileState();
+  State<_ProfileRow> createState() => _ProfileRowState();
 }
 
-class _QuickActionTileState extends State<_QuickActionTile> {
-  bool _hasFocus = false;
+class _ProfileRowState extends State<_ProfileRow> {
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFFEF7A1E);
-    return Focus(
-      onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
-      child: Builder(
-        builder: (context) {
-          return GestureDetector(
-            onTap: widget.onTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.zero,
-                border: Border.all(
-                  color: _hasFocus ? primaryColor : Colors.transparent,
-                  width: _hasFocus ? 2.5 : 1,
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: widget.iconBgColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: widget.icon is String
-                        ? AurisIcon(widget.icon as String, color: Colors.white, size: 24)
-                        : Icon(widget.icon as IconData?, color: Colors.white, size: 24),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 2),
-                        Text(widget.subtitle, style: const TextStyle(color: Colors.white54, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  AurisIcon(AurisIcons.chevronRight, color: Colors.white54, size: 28),
-                ],
-              ),
-            ),
-          );
+    final Color accent = widget.color ?? primaryColor;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Focus(
+        onFocusChange: (f) => setState(() => _focused = f),
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent &&
+              (event.logicalKey == LogicalKeyboardKey.select ||
+               event.logicalKey == LogicalKeyboardKey.enter ||
+               event.logicalKey == LogicalKeyboardKey.space)) {
+            widget.onTap();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
         },
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            width: double.infinity,
+            height: 68,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            decoration: BoxDecoration(
+              color: widget.primary
+                  ? primaryColor
+                  : (_focused
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.transparent),
+              borderRadius: BorderRadius.circular(12),
+              border: widget.primary
+                  ? Border.all(
+                      color: _focused ? Colors.white : Colors.transparent,
+                      width: 2,
+                    )
+                  : Border(
+                      left: BorderSide(
+                        color: _focused ? accent : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  widget.icon,
+                  color: widget.primary
+                      ? Colors.black
+                      : (_focused ? accent : Colors.white54),
+                  size: 24,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: widget.primary
+                          ? Colors.black
+                          : (_focused
+                              ? Colors.white
+                              : (widget.color ?? Colors.white70)),
+                      fontSize: 18,
+                      fontWeight: _focused ? FontWeight.bold : FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (widget.showChevron)
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: _focused ? accent : Colors.white24,
+                    size: 26,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String title;
+  const _SectionLabel({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          color: Color(0xFFEF7A1E),
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  const _Badge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.white24),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white54,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1,
+        ),
       ),
     );
   }

@@ -129,7 +129,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   String _selectedQuality = 'auto';
   bool _userHasPaused = false;
   bool _showCenterIndicator = false;
-  String _centerIndicatorIcon = AurisIcons.play3Filled;
+  String _centerIndicatorIcon = AurisIcons.playFilled;
   Timer? _centerIndicatorTimer;
   final GlobalKey _sliderKey = GlobalKey();
   final ValueNotifier<Offset?> _hoverInfoNotifier = ValueNotifier<Offset?>(null);
@@ -1890,7 +1890,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       } else if (key == LogicalKeyboardKey.keyM) {
         _toggleMute();
         return KeyEventResult.handled;
-      } else if (key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.browserBack) {
+      } else if (key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.goBack ||
+          key == LogicalKeyboardKey.browserBack) {
         _handleBackNavigation();
         return KeyEventResult.handled;
       }
@@ -1948,7 +1950,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _showCentralIndicator(bool playing) {
     _centerIndicatorTimer?.cancel();
     setState(() {
-      _centerIndicatorIcon = playing ? AurisIcons.play3Filled : AurisIcons.pause;
+      _centerIndicatorIcon = playing ? AurisIcons.playFilled : AurisIcons.pause;
       _showCenterIndicator = true;
     });
     _centerIndicatorTimer = Timer(const Duration(milliseconds: 600), () {
@@ -3245,7 +3247,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               child: IconButton(
                 iconSize: 44,
                 icon: AurisIcon(
-                  target.isPlaying ? AurisIcons.pause : AurisIcons.play3Filled,
+                  target.isPlaying ? AurisIcons.pause : AurisIcons.playFilled,
                   color: Colors.black,
                   size: 44,
                 ),
@@ -4477,7 +4479,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       builder: (context, snapshot) {
         final isPlaying = snapshot.data ?? initialPlay;
         
-        String iconData = isPlaying ? AurisIcons.pause : AurisIcons.play3Filled;
+        String iconData = isPlaying ? AurisIcons.pause : AurisIcons.playFilled;
         if (_isCompleted) iconData = AurisIcons.restart;
 
         return _buildCircularButton(

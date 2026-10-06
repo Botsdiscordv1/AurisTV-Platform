@@ -3339,7 +3339,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               child: IconButton(
                 iconSize: 44,
                 icon: AurisIcon(
-                  target.isPlaying ? AurisIcons.pause : AurisIcons.play3,
+                  target.isPlaying ? AurisIcons.pause : AurisIcons.play,
                   color: Colors.black,
                 ),
                 onPressed: () => _sendRemoteAction(target, target.isPlaying ? RemoteAction.pause : RemoteAction.play),
@@ -4672,7 +4672,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       builder: (context, snapshot) {
         final isPlaying = snapshot.data ?? initialPlay;
         
-        String iconData = isPlaying ? AurisIcons.pause : AurisIcons.play3;
+        String iconData = isPlaying ? AurisIcons.pause : AurisIcons.play;
         if (_isCompleted) iconData = AurisIcons.restart;
 
         return _buildCircularButton(
