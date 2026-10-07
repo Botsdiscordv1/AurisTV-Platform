@@ -52,6 +52,12 @@ int? _getRuntime(dynamic detail) {
   return null;
 }
 
+int? _getEpisodeCount(dynamic detail) {
+  if (detail is AnimeDetail) return detail.episodes;
+  if (detail is MovieDetail) return detail.totalEpisodes;
+  return null;
+}
+
 String _formatRuntime(int? minutes) {
   if (minutes == null || minutes == 0) return 'N/A';
   if (minutes < 60) return '$minutes min';
@@ -556,6 +562,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final cert = (detail is MovieDetail ? detail.certification : (detail is AnimeDetail ? detail.certification : null)) ?? 'NR';
     final runtime = _getRuntime(detail);
     final isMovie = _isMovieContent(detail);
+    final episodeCount = _getEpisodeCount(detail);
     final List<String> genres = (detail?.genres as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
 
     return Column(
@@ -574,7 +581,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 if (d != null && d.length >= 4) Text(isMovie && d.length > 4 ? d : d.substring(0, 4)),
                 if (isMovie) ...[ if (runtime != null) Text(_formatRuntime(runtime)) ] 
                 else if (widget.totalSeasons > 1) ...[ Text('${widget.totalSeasons} Temporadas') ] 
-                else if (detail?.episodes != null) ...[ Text('${detail.episodes} Episodios') ],
+                else if (episodeCount != null && episodeCount > 0) ...[ Text('$episodeCount Episodios') ],
                 if (genres.isNotEmpty) ...genres.take(2).map((g) => _buildBadge(context, g.toUpperCase(), small: true)),
                 if (r != null && r > 0) Row(mainAxisSize: MainAxisSize.min, children: [AurisIcon(AurisIcons.star, color: Colors.amber, size: 16), const SizedBox(width: 4), Text(formatRating(r) ?? 'N/A')]),
               ],

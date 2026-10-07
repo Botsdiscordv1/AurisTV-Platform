@@ -138,7 +138,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   String _selectedQuality = 'auto';
   bool _userHasPaused = false;
   bool _showCenterIndicator = false;
-  String _centerIndicatorIcon = AurisIcons.playFilled;
+  String _centerIndicatorIcon = AurisIcons.play;
   Timer? _centerIndicatorTimer;
   final GlobalKey _sliderKey = GlobalKey();
   final ValueNotifier<Offset?> _hoverInfoNotifier = ValueNotifier<Offset?>(null);
@@ -1922,7 +1922,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _showCentralIndicator(bool playing) {
     _centerIndicatorTimer?.cancel();
     setState(() {
-      _centerIndicatorIcon = playing ? AurisIcons.playFilled : AurisIcons.pause;
+      _centerIndicatorIcon = playing ? AurisIcons.play : AurisIcons.pause;
       _showCenterIndicator = true;
     });
     _centerIndicatorTimer = Timer(const Duration(milliseconds: 600), () {
@@ -3475,7 +3475,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               child: IconButton(
                 iconSize: 44,
                 icon: AurisIcon(
-                  target.isPlaying ? AurisIcons.pause : AurisIcons.playFilled,
+                  target.isPlaying ? AurisIcons.pause : AurisIcons.play,
                   color: Colors.black,
                   size: 44,
                 ),
@@ -4494,7 +4494,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                            setState(() => _webNeedsInteraction = false);
                            _player?.play();
                          },
-                          icon: AurisIcon(AurisIcons.playFilled, color: Colors.white, size: 28),
+                          icon: AurisIcon(AurisIcons.play, color: Colors.white, size: 28),
                           label: const Text('REPRODUCIR AHORA', style: TextStyle(fontWeight: FontWeight.w900)),
                        ),
                      ],
@@ -4727,7 +4727,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             mainAxisSize: MainAxisSize.min,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              AurisIcon(AurisIcons.playFilled, color: Colors.black, size: isMobile ? 26 : 30),
+                              AurisIcon(AurisIcons.play, color: Colors.black, size: isMobile ? 26 : 30),
                               SizedBox(width: isMobile ? 8 : 12),
                               Text(
                                 label,
@@ -4894,7 +4894,7 @@ Builder(
       builder: (context, snapshot) {
         final isPlaying = snapshot.data ?? initialPlay;
         
-        String iconData = isPlaying ? AurisIcons.pause : AurisIcons.playFilled;
+        String iconData = isPlaying ? AurisIcons.pause : AurisIcons.play;
         if (_isCompleted) iconData = AurisIcons.restart;
 
         return _buildCircularButton(

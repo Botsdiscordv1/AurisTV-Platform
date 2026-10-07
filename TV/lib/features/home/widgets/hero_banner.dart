@@ -813,7 +813,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
             ],
             
             if (item.rating != null && item.rating! > 0) ...[
-              const Icon(Icons.star_rounded, color: Color(0xFFEF7A1E), size: 16),
+              AurisIcon(AurisIcons.star, color: const Color(0xFFEF7A1E), size: 16),
               const SizedBox(width: 4),
               Text(
                 item.rating!.toStringAsFixed(1), 
@@ -911,7 +911,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                       _BannerButton(
                         focusNode: _playButtonFocusNode, // Asignamos el nodo para la captura de foco
                         onPressed: () => widget.onPlay(item), 
-                        icon: Icons.play_arrow, 
+                        icon: AurisIcons.play,
                         label: 'Reproducir', 
                         isPrimary: true,
                         autofocus: widget.autofocus, // Senior Fix: Autofocus inicial para TV
@@ -922,7 +922,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                             .watch(favoritesProvider)
                             .any((f) => f.id == item.id);
                         return _BannerIconButton(
-                          icon: isFav ? Icons.check : Icons.add,
+                          icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.add,
                           label: isFav ? 'En mi lista' : 'Mi lista',
                           onPressed: () {
                             final user = ref.read(authProvider);
@@ -938,11 +938,11 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                         );
                       }),
                       const SizedBox(width: 12),
-                      _BannerIconButton(icon: Icons.info_outline, label: 'Detalles', onPressed: () => widget.onDetails(item)),
+                      _BannerIconButton(icon: AurisIcons.info, label: 'Detalles', onPressed: () => widget.onDetails(item)),
                       if (item.trailerKey != null) ...[
                         const SizedBox(width: 12),
                         _BannerIconButton(
-                          icon: (kIsWeb && _showTrailerLayer) ? Icons.videocam_off_outlined : Icons.movie_outlined,
+                          icon: (kIsWeb && _showTrailerLayer) ? AurisIcons.close : AurisIcons.trailer,
                           label: 'Tráiler',
                           isLoading: _isTrailerLoading,
                           onPressed: () async {
@@ -971,7 +971,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                         Consumer(builder: (context, ref, _) {
                           final isMuted = ref.watch(heroBannerMutedProvider);
                           return _BannerIconButton(
-                            icon: isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                            icon: isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp,
                             label: isMuted ? 'Activar audio' : 'Silenciar',
                             onPressed: () => ref.read(heroBannerMutedProvider.notifier).state = !isMuted,
                           );
@@ -981,7 +981,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                         const SizedBox(width: 12),
                         _BannerIconButton(
                           focusNode: _prevButtonFocusNode,
-                          icon: Icons.chevron_left,
+                          icon: AurisIcons.arrowLeft2,
                           label: 'Anterior',
                           onPressed: () {
                             _manualPreviousPage();
@@ -991,7 +991,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                         const SizedBox(width: 8),
                         _BannerIconButton(
                           focusNode: _nextButtonFocusNode,
-                          icon: Icons.chevron_right,
+                          icon: AurisIcons.arrowRight2,
                           label: 'Siguiente',
                           onPressed: () {
                             _manualNextPage();
@@ -1034,7 +1034,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
 
 class _BannerButton extends StatelessWidget {
   final VoidCallback onPressed;
-  final IconData icon;
+  final String icon;
   final String label;
   final bool isPrimary;
   final bool autofocus;
@@ -1054,7 +1054,7 @@ class _BannerButton extends StatelessWidget {
       onPressed: onPressed,
       autofocus: autofocus,
       focusNode: focusNode, // Vinculamos el nodo
-      icon: Icon(icon, size: 20), // Reducido de 24
+      icon: AurisIcon(icon, size: 20, color: isPrimary ? Colors.black : Colors.white), // Reducido de 24
       label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)), // Reducido de 15
       style: ElevatedButton.styleFrom(
         backgroundColor: isPrimary ? Colors.white : Colors.white10,
@@ -1067,7 +1067,7 @@ class _BannerButton extends StatelessWidget {
 }
 
 class _BannerIconButton extends StatelessWidget {
-  final IconData icon;
+  final String icon;
   final String label;
   final VoidCallback onPressed;
   final bool isLoading;
@@ -1089,7 +1089,7 @@ class _BannerIconButton extends StatelessWidget {
         onPressed: isLoading ? null : onPressed,
         icon: isLoading 
           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-          : Icon(icon, size: 18), // Reducido de 22
+          : AurisIcon(icon, size: 18, color: Colors.white), // Reducido de 22
         style: IconButton.styleFrom(
           backgroundColor: Colors.white10, 
           foregroundColor: Colors.white, 

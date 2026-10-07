@@ -1186,8 +1186,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   Widget _buildNavArrows() {
     return Stack(
       children: [
-        Positioned(left: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: AurisIcons.chevronLeft, useBackground: false, onTap: _previousPage))),
-        Positioned(right: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: AurisIcons.chevronRight, useBackground: false, onTap: _nextPage))),
+        Positioned(left: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: AurisIcons.arrowLeft2, useBackground: false, onTap: _previousPage))),
+        Positioned(right: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: AurisIcons.arrowRight2, useBackground: false, onTap: _nextPage))),
       ],
     );
   }

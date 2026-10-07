@@ -23,7 +23,6 @@ import 'package:material_symbols_icons/material_symbols_icons.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
-import '../../../core/utils/screen_brightness.dart';
 import '../../../core/utils/web_utils.dart';
 
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
@@ -84,6 +83,15 @@ class PlayerScreen extends ConsumerStatefulWidget {
 enum PlayerOverlay { none, language, server, quality }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBindingObserver {
+  late final FocusNode _timelineFocusNode;
+  late final FocusNode _playerFocusNode;
+  late final FocusNode _headerFocusNode = FocusNode(debugLabel: "player_header");
+  late final FocusNode _serverPillFocusNode = FocusNode(debugLabel: "pill_server");
+  late final FocusNode _episodesPillFocusNode = FocusNode(debugLabel: "pill_episodes");
+  late final FocusNode _qualityPillFocusNode = FocusNode(debugLabel: "pill_quality");
+  late final FocusNode _languagePillFocusNode = FocusNode(debugLabel: "pill_language");
+  FocusNode? _lastFocusedPillNode;
+  DateTime _timelineFocusTime = DateTime.fromMillisecondsSinceEpoch(0);
   bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime';
   Player? _player;
   VideoController? _controller;
@@ -103,7 +111,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     String? _episodesSyncKey;
 
   bool _showControls = true;
-  bool _isLocked = false;
   bool _hasResetPosition = false;
   int _resumePosition = 0;
   /// Generación del seek de resume: cada _initPlayer la incrementa para que
@@ -128,9 +135,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Timer? _volumeExitTimer;
   String _selectedQuality = 'auto';
   bool _userHasPaused = false;
-  bool _showCenterIndicator = false;
-  String _centerIndicatorIcon = AurisIcons.playFilled;
-  Timer? _centerIndicatorTimer;
+  // Center indicator removed
   final GlobalKey _sliderKey = GlobalKey();
   final ValueNotifier<Offset?> _hoverInfoNotifier = ValueNotifier<Offset?>(null);
 
@@ -183,10 +188,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Map<String, String> _currentStreamHeaders = const {};
 
   double _volume = 1.0;
-  double _brightness = 0.5;
-  bool _showVolumeIndicator = false;
-  bool _showBrightnessIndicator = false;
-  Timer? _indicatorTimer;
 
   late String _currentSourceUrl;
   late String _currentSource;
@@ -568,6 +569,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   @override
   void initState() {
     super.initState();
+    _timelineFocusNode = FocusNode(debugLabel: "player_timeline");
+    _playerFocusNode = FocusNode(debugLabel: "player_root");
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _timelineFocusNode.canRequestFocus) {
+        _timelineFocusNode.requestFocus();
+      }
+    });
     WidgetsBinding.instance.addObserver(this);
     
     // Senior Restore: Identificación precisa de dispositivo nativo vs táctil.
@@ -593,17 +601,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ));
     }
     
-    // Senior Brightness Fix: Inicializar el indicador con el brillo real del sistema.
     if (_isMobileDevice) {
-      ScreenBrightnessController.getBrightness().then((b) {
-        if (mounted) setState(() => _brightness = b);
-      });
-
       // Senior Volume Sync: Inicializar con el volumen real del sistema.
       VolumeController.instance.getVolume().then((v) {
         if (mounted) setState(() => _volume = v);
       });
-      VolumeController.instance.showSystemUI = false;
+      VolumeController.instance.showSystemUI = true;
       
       // Senior Shield: Activar la intercepción nativa inmediatamente al entrar
       _setVolumeIntercept(true);
@@ -618,12 +621,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
           setState(() {
             _volume = v;
-            _showVolumeIndicator = true;
-            _showBrightnessIndicator = false;
-          });
-          _indicatorTimer?.cancel();
-          _indicatorTimer = Timer(const Duration(seconds: 2), () {
-            if (mounted) setState(() => _showVolumeIndicator = false);
           });
           _player?.setVolume(100.0);
         }
@@ -724,8 +721,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       VolumeController.instance.showSystemUI = true;
       _setVolumeIntercept(false);
     } else if (state == AppLifecycleState.resumed) {
-      // Al volver al player, retomamos el control total de la interfaz de volumen.
-      VolumeController.instance.showSystemUI = false;
+      // Al volver al player, mantenemos visible la interfaz de volumen del sistema.
+      VolumeController.instance.showSystemUI = true;
       _setVolumeIntercept(true);
     }
   }
@@ -914,7 +911,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 ),
               ),
               trailing: isCurrent 
-                ? AurisIcon(AurisIcons.verify, color: const Color(0xFFEF7A1E), size: 24)
+                ? AurisIcon(AurisIcons.check, color: const Color(0xFFEF7A1E), size: 24)
                 : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.15), size: 20),
             ),
           ),
@@ -1027,7 +1024,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: AurisIcon(
-                  isCurrent ? AurisIcons.verify : AurisIcons.settings,
+                  isCurrent ? AurisIcons.check : AurisIcons.hd,
                   color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white70 : Colors.white24),
                   size: 24,
                 ),
@@ -1374,7 +1371,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 ),
               ),
               trailing: isCurrent 
-                ? AurisIcon(AurisIcons.verify, color: const Color(0xFFEF7A1E), size: 24)
+                ? AurisIcon(AurisIcons.check, color: const Color(0xFFEF7A1E), size: 24)
                 : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.15), size: 20),
             ),
           ),
@@ -1752,7 +1749,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _userHasPaused = false;
       _player?.play();
     }
-    _showCentralIndicator(!wasPlaying);
   }
 
   void _handleVolumeStep(double step) {
@@ -1767,12 +1763,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       
       _volume = nextVol.clamp(0.0, 2.0);
       _applyVolume();
-      _showVolumeIndicator = true;
-      _showBrightnessIndicator = false;
-    });
-    _indicatorTimer?.cancel();
-    _indicatorTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _showVolumeIndicator = false);
     });
   }
 
@@ -1780,11 +1770,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_isExiting) return KeyEventResult.ignored;
     final key = event.logicalKey;
 
-    // Senior TV Remotes Mapping: Soporte para botones físicos de mando
+    // Reiniciar timer de ocultación en cualquier interacción de teclado / D-PAD
+    if (_showControls && (event is KeyDownEvent || event is KeyRepeatEvent)) {
+      _startHideTimer();
+    }
+
+    // Physical Remote Buttons (Media Keys)
     if (event is KeyDownEvent) {
       if (key == LogicalKeyboardKey.mediaPlay || key == LogicalKeyboardKey.mediaPause || key == LogicalKeyboardKey.mediaPlayPause) {
         _handlePlayPause();
-        if (!_showControls) setState(() => _showControls = true);
+        if (!_showControls) {
+          setState(() => _showControls = true);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _timelineFocusNode.canRequestFocus) {
+              _timelineFocusNode.requestFocus();
+            }
+          });
+        }
         _startHideTimer();
         return KeyEventResult.handled;
       }
@@ -1809,30 +1811,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         return KeyEventResult.handled;
       }
     }
-    
-    // Si los controles están ocultos, cualquier flecha o botón central los muestra
-    if (!_showControls && !_isLocked) {
-      if (event is KeyDownEvent) {
-        if (key == LogicalKeyboardKey.arrowUp || 
-            key == LogicalKeyboardKey.arrowDown || 
-            key == LogicalKeyboardKey.arrowLeft || 
-            key == LogicalKeyboardKey.arrowRight || 
-            key == LogicalKeyboardKey.select || 
-            key == LogicalKeyboardKey.enter) {
-          setState(() {
-            _showControls = true;
-          });
-          _startHideTimer();
-          
-          // Si es izquierda/derecha, además de mostrar, ejecutamos el seek
-          if (key == LogicalKeyboardKey.arrowLeft) _skipBackward();
-          if (key == LogicalKeyboardKey.arrowRight) _skipForward();
-          
-          return KeyEventResult.handled;
-        }
-      }
-    }
 
+    // Volume Keys
     final isVolumeKey = key == LogicalKeyboardKey.audioVolumeUp || key == LogicalKeyboardKey.audioVolumeDown;
     if (isVolumeKey) {
       if (event is KeyDownEvent || event is KeyRepeatEvent) {
@@ -1841,62 +1821,90 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return KeyEventResult.handled;
     }
 
-    if (event is KeyDownEvent) {
-      if (_isLocked) return KeyEventResult.ignored;
-      
-      if (key == LogicalKeyboardKey.space || 
-          key == LogicalKeyboardKey.keyK || 
-          key == LogicalKeyboardKey.select || 
-          key == LogicalKeyboardKey.enter) {
-        
-        // Si hay un botón enfocado, dejamos que el sistema lo maneje (el InkWell lo activará)
-        // Pero si no hay nada enfocado o estamos sobre el video, toggle play/pause.
-        final focus = FocusManager.instance.primaryFocus;
-        if (focus == null || focus.debugLabel == 'video_surface' || !focus.hasPrimaryFocus) {
-          _handlePlayPause();
-          if (!_showControls) setState(() => _showControls = true);
+    // 1. SI LOS CONTROLES ESTÁN OCULTOS: Cualquier flecha o botón central los muestra
+    if (!_showControls) {
+      if (event is KeyDownEvent || event is KeyRepeatEvent) {
+        if (key == LogicalKeyboardKey.arrowUp || 
+            key == LogicalKeyboardKey.arrowDown || 
+            key == LogicalKeyboardKey.arrowLeft || 
+            key == LogicalKeyboardKey.arrowRight || 
+            key == LogicalKeyboardKey.select || 
+            key == LogicalKeyboardKey.enter ||
+            key == LogicalKeyboardKey.numpadEnter ||
+            key == LogicalKeyboardKey.space) {
+          
+          setState(() {
+            _showControls = true;
+          });
           _startHideTimer();
+          
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _timelineFocusNode.canRequestFocus) {
+              _timelineFocusNode.requestFocus();
+            }
+          });
+
+          if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyJ) _skipBackward();
+          if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) _skipForward();
+          if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) _handlePlayPause();
+          
           return KeyEventResult.handled;
         }
-        return KeyEventResult.ignored;
-      } else if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) {
-        // Solo hacemos seek directo si NO hay controles visibles o si el foco no está en un botón navegable
-        if (!_showControls) {
-          _skipForward();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      } else if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyJ) {
-        if (!_showControls) {
-          _skipBackward();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      } else if (key == LogicalKeyboardKey.arrowUp) {
-        if (!_showControls) {
-          setState(() => _showControls = true);
-          _startHideTimer();
-          return KeyEventResult.handled;
-        }
-      } else if (key == LogicalKeyboardKey.arrowDown) {
-        if (!_showControls) {
-          setState(() => _showControls = true);
-          _startHideTimer();
-          return KeyEventResult.handled;
-        }
-      } else if (key == LogicalKeyboardKey.keyF) {
-        _toggleFullscreen();
-        return KeyEventResult.handled;
-      } else if (key == LogicalKeyboardKey.keyM) {
-        _toggleMute();
-        return KeyEventResult.handled;
-      } else if (key == LogicalKeyboardKey.escape ||
+      }
+    }
+
+    // 2. SI LOS CONTROLES YA ESTÁN VISIBLES:
+    if (event is KeyDownEvent || event is KeyRepeatEvent) {
+      // Escape / Back
+      if (key == LogicalKeyboardKey.escape ||
           key == LogicalKeyboardKey.goBack ||
           key == LogicalKeyboardKey.browserBack) {
         _handleBackNavigation();
         return KeyEventResult.handled;
       }
+
+      // Space / PlayPause key
+      if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) {
+        _handlePlayPause();
+        _startHideTimer();
+        return KeyEventResult.handled;
+      }
+
+      // Left / Right Arrows (O J / L)
+      if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyJ) {
+        final primaryFocus = FocusManager.instance.primaryFocus;
+        if (primaryFocus == null || primaryFocus == _timelineFocusNode || primaryFocus == _playerFocusNode || primaryFocus.debugLabel == 'video_surface' || !primaryFocus.hasPrimaryFocus) {
+          _skipBackward();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      }
+
+      if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) {
+        final primaryFocus = FocusManager.instance.primaryFocus;
+        if (primaryFocus == null || primaryFocus == _timelineFocusNode || primaryFocus == _playerFocusNode || primaryFocus.debugLabel == 'video_surface' || !primaryFocus.hasPrimaryFocus) {
+          _skipForward();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      }
+
+      // Up / Down Arrows
+      if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
+        return KeyEventResult.ignored;
+      }
+
+      // Fullscreen & Mute shortcuts
+      if (key == LogicalKeyboardKey.keyF) {
+        _toggleFullscreen();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.keyM) {
+        _toggleMute();
+        return KeyEventResult.handled;
+      }
     }
+
     return KeyEventResult.ignored;
   }
 
@@ -1932,8 +1940,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _startHideTimer() {
     _hideTimer?.cancel();
+    if (_timelineFocusNode.hasFocus) {
+      return;
+    }
     _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && !_isLocked) {
+      if (mounted && !_timelineFocusNode.hasFocus) {
         setState(() => _showControls = false);
       }
     });
@@ -1947,16 +1958,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
-  void _showCentralIndicator(bool playing) {
-    _centerIndicatorTimer?.cancel();
-    setState(() {
-      _centerIndicatorIcon = playing ? AurisIcons.playFilled : AurisIcons.pause;
-      _showCenterIndicator = true;
-    });
-    _centerIndicatorTimer = Timer(const Duration(milliseconds: 600), () {
-      if (mounted) setState(() => _showCenterIndicator = false);
-    });
-  }
+  // _showCentralIndicator removed
 
   void _skipForward() {
     final now = DateTime.now();
@@ -1978,6 +1980,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Activamos Visual Feedback con acumulación
     setState(() {
+      _showControls = true;
       _lastSkipValue = isRapidFire ? _lastSkipValue + 10 : 10;
       _showRightSkip = true;
       _showLeftSkip = false;
@@ -2020,6 +2023,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Activamos Visual Feedback con acumulación
     setState(() {
+      _showControls = true;
       _lastSkipValue = isRapidFire ? _lastSkipValue + 10 : 10;
       _showLeftSkip = true;
       _showRightSkip = false;
@@ -2039,6 +2043,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       durationMs: _player?.state.duration.inMilliseconds ?? 0,
       force: true,
     );
+  }
+
+  void _restartToBeginning() {
+    _isStabilizing = true;
+    _isCompleted = false;
+    _lastManualSeekTime = DateTime.now();
+    _lastFrameMs = 0;
+    _lastStablePositionMs = 0;
+    _player?.seek(Duration.zero);
+    _startStabilizationTimer();
+    _updateHistory(
+      positionMs: 0,
+      durationMs: _player?.state.duration.inMilliseconds ?? 0,
+      force: true,
+    );
+    setState(() {
+      _showControls = true;
+    });
+    HapticFeedback.lightImpact();
+    _startHideTimer();
   }
 
   void _skipOpEd() {
@@ -2107,13 +2131,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (!isSwitching) {
         if (!skipResume && widget.startPosition != null && widget.startPosition! > 3000) {
            _resumePosition = widget.startPosition!;
-           _hasResetPosition = false; 
+           _hasResetPosition = true;
+           WidgetsBinding.instance.addPostFrameCallback((_) {
+             if (mounted) _handleResumeAction();
+           });
         } else if (!skipResume && historyPos > 0) {
            _resumePosition = historyPos;
-           _hasResetPosition = false;
-           // En lugar de mostrar el diálogo estático, disparamos el contador blanco de reanudación
+           _hasResetPosition = true;
            WidgetsBinding.instance.addPostFrameCallback((_) {
-             if (mounted) _startAutoplayCountdown(isResume: true);
+             if (mounted) _handleResumeAction();
            });
         } else {
            _resumePosition = 0;
@@ -2743,7 +2769,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _hideTimer?.cancel();
     _autoplayTimer?.cancel();
     _stabilizationTimer?.cancel();
-    _indicatorTimer?.cancel();
     _historySaveTimer?.cancel();
     _bufferingDebounceTimer?.cancel();
     _volumeSubscription?.cancel();
@@ -2790,6 +2815,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     _showNextNotifier.dispose();
     _hoverInfoNotifier.dispose();
+    _timelineFocusNode.dispose();
+    _playerFocusNode.dispose();
+    _headerFocusNode.dispose();
+    _serverPillFocusNode.dispose();
+    _episodesPillFocusNode.dispose();
+    _qualityPillFocusNode.dispose();
+    _languagePillFocusNode.dispose();
     super.dispose();
   }
 
@@ -2803,6 +2835,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_showEpisodesOverlay) {
       setState(() => _showEpisodesOverlay = false);
       _startHideTimer();
+      return;
+    }
+
+    if (_showControls) {
+      setState(() => _showControls = false);
       return;
     }
 
@@ -3247,7 +3284,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               child: IconButton(
                 iconSize: 44,
                 icon: AurisIcon(
-                  target.isPlaying ? AurisIcons.pause : AurisIcons.playFilled,
+                  target.isPlaying ? AurisIcons.pause : AurisIcons.play,
                   color: Colors.black,
                   size: 44,
                 ),
@@ -3604,67 +3641,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ]);
   }
 
-  Widget _buildGestureIndicator(bool isBrightness, double value) {
-    final bool isBoost = !isBrightness && value > 1.0;
-    final IconData icon = isBrightness 
-        ? (value > 0.7 ? Icons.brightness_7_rounded : (value > 0.3 ? Icons.brightness_6_rounded : Icons.brightness_2_rounded))
-        : (value > 1.0 ? Icons.bolt_rounded : (value > 0.5 ? Icons.volume_up_rounded : (value > 0 ? Icons.volume_down_rounded : Icons.volume_off_rounded)));
 
-    return Align(
-      alignment: isBrightness ? Alignment.centerLeft : Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                shape: BoxShape.circle,
-                border: Border.all(color: isBoost ? Colors.orangeAccent.withValues(alpha: 0.5) : Colors.white10),
-              ),
-              child: Icon(icon, color: isBoost ? Colors.orangeAccent : Colors.white, size: 28),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              height: 160,
-              width: 8,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                children: [
-                  FractionallySizedBox(
-                    heightFactor: isBrightness ? value.clamp(0.0, 1.0) : (value / 2.0).clamp(0.0, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isBoost ? Colors.orangeAccent : Colors.white,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '${(value * 100).toInt()}%',
-              style: TextStyle(
-                color: isBoost ? Colors.orangeAccent : Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildSkipVisual(bool isRight) {
     final bool isMobile = ResponsiveUtils.isMobile(context);
@@ -3765,13 +3742,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildMobilePlayer(List<VideoTrackOption> playableTracks, UserSettings settings) {
-    final bool isAnyGestureActive = _isBrightnessGesture != null || _showSeekIndicator;
-    final bool showAnyway = (_showControls || _isLocked || (_autoplayCountdown >= 0 && _isAutoplayResume) || _showEpisodesOverlay || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
+    final bool isAnyGestureActive = _showSeekIndicator;
+    final bool showAnyway = (_showControls || (_autoplayCountdown >= 0 && _isAutoplayResume) || _showEpisodesOverlay || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
 
     return Focus(
+      focusNode: _playerFocusNode,
       autofocus: true, 
       onKeyEvent: (node, event) => _handleKeyEvent(event), 
-      child: Stack(
+      child: FocusScope(
+        child: Stack(
         fit: StackFit.expand, 
         children: [
           if (_webViewController != null)
@@ -3816,7 +3795,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   MouseRegion(
                     onHover: (_) { 
                       if (ResponsiveUtils.isTactic(context)) return;
-                      if (!_showControls && !_isLocked) setState(() => _showControls = true); 
+                      if (!_showControls) setState(() => _showControls = true); 
                       _startHideTimer(); 
                     }, 
                     cursor: showAnyway ? SystemMouseCursors.basic : SystemMouseCursors.none, 
@@ -3830,11 +3809,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       }, 
                       child: GestureDetector(
                         onTap: () {
-                          if (_isLocked) return;
                           if (!_isMobileDevice) {
                             final bool wasPlaying = _player?.state.playing ?? false;
                             if (wasPlaying) _player?.pause(); else _player?.play();
-                            _showCentralIndicator(!wasPlaying);
                             if (!_showControls) setState(() => _showControls = true);
                             _startHideTimer();
                           } else {
@@ -3843,13 +3820,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         },
                         behavior: HitTestBehavior.opaque, 
                         onDoubleTapDown: (details) { 
-                          if (_isLocked) return; 
                           final width = MediaQuery.sizeOf(context).width; 
                           final bool isRight = details.globalPosition.dx >= width / 2;
                           if (isRight) _skipForward(); else _skipBackward();
                         }, 
                         onHorizontalDragStart: (details) {
-                          if (_isLocked || !ResponsiveUtils.isNative) return;
+                          if (!ResponsiveUtils.isNative) return;
                           final duration = _player?.state.duration ?? Duration.zero;
                           if (duration.inMilliseconds <= 0) return;
                           
@@ -3889,117 +3865,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           _startHideTimer();
                           HapticFeedback.mediumImpact();
                         },
-                        onVerticalDragStart: (details) {
-                          if (_isLocked || !ResponsiveUtils.isNative) return;
-                          final width = MediaQuery.sizeOf(context).width;
-                          _isBrightnessGesture = details.globalPosition.dx < width / 2;
-                          setState(() => _showControls = false);
-                        },
-                        onVerticalDragUpdate: (details) { 
-                          if (_isLocked || !ResponsiveUtils.isNative || _isBrightnessGesture == null) return; 
-                          
-                          // Senior Plus: Sensibilidad adaptativa (80% de la altura = 100% de cambio)
-                          final double screenHeight = MediaQuery.sizeOf(context).height;
-                          final double sensitivity = screenHeight > 0 ? screenHeight * 0.8 : 400.0;
-                          final delta = details.primaryDelta! / -sensitivity; 
-                          
-                          if (_isBrightnessGesture!) {
-                            final double oldB = _brightness;
-                            final newBrightness = (_brightness + delta).clamp(0.0, 1.0);
-                            
-                            if (newBrightness != oldB) {
-                              setState(() { 
-                                _brightness = newBrightness; 
-                                _showBrightnessIndicator = true; 
-                                _showVolumeIndicator = false; 
-                               });
-                               
-                               // Senior Plus: Feedback Háptico en límites (0% y 100%)
-                               if ((newBrightness == 0.0 || newBrightness == 1.0) && oldB != newBrightness) {
-                                 HapticFeedback.selectionClick();
-                               }
-                               
-                               // Throttling de brillo
-                               if ((_brightness - _lastAppliedBrightness).abs() > 0.03 || _brightness == 1.0 || _brightness == 0.0) {
-                                 _lastAppliedBrightness = _brightness;
-                                 ScreenBrightnessController.setBrightness(_brightness);
-                               }
-                            }
-                           } else {
-                             _lastManualVolumeTime = DateTime.now();
-                             final double oldV = _volume;
-                             double nextVol = _volume + delta;
-                             
-                             // Senior Plus: Snap magnético en 100% (límite de hardware)
-                             if (oldV < 1.0 && nextVol > 1.0) nextVol = 1.0;
-                             else if (oldV > 1.0 && nextVol < 1.0) nextVol = 1.0;
-                             else if ((nextVol - 1.0).abs() < 0.02) nextVol = 1.0;
-                             
-                             final newVolume = nextVol.clamp(0.0, 2.0);
-                             if (newVolume != oldV) {
-                               setState(() { 
-                                 _volume = newVolume;
-                                 _showVolumeIndicator = true; 
-                                 _showBrightnessIndicator = false; 
-                               });
-
-                               // Senior Plus: Feedback Háptico en límites y cambio de modo Boost
-                               if ((newVolume == 0.0 || newVolume == 2.0 || (newVolume == 1.0 && oldV != 1.0)) && oldV != newVolume) {
-                                 HapticFeedback.mediumImpact();
-                               }
-
-                               // Senior Plus: Throttling de volumen nativo (0.05 delta para fluidez)
-                               if ((_volume - _lastAppliedVolume).abs() > 0.05 || _volume == 1.0 || _volume == 0.0) {
-                                 _lastAppliedVolume = _volume;
-                                 _applyVolume();
-                               }
-                             }
-                           } 
-                           _indicatorTimer?.cancel(); 
-                           _indicatorTimer = Timer(const Duration(seconds: 2), () { 
-                             if (mounted) setState(() { _showVolumeIndicator = false; _showBrightnessIndicator = false; }); 
-                           }); 
-                         }, 
-                         onVerticalDragEnd: (_) {
-                           // Asegurar que aplicamos el valor final exacto al terminar el gesto
-                           if (_isBrightnessGesture == true) {
-                             ScreenBrightnessController.setBrightness(_brightness);
-                             _lastAppliedBrightness = _brightness;
-                           } else if (_isBrightnessGesture == false) {
-                             _applyVolume();
-                             _lastAppliedVolume = _volume;
-                           }
-                           _isBrightnessGesture = null;
-                           setState(() => _showControls = true);
-                           _startHideTimer();
-                         },
-                         child: Container(color: Colors.transparent),
+                        child: Container(color: Colors.transparent),
                        ),
                      ),
                    ),
 
-                  // CAPA 2: Indicador Central (Play/Pause Feedback)
-                  if (_showCenterIndicator)
-                    IgnorePointer(
-                      child: Center(
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 200),
-                          opacity: _showCenterIndicator ? 1.0 : 0.0,
-                          child: Container(
-                            width: 100, height: 100,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              shape: BoxShape.circle,
-                            ),
-                            child: AurisIcon(
-                              _centerIndicatorIcon,
-                              color: Colors.white,
-                              size: 60,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  // Central indicator removed
 
                    // CAPA 2: Los controles reales (Superpuestos)
                    IgnorePointer(
@@ -4010,7 +3881,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                        child: Stack(
                          fit: StackFit.expand,
                          children: [
-                           if (!_isLocked && !(_autoplayCountdown >= 0 && _isAutoplayResume)) 
+                           if (!(_autoplayCountdown >= 0 && _isAutoplayResume)) 
                              Positioned.fill(
                                child: IgnorePointer(
                                  child: DecoratedBox(
@@ -4057,8 +3928,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                ),
              ),
            
-           if (_showVolumeIndicator) IgnorePointer(child: _buildGestureIndicator(false, _volume)),
-           if (_showBrightnessIndicator) IgnorePointer(child: _buildGestureIndicator(true, _brightness)),
+
            if (_showSeekIndicator) Positioned.fill(child: IgnorePointer(child: _buildSeekIndicator())),
            
            if (_showLeftSkip) _buildSkipVisual(false),
@@ -4106,7 +3976,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
              ),
            
            // CAPA: Carrusel de Episodios (Estilo Netflix/Prime Video)
-           if (_showEpisodesOverlay && !_isLocked && !(_autoplayCountdown >= 0 && _isAutoplayResume))
+           if (_showEpisodesOverlay && !(_autoplayCountdown >= 0 && _isAutoplayResume))
              Positioned.fill(
                child: Column(
                  children: [
@@ -4222,24 +4092,82 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                ),
              ),
          ],
-       ),
+        ),
+      ),
     );
   }
 
   Widget _buildControlsStack() {
     return Stack(children: [
-        if (!_isLocked) ...[
-          _buildMobileHeader(),
-          _buildMobileCenterControls(),
-          _buildMobileBottomBar(),
-          _buildNextEpisodeOverlay(),
-        ],
-        if (_autoplayCountdown == -1 && _isMobileDevice) _buildLockToggle(),
+        _buildMobileHeader(),
+        _buildMobileTimelineLayer(),
+        _buildMobilePillsLayer(),
+        _buildNextEpisodeOverlay(),
       ]);
   }
 
+  Widget _buildMobileTimelineLayer() {
+    return Positioned(
+      bottom: 104,
+      left: 0,
+      right: 0,
+      child: Center(child: _buildMobileTimeline()),
+    );
+  }
+
+  Widget _buildMobilePillsLayer() {
+    return Positioned(
+      bottom: 40,
+      left: 0,
+      right: 0,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildPillButton(
+                label: _currentSource.isNotEmpty ? _currentSource : 'Servidor',
+                icon: AurisIcons.server,
+                isSelected: _activeOverlay == PlayerOverlay.server,
+                onTap: _showServerSelector,
+                focusNode: _serverPillFocusNode,
+              ),
+              const SizedBox(width: 10),
+              if (!_isMovie) ...[
+                _buildPillButton(
+                  label: _activeEpisode != null ? 'Ep. $_activeEpisode' : 'Episodios',
+                  icon: AurisIcons.episodes,
+                  isSelected: _showEpisodesOverlay,
+                  onTap: _showEpisodesCarousel,
+                  focusNode: _episodesPillFocusNode,
+                ),
+                const SizedBox(width: 10),
+              ],
+              _buildPillButton(
+                label: _selectedQuality == 'auto' ? 'Calidad: Auto' : 'Calidad: ${_selectedQuality.toUpperCase()}p',
+                icon: AurisIcons.hd,
+                isSelected: _activeOverlay == PlayerOverlay.quality,
+                onTap: _showQualitySelector,
+                focusNode: _qualityPillFocusNode,
+              ),
+              const SizedBox(width: 10),
+              _buildPillButton(
+                label: _currentLanguage ?? 'Audio / Subs',
+                icon: AurisIcons.subtitles,
+                isSelected: _activeOverlay == PlayerOverlay.language,
+                onTap: _showLanguageSelector,
+                focusNode: _languagePillFocusNode,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNextEpisodeOverlay() {
-    if (_isTrailer) return const SizedBox.shrink();
+    if (_isTrailer || _isAutoplayResume) return const SizedBox.shrink();
     final isMobile = ResponsiveUtils.isMobile(context);
     final bool isCountdown = _autoplayCountdown >= 0;
     final String label = _isAutoplayResume ? 'Reanudar' : 'Siguiente episodio';
@@ -4361,7 +4289,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildMobileHeader() {
     final bool hideBack = _isFullscreen && !_isMobileDevice;
-    final double iconSize = _isMobileDevice ? 24 : 30;
 
     return Positioned(
       top: 0, 
@@ -4373,41 +4300,48 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Top-Left: Back, Replay 10s, Optionen
+            // Top-Left: Back, Replay 10s, Options
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 if (!hideBack) ...[
-                  IconButton(
-                    iconSize: iconSize,
-                    icon: const Icon(Symbols.arrow_back, color: Colors.white),
-                    onPressed: _handleBackNavigation,
+                  _buildCircularButton(
+                    icon: Symbols.arrow_back,
+                    onTap: _handleBackNavigation,
+                    size: 44,
+                    iconSize: 22,
+                    debugLabel: 'header_back',
+                    focusNode: _headerFocusNode,
+                    isTopButton: true,
                   ),
                   const SizedBox(width: 16),
-                ],
-                IconButton(
-                  iconSize: iconSize,
-                  icon: const Icon(Symbols.replay_10, color: Colors.white),
-                  onPressed: _skipBackward,
-                ),
-                const SizedBox(width: 16),
-                InkWell(
-                  onTap: _showLanguageSelector,
-                  borderRadius: BorderRadius.circular(4),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Icon(Symbols.settings, color: Colors.white, size: 24),
-                        SizedBox(height: 2),
-                        Text(
-                          'OPTIONEN',
-                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2),
-                        ),
-                      ],
-                    ),
+                  _buildCircularButton(
+                    icon: AurisIcons.repeat,
+                    onTap: _restartToBeginning,
+                    size: 44,
+                    iconSize: 22,
+                    debugLabel: 'header_replay',
+                    isTopButton: true,
                   ),
+                ] else ...[
+                  _buildCircularButton(
+                    icon: AurisIcons.repeat,
+                    onTap: _skipBackward,
+                    size: 44,
+                    iconSize: 22,
+                    debugLabel: 'header_replay',
+                    focusNode: _headerFocusNode,
+                    isTopButton: true,
+                  ),
+                ],
+                const SizedBox(width: 16),
+                _buildCircularButton(
+                  icon: Symbols.settings,
+                  onTap: _showLanguageSelector,
+                  size: 44,
+                  iconSize: 22,
+                  debugLabel: 'header_options',
+                  isTopButton: true,
                 ),
               ],
             ),
@@ -4417,49 +4351,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               children: [
                 Text(
                   _displayTitle.toUpperCase(),
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: 1.0),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.0),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                if (_activeEpisode != null && !_isMovie)
-                  Text(
-                    _episodeLabel(),
-                    style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
-                  )
-                else
-                  Text(
-                    (widget.category ?? '').toUpperCase(),
-                    style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                const SizedBox(height: 8),
-                Builder(
-                  builder: (context) {
-                    final currentTrack = _allTracks.isNotEmpty
-                        ? _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0]
-                        : null;
-
-                    // Etiqueta de idioma (quality) con fallback al estado actual
-                    // para asegurar visibilidad constante en Web y durante la carga inicial.
-                    String label = currentTrack?.quality ?? _currentTrackQuality;
-                    if (label.isEmpty) label = _currentLanguage ?? '';
-
-                    Color color = const Color(0xFFEF7A1E);
-                    if (currentTrack?.color != null) {
-                      color = Color(currentTrack!.color!);
-                    } else {
-                      // Fallback visual por tipo de contenido
-                      final type = trackQualityType(label);
-                      if (type == 'SUB') color = Colors.blueAccent;
-                    }
-
-                    return ActiveSourceBadge(
-                      serverName: _currentServerName ?? widget.serverName ?? widget.source,
-                      label: label,
-                      color: color,
-                    );
-                  },
-                ),
+                if (!_isMovie) ...[
+                  const SizedBox(height: 4),
+                  if (_activeEpisode != null)
+                    Text(
+                      _episodeLabel(),
+                      style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+                    )
+                  else
+                    Text(
+                      (widget.category ?? '').toUpperCase(),
+                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                ],
               ],
             ),
           ],
@@ -4468,8 +4376,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  Widget _buildPlayPauseButton({double? size}) {
-    final double buttonSize = size ?? (_isMobileDevice ? 64 : 44); // Unificado a 44px
+  Widget _buildPlayPauseButton({double? size, Color? backgroundColor, Color? iconColor, bool isCapsule = false}) {
+    final double buttonSize = size ?? (_isMobileDevice ? 44 : 44);
     final Stream<bool> playStream = _player?.stream.playing ?? const Stream.empty();
     final bool initialPlay = _player?.state.playing ?? false;
 
@@ -4479,7 +4387,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       builder: (context, snapshot) {
         final isPlaying = snapshot.data ?? initialPlay;
         
-        String iconData = isPlaying ? AurisIcons.pause : AurisIcons.playFilled;
+        String iconData = isPlaying 
+            ? AurisIcons.pauseFilled
+            : AurisIcons.playFilled;
         if (_isCompleted) iconData = AurisIcons.restart;
 
         return _buildCircularButton(
@@ -4508,8 +4418,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               _startHideTimer();
             }
           },
-          backgroundColor: _isMobileDevice ? Colors.black.withValues(alpha: 0.15) : null,
-          iconSize: _isMobileDevice ? null : 30, // Unificado a 30px para Desktop
+          backgroundColor: backgroundColor ?? (_isMobileDevice ? Colors.black.withValues(alpha: 0.15) : null),
+          iconColor: isCapsule ? Colors.black : iconColor,
+          isCapsule: isCapsule,
+          iconSize: isCapsule ? 22 : (_isMobileDevice ? null : 30),
         );
       }
     );
@@ -4524,20 +4436,69 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     double? iconSize,
     Color? iconColor,
     String? debugLabel,
+    bool isCapsule = false,
+    FocusNode? focusNode,
+    bool isTopButton = false,
   }) {
     return Focus(
+      focusNode: focusNode,
       debugLabel: debugLabel,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          final key = event.logicalKey;
+          if ((debugLabel == 'header_back' || debugLabel == 'header_replay' || debugLabel == 'header_options') &&
+              key == LogicalKeyboardKey.arrowDown) {
+            _timelineFocusNode.requestFocus();
+            _startHideTimer();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
       child: Builder(
         builder: (context) {
           final bool isFocused = Focus.of(context).hasFocus;
+          if (isTopButton) {
+            return AnimatedScale(
+              scale: isFocused ? 1.15 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(size / 2),
+                  child: SizedBox(
+                    width: size,
+                    height: size,
+                    child: Center(
+                      child: icon is String
+                          ? AurisIcon(
+                              icon as String,
+                              color: isFocused ? Colors.white : (iconColor ?? Colors.white.withOpacity(0.8)),
+                              size: iconSize ?? 24,
+                            )
+                          : Icon(
+                              icon as IconData?,
+                              color: isFocused ? Colors.white : (iconColor ?? Colors.white.withOpacity(0.8)),
+                              size: iconSize ?? 24,
+                              fill: fill ? 1.0 : 0.0,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
           return AnimatedScale(
             scale: isFocused ? 1.15 : 1.0,
             duration: const Duration(milliseconds: 200),
             child: Container(
-              width: size, height: size,
+              width: isCapsule ? (size * 1.4) : size, height: size,
               decoration: BoxDecoration(
                 color: isFocused ? const Color(0xFFEF7A1E) : (backgroundColor ?? Colors.black.withValues(alpha: 0.45)),
-                shape: BoxShape.circle,
+                borderRadius: isCapsule ? BorderRadius.circular(size / 2) : null,
+                shape: isCapsule ? BoxShape.rectangle : BoxShape.circle,
                 border: isFocused ? Border.all(color: Colors.white, width: 2) : null,
                 boxShadow: isFocused ? [BoxShadow(color: const Color(0xFFEF7A1E).withOpacity(0.4), blurRadius: 12)] : null,
               ),
@@ -4690,109 +4651,75 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  Widget _buildMobileCenterControls() {
-    if (!_isMobileDevice) return const SizedBox.shrink();
-    
-    final double iconSize = _isMobileDevice ? 44 : 56;
-    final double playSize = _isMobileDevice ? 64 : 90;
-    // Senior UI: Espaciado aumentado para evitar toques accidentales en el botón central en móviles
-    final double spacing = _isMobileDevice ? 56 : 40;
+  // Central controls removed per user request
 
-    return Center(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          _buildCircularCenterAction(icon: AurisIcons.backward10, size: iconSize, onTap: _skipBackward),
-          SizedBox(width: spacing), 
-          _buildPlayPauseButton(size: playSize),
-          SizedBox(width: spacing),
-          _buildCircularCenterAction(icon: AurisIcons.forward10, size: iconSize, onTap: _skipForward),
-        ]));
-  }
+// _buildMobileBottomBar replaced by independent layers
 
-  Widget _buildCircularCenterAction({required Object icon, required double size, required VoidCallback onTap}) {
-    return _buildCircularButton(
-      icon: icon,
-      onTap: onTap,
-      size: size + 20, // Ajuste para el padding del contenedor circular
-      fill: true,
-      backgroundColor: _isMobileDevice ? Colors.black.withValues(alpha: 0.15) : Colors.transparent,
-      iconSize: size,
-    );
-  }
-
-  Widget _buildMobileBottomBar() {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildMobileTimeline(),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    _buildPlayPauseButton(size: 48),
-                  ],
+  Widget _buildPillButton({
+    required String label, 
+    Object? icon, 
+    required bool isSelected, 
+    required VoidCallback onTap,
+    FocusNode? focusNode,
+  }) {
+    final node = focusNode ?? FocusNode();
+    return Focus(
+      focusNode: node,
+      onFocusChange: (focused) {
+        if (focused) {
+          _lastFocusedPillNode = node;
+        }
+      },
+      child: Builder(
+        builder: (context) {
+          final bool isFocused = Focus.of(context).hasFocus;
+          return AnimatedScale(
+            scale: isFocused ? 1.0 : 0.95,
+            alignment: Alignment.topCenter,
+            duration: const Duration(milliseconds: 200),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isFocused
+                    ? Colors.white
+                    : (isSelected ? Colors.white : Colors.white.withValues(alpha: 0.2)),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isFocused ? Colors.white : Colors.transparent,
+                  width: 2,
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildPillButton(
-                      label: _currentLanguage ?? 'Deutsch',
-                      isSelected: true,
-                      onTap: _showLanguageSelector,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (icon != null) ...[
+                          icon is String
+                              ? AurisIcon(icon, color: isFocused ? Colors.black : (isSelected ? Colors.black : Colors.white), size: 16)
+                              : Icon(icon as IconData?, color: isFocused ? Colors.black : (isSelected ? Colors.black : Colors.white), size: 16),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          label,
+                          style: TextStyle(
+                            color: isFocused ? Colors.black : (isSelected ? Colors.black : Colors.white),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    _buildPillButton(
-                      label: 'Englisch [Original] mit Untertiteln',
-                      isSelected: false,
-                      onTap: _showLanguageSelector,
-                    ),
-                    const SizedBox(width: 10),
-                    _buildPillButton(
-                      label: 'Deutsch mit Untertiteln',
-                      isSelected: false,
-                      onTap: _showLanguageSelector,
-                    ),
-                    const SizedBox(width: 10),
-                    _buildPillButton(
-                      label: 'Andere ...',
-                      isSelected: false,
-                      onTap: _showLanguageSelector,
-                    ),
-                  ],
+                  ),
                 ),
-              ],
+              ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPillButton({required String label, required bool isSelected, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.black : Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -4812,60 +4739,126 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final double maxMs = duration.inMilliseconds.toDouble().clamp(0.01, double.infinity);
         final double currentMs = position.inMilliseconds.toDouble().clamp(0.0, maxMs);
 
-        return Row(
-          children: [
-            Text(
-              _formatDuration(position),
-              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: StreamBuilder<Duration>(
-                stream: bufferStream,
-                initialData: initialBuffer,
-                builder: (context, bufSnapshot) {
-                  return SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                      activeTrackColor: const Color(0xFFE50914), // Netflix Red
-                      inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
-                      thumbColor: Colors.white,
-                      overlayColor: const Color(0xFFE50914).withOpacity(0.3),
+        return Focus(
+          focusNode: _timelineFocusNode,
+          onFocusChange: (focused) {
+            if (focused) {
+              _timelineFocusTime = DateTime.now();
+            }
+            if (mounted) setState(() {});
+          },
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent || event is KeyRepeatEvent) {
+              final key = event.logicalKey;
+              if (key == LogicalKeyboardKey.arrowLeft) {
+                _skipBackward();
+                _startHideTimer();
+                return KeyEventResult.handled;
+              } else if (key == LogicalKeyboardKey.arrowRight) {
+                _skipForward();
+                _startHideTimer();
+                return KeyEventResult.handled;
+              } else if (key == LogicalKeyboardKey.arrowUp) {
+                _headerFocusNode.requestFocus();
+                _startHideTimer();
+                return KeyEventResult.handled;
+              } else if (key == LogicalKeyboardKey.arrowDown) {
+                if (DateTime.now().difference(_timelineFocusTime).inMilliseconds < 250) {
+                  return KeyEventResult.handled;
+                }
+                (_lastFocusedPillNode ?? _serverPillFocusNode).requestFocus();
+                _startHideTimer();
+                return KeyEventResult.handled;
+              } else if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space) {
+                _handlePlayPause();
+                _startHideTimer();
+                return KeyEventResult.handled;
+              }
+            }
+            return KeyEventResult.ignored;
+          },
+          child: Builder(
+            builder: (context) {
+              final bool isFocused = Focus.of(context).hasFocus;
+              return AnimatedScale(
+                scale: isFocused ? 1.0 : 0.95,
+                alignment: Alignment.bottomCenter,
+                duration: const Duration(milliseconds: 200),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ExcludeFocus(
+                      child: _buildPlayPauseButton(size: 54, backgroundColor: Colors.white, iconColor: Colors.black, isCapsule: false),
                     ),
-                    child: Slider(
-                      value: currentMs,
-                      max: maxMs,
-                      onChanged: (value) {
-                        final int targetMs = value.toInt();
-                        _isStabilizing = true;
-                        _isCompleted = false;
-                        _lastManualSeekTime = DateTime.now();
-                        _lastFrameMs = targetMs;
-                        _lastStablePositionMs = targetMs;
-                        _player?.seek(Duration(milliseconds: targetMs));
-                        _startStabilizationTimer();
-                        _updateHistory(positionMs: targetMs, durationMs: duration.inMilliseconds, force: true);
-                      },
+                    const SizedBox(width: 10),
+                    Text(
+                      _formatDuration(position),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
                     ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 16),
-            Text(
-              _formatDuration(duration),
-              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-            ),
-          ],
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 520,
+                      child: StreamBuilder<Duration>(
+                        stream: bufferStream,
+                        initialData: initialBuffer,
+                        builder: (context, bufSnapshot) {
+                          return ExcludeFocus(
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 4,
+                                trackShape: const _ZeroPaddingSliderTrackShape(),
+                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                                activeTrackColor: const Color(0xFFEF7A1E),
+                                inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
+                                thumbColor: const Color(0xFFEF7A1E),
+                                overlayColor: const Color(0xFFEF7A1E).withOpacity(0.3),
+                              ),
+                              child: Slider(
+                                value: currentMs,
+                                max: maxMs,
+                                onChanged: (value) {
+                                  final int targetMs = value.toInt();
+                                  _isStabilizing = true;
+                                  _isCompleted = false;
+                                  _lastManualSeekTime = DateTime.now();
+                                  _lastFrameMs = targetMs;
+                                  _lastStablePositionMs = targetMs;
+                                  _player?.seek(Duration(milliseconds: targetMs));
+                                  _startStabilizationTimer();
+                                  _updateHistory(positionMs: targetMs, durationMs: duration.inMilliseconds, force: true);
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      _formatDuration(duration),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );
   }
 
-  Widget _buildLockToggle() {
-    return Positioned(top: 60, right: 16, child: IconButton(icon: Icon(_isLocked ? Icons.lock : Icons.lock_open, color: Colors.white), onPressed: () { setState(() { _isLocked = !_isLocked; if (_isLocked) _showControls = false; else { _showControls = true; _startHideTimer(); } }); }));
-  }
+  // _buildLockToggle removed
 }
 
 class _PlayerTextButton extends StatefulWidget {
@@ -5179,6 +5172,25 @@ class _CarouselArrowState extends State<_CarouselArrow> {
   }
 }
 
+class _ZeroPaddingSliderTrackShape extends RoundedRectSliderTrackShape {
+  const _ZeroPaddingSliderTrackShape();
+
+  @override
+  Rect getPreferredRect({
+    required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    final double trackHeight = sliderTheme.trackHeight ?? 4;
+    final double trackLeft = offset.dx;
+    final double trackTop = offset.dy + (parentBox.size.height - trackHeight) / 2;
+    final double trackWidth = parentBox.size.width;
+    return Rect.fromLTWH(trackLeft, trackTop, trackWidth, trackHeight);
+  }
+}
+
 class _EpisodeCarouselItem extends StatefulWidget {
   final int number;
   final String? title;
@@ -5337,6 +5349,8 @@ class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
   }
 }
 
+
+
 class _PlayerSidePanel extends StatelessWidget {
   final String title;
   final Widget child;
@@ -5425,6 +5439,8 @@ class _PlayerSidePanel extends StatelessWidget {
     );
   }
 }
+
+
 
 class _NetflixProgressBar extends StatefulWidget {
   const _NetflixProgressBar({super.key});
@@ -5521,3 +5537,7 @@ class _RemoteMandoActionButton extends StatelessWidget {
     );
   }
 }
+
+
+
+// _ZeroPaddingSliderTrackShape removed

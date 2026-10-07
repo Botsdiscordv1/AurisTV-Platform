@@ -465,7 +465,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                                       const SizedBox(width: 16),
                                       IconButton(
                                         icon: AurisIcon(
-                                            AurisIcons.grid,
+                                            AurisIcons.exitPip,
                                             color: Colors.white,
                                             size: 28),
                                         onPressed: widget.onExpand,
@@ -636,7 +636,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
               child: IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: AurisIcon(AurisIcons.grid, color: Colors.white, size: 20),
+                icon: AurisIcon(AurisIcons.exitPip, color: Colors.white, size: 20),
                 onPressed: () {
                   widget.onExpand();
                   _keepControlsVisible();
