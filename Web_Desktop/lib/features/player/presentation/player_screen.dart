@@ -955,7 +955,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ),
             ),
             trailing: isCurrent
-              ? AurisIcon(AurisIcons.verify, color: const Color(0xFFEF7A1E), size: 18)
+              ? AurisIcon(AurisIcons.check, color: const Color(0xFFEF7A1E), size: 18)
               : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.1), size: 16),
           ),
         );
@@ -1060,7 +1060,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 borderRadius: BorderRadius.circular(6),
               ),
               child: AurisIcon(
-                isCurrent ? AurisIcons.verify : AurisIcons.settings,
+                isCurrent ? AurisIcons.check : AurisIcons.hd,
                 color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white54 : Colors.white12),
                 size: 16,
               ),
@@ -1352,7 +1352,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               maxLines: 1,
             ),
             trailing: isCurrent
-              ? AurisIcon(AurisIcons.verify, color: const Color(0xFFEF7A1E), size: 18)
+              ? AurisIcon(AurisIcons.check, color: const Color(0xFFEF7A1E), size: 18)
               : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.1), size: 16),
           ),
         );

@@ -641,7 +641,7 @@ class _TVSubMenuOptionState extends State<_TVSubMenuOption> {
           child: Row(
             children: [
               widget.isSelected 
-                  ? AurisIcon(AurisIcons.verify, color: _hasFocus ? primaryColor : Colors.white70, size: 18)
+                  ? AurisIcon(AurisIcons.check, color: _hasFocus ? primaryColor : Colors.white70, size: 18)
                   : AurisIcon(AurisIcons.add, color: _hasFocus ? primaryColor : Colors.transparent, size: 18),
               const SizedBox(width: 12),
               Text(
@@ -722,7 +722,7 @@ class _TVCheckboxTileState extends State<_TVCheckboxTile> {
                   color: widget.value ? primaryColor : Colors.transparent,
                 ),
                 child: widget.value
-                    ? AurisIcon(AurisIcons.verify, size: 16, color: Colors.black)
+                    ? AurisIcon(AurisIcons.check, size: 16, color: Colors.black)
                     : null,
               ),
               const SizedBox(width: 14),

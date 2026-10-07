@@ -19,11 +19,14 @@ class AurisIcons {
   static String get checkCircleFilled => reiconSvg(Reicon.filled.checkCircle);
   static String get hd => reiconSvg(Reicon.outline.hd);
   static String get arrowLeft => reiconSvg(Reicon.outline.arrowLeft);
+  static String get arrowLeft2 => reiconSvg(Reicon.outline.arrowLeft2);
+  static String get arrowRight2 => reiconSvg(Reicon.outline.arrowRight2);
   static String get export => reiconSvg(Reicon.outline.export);
   static String get arrowUpRight => reiconSvg(Reicon.outline.arrowUpRight);
   static String get squareArrowUp => reiconSvg(Reicon.outline.squareArrowUp);
   static String get film => reiconSvg(Reicon.outline.film);
   static String get pause => reiconSvg(Reicon.outline.pause);
+  static String get pauseFilled => reiconSvg(Reicon.filled.pause);
   static String get forwardStep => reiconSvg(Reicon.outline.forwardStep);
   static String get backwardStep => reiconSvg(Reicon.outline.backwardStep);
   static String get skipNext => forwardStep;
@@ -36,8 +39,9 @@ class AurisIcons {
   static String get subtitles => reiconSvg(Reicon.outline.subtitles);
   static String get language => reiconSvg(Reicon.outline.subtitles);
   static String get audioLanguage => reiconSvg(Reicon.outline.subtitles);
-  static String get restart => reiconSvg(Reicon.outline.restart);
-  static String get repeat => reiconSvg(Reicon.outline.restart);
+  static String get restart => reiconSvg(Reicon.outline.rotateLeft);
+  static String get repeat => reiconSvg(Reicon.outline.rotateLeft);
+  static String get rotateLeft => reiconSvg(Reicon.outline.rotateLeft);
   static String get backward10 => reiconSvg(Reicon.outline.backward10Seconds);
   static String get forward10 => reiconSvg(Reicon.outline.forward10Seconds);
   static String get backward10Seconds => reiconSvg(Reicon.outline.backward10Seconds);
