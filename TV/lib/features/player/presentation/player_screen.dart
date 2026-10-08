@@ -144,10 +144,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   // Senior Pro Gestures State
   double? _gestureStartX;
-  int _lastSkipValue = 0;
-  Timer? _skipVisualTimer;
-  bool _showLeftSkip = false;
-  bool _showRightSkip = false;
   double _lastGestureValue = 0.0;
   bool? _isBrightnessGesture;
   double _lastAppliedBrightness = -1.0;
@@ -155,6 +151,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _showSeekIndicator = false;
   Duration _seekTargetDuration = Duration.zero;
   Duration _seekDiff = Duration.zero;
+  // Hold-scrub estilo YouTube TV (D-pad mantenido en el timeline).
+  Timer? _holdTimer;
+  int _holdDir = 0; // -1 atrás, +1 adelante, 0 inactivo
+  int _holdBaseMs = 0;
+  DateTime? _holdStart;
   Timer? _historySaveTimer;
   int? _lastSeekPosMs;
 
@@ -229,7 +230,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (title == null || title.isEmpty) {
         final eps = ref
             .read(episodesProvider(EpisodesParams(
-              url: widget.sourceUrl,
+              url: _seriesListUrl,
               source: widget.source,
               title: widget.title,
               season: widget.season,
@@ -240,6 +241,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     } catch (_) {}
     return episodeDisplayLabel(_activeEpisode, season: widget.season, title: title);
+  }
+
+  /// URL de SERIE para listar episodios. El player recibe la URL del
+  /// episodio y con ella el backend devuelve lista incompleta (a veces solo
+  /// ese episodio); la ficha usa la URL de serie y ve todo. Se resuelve
+  /// desde las fuentes sincronizadas; fallback a la URL actual.
+  String get _seriesListUrl {
+    try {
+      final sources = ref.read(activeContentSourcesProvider);
+      final match = findSourceByName(sources, _currentSource) ??
+          (sources.isNotEmpty ? sources.first : null);
+      final url = match?.url ?? '';
+      if (url.isNotEmpty) return url;
+    } catch (_) {}
+    return widget.sourceUrl;
   }
 
   /// Hereda la metadata enriquecida de la ficha (títulos ES, thumbnails TMDB)
@@ -464,7 +480,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (episodeThumb == null || episodeThumb == widget.bannerUrl) {
         final epsData = ref
             .read(episodesProvider(EpisodesParams(
-              url: widget.sourceUrl,
+              url: _seriesListUrl,
               source: widget.source,
               title: widget.title,
               season: widget.season,
@@ -899,6 +915,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Cierra el panel lateral y devuelve el foco D-pad a la pill que lo abrió
   /// (estilo YouTube-TV: salir del panel = volver a los controles).
   void _dismissSidePanel() {
+    // Escudo anti-doble Back: el Back físico dispara la trampa (tecla) y
+    // después el back del sistema (PopScope); sin esto el segundo encuentra
+    // el panel ya cerrado y oculta los controles recién mostrados.
+    _ignoreNextPop = true;
+    Timer(const Duration(milliseconds: 300), () {
+      _ignoreNextPop = false;
+    });
     // Vuelta atrás de un nivel (Calidad → Configuración).
     if (_overlayParent != null) {
       final parent = _overlayParent!;
@@ -1405,7 +1428,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildEpisodesSelectorContent({bool isSidebar = false}) {
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
+      url: _seriesListUrl,
       source: _currentSource,
       title: widget.title ?? '',
       season: widget.season ?? 1,
@@ -1933,16 +1956,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             _showControls = true;
           });
           _startHideTimer();
-          
+
+          // Despertar direccional desde el ancla (timeline): arriba = header,
+          // abajo = pills, resto = timeline (+ su acción de seek/toggle).
+          final FocusNode wakeTarget;
+          if (key == LogicalKeyboardKey.arrowUp) {
+            wakeTarget = _headerFocusNode;
+          } else if (key == LogicalKeyboardKey.arrowDown) {
+            wakeTarget = _lastFocusedPillNode ?? _serverPillFocusNode;
+          } else {
+            wakeTarget = _timelineFocusNode;
+          }
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _timelineFocusNode.canRequestFocus) {
-              _timelineFocusNode.requestFocus();
+            if (mounted && wakeTarget.canRequestFocus) {
+              wakeTarget.requestFocus();
             }
           });
 
           if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyJ) _skipBackward();
           if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) _skipForward();
-          if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) _handlePlayPause();
+          // Con controles ocultos, OK/centro alterna play/pausa directo
+          // (solo al pulsar, no al mantener, para no hacer strobe).
+          if (event is KeyDownEvent &&
+              (key == LogicalKeyboardKey.space ||
+                  key == LogicalKeyboardKey.keyK ||
+                  key == LogicalKeyboardKey.select ||
+                  key == LogicalKeyboardKey.enter ||
+                  key == LogicalKeyboardKey.numpadEnter)) {
+            _handlePlayPause();
+          }
           
           return KeyEventResult.handled;
         }
@@ -2036,12 +2078,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    if (_timelineFocusNode.hasFocus) {
-      return;
-    }
+    // Sin exenciones por foco: cualquier tecla en timeline/header/pills
+    // vuelve a mostrar los controles, así que ocultar con foco aparcado
+    // es seguro y evita que queden encendidos eternamente.
     _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && !_timelineFocusNode.hasFocus) {
+      if (mounted) {
         setState(() => _showControls = false);
+        // Ancla neutral: con controles ocultos el foco vive en el timeline.
+        if (_timelineFocusNode.canRequestFocus) _timelineFocusNode.requestFocus();
       }
     });
   }
@@ -2050,7 +2094,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (!mounted) return;
     setState(() {
       _showControls = !_showControls;
-      if (_showControls) _startHideTimer();
+      if (_showControls) {
+        _startHideTimer();
+      } else if (_timelineFocusNode.canRequestFocus) {
+        _timelineFocusNode.requestFocus();
+      }
     });
   }
 
@@ -2074,19 +2122,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     _player?.seek(target);
 
-    // Activamos Visual Feedback con acumulación
     setState(() {
       _showControls = true;
-      _lastSkipValue = isRapidFire ? _lastSkipValue + 10 : 10;
-      _showRightSkip = true;
-      _showLeftSkip = false;
     });
 
-    _skipVisualTimer?.cancel();
-    _skipVisualTimer = Timer(const Duration(milliseconds: 800), () {
-      if (mounted) setState(() { _showLeftSkip = false; _showRightSkip = false; });
-    });
-    
     HapticFeedback.lightImpact();
     _startHideTimer();
     _startStabilizationTimer();
@@ -2117,17 +2156,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     _player?.seek(finalTarget);
 
-    // Activamos Visual Feedback con acumulación
     setState(() {
       _showControls = true;
-      _lastSkipValue = isRapidFire ? _lastSkipValue + 10 : 10;
-      _showLeftSkip = true;
-      _showRightSkip = false;
-    });
-
-    _skipVisualTimer?.cancel();
-    _skipVisualTimer = Timer(const Duration(milliseconds: 800), () {
-      if (mounted) setState(() { _showLeftSkip = false; _showRightSkip = false; });
     });
 
     HapticFeedback.lightImpact();
@@ -2136,6 +2166,79 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     _updateHistory(
       positionMs: _lastFrameMs,
+      durationMs: _player?.state.duration.inMilliseconds ?? 0,
+      force: true,
+    );
+  }
+
+  /// Hold-scrub estilo YouTube TV: al mantener ←/→ en el timeline el
+  /// objetivo avanza por ticks acelerados con preview, y UN solo seek se
+  /// confirma al soltar. Un toque simple equivale al ±10s de antes.
+  void _beginHoldScrub(int dir) {
+    if (_holdDir != 0) return;
+    final pos = _player?.state.position.inMilliseconds ?? 0;
+    final dur = _player?.state.duration.inMilliseconds ?? 0;
+    if (dur <= 0) return;
+    _holdDir = dir;
+    _holdBaseMs = pos;
+    _holdStart = DateTime.now();
+    final target = (pos + dir * 10000).clamp(0, dur);
+    setState(() {
+      _showControls = true;
+      _seekTargetDuration = Duration(milliseconds: target);
+      _seekDiff = Duration(milliseconds: target - pos);
+    });
+    _holdTimer?.cancel();
+    _holdTimer = Timer.periodic(
+      const Duration(milliseconds: 200),
+      (_) => _tickHoldScrub(),
+    );
+    HapticFeedback.selectionClick();
+  }
+
+  void _tickHoldScrub() {
+    if (_holdDir == 0 || _player == null || !mounted) return;
+    final dur = _player!.state.duration.inMilliseconds;
+    if (dur <= 0) return;
+    final elapsed = DateTime.now().difference(_holdStart ?? DateTime.now());
+    final int stepMs;
+    if (elapsed < const Duration(seconds: 1)) {
+      stepMs = 10000;
+    } else if (elapsed < const Duration(seconds: 3)) {
+      stepMs = 30000;
+    } else {
+      stepMs = 60000;
+    }
+    final target =
+        (_seekTargetDuration.inMilliseconds + _holdDir * stepMs).clamp(0, dur);
+    setState(() {
+      _seekTargetDuration = Duration(milliseconds: target);
+      _seekDiff = Duration(milliseconds: target - _holdBaseMs);
+    });
+    _startHideTimer();
+  }
+
+  void _endHoldScrub() {
+    final timer = _holdTimer;
+    _holdTimer = null;
+    timer?.cancel();
+    if (_holdDir == 0 || !mounted) {
+      _holdDir = 0;
+      return;
+    }
+    _holdDir = 0;
+    final targetMs = _seekTargetDuration.inMilliseconds;
+    if (_player == null) return;
+    _isStabilizing = true;
+    _lastManualSeekTime = DateTime.now();
+    _lastFrameMs = targetMs;
+    _lastStablePositionMs = targetMs;
+    _player?.seek(Duration(milliseconds: targetMs));
+    HapticFeedback.mediumImpact();
+    _startHideTimer();
+    _startStabilizationTimer();
+    _updateHistory(
+      positionMs: targetMs,
       durationMs: _player?.state.duration.inMilliseconds ?? 0,
       force: true,
     );
@@ -2866,6 +2969,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _autoplayTimer?.cancel();
     _stabilizationTimer?.cancel();
     _historySaveTimer?.cancel();
+    _holdTimer?.cancel();
     _bufferingDebounceTimer?.cancel();
     _volumeSubscription?.cancel();
     _volumeControlChannel.setMethodCallHandler(null);
@@ -2930,6 +3034,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     if (_showControls) {
       setState(() => _showControls = false);
+      if (_timelineFocusNode.canRequestFocus) _timelineFocusNode.requestFocus();
       return;
     }
 
@@ -3032,7 +3137,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // los ticks/stop resuelven el título desde availableEpisodes.
     // Key anti re-sync: el whenData dispara por cada rebuild con data.
     final episodesForSession = ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
+      url: _seriesListUrl,
       source: widget.source,
       title: widget.title,
       season: widget.season,
@@ -3513,7 +3618,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
-          url: widget.sourceUrl,
+          url: _seriesListUrl,
           source: _currentSource,
           title: widget.title ?? '',
           season: widget.season ?? 1,
@@ -3737,48 +3842,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
 
-
-  Widget _buildSkipVisual(bool isRight) {
-    final bool isMobile = ResponsiveUtils.isMobile(context);
-    
-    return Align(
-      alignment: isRight ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        width: MediaQuery.sizeOf(context).width / 4,
-        height: double.infinity,
-        // Solo mostramos un fondo sutil en móvil para delimitar la zona táctil
-        decoration: isMobile ? BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.only(
-            topLeft: isRight ? const Radius.circular(500) : Radius.zero,
-            bottomLeft: isRight ? const Radius.circular(500) : Radius.zero,
-            topRight: !isRight ? const Radius.circular(500) : Radius.zero,
-            bottomRight: !isRight ? const Radius.circular(500) : Radius.zero,
-          ),
-        ) : null,
-        child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!isRight) const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 36),
-              const SizedBox(width: 4),
-              Text(
-                '${isRight ? "+" : "-"}${_lastSkipValue}',
-                style: GoogleFonts.poppins(
-                  color: Colors.white, 
-                  fontWeight: FontWeight.w500, 
-                  fontSize: isMobile ? 22 : 32,
-                  shadows: const [Shadow(color: Colors.black45, blurRadius: 8)],
-                ),
-              ),
-              const SizedBox(width: 4),
-              if (isRight) const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 36),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildSeekIndicator() {
     final bool isForward = _seekDiff.inMilliseconds >= 0;
@@ -4022,8 +4085,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     ),
                   ),
                 if (_showSeekIndicator) Positioned.fill(child: IgnorePointer(child: _buildSeekIndicator())),
-                if (_showLeftSkip) _buildSkipVisual(false),
-                if (_showRightSkip) _buildSkipVisual(true),
                 // Senior Web Fix: Overlay para superar el bloqueo de Autoplay en Web
                 if (kIsWeb && _webNeedsInteraction)
                   Positioned.fill(
@@ -4090,7 +4151,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               trapFocus: true,
               onBack: _dismissSidePanel,
               railWidth: 460,
-              borderRadius: 28,
+              borderRadius: 40,
             ),
            
            if (_playbackError != null) 
@@ -4211,7 +4272,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Senior Autoplay Shield: Verificar si existe un siguiente episodio para evitar el popup en el final
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
+      url: _seriesListUrl,
       source: widget.source,
       title: widget.title,
       season: widget.season,
@@ -4484,6 +4545,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         if (event is KeyDownEvent || event is KeyRepeatEvent) {
           final key = event.logicalKey;
           if (debugLabel == 'header_back' || debugLabel == 'header_replay' || debugLabel == 'header_options') {
+            if (!_showControls) {
+              setState(() => _showControls = true);
+            }
             if (key == LogicalKeyboardKey.arrowDown) {
               _timelineFocusNode.requestFocus();
               _startHideTimer();
@@ -4697,6 +4761,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
 // _buildMobileBottomBar replaced by independent layers
 
+  /// Orden visual de las pills (igual que [_buildMobilePillsLayer]).
+  /// La navegación izq/der es explícita porque el scoring geométrico del
+  /// traversal salta al timeline ancho en vez de a la pill vecina.
+  List<FocusNode> get _pillTraversalOrder {
+    final order = <FocusNode>[_serverPillFocusNode];
+    if (!_isMovie) order.add(_episodesPillFocusNode);
+    if (!_isMovie && !_isOpEd) order.add(_opedPillFocusNode);
+    order.add(_languagePillFocusNode);
+    return order;
+  }
+
   Widget _buildPillButton({
     required String label, 
     Object? icon, 
@@ -4710,7 +4785,50 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       onFocusChange: (focused) {
         if (focused) {
           _lastFocusedPillNode = node;
+        } else {
+          // Al salir de la pill se reanuda el auto-ocultado.
+          _startHideTimer();
         }
+      },
+      // D-pad en pills: OK/centro (select) activa —el mando de TV no manda
+      // Enter sino `select`, sin binding por defecto— y arriba vuelve al
+      // timeline. Izquierda/derecha/abajo se contienen en la fila con orden
+      // explícito (los topes se tragan para no fugar el foco al timeline).
+      // Se consume aquí para que Espacio no llegue al play/pausa global.
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.numpadEnter ||
+              key == LogicalKeyboardKey.space) {
+            if (event is KeyDownEvent) onTap();
+            _startHideTimer();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowUp) {
+            _timelineFocusNode.requestFocus();
+            _startHideTimer();
+            return KeyEventResult.handled;
+          }
+          if (key == LogicalKeyboardKey.arrowLeft ||
+              key == LogicalKeyboardKey.arrowRight ||
+              key == LogicalKeyboardKey.arrowDown) {
+            final order = _pillTraversalOrder;
+            final idx = order.indexOf(node);
+            if (idx != -1 &&
+                (key == LogicalKeyboardKey.arrowLeft ||
+                    key == LogicalKeyboardKey.arrowRight)) {
+              final next = key == LogicalKeyboardKey.arrowRight ? idx + 1 : idx - 1;
+              if (next >= 0 && next < order.length) {
+                order[next].requestFocus();
+                _startHideTimer();
+              }
+            }
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
       },
       child: Builder(
         builder: (context) {
@@ -4780,6 +4898,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final duration = _player?.state.duration ?? Duration.zero;
         final double maxMs = duration.inMilliseconds.toDouble().clamp(0.01, double.infinity);
         final double currentMs = position.inMilliseconds.toDouble().clamp(0.0, maxMs);
+        // Scrub en el propio timeline (estilo YouTube TV): el playhead y la
+        // hora siguen al objetivo mientras se mantiene pulsado.
+        final bool scrubbing = _holdDir != 0;
+        final double displayMs = scrubbing
+            ? _seekTargetDuration.inMilliseconds.toDouble().clamp(0.0, maxMs)
+            : currentMs;
 
         return Focus(
           focusNode: _timelineFocusNode,
@@ -4790,14 +4914,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             if (mounted) setState(() {});
           },
           onKeyEvent: (node, event) {
+            // Soltar ←/→ confirma el hold-scrub con un solo seek.
+            if (event is KeyUpEvent &&
+                (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                    event.logicalKey == LogicalKeyboardKey.arrowRight)) {
+              _endHoldScrub();
+              return KeyEventResult.handled;
+            }
             if (event is KeyDownEvent || event is KeyRepeatEvent) {
+              // El timeline consume las teclas antes que la raíz: si los
+              // controles están ocultos hay que mostrarlos aquí también.
+              if (!_showControls) {
+                setState(() => _showControls = true);
+              }
               final key = event.logicalKey;
               if (key == LogicalKeyboardKey.arrowLeft) {
-                _skipBackward();
+                if (event is KeyDownEvent) _beginHoldScrub(-1);
                 _startHideTimer();
                 return KeyEventResult.handled;
               } else if (key == LogicalKeyboardKey.arrowRight) {
-                _skipForward();
+                if (event is KeyDownEvent) _beginHoldScrub(1);
                 _startHideTimer();
                 return KeyEventResult.handled;
               } else if (key == LogicalKeyboardKey.arrowUp) {
@@ -4833,14 +4969,38 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       child: _buildPlayPauseButton(size: 54, backgroundColor: Colors.white, iconColor: Colors.black, isCapsule: false),
                     ),
                     const SizedBox(width: 10),
-                    Text(
-                      _formatDuration(position),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final String timeText = _formatDuration(
+                            scrubbing ? _seekTargetDuration : position);
+                        final style = TextStyle(
+                          color: scrubbing
+                              ? const Color(0xFFEF7A1E)
+                              : Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          fontFeatures: const [
+                            FontFeature.tabularFigures()
+                          ],
+                        );
+                        // Solo durante el scrub: odómetro vertical por
+                        // dígito en vez de saltos.
+                        if (!scrubbing) return Text(timeText, style: style);
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            for (final ch in timeText.split(''))
+                              int.tryParse(ch) != null
+                                  ? _OdometerDigit(
+                                      value: int.parse(ch),
+                                      style: style,
+                                      direction: _holdDir,
+                                    )
+                                  : Text(ch, style: style),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(width: 10),
                     SizedBox(
@@ -4854,14 +5014,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                               data: SliderTheme.of(context).copyWith(
                                 trackHeight: 4,
                                 trackShape: const _ZeroPaddingSliderTrackShape(),
-                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                                thumbShape: RoundSliderThumbShape(
+                                    enabledThumbRadius: scrubbing ? 11 : 7),
                                 activeTrackColor: const Color(0xFFEF7A1E),
                                 inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
                                 thumbColor: const Color(0xFFEF7A1E),
                                 overlayColor: const Color(0xFFEF7A1E).withOpacity(0.3),
                               ),
                               child: Slider(
-                                value: currentMs,
+                                value: displayMs,
                                 max: maxMs,
                                 onChanged: (value) {
                                   final int targetMs = value.toInt();
@@ -4939,6 +5100,108 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
                             Text(widget.label, style: TextStyle(color: _isFocused ? Colors.black : Colors.white, fontSize: isMobile ? 12 : 16, fontWeight: widget.isBold ? FontWeight.w900 : FontWeight.bold)),
                           ]
                         ]))))));
+  }
+}
+
+/// Dígito con ruleta vertical (odómetro): tira 0-9 que rota hasta el
+/// valor actual. La altura se mide de la propia fuente para un encaje exacto.
+/// El wrap (9→0 / 0→9) usa duplicados en los bordes para seguir girando en
+/// la dirección del scrub en vez de rebobinar.
+class _OdometerDigit extends StatefulWidget {
+  final int value; // 0-9
+  final TextStyle style;
+  final int direction; // +1 adelante, -1 atrás
+
+  const _OdometerDigit({
+    required this.value,
+    required this.style,
+    this.direction = 1,
+  });
+
+  @override
+  State<_OdometerDigit> createState() => _OdometerDigitState();
+}
+
+class _OdometerDigitState extends State<_OdometerDigit> {
+  late double _from;
+  late double _to;
+  double _lastRendered = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _from = _to = _lastRendered = widget.value.toDouble();
+  }
+
+  @override
+  void didUpdateWidget(covariant _OdometerDigit oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value == oldWidget.value &&
+        widget.direction == oldWidget.direction) {
+      return;
+    }
+    double target = widget.value.toDouble();
+    if (widget.direction >= 0 && widget.value == 0 && _to >= 8.5) {
+      target = 10.0; // wrap adelante: girar al "0" duplicado
+    } else if (widget.direction < 0 && widget.value == 9 && _to <= 0.5) {
+      target = -1.0; // wrap atrás: girar al "9" duplicado
+    }
+    _from = _lastRendered;
+    _to = target;
+  }
+
+  void _snapIfNeeded() {
+    double? snap;
+    if (_to == 10.0) {
+      snap = 0.0;
+    } else if (_to == -1.0) {
+      snap = 9.0;
+    }
+    final target = snap;
+    if (target == null) return;
+    setState(() {
+      _from = target;
+      _to = target;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tp = TextPainter(
+      text: TextSpan(text: '8', style: widget.style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final h = tp.height;
+    // Tira con duplicados en los bordes: [9][0..9][0], altura exacta.
+    return SizedBox(
+      height: h,
+      child: ClipRect(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: _from, end: _to),
+          duration: const Duration(milliseconds: 170),
+          curve: Curves.easeOutCubic,
+          onEnd: _snapIfNeeded,
+          builder: (context, pos, _) {
+            _lastRendered = pos ?? _to;
+            return Transform.translate(
+              offset: Offset(0, -(pos + 1) * h),
+              child: SizedBox(
+                height: h * 12,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: h, child: Text('9', style: widget.style)),
+                    for (var i = 0; i <= 9; i++)
+                      SizedBox(height: h, child: Text('$i', style: widget.style)),
+                    SizedBox(height: h, child: Text('0', style: widget.style)),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 
