@@ -80,7 +80,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-enum PlayerOverlay { none, language, server, quality }
+enum PlayerOverlay { none, language, server, quality, config, speed, volume, episodes }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBindingObserver {
   late final FocusNode _timelineFocusNode;
@@ -88,8 +88,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   late final FocusNode _headerFocusNode = FocusNode(debugLabel: "player_header");
   late final FocusNode _serverPillFocusNode = FocusNode(debugLabel: "pill_server");
   late final FocusNode _episodesPillFocusNode = FocusNode(debugLabel: "pill_episodes");
-  late final FocusNode _qualityPillFocusNode = FocusNode(debugLabel: "pill_quality");
+  late final FocusNode _opedPillFocusNode = FocusNode(debugLabel: "pill_oped");
   late final FocusNode _languagePillFocusNode = FocusNode(debugLabel: "pill_language");
+  late final FocusNode _sidePanelCloseNode = FocusNode(debugLabel: "sidepanel_close");
   FocusNode? _lastFocusedPillNode;
   DateTime _timelineFocusTime = DateTime.fromMillisecondsSinceEpoch(0);
   bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime';
@@ -128,9 +129,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isMobileDevice = false;
   bool _isFullscreen = false;
   bool _isExiting = false;
-  bool _showEpisodesOverlay = false;
   bool _webNeedsInteraction = false; // Senior Web Fix: Autoplay blocker
   PlayerOverlay _activeOverlay = PlayerOverlay.none;
+  /// Sub-panel padre para la navegación en dos niveles (Configuración →
+  /// Calidad): salir desde el hijo vuelve al padre en vez de cerrar.
+  PlayerOverlay? _overlayParent;
   bool _isVolumePillHovered = false;
   Timer? _volumeExitTimer;
   String _selectedQuality = 'auto';
@@ -222,7 +225,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     try {
       final synced = ref.watch(activePlayerProvider.select((s) => s.availableEpisodes));
       final notifier = ref.read(activePlayerProvider.notifier);
-      title = notifier.episodeInfoFor(_activeEpisode, synced)?.title;
+      title = notifier.episodeInfoFor(_activeEpisode, _enrichedEpisodes(synced ?? const []))?.title;
       if (title == null || title.isEmpty) {
         final eps = ref
             .read(episodesProvider(EpisodesParams(
@@ -233,10 +236,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             )))
             .valueOrNull
             ?.episodes;
-        title = notifier.episodeInfoFor(_activeEpisode, eps ?? const [])?.title;
+        title = notifier.episodeInfoFor(_activeEpisode, _enrichedEpisodes(eps ?? const []))?.title;
       }
     } catch (_) {}
     return episodeDisplayLabel(_activeEpisode, season: widget.season, title: title);
+  }
+
+  /// Hereda la metadata enriquecida de la ficha (títulos ES, thumbnails TMDB)
+  /// desde el caché de serie del core. El player consulta episodesProvider
+  /// con la URL del episodio y recibe la respuesta cruda (números/URLs); sin
+  /// esto el carrusel y los títulos quedan sin metadata. Si la ficha no se
+  /// visitó (deep link, Continuar Viendo directo) devuelve la lista intacta.
+  List<EpisodeInfo> _enrichedEpisodes(List<EpisodeInfo> episodes) {
+    if (episodes.isEmpty) return episodes;
+    return ProgressiveContentNotifier.enrichWithSeriesMetadata(
+      title: widget.title ?? widget.contentId,
+      metadataTitle: widget.metadataTitle,
+      season: widget.season ?? 1,
+      episodes: episodes,
+    );
   }
 
   /// Al navegar al siguiente/anterior episodio, el nuevo stream debe arrancar
@@ -406,7 +424,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       VolumeController.instance.setVolume(safeVol);
       _player?.setVolume(100.0);
     } else {
-      VolumeController.instance.setVolume(1.0);
+      // Boost INTERNO del video (125-200%): no se toca el volumen del
+      // sistema, solo se amplifica el audio del reproductor (mpv tiene
+      // volume-max 200). Paridad con el GainNode de Web.
       _player?.setVolume(_volume * 100);
     }
   }
@@ -450,8 +470,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               season: widget.season,
             )))
             .valueOrNull;
-        final info = notifier.episodeInfoFor(
-            _activeEpisode, epsData?.episodes ?? const []);
+        final info = notifier.episodeInfoFor(_activeEpisode,
+            _enrichedEpisodes(epsData?.episodes ?? const []));
         if (info?.thumbnail != null && info!.thumbnail!.isNotEmpty) {
           episodeThumb = info.thumbnail;
         }
@@ -851,79 +871,62 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     return ListView.builder(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(horizontal: 16) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
       itemCount: servers.length,
       itemBuilder: (context, index) {
         final sName = servers[index];
         final isCurrent = sName == simplifySourceName(_currentSource);
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-          child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.12) : Colors.white.withOpacity(0.03),
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              autofocus: index == 0,
-              focusColor: const Color(0xFFEF7A1E).withOpacity(0.2),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: isCurrent ? const Color(0xFFEF7A1E) : Colors.transparent),
-              ),
-              onTap: () {
-                if (!isSidebar) Navigator.pop(context);
-                else setState(() => _activeOverlay = PlayerOverlay.none);
-                
-                if (!isCurrent) {
-                  _switchSource(_groupedSources[sName]!.first);
-                }
-              },
-              leading: Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: isCurrent ? Border.all(color: const Color(0xFFEF7A1E).withOpacity(0.5), width: 1.5) : null,
-                ),
-                child: Center(
-                  child: AurisIcon(
-                    AurisIcons.server, 
-                    color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white60, 
-                    size: 22,
-                  ),
-                ),
-              ),
-              title: Text(
-                sName,
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? Colors.white : Colors.white.withOpacity(0.85),
-                  fontSize: 16,
-                  fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-              subtitle: Text(
-                '${_groupedSources[sName]!.length} opciones disponibles',
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.8) : Colors.white30,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              trailing: isCurrent 
-                ? AurisIcon(AurisIcons.check, color: const Color(0xFFEF7A1E), size: 24)
-                : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.15), size: 20),
-            ),
-          ),
+        return AurisOptionCard(
+          title: sName,
+          subtitle: '${_groupedSources[sName]!.length} opciones disponibles',
+          icon: AurisIcons.server,
+          isCurrent: isCurrent,
+          autofocus: index == 0,
+          onTap: () {
+            if (!isSidebar) Navigator.pop(context);
+            else setState(() => _activeOverlay = PlayerOverlay.none);
+
+            if (!isCurrent) {
+              _switchSource(_groupedSources[sName]!.first);
+            }
+          },
         );
       },
     );
+  }
+
+  /// Cierra el panel lateral y devuelve el foco D-pad a la pill que lo abrió
+  /// (estilo YouTube-TV: salir del panel = volver a los controles).
+  void _dismissSidePanel() {
+    // Vuelta atrás de un nivel (Calidad → Configuración).
+    if (_overlayParent != null) {
+      final parent = _overlayParent!;
+      setState(() {
+        _activeOverlay = parent;
+        _overlayParent = null;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _sidePanelCloseNode.canRequestFocus) {
+          _sidePanelCloseNode.requestFocus();
+        }
+      });
+      return;
+    }
+    setState(() => _activeOverlay = PlayerOverlay.none);
+    _startHideTimer();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _lastFocusedPillNode ?? _serverPillFocusNode;
+      if (target.canRequestFocus) target.requestFocus();
+    });
   }
 
   void _showServerSelector() {
     _hideTimer?.cancel();
 
     setState(() {
+      _overlayParent = null;
       _activeOverlay = _activeOverlay == PlayerOverlay.server ? PlayerOverlay.none : PlayerOverlay.server;
       if (_activeOverlay != PlayerOverlay.none) {
         _showControls = true;
@@ -932,6 +935,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _startHideTimer();
       }
     });
+    if (_activeOverlay != PlayerOverlay.none) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _sidePanelCloseNode.canRequestFocus) {
+          _sidePanelCloseNode.requestFocus();
+        }
+      });
+    }
   }
 
   void _changeQuality(String quality) {
@@ -964,26 +974,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _initPlayer(targetUrl, targetHeaders);
   }
 
-  void _showQualitySelector() {
-    _hideTimer?.cancel();
-
-    setState(() {
-      _activeOverlay = _activeOverlay == PlayerOverlay.quality ? PlayerOverlay.none : PlayerOverlay.quality;
-      if (_activeOverlay != PlayerOverlay.none) {
-        _showControls = true;
-        _hideTimer?.cancel();
-      } else {
-        _startHideTimer();
-      }
-    });
-  }
-
   Widget _buildQualitySelectorContent({bool isSidebar = false}) {
     final List<Map<String, dynamic>> options = _qualityMenuOptions;
 
     return ListView.builder(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
       itemCount: options.length,
       itemBuilder: (context, index) {
         final option = options[index];
@@ -994,58 +990,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final bool isAvailable = url != null && url.isNotEmpty;
         final bool isCurrent = _selectedQuality == key;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-          child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.12) : Colors.white.withOpacity(0.03),
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              autofocus: index == 0,
-              focusColor: const Color(0xFFEF7A1E).withOpacity(0.2),
-              enabled: isAvailable,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: isCurrent ? const Color(0xFFEF7A1E) : Colors.transparent),
-              ),
-              onTap: () {
-                if (!isSidebar) Navigator.pop(context);
-                else setState(() => _activeOverlay = PlayerOverlay.none);
-                
-                if (isAvailable && !isCurrent) {
-                  _changeQuality(key);
-                }
-              },
-              leading: Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: AurisIcon(
-                  isCurrent ? AurisIcons.check : AurisIcons.hd,
-                  color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white70 : Colors.white24),
-                  size: 24,
-                ),
-              ),
-              title: Text(
-                label,
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? Colors.white : (isAvailable ? Colors.white.withOpacity(0.85) : Colors.white24),
-                  fontSize: 16,
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                ),
-              ),
-              subtitle: Text(
-                isAvailable ? sub : 'No disponible para este tema',
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.7) : Colors.white30,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
+        return AurisOptionCard(
+          title: label,
+          subtitle: isAvailable ? sub : 'No disponible para este tema',
+          icon: AurisIcons.hd,
+          isCurrent: isCurrent,
+          isAvailable: isAvailable,
+          autofocus: index == 0,
+          onTap: () {
+            if (!isSidebar) Navigator.pop(context);
+            else setState(() => _activeOverlay = PlayerOverlay.none);
+            
+            if (isAvailable && !isCurrent) {
+              _changeQuality(key);
+            }
+          },
         );
       },
     );
@@ -1162,18 +1121,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  void _showEpisodesCarousel() {
-    setState(() {
-      _showEpisodesOverlay = !_showEpisodesOverlay;
-      if (_showEpisodesOverlay) {
-        _showControls = true;
-        _hideTimer?.cancel();
-      } else {
-        _startHideTimer();
-      }
-    });
-  }
-
   List<({String server, SearchResult result, bool isTrack, int trackIndex})> _getLanguageOptions() {
     final currentSName = simplifySourceName(_currentSource);
     final baseOptions = _groupedSources[currentSName] ?? [];
@@ -1231,7 +1178,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildLanguageSelectorContent({bool isSidebar = false}) {
-    final isMobile = ResponsiveUtils.isMobile(context);
     final sourceOptions = _getLanguageOptions();
     if (sourceOptions.isEmpty) {
       return const Center(child: Padding(
@@ -1242,141 +1188,261 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     return ListView.builder(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(horizontal: 16, vertical: 8) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
       itemCount: sourceOptions.length,
       itemBuilder: (context, index) {
         final entry = sourceOptions[index];
         final s = entry.result;
         final serverName = entry.server;
-        final quality = s.quality.toUpperCase();
         final type = trackQualityType(s.quality);
-        final isLatino = type != 'SUB';
-        final isCastellano = type == 'CAST';
-        
-
-        final accentColor = isLatino 
-            ? Colors.greenAccent 
-            : (isCastellano ? Colors.orangeAccent : Colors.blueAccent);
-        
-        // Senior Logic: Identificación precisa de la fuente actual
-        // Si es un track (sub-fuente), comparamos por índice.
-        // Si es una fuente base (servidor), comparamos por URL.
         final bool isCurrent = entry.isTrack 
             ? entry.trackIndex == _selectedTrackIndex
             : s.url == _currentSourceUrl;
 
-        final String? trackBadge = entry.isTrack
-            ? _allTracks[entry.trackIndex].label.toUpperCase()
-            : null;
+        final titleText = '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source} ($type)';
+        final subtitleText = s.quality.isNotEmpty ? s.quality.toUpperCase() : 'Servidor: $serverName';
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-          child: Material(
-            color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.12) : Colors.white.withOpacity(0.03),
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-              autofocus: index == 0,
-              focusColor: const Color(0xFFEF7A1E).withOpacity(0.2),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: isCurrent ? const Color(0xFFEF7A1E) : Colors.transparent),
-              ),
-              onTap: () {
-                if (!isSidebar) Navigator.pop(context);
-                else setState(() => _activeOverlay = PlayerOverlay.none);
-                
-                if (!isCurrent) {
-                  if (entry.isTrack) {
-                    _switchTrack(entry.trackIndex);
-                  } else {
-                    _switchSource(s);
-                  }
-                }
-              },
-              leading: Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: isCurrent ? Border.all(color: accentColor, width: 2) : null,
-                ),
-                child: Center(
-                  child: Text(
-                    type,
-                    style: GoogleFonts.poppins(
-                      color: accentColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ),
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source}',
-                      style: GoogleFonts.poppins(
-                        color: isCurrent ? Colors.white : Colors.white.withOpacity(0.85),
-                        fontSize: 15,
-                        fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (trackBadge != null) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFC107).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFFFC107).withOpacity(0.3), width: 1),
-                      ),
-                      child: Text(
-                        trackBadge,
-                        style: const TextStyle(color: Color(0xFFFFC107), fontSize: 9, fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ],
-                  if (quality.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: (type == 'SUB' ? Colors.blueAccent : const Color(0xFFEF7A1E)).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        quality,
-                        style: TextStyle(
-                          color: (type == 'SUB' ? Colors.blueAccent : const Color(0xFFEF7A1E)),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              subtitle: Text(
-                entry.isTrack ? 'Pista de audio interna' : 'Fuente de servidor externo ($serverName)',
-                style: GoogleFonts.poppins(
-                  color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.8) : Colors.white30,
-                  fontSize: 11,
-                ),
-              ),
-              trailing: isCurrent 
-                ? AurisIcon(AurisIcons.check, color: const Color(0xFFEF7A1E), size: 24)
-                : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.15), size: 20),
-            ),
-          ),
+        return AurisOptionCard(
+          title: titleText,
+          subtitle: subtitleText,
+          icon: AurisIcons.subtitles,
+          isCurrent: isCurrent,
+          autofocus: index == 0,
+          onTap: () {
+            if (!isSidebar) Navigator.pop(context);
+            else setState(() => _activeOverlay = PlayerOverlay.none);
+            
+            if (!isCurrent) {
+              if (entry.isTrack) {
+                _switchTrack(entry.trackIndex);
+              } else {
+                _switchSource(s);
+              }
+            }
+          },
         );
       },
+    );
+  }
+
+  /// Menú raíz del engranaje de configuración: cada fila abre su sub-panel.
+  /// Calidad solo aparece cuando hay opciones reales (ver _hasQualityOptions).
+  Widget _buildConfigMenuContent({bool isSidebar = false}) {
+    final String qualitySub = _selectedQuality == 'auto'
+        ? 'Automático'
+        : '${_selectedQuality.toUpperCase()}p';
+    final bool showQuality = _hasQualityOptions;
+    final children = <Widget>[
+      if (showQuality)
+        AurisOptionCard(
+          title: 'Calidad',
+          subtitle: qualitySub,
+          icon: AurisIcons.hd,
+          autofocus: true,
+          onTap: () => _openConfigSubPanel(PlayerOverlay.quality),
+        ),
+      AurisOptionCard(
+        title: 'Velocidad',
+        subtitle: _formatSpeed(_playbackSpeed),
+        icon: AurisIcons.speedometer,
+        autofocus: !showQuality,
+        onTap: () => _openConfigSubPanel(PlayerOverlay.speed),
+      ),
+      AurisOptionCard(
+        title: 'Boost de volumen',
+        subtitle: _volumeLabel,
+        icon: AurisIcons.volumeUp,
+        isCurrent: _volume > 1.0,
+        onTap: () => _openConfigSubPanel(PlayerOverlay.volume),
+      ),
+    ];
+    if (children.isEmpty) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(32.0),
+        child: Text('No hay opciones disponibles', style: TextStyle(color: Colors.white54)),
+      ));
+    }
+    return ListView(
+      shrinkWrap: !isSidebar,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
+      children: children,
+    );
+  }
+
+  /// Abre un sub-panel desde Configuración (vuelta atrás de un nivel).
+  void _openConfigSubPanel(PlayerOverlay overlay) {
+    setState(() {
+      _overlayParent = PlayerOverlay.config;
+      _activeOverlay = overlay;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _sidePanelCloseNode.canRequestFocus) {
+        _sidePanelCloseNode.requestFocus();
+      }
+    });
+  }
+
+  String _formatSpeed(double speed) =>
+      speed == speed.roundToDouble() ? '${speed.toInt()}x' : '${speed}x';
+
+  String get _volumeLabel {
+    final percent = (_volume * 100).round();
+    return _volume > 1.0 ? '$percent% · Boost' : '$percent%';
+  }
+
+  void _setPlaybackSpeed(double speed) {
+    if (_playbackSpeed == speed) return;
+    setState(() => _playbackSpeed = speed);
+    _player?.setRate(speed);
+  }
+
+  void _setVolumePreset(double value) {
+    // Escudo anti-eco del listener de volumen físico (igual que el slider).
+    _lastManualVolumeTime = DateTime.now();
+    setState(() => _volume = value);
+    _applyVolume();
+  }
+
+  static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+  Widget _buildSpeedSelectorContent({bool isSidebar = false}) {
+    return ListView.builder(
+      shrinkWrap: !isSidebar,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
+      itemCount: _speedOptions.length,
+      itemBuilder: (context, index) {
+        final speed = _speedOptions[index];
+        final bool isCurrent = _playbackSpeed == speed;
+        return AurisOptionCard(
+          title: _formatSpeed(speed),
+          subtitle: speed == 1.0 ? 'Normal' : '',
+          icon: AurisIcons.speedometer,
+          isCurrent: isCurrent,
+          autofocus: index == 0,
+          onTap: () {
+            if (!isCurrent) _setPlaybackSpeed(speed);
+          },
+        );
+      },
+    );
+  }
+
+  static const List<double> _volumePresets = [1.0, 1.25, 1.5, 1.75, 2.0];
+
+  Widget _buildVolumeSelectorContent({bool isSidebar = false}) {
+    return ListView.builder(
+      shrinkWrap: !isSidebar,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
+      itemCount: _volumePresets.length,
+      itemBuilder: (context, index) {
+        final value = _volumePresets[index];
+        final percent = (value * 100).round();
+        final bool isCurrent = (_volume - value).abs() < 0.01;
+        return AurisOptionCard(
+          title: value >= 2.0 ? '$percent% Máximo' : '$percent%',
+          subtitle: value <= 1.0 ? 'Normal' : (value > 1.0 ? 'Boost' : ''),
+          icon: AurisIcons.volumeUp,
+          isCurrent: isCurrent,
+          autofocus: index == 0,
+          onTap: () {
+            if (!isCurrent) _setVolumePreset(value);
+          },
+        );
+      },
+    );
+  }
+
+  void _showEpisodesPanel() {
+    _hideTimer?.cancel();
+
+    setState(() {
+      _overlayParent = null;
+      _activeOverlay = _activeOverlay == PlayerOverlay.episodes ? PlayerOverlay.none : PlayerOverlay.episodes;
+      if (_activeOverlay != PlayerOverlay.none) {
+        _showControls = true;
+        _hideTimer?.cancel();
+      } else {
+        _startHideTimer();
+      }
+    });
+    if (_activeOverlay != PlayerOverlay.none) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _sidePanelCloseNode.canRequestFocus) {
+          _sidePanelCloseNode.requestFocus();
+        }
+      });
+    }
+  }
+
+  void _selectEpisodeFromPanel(EpisodeInfo ep) {
+    final epNum = ep.number;
+    if (epNum.toString() == _activeEpisode) return;
+
+    // Prioriza la URL del item o reconstruye con buildEpisodeUrl.
+    final String resolvedEpisodeUrl = ep.url.isNotEmpty
+        ? ep.url
+        : buildEpisodeUrl(_currentSourceUrl, _currentSource ?? '', epNum);
+
+    // Parar el player actual INMEDIATAMENTE para no arrastrar audio.
+    _player?.stop();
+
+    // Reemplazar la URL actual para limpiar historial de navegación.
+    final String newPath = '/player/${widget.contentId}';
+    final queryParameters = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
+    queryParameters['episode'] = epNum.toString();
+    queryParameters['url'] = resolvedEpisodeUrl;
+    queryParameters['skipResume'] = '1';
+
+    // Invalidar el extractor para forzar una carga limpia.
+    ref.invalidate(extractProvider);
+
+    setState(() {
+      _activeOverlay = PlayerOverlay.none;
+      _overlayParent = null;
+    });
+    context.replace(Uri(path: newPath, queryParameters: queryParameters).toString());
+  }
+
+  Widget _buildEpisodesSelectorContent({bool isSidebar = false}) {
+    final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
+      url: widget.sourceUrl,
+      source: _currentSource,
+      title: widget.title ?? '',
+      season: widget.season ?? 1,
+    )));
+    return episodesAsync.when(
+      data: (data) {
+        if (data == null || data.episodes.isEmpty) {
+          return const Center(child: Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Text('No hay episodios disponibles', style: TextStyle(color: Colors.white54)),
+          ));
+        }
+        final eps = _enrichedEpisodes(data.episodes);
+        return ListView.builder(
+          shrinkWrap: !isSidebar,
+          padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
+          itemCount: eps.length,
+          itemBuilder: (context, index) {
+            final ep = eps[index];
+            final isCurrent = ep.number.toString() == _activeEpisode;
+            return AurisEpisodeListCard(
+              ep: ep,
+              isCurrent: isCurrent,
+              autofocus: isCurrent,
+              onTap: () => _selectEpisodeFromPanel(ep),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: Padding(
+        padding: EdgeInsets.all(32.0),
+        child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+      )),
+      error: (err, _) => Center(child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent)),
+      )),
     );
   }
 
@@ -1384,6 +1450,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _hideTimer?.cancel();
 
     setState(() {
+      _overlayParent = null;
       _activeOverlay = _activeOverlay == PlayerOverlay.language ? PlayerOverlay.none : PlayerOverlay.language;
       if (_activeOverlay != PlayerOverlay.none) {
         _showControls = true;
@@ -1392,6 +1459,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _startHideTimer();
       }
     });
+    if (_activeOverlay != PlayerOverlay.none) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _sidePanelCloseNode.canRequestFocus) {
+          _sidePanelCloseNode.requestFocus();
+        }
+      });
+    }
+  }
+
+  void _showConfigMenu() {
+    _hideTimer?.cancel();
+
+    setState(() {
+      _overlayParent = null;
+      _activeOverlay = _activeOverlay == PlayerOverlay.config ? PlayerOverlay.none : PlayerOverlay.config;
+      if (_activeOverlay != PlayerOverlay.none) {
+        _showControls = true;
+        _hideTimer?.cancel();
+      } else {
+        _startHideTimer();
+      }
+    });
+    if (_activeOverlay != PlayerOverlay.none) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _sidePanelCloseNode.canRequestFocus) {
+          _sidePanelCloseNode.requestFocus();
+        }
+      });
+    }
   }
 
   @override
@@ -2820,21 +2916,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _headerFocusNode.dispose();
     _serverPillFocusNode.dispose();
     _episodesPillFocusNode.dispose();
-    _qualityPillFocusNode.dispose();
+    _opedPillFocusNode.dispose();
     _languagePillFocusNode.dispose();
+    _sidePanelCloseNode.dispose();
     super.dispose();
   }
 
   void _handleBackNavigation() {
     if (_activeOverlay != PlayerOverlay.none) {
-      setState(() => _activeOverlay = PlayerOverlay.none);
-      _startHideTimer();
-      return;
-    }
-
-    if (_showEpisodesOverlay) {
-      setState(() => _showEpisodesOverlay = false);
-      _startHideTimer();
+      _dismissSidePanel();
       return;
     }
 
@@ -2958,9 +3048,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         if (!mounted) return;
         try {
           final notifier = ref.read(activePlayerProvider.notifier);
-          final t = notifier.episodeInfoFor(_activeEpisode, data.episodes)?.title;
+          final enriched = _enrichedEpisodes(data.episodes);
+          final t = notifier.episodeInfoFor(_activeEpisode, enriched)?.title;
           notifier.updateSession(
-            episodes: data.episodes,
+            episodes: enriched,
             episodeTitle: (t != null && t.isNotEmpty) ? t : null,
           );
         } catch (_) {}
@@ -2993,17 +3084,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Widget _buildMainContent(BuildContext context, UserSettings settings) {
     final remoteState = ref.watch(remoteControlProvider);
     final targetId = remoteState.activeTargetDeviceId;
-    
+
     if (targetId != null) {
       final target = remoteState.availableDevices.firstWhereOrNull((d) => d.id == targetId);
       if (target != null) return _buildRemoteModeView(target);
     }
 
+    // Fondo: negro puro en reproducción; gris del panel solo con menú abierto.
+    final bg = _activeOverlay != PlayerOverlay.none ? const Color(0xFF0F0F0F) : Colors.black;
+
     // Senior Direct Flow: Fuentes que ya entregan el stream directo o proxied
     final bool isDirectSource = _currentSource == 'Themes' || _currentSource == 'YouTube';
 
     if (isDirectSource || widget.source.isEmpty && widget.sourceUrl.isNotEmpty) {
-      return Material(color: Colors.black, child: _playerView(settings: settings));
+      return Material(color: bg, child: _playerView(settings: settings));
     }
 
     final extractAsync = ref.watch(extractProvider(ExtractParams(
@@ -3013,7 +3107,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     )));
 
     return Material(
-      color: Colors.black,
+      color: bg,
       child: extractAsync.when(
         data: (result) {
           final tracks = result.tracks;
@@ -3115,7 +3209,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildRemoteModeView(RemoteDevice target) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF0F0F0F),
       body: LayoutBuilder(
         builder: (context, constraints) {
           return Stack(
@@ -3444,11 +3538,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       if (data == null || data.episodes.isEmpty) {
                         return const Center(child: Text('No hay episodios disponibles', style: TextStyle(color: Colors.white54)));
                       }
+                      final eps = _enrichedEpisodes(data.episodes);
                       return ListView.builder(
                         controller: scrollController,
-                        itemCount: data.episodes.length,
+                        itemCount: eps.length,
                         itemBuilder: (context, index) {
-                          final ep = data.episodes[index];
+                          final ep = eps[index];
                           final bool isCurrent = ep.number.toString() == _activeEpisode;
                           
                           return ListTile(
@@ -3743,7 +3838,157 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildMobilePlayer(List<VideoTrackOption> playableTracks, UserSettings settings) {
     final bool isAnyGestureActive = _showSeekIndicator;
-    final bool showAnyway = (_showControls || (_autoplayCountdown >= 0 && _isAutoplayResume) || _showEpisodesOverlay || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
+    final bool showAnyway = (_showControls || (_autoplayCountdown >= 0 && _isAutoplayResume) || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
+    final bool isMenuOpen = _activeOverlay != PlayerOverlay.none;
+
+    final videoAndControls = Stack(
+      fit: StackFit.expand,
+      children: [
+        if (_webViewController != null)
+          RepaintBoundary(child: WebViewWidget(controller: _webViewController!))
+        else if (_controller != null)
+          RepaintBoundary(
+            child: AnimatedOpacity(
+              opacity: (!_hasResetPosition && _resumePosition > 3000) ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeIn,
+              child: Video(
+                key: _videoKey,
+                controller: _controller!, 
+                controls: NoVideoControls, 
+                fit: _videoFit,
+                subtitleViewConfiguration: SubtitleViewConfiguration(
+                  style: TextStyle(
+                    height: 1.2,
+                    fontSize: 24 * settings.subtitleSize,
+                    color: Color(settings.subtitleColor),
+                    fontWeight: FontWeight.bold,
+                    backgroundColor: Colors.black38,
+                  ),
+                  padding: EdgeInsets.only(bottom: _showControls ? 160 : 60),
+                ),
+              ),
+            ),
+          )
+        else
+          const SizedBox.shrink(),
+
+        if (!isMenuOpen)
+          Positioned.fill(
+            child: PointerInterceptor(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                MouseRegion(
+                  onHover: (_) { 
+                    if (ResponsiveUtils.isTactic(context)) return;
+                    if (!_showControls) setState(() => _showControls = true); 
+                    _startHideTimer(); 
+                  }, 
+                  cursor: showAnyway ? SystemMouseCursors.basic : SystemMouseCursors.none, 
+                  child: Listener(
+                    onPointerDown: (event) { 
+                      if (_isFullscreen && (event.buttons & kBackMouseButton != 0)) { 
+                        _ignoreNextPop = true;
+                        _toggleFullscreen();
+                        Timer(const Duration(milliseconds: 300), () => _ignoreNextPop = false);
+                      } 
+                    }, 
+                    child: GestureDetector(
+                      onTap: () {
+                        if (!_isMobileDevice) {
+                          final bool wasPlaying = _player?.state.playing ?? false;
+                          if (wasPlaying) _player?.pause(); else _player?.play();
+                          if (!_showControls) setState(() => _showControls = true);
+                          _startHideTimer();
+                        } else {
+                          _toggleControls();
+                        }
+                      },
+                      behavior: HitTestBehavior.opaque, 
+                      onDoubleTapDown: (details) { 
+                        final width = MediaQuery.sizeOf(context).width; 
+                        final bool isRight = details.globalPosition.dx >= width / 2;
+                        if (isRight) _skipForward(); else _skipBackward();
+                      }, 
+                      onHorizontalDragStart: (details) {
+                        if (!ResponsiveUtils.isNative) return;
+                        final duration = _player?.state.duration ?? Duration.zero;
+                        if (duration.inMilliseconds <= 0) return;
+                        
+                        setState(() {
+                          _showSeekIndicator = true;
+                          _seekTargetDuration = _player?.state.position ?? Duration.zero;
+                          _seekDiff = Duration.zero;
+                          _showControls = false;
+                        });
+                        HapticFeedback.selectionClick();
+                      },
+                      onHorizontalDragUpdate: (details) {
+                        if (!_showSeekIndicator || _player == null) return;
+                        
+                        final double screenWidth = MediaQuery.sizeOf(context).width;
+                        final duration = _player!.state.duration;
+                        final double sensitivityMs = (duration.inMinutes > 2) ? 120000.0 : duration.inMilliseconds.toDouble();
+                        final double deltaMs = (details.primaryDelta! / screenWidth) * sensitivityMs;
+                        
+                        setState(() {
+                          final newMs = (_seekTargetDuration.inMilliseconds + deltaMs).clamp(0.0, duration.inMilliseconds.toDouble());
+                          _seekTargetDuration = Duration(milliseconds: newMs.toInt());
+                          _seekDiff = Duration(milliseconds: _seekTargetDuration.inMilliseconds - (_player!.state.position.inMilliseconds));
+                        });
+                      },
+                      onHorizontalDragEnd: (details) {
+                        if (!_showSeekIndicator) return;
+                        
+                        _player?.seek(_seekTargetDuration);
+                        _updateHistory(positionMs: _seekTargetDuration.inMilliseconds, durationMs: _player?.state.duration.inMilliseconds ?? 0, force: true);
+                        
+                        setState(() {
+                          _showSeekIndicator = false;
+                          _showControls = true;
+                        });
+                        _startHideTimer();
+                        HapticFeedback.mediumImpact();
+                      },
+                      child: Container(color: Colors.transparent),
+                    ),
+                  ),
+                ),
+                IgnorePointer(
+                  ignoring: !showAnyway, 
+                  child: AnimatedOpacity(
+                    opacity: showAnyway ? 1.0 : 0.0, 
+                    duration: const Duration(milliseconds: 300), 
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (!(_autoplayCountdown >= 0 && _isAutoplayResume)) 
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter, 
+                                    end: Alignment.bottomCenter, 
+                                    colors: [Colors.black.withOpacity(0.7), Colors.transparent, Colors.transparent, Colors.black.withOpacity(0.8)], 
+                                    stops: const [0.0, 0.2, 0.7, 1.0],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        _buildControlsStack(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
 
     return Focus(
       focusNode: _playerFocusNode,
@@ -3751,313 +3996,102 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       onKeyEvent: (node, event) => _handleKeyEvent(event), 
       child: FocusScope(
         child: Stack(
-        fit: StackFit.expand, 
-        children: [
-          if (_webViewController != null)
-            RepaintBoundary(child: WebViewWidget(controller: _webViewController!))
-          else if (_controller != null)
-            RepaintBoundary(
-              child: AnimatedOpacity(
-                // Senior Visual Shield: Opacidad 0 hasta que el seek de reanudación sea estable
-                opacity: (!_hasResetPosition && _resumePosition > 3000) ? 0.0 : 1.0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeIn,
-                child: Video(
-                  key: _videoKey,
-                  controller: _controller!, 
-                  controls: NoVideoControls, 
-                  fit: _videoFit,
-                  subtitleViewConfiguration: SubtitleViewConfiguration(
-                    style: TextStyle(
-                      height: 1.2,
-                      fontSize: 24 * settings.subtitleSize,
-                      color: Color(settings.subtitleColor),
-                      fontWeight: FontWeight.bold,
-                      backgroundColor: Colors.black38,
+          fit: StackFit.expand, 
+          children: [
+            AurisTwoPanel(
+              video: videoAndControls,
+              videoOverlays: [
+                // Senior UI Fix: El overlay se muestra durante TODA la carga.
+                if (_isLoading)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        // Senior UI: Negro opaco durante la reanudación para ocultar flickeos
+                        color: (_resumePosition > 3000 && !_hasResetPosition) ? Colors.black : Colors.black45,
+                        child: const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(width: 48, height: 48, child: CircularProgressIndicator(strokeWidth: 4, color: Colors.white)),
+                              SizedBox(height: 16),
+                              Text('Cargando...', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    padding: EdgeInsets.only(bottom: _showControls ? 160 : 60),
                   ),
-                ),
-              ),
-            )
-          else
-            const SizedBox.shrink(),
-
-          // EL DETECTOR UNIVERSAL DE GESTOS Y CAPA DE CONTROLES
-          // Senior Elite Fix: Unificamos todo bajo un solo PointerInterceptor para evitar que
-          // las capas de UI bloqueen el GestureDetector de fondo en Web.
-          Positioned.fill(
-            child: PointerInterceptor(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // CAPA 1: El detector de gestos (Fondo)
-                  MouseRegion(
-                    onHover: (_) { 
-                      if (ResponsiveUtils.isTactic(context)) return;
-                      if (!_showControls) setState(() => _showControls = true); 
-                      _startHideTimer(); 
-                    }, 
-                    cursor: showAnyway ? SystemMouseCursors.basic : SystemMouseCursors.none, 
-                    child: Listener(
-                      onPointerDown: (event) { 
-                        if (_isFullscreen && (event.buttons & kBackMouseButton != 0)) { 
-                          _ignoreNextPop = true;
-                          _toggleFullscreen();
-                          Timer(const Duration(milliseconds: 300), () => _ignoreNextPop = false);
-                        } 
-                      }, 
-                      child: GestureDetector(
-                        onTap: () {
-                          if (!_isMobileDevice) {
-                            final bool wasPlaying = _player?.state.playing ?? false;
-                            if (wasPlaying) _player?.pause(); else _player?.play();
-                            if (!_showControls) setState(() => _showControls = true);
-                            _startHideTimer();
-                          } else {
-                            _toggleControls();
-                          }
-                        },
-                        behavior: HitTestBehavior.opaque, 
-                        onDoubleTapDown: (details) { 
-                          final width = MediaQuery.sizeOf(context).width; 
-                          final bool isRight = details.globalPosition.dx >= width / 2;
-                          if (isRight) _skipForward(); else _skipBackward();
-                        }, 
-                        onHorizontalDragStart: (details) {
-                          if (!ResponsiveUtils.isNative) return;
-                          final duration = _player?.state.duration ?? Duration.zero;
-                          if (duration.inMilliseconds <= 0) return;
-                          
-                          setState(() {
-                            _showSeekIndicator = true;
-                            _seekTargetDuration = _player?.state.position ?? Duration.zero;
-                            _seekDiff = Duration.zero;
-                            _showControls = false;
-                          });
-                          HapticFeedback.selectionClick();
-                        },
-                        onHorizontalDragUpdate: (details) {
-                          if (!_showSeekIndicator || _player == null) return;
-                          
-                          final double screenWidth = MediaQuery.sizeOf(context).width;
-                          final duration = _player!.state.duration;
-                          // Senior Plus: Sensibilidad de búsqueda (deslizar toda la pantalla = 2 min de búsqueda o duración total si es menor)
-                          final double sensitivityMs = (duration.inMinutes > 2) ? 120000.0 : duration.inMilliseconds.toDouble();
-                          final double deltaMs = (details.primaryDelta! / screenWidth) * sensitivityMs;
-                          
-                          setState(() {
-                            final newMs = (_seekTargetDuration.inMilliseconds + deltaMs).clamp(0.0, duration.inMilliseconds.toDouble());
-                            _seekTargetDuration = Duration(milliseconds: newMs.toInt());
-                            _seekDiff = Duration(milliseconds: _seekTargetDuration.inMilliseconds - (_player!.state.position.inMilliseconds));
-                          });
-                        },
-                        onHorizontalDragEnd: (details) {
-                          if (!_showSeekIndicator) return;
-                          
-                          _player?.seek(_seekTargetDuration);
-                          _updateHistory(positionMs: _seekTargetDuration.inMilliseconds, durationMs: _player?.state.duration.inMilliseconds ?? 0, force: true);
-                          
-                          setState(() {
-                            _showSeekIndicator = false;
-                            _showControls = true;
-                          });
-                          _startHideTimer();
-                          HapticFeedback.mediumImpact();
-                        },
-                        child: Container(color: Colors.transparent),
-                       ),
-                     ),
-                   ),
-
-                  // Central indicator removed
-
-                   // CAPA 2: Los controles reales (Superpuestos)
-                   IgnorePointer(
-                     ignoring: !showAnyway, 
-                     child: AnimatedOpacity(
-                       opacity: showAnyway ? 1.0 : 0.0, 
-                       duration: const Duration(milliseconds: 300), 
-                       child: Stack(
-                         fit: StackFit.expand,
-                         children: [
-                           if (!(_autoplayCountdown >= 0 && _isAutoplayResume)) 
-                             Positioned.fill(
-                               child: IgnorePointer(
-                                 child: DecoratedBox(
-                                   decoration: BoxDecoration(
-                                     gradient: LinearGradient(
-                                       begin: Alignment.topCenter, 
-                                       end: Alignment.bottomCenter, 
-                                       colors: [Colors.black.withOpacity(0.7), Colors.transparent, Colors.transparent, Colors.black.withOpacity(0.8)], 
-                                       stops: const [0.0, 0.2, 0.7, 1.0],
-                                     ),
-                                   ),
-                                 ),
-                               ),
-                             ),
-                           _buildControlsStack(),
-                         ],
-                       ),
-                     ),
-                   ),
-                 ],
-               ),
-             ),
-           ),
-           // Senior UI Fix: El overlay se muestra durante TODA la carga (antes
-           // se ocultaba con `!_showControls`, pero al abrir el stream los
-           // controles ya son visibles y el usuario veía negro + 0:00).
-           if (_isLoading) 
-             Positioned.fill(
-               child: IgnorePointer(
-                 child: Container(
-                   // Senior UI: Negro opaco durante la reanudación para ocultar flickeos
-                   color: (_resumePosition > 3000 && !_hasResetPosition) ? Colors.black : Colors.black45, 
-                   child: const Center(
-                     child: Column(
-                       mainAxisSize: MainAxisSize.min, 
-                       children: [
-                         SizedBox(width: 48, height: 48, child: CircularProgressIndicator(strokeWidth: 4, color: Colors.white)), 
-                         SizedBox(height: 16), 
-                         Text('Cargando...', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
-                       ],
-                     ),
-                   ),
-                 ),
-               ),
-             ),
-           
-
-           if (_showSeekIndicator) Positioned.fill(child: IgnorePointer(child: _buildSeekIndicator())),
-           
-           if (_showLeftSkip) _buildSkipVisual(false),
-           if (_showRightSkip) _buildSkipVisual(true),
-           
-           // Senior Web Fix: Overlay para superar el bloqueo de Autoplay en Web
-           if (kIsWeb && _webNeedsInteraction)
-             Positioned.fill(
-               child: Container(
-                 color: Colors.black87,
-                 child: Center(
-                   child: Column(
-                     mainAxisSize: MainAxisSize.min,
-                     children: [
-                       const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 64),
-                       const SizedBox(height: 24),
-                       const Text(
-                         'SINCROIZACIÓN REMOTA',
-                         style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2),
-                       ),
-                       const SizedBox(height: 8),
-                       const Text(
-                         'Haz clic para empezar a reproducir',
-                         style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                       ),
-                       const SizedBox(height: 32),
-                       ElevatedButton.icon(
-                         style: ElevatedButton.styleFrom(
-                           backgroundColor: const Color(0xFFEF7A1E),
-                           foregroundColor: Colors.white,
-                           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                         ),
-                         onPressed: () {
-                           setState(() => _webNeedsInteraction = false);
-                           _player?.play();
-                         },
-                         icon: const Icon(Icons.play_arrow_rounded, size: 28),
-                         label: const Text('REPRODUCIR AHORA', style: TextStyle(fontWeight: FontWeight.w900)),
-                       ),
-                     ],
-                   ),
-                 ),
-               ),
-             ),
-           
-           // CAPA: Carrusel de Episodios (Estilo Netflix/Prime Video)
-           if (_showEpisodesOverlay && !(_autoplayCountdown >= 0 && _isAutoplayResume))
-             Positioned.fill(
-               child: Column(
-                 children: [
-                   // Senior Lazy-Close Shield: Si el usuario toca el área vacía superior, cerramos el carrusel
-                   Expanded(
-                     child: GestureDetector(
-                       onTap: () => setState(() => _showEpisodesOverlay = false),
-                       child: Container(color: Colors.transparent),
-                     ),
-                   ),
-                   _EpisodesCarouselPanel(
-                     title: widget.title ?? widget.contentId,
-                     sourceUrl: _currentSourceUrl,
-                     source: _currentSource,
-                     currentEpisode: _activeEpisode,
-                     season: widget.season ?? 1,
-                     category: widget.category ?? 'anime',
-                     onClose: () => setState(() => _showEpisodesOverlay = false),
-                     onEpisodeSelected: (epNum, epUrl, epTitle) {
-                       if (epNum.toString() == _activeEpisode) return;
-                       
-                       // Senior Fix Definitivo: Priorizamos epUrl del carrusel o reconstruimos con buildEpisodeUrl
-                       final String resolvedEpisodeUrl = epUrl.isNotEmpty 
-                          ? epUrl 
-                          : buildEpisodeUrl(_currentSourceUrl, _currentSource ?? '', epNum);
-
-                       // Senior Autoplay Fix: Parar el player actual INMEDIATAMENTE
-                       _player?.stop();
-
-                       // Senior Navigation Fix: Reemplazar la URL actual para limpiar historial
-                       final String newPath = '/player/${widget.contentId}';
-                       final queryParameters = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
-                       queryParameters['episode'] = epNum.toString();
-                       queryParameters['url'] = resolvedEpisodeUrl;
-                       queryParameters['skipResume'] = '1';
-
-                       // Senior Sync Fix: Invalidar el extractor para forzar una carga limpia
-                       ref.invalidate(extractProvider);
-                       
-                       context.replace(Uri(path: newPath, queryParameters: queryParameters).toString());
-                     }
-                   ),
-                 ],
-               ),
-             ),
-
-           // CAPA: Side Panel (Adaptive Unified UI)
-           if (_activeOverlay != PlayerOverlay.none)
-             Positioned.fill(
-               child: Stack(
-                 children: [
-                   // Backdrop transparente para cerrar al tocar fuera
-                   GestureDetector(
-                     onTap: () {
-                       setState(() => _activeOverlay = PlayerOverlay.none);
-                       _startHideTimer();
-                     },
-                     behavior: HitTestBehavior.opaque,
-                     child: Container(color: Colors.transparent),
-                   ),
-                   _PlayerSidePanel(
-                     title: switch (_activeOverlay) {
-                       PlayerOverlay.language => 'Fuentes Disponibles (${_getLanguageOptions().length})',
-                       PlayerOverlay.server => 'Servidores (${_groupedSources.keys.length})',
-                       PlayerOverlay.quality => 'Calidad de Video',
-                       _ => '',
-                     },
-                     onClose: () {
-                       setState(() => _activeOverlay = PlayerOverlay.none);
-                       _startHideTimer();
-                     },
-                     child: switch (_activeOverlay) {
-                       PlayerOverlay.language => _buildLanguageSelectorContent(isSidebar: true),
-                       PlayerOverlay.server => _buildServerSelectorContent(isSidebar: true),
-                       PlayerOverlay.quality => _buildQualitySelectorContent(isSidebar: true),
-                       _ => const SizedBox.shrink(),
-                     },
-                   ),
-                 ],
-               ),
-             ),
+                if (_showSeekIndicator) Positioned.fill(child: IgnorePointer(child: _buildSeekIndicator())),
+                if (_showLeftSkip) _buildSkipVisual(false),
+                if (_showRightSkip) _buildSkipVisual(true),
+                // Senior Web Fix: Overlay para superar el bloqueo de Autoplay en Web
+                if (kIsWeb && _webNeedsInteraction)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black87,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 64),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'SINCROIZACIÓN REMOTA',
+                              style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Haz clic para empezar a reproducir',
+                              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 32),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFEF7A1E),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                              ),
+                              onPressed: () {
+                                setState(() => _webNeedsInteraction = false);
+                                _player?.play();
+                              },
+                              icon: const Icon(Icons.play_arrow_rounded, size: 28),
+                              label: const Text('REPRODUCIR AHORA', style: TextStyle(fontWeight: FontWeight.w900)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+              panelOpen: isMenuOpen,
+              panelTitle: switch (_activeOverlay) {
+                PlayerOverlay.language => 'Audio y subtítulos',
+                PlayerOverlay.server => 'Servidor',
+                PlayerOverlay.quality => 'Calidad',
+                PlayerOverlay.speed => 'Velocidad',
+                PlayerOverlay.volume => 'Volumen',
+                PlayerOverlay.episodes => 'Episodios',
+                _ => 'Configuración',
+              },
+              panelContent: switch (_activeOverlay) {
+                PlayerOverlay.language => _buildLanguageSelectorContent(isSidebar: true),
+                PlayerOverlay.server => _buildServerSelectorContent(isSidebar: true),
+                PlayerOverlay.quality => _buildQualitySelectorContent(isSidebar: true),
+                PlayerOverlay.config => _buildConfigMenuContent(isSidebar: true),
+                PlayerOverlay.speed => _buildSpeedSelectorContent(isSidebar: true),
+                PlayerOverlay.volume => _buildVolumeSelectorContent(isSidebar: true),
+                PlayerOverlay.episodes => _buildEpisodesSelectorContent(isSidebar: true),
+                _ => const SizedBox.shrink(),
+              },
+              onDismiss: _dismissSidePanel,
+              closeFocusNode: _sidePanelCloseNode,
+              trapFocus: true,
+              onBack: _dismissSidePanel,
+              railWidth: 460,
+              borderRadius: 28,
+            ),
            
            if (_playbackError != null) 
              Positioned.fill(
@@ -4108,7 +4142,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildMobileTimelineLayer() {
     return Positioned(
-      bottom: 104,
+      bottom: 70,
       left: 0,
       right: 0,
       child: Center(child: _buildMobileTimeline()),
@@ -4138,19 +4172,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 _buildPillButton(
                   label: _activeEpisode != null ? 'Ep. $_activeEpisode' : 'Episodios',
                   icon: AurisIcons.episodes,
-                  isSelected: _showEpisodesOverlay,
-                  onTap: _showEpisodesCarousel,
+                  isSelected: _activeOverlay == PlayerOverlay.episodes,
+                  onTap: _showEpisodesPanel,
                   focusNode: _episodesPillFocusNode,
                 ),
                 const SizedBox(width: 10),
               ],
-              _buildPillButton(
-                label: _selectedQuality == 'auto' ? 'Calidad: Auto' : 'Calidad: ${_selectedQuality.toUpperCase()}p',
-                icon: AurisIcons.hd,
-                isSelected: _activeOverlay == PlayerOverlay.quality,
-                onTap: _showQualitySelector,
-                focusNode: _qualityPillFocusNode,
-              ),
+              if (!_isMovie && !_isOpEd) ...[
+                _buildPillButton(
+                  label: 'Saltar OP/ED',
+                  icon: AurisIcons.fastForward,
+                  isSelected: false,
+                  onTap: _skipOpEd,
+                  focusNode: _opedPillFocusNode,
+                ),
+                const SizedBox(width: 10),
+              ],
               const SizedBox(width: 10),
               _buildPillButton(
                 label: _currentLanguage ?? 'Audio / Subs',
@@ -4307,7 +4344,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 if (!hideBack) ...[
                   _buildCircularButton(
                     icon: Symbols.arrow_back,
-                    onTap: _handleBackNavigation,
+                    onTap: _exitPlayer,
                     size: 44,
                     iconSize: 22,
                     debugLabel: 'header_back',
@@ -4337,7 +4374,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 const SizedBox(width: 16),
                 _buildCircularButton(
                   icon: Symbols.settings,
-                  onTap: _showLanguageSelector,
+                  onTap: _showConfigMenu,
                   size: 44,
                   iconSize: 22,
                   debugLabel: 'header_options',
@@ -4446,11 +4483,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent || event is KeyRepeatEvent) {
           final key = event.logicalKey;
-          if ((debugLabel == 'header_back' || debugLabel == 'header_replay' || debugLabel == 'header_options') &&
-              key == LogicalKeyboardKey.arrowDown) {
-            _timelineFocusNode.requestFocus();
-            _startHideTimer();
-            return KeyEventResult.handled;
+          if (debugLabel == 'header_back' || debugLabel == 'header_replay' || debugLabel == 'header_options') {
+            if (key == LogicalKeyboardKey.arrowDown) {
+              _timelineFocusNode.requestFocus();
+              _startHideTimer();
+              return KeyEventResult.handled;
+            } else if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space) {
+              onTap();
+              _startHideTimer();
+              return KeyEventResult.handled;
+            }
           }
         }
         return KeyEventResult.ignored;
@@ -4900,278 +4942,6 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
   }
 }
 
-class _EpisodesCarouselPanel extends ConsumerStatefulWidget {
-  final String title;
-  final String sourceUrl;
-  final String source;
-  final String? currentEpisode;
-  final int season;
-  final String category;
-  final VoidCallback onClose;
-  final Function(int, String, String?) onEpisodeSelected;
-
-  const _EpisodesCarouselPanel({
-    required this.title,
-    required this.sourceUrl,
-    required this.source,
-    required this.currentEpisode,
-    required this.season,
-    required this.category,
-    required this.onClose,
-    required this.onEpisodeSelected,
-  });
-
-  @override
-  ConsumerState<_EpisodesCarouselPanel> createState() => _EpisodesCarouselPanelState();
-}
-
-class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> {
-  final ScrollController _scrollController = ScrollController();
-  bool _showLeftArrow = false;
-  bool _showRightArrow = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_updateArrows);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateArrows());
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_updateArrows);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _updateArrows() {
-    if (!mounted || !_scrollController.hasClients) return;
-    final bool left = _scrollController.offset > 10;
-    final bool right = _scrollController.offset < _scrollController.position.maxScrollExtent - 10;
-    if (left != _showLeftArrow || right != _showRightArrow) {
-      setState(() {
-        _showLeftArrow = left;
-        _showRightArrow = right;
-      });
-    }
-  }
-
-  void _scroll(bool right) {
-    final double offset = right ? 800 : -800;
-    _scrollController.animateTo(
-      (_scrollController.offset + offset).clamp(0, _scrollController.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    // TV: siempre horizontal 16:9 (sin variante vertical).
-    const isLandscape = true;
-    
-    final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
-      source: widget.source,
-      title: widget.title,
-      season: widget.season,
-    )));
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.only(
-        bottom: isMobile ? 0 : 12, // Senior Fix: Eliminado padding inferior en móvil para máximo aprovechamiento
-        top: isMobile ? (isLandscape ? 5 : 60) : 40 
-      ), 
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            Colors.black.withOpacity(0.98),
-            Colors.black.withOpacity(0.85),
-            Colors.black.withOpacity(0.4),
-            Colors.transparent,
-          ],
-          stops: const [0.0, 0.4, 0.7, 1.0],
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 48),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'EPISODIOS',
-                      style: TextStyle(
-                        color: const Color(0xFFEF7A1E), 
-                        fontSize: isMobile ? (isLandscape ? 11 : 13) : 15, 
-                        fontWeight: FontWeight.w900, 
-                        letterSpacing: 2
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'TEMPORADA ${widget.season}',
-                      style: TextStyle(
-                        color: Colors.white, 
-                        fontSize: isMobile ? (isLandscape ? 16 : 18) : 26, 
-                        fontWeight: FontWeight.w900
-                      ),
-                    ),
-                  ],
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: Icon(Symbols.close, color: Colors.white, size: isMobile ? (isLandscape ? 28 : 36) : 48),
-                  onPressed: widget.onClose,
-                ),
-              ],
-            ),
-          ),
-          
-          SizedBox(height: isMobile ? 2 : 16), // Senior Fix: Reducido al mínimo el espacio bajo el título
-          
-          Stack(
-            children: [
-              SizedBox(
-                height: isMobile ? (isLandscape ? 250 : 280) : 440, // Senior Fix: Ajustado a 250px en landscape para eliminar aire inferior
-                child: episodesAsync.when(
-                  data: (data) {
-                    if (data == null || data.episodes.isEmpty) {
-                      return const Center(child: Text('No hay episodios disponibles', style: TextStyle(color: Colors.white54)));
-                    }
-                    return ListView.builder(
-                      controller: _scrollController,
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      padding: EdgeInsets.only(
-                        left: isMobile ? 24 : 48, 
-                        right: isMobile ? 24 : 48,
-                        top: isLandscape ? 5 : 10, // Senior Fix: Reducido espacio superior en horizontal
-                        bottom: 0,
-                      ),
-                      itemCount: data.episodes.length,
-                      itemBuilder: (context, index) {
-                        final ep = data.episodes[index];
-                        final isCurrent = ep.number.toString() == widget.currentEpisode;
-                        return _EpisodeCarouselItem(
-                          number: ep.number,
-                          title: ep.title,
-                          thumbnail: ep.thumbnail,
-                          description: ep.description,
-                          isCurrent: isCurrent,
-                          autofocus: isCurrent,
-                          onTap: () => widget.onEpisodeSelected(ep.number, ep.url, ep.title),
-                        );
-                      },
-                    );
-                  },
-                  loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
-                  error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
-                ),
-              ),
-
-              // Senior: Flechas de Navegación Proactivas
-              if (!isMobile) ...[
-                Positioned(
-                  left: 0, 
-                  top: 0, 
-                  bottom: 180, // Senior Fix: Ajustado al área de la imagen
-                  child: AnimatedOpacity(
-                    opacity: _showLeftArrow ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: IgnorePointer(
-                      ignoring: !_showLeftArrow,
-                      child: Center(
-                        child: _CarouselArrow(isRight: false, onTap: () => _scroll(false)),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 0, 
-                  top: 0, 
-                  bottom: 180, // Senior Fix: Ajustado al área de la imagen
-                  child: AnimatedOpacity(
-                    opacity: _showRightArrow ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: IgnorePointer(
-                      ignoring: !_showRightArrow,
-                      child: Center(
-                        child: _CarouselArrow(isRight: true, onTap: () => _scroll(true)),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CarouselArrow extends StatefulWidget {
-  final bool isRight;
-  final VoidCallback onTap;
-
-  const _CarouselArrow({required this.isRight, required this.onTap});
-
-  @override
-  State<_CarouselArrow> createState() => _CarouselArrowState();
-}
-
-class _CarouselArrowState extends State<_CarouselArrow> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _isHovered ? 1.2 : 1.0,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          child: Container(
-            width: 80,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: widget.isRight ? Alignment.centerLeft : Alignment.centerRight,
-                end: widget.isRight ? Alignment.centerRight : Alignment.centerLeft,
-                colors: [
-                  Colors.black.withOpacity(0.0),
-                  Colors.black.withOpacity(0.8),
-                ],
-              ),
-            ),
-            child: Center(
-              child: Icon(
-                widget.isRight ? Icons.arrow_forward_ios_rounded : Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 40,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _ZeroPaddingSliderTrackShape extends RoundedRectSliderTrackShape {
   const _ZeroPaddingSliderTrackShape();
 
@@ -5189,258 +4959,51 @@ class _ZeroPaddingSliderTrackShape extends RoundedRectSliderTrackShape {
     final double trackWidth = parentBox.size.width;
     return Rect.fromLTWH(trackLeft, trackTop, trackWidth, trackHeight);
   }
-}
-
-class _EpisodeCarouselItem extends StatefulWidget {
-  final int number;
-  final String? title;
-  final String? thumbnail;
-  final String? description;
-  final bool isCurrent;
-  final bool autofocus;
-  final VoidCallback onTap;
-
-  const _EpisodeCarouselItem({
-    required this.number,
-    this.title,
-    this.thumbnail,
-    this.description,
-    required this.isCurrent,
-    this.autofocus = false,
-    required this.onTap,
-  });
 
   @override
-  State<_EpisodeCarouselItem> createState() => _EpisodeCarouselItemState();
-}
+  void paint(
+    PaintingContext context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required TextDirection textDirection,
+    required Offset thumbCenter,
+    Offset? secondaryOffset,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+    double additionalActiveTrackHeight = 0.0,
+  }) {
+    if (sliderTheme.trackHeight == null || sliderTheme.trackHeight! <= 0) {
+      return;
+    }
 
-class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
-  bool _isHovered = false;
-  bool _isFocused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    // TV: siempre horizontal 16:9 (sin variante vertical).
-    const isLandscape = true;
-    
-    // Senior UI Adaptive logic:
-    final double cardWidth = isMobile ? 240.0 : 440.0;
-    final bool isActive = _isHovered || _isFocused;
-    
-    return Focus(
-      autofocus: widget.autofocus,
-      onFocusChange: (focused) => setState(() => _isFocused = focused),
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedScale(
-            scale: isActive ? 1.05 : 1.0,
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOut,
-            child: Container(
-              width: cardWidth,
-              margin: EdgeInsets.only(right: isMobile ? 20 : 32), 
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(isMobile ? 10 : 16),
-                        border: Border.all(
-                          color: widget.isCurrent ? const Color(0xFFEF7A1E) : (isActive ? Colors.white : Colors.white.withOpacity(0.1)), 
-                          width: widget.isCurrent ? (isMobile ? 3 : 5) : (isActive ? 3 : 1)
-                        ),
-                        boxShadow: (widget.isCurrent || isActive) ? [
-                          BoxShadow(
-                            color: (widget.isCurrent ? const Color(0xFFEF7A1E) : Colors.white).withOpacity(0.4), 
-                            blurRadius: isMobile ? 15 : 30, 
-                            spreadRadius: 1
-                          )
-                        ] : [],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(isMobile ? 8 : 13),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            if (widget.thumbnail != null && widget.thumbnail!.isNotEmpty)
-                              CachedNetworkImage(
-                                imageUrl: ApiEndpoints.proxyImage(widget.thumbnail!),
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
-                                errorWidget: (context, url, error) => Container(color: Colors.black26),
-                              )
-                            else
-                              Container(color: Colors.white.withOpacity(0.05), child: Icon(Icons.movie_outlined, color: Colors.white10, size: isMobile ? 48 : 72)),
-                            
-                            if (widget.isCurrent)
-                              Positioned.fill(
-                                child: Container(
-                                  color: const Color(0xFFEF7A1E).withOpacity(0.15), // Senior: Tinte sutil en lugar de icono play
-                                ),
-                              ),
-                            
-                            // Badge de EP (Esquina inferior derecha)
-                            Positioned(
-                              bottom: isMobile ? 8 : 12, 
-                              right: isMobile ? 8 : 12,
-                              child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 12, vertical: isMobile ? 2 : 5),
-                                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(isMobile ? 4 : 8)),
-                                child: Text('EP ${widget.number}', style: TextStyle(color: Colors.white, fontSize: isMobile ? 10 : 14, fontWeight: FontWeight.w900)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12), // Senior Fix: Más compacto
-                  // Información del episodio
-                  Builder(
-                    builder: (context) {
-                      final String rawTitle = widget.title ?? "Episodio ${widget.number}";
-                      // Senior Clean Logic: Evitamos duplicados si el título ya trae el número o la palabra Episodio/EP
-                      final bool startsWithNumber = rawTitle.startsWith('${widget.number}') || 
-                                                  rawTitle.startsWith('0${widget.number}') ||
-                                                  rawTitle.toLowerCase().startsWith('episodio') ||
-                                                  rawTitle.toLowerCase().startsWith('ep ') ||
-                                                  rawTitle.contains('${widget.number}ª');
-                      
-                      final String cleanTitle = startsWithNumber ? rawTitle : '${widget.number} . $rawTitle';
-
-                      return Text(
-                        cleanTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: widget.isCurrent || isActive ? Colors.white : Colors.white.withOpacity(0.9),
-                          fontSize: isMobile ? 14 : 22, 
-                          fontWeight: widget.isCurrent || isActive ? FontWeight.w900 : FontWeight.bold,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    widget.description ?? 'Sin descripción disponible para este episodio.',
-                    maxLines: isMobile ? 2 : 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.55), 
-                      fontSize: isMobile ? 11 : 17, 
-                      height: 1.4,
-                      fontWeight: FontWeight.w500
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    final Rect trackRect = getPreferredRect(
+      parentBox: parentBox,
+      offset: offset,
+      sliderTheme: sliderTheme,
+      isEnabled: isEnabled,
+      isDiscrete: isDiscrete,
     );
+
+    final Paint activePaint = Paint()
+      ..color = sliderTheme.activeTrackColor ?? const Color(0xFFEF7A1E);
+    final Paint inactivePaint = Paint()
+      ..color = sliderTheme.inactiveTrackColor ?? Colors.white.withOpacity(0.25);
+
+    final Radius radius = Radius.circular(trackRect.height / 2);
+
+    // Inactive track (full width)
+    context.canvas.drawRRect(RRect.fromRectAndRadius(trackRect, radius), inactivePaint);
+
+    // Active track (from left to thumb center)
+    final double thumbRight = thumbCenter.dx.clamp(trackRect.left, trackRect.right);
+    if (thumbRight > trackRect.left) {
+      final Rect activeRect = Rect.fromLTRB(trackRect.left, trackRect.top, thumbRight, trackRect.bottom);
+      context.canvas.drawRRect(RRect.fromRectAndRadius(activeRect, radius), activePaint);
+    }
   }
 }
-
-
-
-class _PlayerSidePanel extends StatelessWidget {
-  final String title;
-  final Widget child;
-  final VoidCallback onClose;
-  final double width;
-
-  const _PlayerSidePanel({
-    required this.title,
-    required this.child,
-    required this.onClose,
-    this.width = 450,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    // TV: siempre horizontal 16:9 (sin variante vertical).
-    const isLandscape = true;
-    
-    // Senior UI Adaptive logic:
-    // En móvil landscape o tablet, el ancho es 380. En desktop 450.
-    final double panelWidth = isMobile ? (isLandscape ? 380 : MediaQuery.of(context).size.width * 0.85) : width;
-    final double padding = isMobile ? 12 : 24;
-
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        padding: EdgeInsets.all(padding),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(isMobile ? 24 : 32),
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Material(
-              color: const Color(0xF00F0F12), // Semi-transparente estilo YouTube
-              elevation: 0,
-              child: Container(
-                width: panelWidth,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(isMobile ? 24 : 32),
-                  border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withOpacity(0.05),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min, 
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(isMobile ? 24 : 32, isMobile ? 24 : 32, 16, 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            title.toUpperCase(),
-                            style: GoogleFonts.poppins(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: isMobile ? 13 : 15,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: onClose,
-                            icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.4), size: isMobile ? 22 : 26),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(color: Colors.white10, height: 1, indent: 24, endIndent: 24),
-                    const SizedBox(height: 8),
-                    Flexible(child: child),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
 
 class _NetflixProgressBar extends StatefulWidget {
   const _NetflixProgressBar({super.key});

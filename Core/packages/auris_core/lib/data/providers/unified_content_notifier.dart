@@ -480,6 +480,84 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       }
     }
   }
+  /// Clave de [_seriesMetadataCache] reconstruida desde fuera (p. ej. el
+  /// player). Replica EXACTO la construcción de títulos de ProgressiveParams
+  /// (stripSeasonSuffix + seasonTitleFor en S>1) y la preferencia de
+  /// _getSeriesKey (metadataTitle sobre title). Solo lectura: no altera el
+  /// comportamiento de la ficha.
+  static String seriesKeyFor({String? title, String? metadataTitle, required int season}) {
+    final t0 = stripSeasonSuffix(title ?? '');
+    final m0 = (metadataTitle ?? '').trim().isNotEmpty
+        ? stripSeasonSuffix(metadataTitle!)
+        : t0;
+    final t = season > 1 ? seasonTitleFor(t0, season) : t0;
+    final m = season > 1 ? seasonTitleFor(m0, season) : m0;
+    final norm = (m.isNotEmpty ? m : t).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    return '$norm:s$season';
+  }
+
+  /// Lee el caché de metadata de serie poblado por la ficha (títulos ES,
+  /// thumbnails TMDB). Null si la ficha no se visitó en esta sesión
+  /// (deep link / Continuar Viendo directo). Prueba con y sin metadataTitle
+  /// porque el player no siempre lo recibe en la ruta.
+  static Map<int, EpisodeInfo>? lookupSeriesMetadata({String? title, String? metadataTitle, required int season}) {
+    final hit = _seriesMetadataCache[seriesKeyFor(title: title, metadataTitle: metadataTitle, season: season)];
+    if (hit != null) return hit;
+    if ((metadataTitle ?? '').trim().isNotEmpty) {
+      return _seriesMetadataCache[seriesKeyFor(title: title, season: season)];
+    }
+    return null;
+  }
+
+  /// Fusiona la lista cruda del backend con la metadata enriquecida del
+  /// caché. Reglas espejo de _applyMetadataInheritance: el título crudo solo
+  /// gana si es real (no genérico "Episodio N" ni pendiente de traducción);
+  /// el resto de campos se rellenan por huecos. Nunca inventa datos: sin
+  /// caché devuelve la lista intacta.
+  static List<EpisodeInfo> enrichWithSeriesMetadata({
+    String? title,
+    String? metadataTitle,
+    required int season,
+    required List<EpisodeInfo> episodes,
+  }) {
+    if (episodes.isEmpty) return episodes;
+    final cached = lookupSeriesMetadata(title: title, metadataTitle: metadataTitle, season: season);
+    if (cached == null || cached.isEmpty) return episodes;
+    bool hasValue(String? s) => s != null && s.trim().isNotEmpty;
+    return episodes.map((ep) {
+      final c = cached[ep.number];
+      if (c == null) return ep;
+      final rawTitle = ep.title;
+      final rawIsReal = hasValue(rawTitle) &&
+          !CommunityTranslationManager.isGenericTitle(rawTitle) &&
+          !ep.needsTranslation;
+      final cachedTitle = c.title;
+      final cachedIsReal = hasValue(cachedTitle) &&
+          !CommunityTranslationManager.isGenericTitle(cachedTitle);
+      final mergedTitle = rawIsReal ? rawTitle : (cachedIsReal ? cachedTitle : rawTitle);
+      // Thumbnail: manda el caché (still TMDB ya verificado en la ficha).
+      // El fetch del player usa la URL del episodio y suele traer thumbs
+      // no vacíos pero rotos/duplicados; con prioridad al crudo tapaban al
+      // bueno y el carrusel quedaba sin imágenes.
+      final mergedThumb = hasValue(c.thumbnail) ? c.thumbnail : ep.thumbnail;
+      return EpisodeInfo(
+        number: ep.number,
+        id: ep.id != 0 ? ep.id : c.id,
+        url: hasValue(ep.url) ? ep.url : c.url,
+        title: mergedTitle,
+        thumbnail: mergedThumb,
+        description: hasValue(ep.description) ? ep.description : c.description,
+        airDate: ep.airDate ?? c.airDate,
+        duration: ep.duration ?? c.duration,
+        runtime: ep.runtime ?? c.runtime,
+        quality: ep.quality ?? c.quality,
+        episodeType: ep.episodeType ?? c.episodeType,
+        tmdbSpecialNumber: ep.tmdbSpecialNumber ?? c.tmdbSpecialNumber,
+        needsTranslation: mergedTitle == rawTitle ? ep.needsTranslation : false,
+      );
+    }).toList();
+  }
+
   final Ref _ref;
   final ProgressiveParams _params;
 

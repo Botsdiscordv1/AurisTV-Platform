@@ -1,27 +1,26 @@
 # 🚀 AurisTV v1.0.0 - Lanzamiento Oficial & Actualización Multiplataforma
 
-¡Nos complace anunciar una nueva actualización mayor de **AurisTV v1.0.0** con importantes mejoras en el reproductor multimedia, la nueva pantalla de programación (`schedule_screen`), banners de héroe y optimizaciones en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
+¡Nos complace anunciar una nueva actualización mayor de **AurisTV v1.0.0** con importantes componentes adaptativos, selector de dispositivos para control remoto y optimizaciones avanzadas en reproductor y contenido en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
 
 ---
 
 ## ✨ Novedades y Características Principales
 
-- **Nueva Pantalla de Programación (`schedule_screen` en TV):**
-  - Integración de la guía de programación y horarios optimizada para control remoto en Android TV.
-- **Mejoras Avanzadas en el Reproductor (`player_screen`):**
-  - Optimizaciones de control de video, gestos, volumen, brillo y estabilidad de reproducción en Móvil, TV y Web/Desktop.
-- **Actualizaciones en Widgets del Núcleo (`auris_core`):**
-  - Mejoras visuales y funcionales en `hero_banner`, `mini_player_bar` y constantes de iconos actualizadas (`auris_icons`).
-- **Gestión de Perfiles y Contenido TV (`profile_edit_screen`, `content_screen`):**
-  - Ajustes en la edición de perfiles y visualización de detalles de contenido en Android TV.
+- **Nuevos Widgets Adaptativos y de Tarjetas (`auris_core`):**
+  - Incorporación de `adaptive_two_panel` para diseños de doble panel adaptativos en tabletas, TV y escritorios.
+  - Nuevas tarjetas especializadas `episode_list_card` y `option_list_card`.
+- **Selector de Dispositivos y Control Remoto (`device_selector_dialog`):**
+  - Mejoras en la interfaz del diálogo de selección de dispositivos para control remoto multiplataforma.
+- **Optimizaciones en Reproductor y Contenido (`player_screen`, `content_screen`):**
+  - Refactorización de `unified_content_notifier` y mejoras de estabilidad en la reproducción y visualización de detalles de contenido en Móvil, TV y Web/Desktop.
 - **Soporte Multiplataforma Unificado:**
-  - Sincronización completa entre Móvil, TV y Web/Desktop.
+  - Sincronización completa y fluida de la lógica de negocio y UI en las 3 plataformas principales.
 
 ---
 
 ## 🛠️ Correcciones de Errores y Mejoras de Rendimiento
 
-- **Estabilidad de Enfoque y Navegación:** Corrección de transiciones y manejo de eventos de control remoto en la interfaz de TV.
+- **Estabilidad de Estado:** Mejoras en la reactividad de contenidos y proveedores de datos compartidos.
 - **Empaquetado y Release:** Automatización limpia de compilación de APKs (Móvil y TV) e instalador de Windows.
 
 ---

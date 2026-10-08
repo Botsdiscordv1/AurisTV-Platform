@@ -102,5 +102,8 @@ export 'presentation/widgets/detail_info.dart';
 export 'presentation/widgets/content_tab_bar.dart';
 export 'presentation/widgets/auris_icon.dart';
 export 'presentation/widgets/collage_grid_background.dart';
+export 'presentation/widgets/episode_list_card.dart';
+export 'presentation/widgets/adaptive_two_panel.dart';
+export 'presentation/widgets/option_list_card.dart';
 
 export 'data/services/device_activation_service.dart';
