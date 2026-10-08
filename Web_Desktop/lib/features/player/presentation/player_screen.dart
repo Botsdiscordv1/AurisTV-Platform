@@ -81,7 +81,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-enum PlayerOverlay { none, language, server, quality }
+enum PlayerOverlay { none, language, server, quality, episodes }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBindingObserver {
   bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime' || widget.episode == 'Trailer';
@@ -121,7 +121,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isFullscreen = false;
   bool _isBoostActive = false; // Senior Fix: Flag para rastrear si el audio ya está enganchado a WebAudio
   bool _isExiting = false;
-  bool _showEpisodesOverlay = false;
   bool _webNeedsInteraction = false; // Senior Web Fix: Autoplay blocker
   yt.YoutubePlayerController? _ytController;
   PlayerOverlay _activeOverlay = PlayerOverlay.none;
@@ -225,7 +224,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     try {
       final synced = ref.watch(activePlayerProvider.select((s) => s.availableEpisodes));
       final notifier = ref.read(activePlayerProvider.notifier);
-      title = notifier.episodeInfoFor(_activeEpisode, synced)?.title;
+      title = notifier.episodeInfoFor(_activeEpisode, _enrichedEpisodes(synced ?? const []))?.title;
       if (title == null || title.isEmpty) {
         final eps = ref
             .read(episodesProvider(EpisodesParams(
@@ -236,10 +235,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             )))
             .valueOrNull
             ?.episodes;
-        title = notifier.episodeInfoFor(_activeEpisode, eps ?? const [])?.title;
+        title = notifier.episodeInfoFor(_activeEpisode, _enrichedEpisodes(eps ?? const []))?.title;
       }
     } catch (_) {}
     return episodeDisplayLabel(_activeEpisode, season: widget.season, title: title);
+  }
+
+  /// Hereda la metadata enriquecida de la ficha (títulos ES, thumbnails TMDB)
+  /// desde el caché de serie del core. El player consulta episodesProvider
+  /// con la URL del episodio y recibe la respuesta cruda (números/URLs); sin
+  /// esto la lista queda sin metadata. Si la ficha no se visitó devuelve la
+  /// lista intacta.
+  List<EpisodeInfo> _enrichedEpisodes(List<EpisodeInfo> episodes) {
+    if (episodes.isEmpty) return episodes;
+    return ProgressiveContentNotifier.enrichWithSeriesMetadata(
+      title: widget.title ?? widget.contentId,
+      metadataTitle: widget.metadataTitle,
+      season: widget.season ?? 1,
+      episodes: episodes,
+    );
   }
 
   /// Si el contenido actual es un Opening (OP) o Ending (ED).
@@ -461,8 +475,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               season: widget.season,
             )))
             .valueOrNull;
-        final info = notifier.episodeInfoFor(
-            _activeEpisode, epsData?.episodes ?? const []);
+        final info = notifier.episodeInfoFor(_activeEpisode,
+            _enrichedEpisodes(epsData?.episodes ?? const []));
         if (info?.thumbnail != null && info!.thumbnail!.isNotEmpty) {
           episodeThumb = info.thumbnail;
         }
@@ -902,62 +916,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ));
     }
 
-    return ListView.separated(
+    return ListView.builder(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
       itemCount: servers.length,
-      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1, indent: 64),
       itemBuilder: (context, index) {
         final sName = servers[index];
         final isCurrent = sName == simplifySourceName(_currentSource);
 
-        return Material(
-          color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.08) : Colors.transparent,
-          child: ListTile(
-            dense: true,
-            visualDensity: VisualDensity.compact,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-            onTap: () {
-              if (!isSidebar) Navigator.pop(context);
-              else setState(() => _activeOverlay = PlayerOverlay.none);
+        return AurisOptionCard(
+          title: sName,
+          subtitle: '${_groupedSources[sName]!.length} opciones disponibles',
+          icon: AurisIcons.server,
+          isCurrent: isCurrent,
+          autofocus: index == 0,
+          onTap: () {
+            if (!isSidebar) Navigator.pop(context);
+            else setState(() => _activeOverlay = PlayerOverlay.none);
 
-              if (!isCurrent) {
-                _switchSource(_groupedSources[sName]!.first);
-              }
-            },
-            leading: Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Center(
-                child: AurisIcon(
-                  AurisIcons.server,
-                  color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white54,
-                  size: 16,
-                ),
-              ),
-            ),
-            title: Text(
-              sName,
-              style: GoogleFonts.poppins(
-                color: isCurrent ? Colors.white : Colors.white.withOpacity(0.8),
-                fontSize: 14,
-                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-            subtitle: Text(
-              '${_groupedSources[sName]!.length} opciones',
-              style: GoogleFonts.poppins(
-                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.6) : Colors.white24,
-                fontSize: 11,
-              ),
-            ),
-            trailing: isCurrent
-              ? AurisIcon(AurisIcons.check, color: const Color(0xFFEF7A1E), size: 18)
-              : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.1), size: 16),
-          ),
+            if (!isCurrent) {
+              _switchSource(_groupedSources[sName]!.first);
+            }
+          },
         );
       },
     );
@@ -1024,11 +1004,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Widget _buildQualitySelectorContent({bool isSidebar = false}) {
     final List<Map<String, dynamic>> options = _qualityMenuOptions;
 
-    return ListView.separated(
+    return ListView.builder(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
       itemCount: options.length,
-      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1, indent: 64),
       itemBuilder: (context, index) {
         final option = options[index];
         final String key = option['key'] as String;
@@ -1038,49 +1017,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final bool isAvailable = url != null && url.isNotEmpty;
         final bool isCurrent = _selectedQuality == key;
 
-        return Material(
-          color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.08) : Colors.transparent,
-          child: ListTile(
-            enabled: isAvailable,
-            dense: true,
-            visualDensity: VisualDensity.compact,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-            onTap: () {
-              if (!isSidebar) Navigator.pop(context);
-              else setState(() => _activeOverlay = PlayerOverlay.none);
+        return AurisOptionCard(
+          title: label,
+          subtitle: isAvailable ? sub : 'No disponible para este tema',
+          icon: AurisIcons.hd,
+          isCurrent: isCurrent,
+          isAvailable: isAvailable,
+          autofocus: index == 0,
+          onTap: () {
+            if (!isSidebar) Navigator.pop(context);
+            else setState(() => _activeOverlay = PlayerOverlay.none);
 
-              if (isAvailable && !isCurrent) {
-                _changeQuality(key);
-              }
-            },
-            leading: Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.2) : Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: AurisIcon(
-                isCurrent ? AurisIcons.check : AurisIcons.hd,
-                color: isCurrent ? const Color(0xFFEF7A1E) : (isAvailable ? Colors.white54 : Colors.white12),
-                size: 16,
-              ),
-            ),
-            title: Text(
-              label,
-              style: GoogleFonts.poppins(
-                color: isCurrent ? Colors.white : (isAvailable ? Colors.white.withOpacity(0.8) : Colors.white12),
-                fontSize: 14,
-                fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-              ),
-            ),
-            subtitle: Text(
-              isAvailable ? sub : 'No disponible para este tema',
-              style: GoogleFonts.poppins(
-                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.6) : Colors.white24,
-                fontSize: 11,
-              ),
-            ),
-          ),
+            if (isAvailable && !isCurrent) {
+              _changeQuality(key);
+            }
+          },
         );
       },
     );
@@ -1205,16 +1156,89 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  void _showEpisodesCarousel() {
+  void _showEpisodesPanel() {
+    _hideTimer?.cancel();
     setState(() {
-      _showEpisodesOverlay = !_showEpisodesOverlay;
-      if (_showEpisodesOverlay) {
+      _activeOverlay = _activeOverlay == PlayerOverlay.episodes ? PlayerOverlay.none : PlayerOverlay.episodes;
+      if (_activeOverlay != PlayerOverlay.none) {
         _showControls = true;
         _hideTimer?.cancel();
       } else {
         _startHideTimer();
       }
     });
+  }
+
+  void _selectEpisodeFromPanel(EpisodeInfo ep) {
+    final epNum = ep.number;
+    if (epNum.toString() == _activeEpisode) return;
+
+    final String resolvedEpisodeUrl = ep.url.isNotEmpty
+        ? ep.url
+        : buildEpisodeUrl(_currentSourceUrl, _currentSource ?? '', epNum);
+
+    _player?.stop();
+    ref.invalidate(extractProvider);
+
+    // En Web el player es un Overlay/Diálogo: estado interno, sin router.
+    setState(() {
+      _activeOverlay = PlayerOverlay.none;
+      _currentEpisode = epNum.toString();
+      _currentSourceUrl = resolvedEpisodeUrl;
+      _hasInitialized = false;
+      _resumePosition = 0;
+      _isAutoplayResume = false;
+      _hasResetPosition = false;
+      _isStabilizing = true;
+      _extractTracks = [];
+    });
+  }
+
+  Widget _buildEpisodesSelectorContent({bool isSidebar = false}) {
+    final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
+      url: widget.sourceUrl,
+      source: _currentSource,
+      title: widget.title ?? '',
+      season: widget.season ?? 1,
+    )));
+    return episodesAsync.when(
+      data: (data) {
+        if (data == null || data.episodes.isEmpty) {
+          return const Center(child: Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Text('No hay episodios disponibles', style: TextStyle(color: Colors.white54)),
+          ));
+        }
+        final eps = _enrichedEpisodes(data.episodes);
+        return ListView.builder(
+          shrinkWrap: !isSidebar,
+          padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
+          itemCount: eps.length,
+          itemBuilder: (context, index) {
+            final ep = eps[index];
+            final isCurrent = ep.number.toString() == _activeEpisode;
+            return AurisEpisodeListCard(
+              ep: ep,
+              isCurrent: isCurrent,
+              autofocus: false,
+              thumbWidth: 88,
+              titleSize: 13,
+              subtitleSize: 11,
+              overlineSize: 10,
+              onTap: () => _selectEpisodeFromPanel(ep),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: Padding(
+        padding: EdgeInsets.all(32.0),
+        child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+      )),
+      error: (err, _) => Center(child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent)),
+      )),
+    );
   }
 
   List<({String server, SearchResult result, bool isTrack, int trackIndex})> _getLanguageOptions() {
@@ -1282,79 +1306,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ));
     }
 
-    return ListView.separated(
+    return ListView.builder(
       shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.symmetric(vertical: 4) : EdgeInsets.zero,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
       itemCount: sourceOptions.length,
-      separatorBuilder: (context, index) => const Divider(color: Colors.white10, height: 1, indent: 64),
       itemBuilder: (context, index) {
         final entry = sourceOptions[index];
         final s = entry.result;
+        final serverName = entry.server;
         final type = trackQualityType(s.quality);
-        final accentColor = type != 'SUB' ? Colors.greenAccent : Colors.blueAccent;
-        
+
         final bool isCurrent = entry.isTrack
             ? entry.trackIndex == _selectedTrackIndex
             : s.url == _currentSourceUrl;
 
-        return Material(
-          color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.08) : Colors.transparent,
-          child: ListTile(
-            dense: true,
-            visualDensity: VisualDensity.compact,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-            onTap: () {
-              if (!isSidebar) Navigator.pop(context);
-              else setState(() => _activeOverlay = PlayerOverlay.none);
+        final titleText = '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source} ($type)';
+        final subtitleText = s.quality.isNotEmpty ? s.quality.toUpperCase() : 'Servidor: $serverName';
 
-              if (!isCurrent) {
-                if (entry.isTrack) {
-                  _switchTrack(entry.trackIndex);
-                } else {
-                  _switchSource(s);
-                }
+        return AurisOptionCard(
+          title: titleText,
+          subtitle: subtitleText,
+          icon: AurisIcons.subtitles,
+          isCurrent: isCurrent,
+          autofocus: index == 0,
+          onTap: () {
+            if (!isSidebar) Navigator.pop(context);
+            else setState(() => _activeOverlay = PlayerOverlay.none);
+
+            if (!isCurrent) {
+              if (entry.isTrack) {
+                _switchTrack(entry.trackIndex);
+              } else {
+                _switchSource(s);
               }
-            },
-            leading: Container(
-              width: 36, height: 28,
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: accentColor.withOpacity(0.3), width: 1),
-              ),
-              child: Center(
-                child: Text(
-                  type,
-                  style: GoogleFonts.poppins(
-                    color: accentColor,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-            title: Text(
-              '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source}',
-              style: GoogleFonts.poppins(
-                color: isCurrent ? Colors.white : Colors.white.withOpacity(0.8),
-                fontSize: 14,
-                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              entry.server,
-              style: GoogleFonts.poppins(
-                color: Colors.white24,
-                fontSize: 10,
-              ),
-              maxLines: 1,
-            ),
-            trailing: isCurrent
-              ? AurisIcon(AurisIcons.check, color: const Color(0xFFEF7A1E), size: 18)
-              : AurisIcon(AurisIcons.chevronRight, color: Colors.white.withOpacity(0.1), size: 16),
-          ),
+            }
+          },
         );
       },
     );
@@ -1525,7 +1511,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         : _currentSourceUrl;
 
     setState(() {
-      _showEpisodesOverlay = false;
       _currentEpisode = epNum.toString();
       _currentSourceUrl = nextSourceUrl;
       _hasInitialized = false; 
@@ -2853,12 +2838,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return;
     }
 
-    if (_showEpisodesOverlay) {
-      setState(() => _showEpisodesOverlay = false);
-      _startHideTimer();
-      return;
-    }
-
     if (_isFullscreen && !ResponsiveUtils.isTactic(context)) {
       _toggleFullscreen();
       return;
@@ -3050,7 +3029,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     )), (prev, next) {
       next.whenData((data) {
         if (data != null && data.episodes.isNotEmpty && mounted) {
-          ref.read(activePlayerProvider.notifier).updateSession(episodes: data.episodes);
+          ref.read(activePlayerProvider.notifier).updateSession(episodes: _enrichedEpisodes(data.episodes));
         }
       });
     });
@@ -3503,31 +3482,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           if (data == null || data.episodes.isEmpty) {
                             return const Center(child: Text('No hay episodios disponibles', style: TextStyle(color: Colors.white54)));
                           }
+                          final eps = _enrichedEpisodes(data.episodes);
                           return ListView.builder(
                         controller: scrollController,
-                        itemCount: data.episodes.length,
+                        itemCount: eps.length,
                         itemBuilder: (context, index) {
-                          final ep = data.episodes[index];
+                          final ep = eps[index];
                           final bool isCurrent = ep.number.toString() == _activeEpisode;
-                          
-                          return ListTile(
+
+                          return AurisEpisodeListCard(
+                            ep: ep,
+                            isCurrent: isCurrent,
+                            thumbWidth: 72,
+                            titleSize: 13,
+                            subtitleSize: 11,
+                            overlineSize: 10,
                             onTap: () {
                               _handleRemoteNavigationTo(ep.number, ep.url, target);
                               Navigator.pop(context);
                             },
-                            leading: Container(
-                              width: 40, height: 40,
-                              decoration: BoxDecoration(
-                                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.white10,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Center(
-                                child: Text('${ep.number}', style: TextStyle(color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white70, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                            title: Text(ep.title ?? 'Episodio ${ep.number}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isCurrent ? Colors.white : Colors.white70, fontWeight: isCurrent ? FontWeight.w900 : FontWeight.normal)),
-                            subtitle: (ep.description != null && ep.description!.isNotEmpty) ? Text(ep.description!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)) : null,
-                            trailing: isCurrent ? const Icon(Icons.play_circle_fill_rounded, color: Color(0xFFEF7A1E)) : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white10, size: 14),
                           );
                         },
                       );
@@ -3897,14 +3870,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildMobilePlayer(List<VideoTrackOption> playableTracks, UserSettings settings) {
     final bool isAnyGestureActive = _isBrightnessGesture != null || _showSeekIndicator;
-    final bool showAnyway = (_showControls || _isLocked || (_autoplayCountdown >= 0 && _isAutoplayResume) || _showEpisodesOverlay || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
+    final bool showAnyway = (_showControls || _isLocked || (_autoplayCountdown >= 0 && _isAutoplayResume) || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
 
     return Focus(
       autofocus: true, 
       onKeyEvent: (node, event) => _handleKeyEvent(event), 
       child: Stack(
-        fit: StackFit.expand, 
+        fit: StackFit.expand,
         children: [
+          AurisTwoPanel(
+            video: Stack(
+              fit: StackFit.expand,
+              children: [
           if (_webViewController != null)
             RepaintBoundary(child: WebViewWidget(controller: _webViewController!))
           else if (_controller != null)
@@ -4252,106 +4229,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                        ),
                      ],
                    ),
-                 ),
-               ),
-             ),
-           
-           // CAPA: Carrusel de Episodios (Estilo Netflix/Prime Video)
-           if (_showEpisodesOverlay && !_isLocked && !(_autoplayCountdown >= 0 && _isAutoplayResume))
-             Positioned.fill(
-               child: Column(
-                 children: [
-                   // Senior Lazy-Close Shield: Si el usuario toca el área vacía superior, cerramos el carrusel
-                   Expanded(
-                     child: GestureDetector(
-                       onTap: () => setState(() => _showEpisodesOverlay = false),
-                       child: Container(color: Colors.transparent),
-                     ),
-                   ),
-                   _EpisodesCarouselPanel(
-                     title: widget.title ?? widget.contentId,
-                     sourceUrl: _currentSourceUrl,
-                     source: _currentSource,
-                     currentEpisode: _activeEpisode,
-                     season: widget.season ?? 1,
-                     category: widget.category ?? 'anime',
-                     onClose: () => setState(() => _showEpisodesOverlay = false),
-                     onEpisodeSelected: (epNum, epUrl, epTitle) {
-                       if (epNum.toString() == _activeEpisode) return;
-                       
-                       // Senior Fix Definitivo: Priorizamos epUrl del carrusel.
-                       // Si viene vacío (común en JKAnime), reconstruimos usando la URL activa actual.
-                       final String resolvedEpisodeUrl = epUrl.isNotEmpty
-                          ? epUrl
-                          : buildEpisodeUrl(_currentSourceUrl, _currentSource ?? '', epNum);
-
-                       debugPrint('[player] Cambiando episodio desde carrusel a URL: $resolvedEpisodeUrl');
-
-                       // Detener reproductores actuales para evitar fugas y errores
-                       _player?.stop();
-
-                       // Senior Web Fix: NO usamos context.replace aquí porque el player en Web
-                       // es un Overlay/Diálogo. Cambiar la URL provocaría que GoRouter intente
-                       // montar una segunda instancia del player en la ruta principal, causando
-                       // el error "Multiple widgets used the same GlobalKey".
-
-                       // Senior Sync Fix: Invalidar el extractor para forzar una carga limpia
-                       ref.invalidate(extractProvider);
-
-                       setState(() {
-                         _showEpisodesOverlay = false;
-                         _currentEpisode = epNum.toString();
-                         _currentSourceUrl = resolvedEpisodeUrl;
-                         _hasInitialized = false;
-                         _resumePosition = 0;
-                         _isAutoplayResume = false;
-                         _hasResetPosition = false;
-                         _isStabilizing = true;
-                         _extractTracks = [];
-                       });
-                     }
-                   ),
-                 ],
-               ),
-             ),
-
-           // CAPA: Side Panel (Adaptive Unified UI)
-           if (_activeOverlay != PlayerOverlay.none)
-             Positioned.fill(
-               child: Stack(
-                 children: [
-                   // Backdrop transparente para cerrar al tocar fuera
-                   GestureDetector(
-                     onTap: () {
-                       setState(() => _activeOverlay = PlayerOverlay.none);
-                       _startHideTimer();
-                     },
-                     behavior: HitTestBehavior.opaque,
-                     child: Container(color: Colors.transparent),
-                   ),
-                   _PlayerSidePanel(
-                     title: switch (_activeOverlay) {
-                       PlayerOverlay.language => 'Fuentes Disponibles (${_getLanguageOptions().length})',
-                       PlayerOverlay.server => 'Servidores (${_groupedSources.keys.length})',
-                       PlayerOverlay.quality => 'Calidad de Video',
-                       _ => '',
-                     },
-                     onClose: () {
-                       setState(() => _activeOverlay = PlayerOverlay.none);
-                       _startHideTimer();
-                     },
-                     child: switch (_activeOverlay) {
-                       PlayerOverlay.language => _buildLanguageSelectorContent(isSidebar: true),
-                       PlayerOverlay.server => _buildServerSelectorContent(isSidebar: true),
-                       PlayerOverlay.quality => _buildQualitySelectorContent(isSidebar: true),
-                       _ => const SizedBox.shrink(),
-                     },
-                   ),
-                 ],
-               ),
-             ),
-           
-           if (_playbackError != null) 
+                  ),
+                ),
+              ),
+            
+              ],
+            ),
+            panelOpen: _activeOverlay != PlayerOverlay.none,
+            panelTitle: switch (_activeOverlay) {
+              PlayerOverlay.language => 'Fuentes Disponibles (${_getLanguageOptions().length})',
+              PlayerOverlay.server => 'Servidores (${_groupedSources.keys.length})',
+              PlayerOverlay.quality => 'Calidad de Video',
+              PlayerOverlay.episodes => 'Episodios',
+              _ => '',
+            },
+            panelContent: switch (_activeOverlay) {
+              PlayerOverlay.language => _buildLanguageSelectorContent(isSidebar: true),
+              PlayerOverlay.server => _buildServerSelectorContent(isSidebar: true),
+              PlayerOverlay.quality => _buildQualitySelectorContent(isSidebar: true),
+              PlayerOverlay.episodes => _buildEpisodesSelectorContent(isSidebar: true),
+              _ => const SizedBox.shrink(),
+            },
+            onDismiss: () {
+              setState(() => _activeOverlay = PlayerOverlay.none);
+              _startHideTimer();
+            },
+            lockAspect: false,
+          ),
+            
+            if (_playbackError != null) 
              Positioned.fill(
                child: Container(
                  color: Colors.black.withOpacity(0.92), 
@@ -5064,7 +4970,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           IconButton(
                             iconSize: iconSize,
                             icon: AurisIcon(AurisIcons.episodes, color: Colors.white),
-                            onPressed: _showEpisodesCarousel
+                            onPressed: _showEpisodesPanel
                           ),
                         SizedBox(width: spacing),
                         IconButton(
@@ -5316,559 +5222,6 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
   }
 }
 
-class _EpisodesCarouselPanel extends ConsumerStatefulWidget {
-  final String title;
-  final String sourceUrl;
-  final String source;
-  final String? currentEpisode;
-  final int season;
-  final String category;
-  final VoidCallback onClose;
-  final Function(int, String, String?) onEpisodeSelected;
-
-  const _EpisodesCarouselPanel({
-    required this.title,
-    required this.sourceUrl,
-    required this.source,
-    required this.currentEpisode,
-    required this.season,
-    required this.category,
-    required this.onClose,
-    required this.onEpisodeSelected,
-  });
-
-  @override
-  ConsumerState<_EpisodesCarouselPanel> createState() => _EpisodesCarouselPanelState();
-}
-
-class _EpisodesCarouselPanelState extends ConsumerState<_EpisodesCarouselPanel> {
-  final ScrollController _scrollController = ScrollController();
-  bool _showLeftArrow = false;
-  bool _showRightArrow = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_updateArrows);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateArrows());
-    
-    // Senior Fix (Issue #6): Prefetch de thumbnails del carrusel
-    _prefetchThumbnails();
-  }
-
-  void _prefetchThumbnails() {
-    final episodesAsync = ref.read(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
-      source: widget.source,
-      title: widget.title,
-      season: widget.season,
-    )));
-    episodesAsync.whenData((data) {
-      if (data == null || data.episodes.isEmpty) return;
-      // Prefetch las primeras 12 imágenes
-      final thumbnails = data.episodes
-          .take(12)
-          .map((e) => e.thumbnail)
-          .where((t) => t != null && t.isNotEmpty)
-          .cast<String>()
-          .toList();
-      if (thumbnails.isNotEmpty) {
-        for (final url in thumbnails) {
-          precacheImage(CachedNetworkImageProvider(url), context).catchError((_) {});
-        }
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_updateArrows);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _updateArrows() {
-    if (!mounted || !_scrollController.hasClients) return;
-    final bool left = _scrollController.offset > 10;
-    final bool right = _scrollController.offset < _scrollController.position.maxScrollExtent - 10;
-    if (left != _showLeftArrow || right != _showRightArrow) {
-      setState(() {
-        _showLeftArrow = left;
-        _showRightArrow = right;
-      });
-    }
-  }
-
-  void _scroll(bool right) {
-    final double offset = right ? 800 : -800;
-    _scrollController.animateTo(
-      (_scrollController.offset + offset).clamp(0, _scrollController.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-
-    // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
-    final bool useMobileLayout = isMobile || screenHeight < 500;
-
-    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
-        ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
-        : ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
-      source: widget.source,
-      title: widget.title,
-      season: widget.season,
-    )));
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.only(
-        bottom: useMobileLayout ? 0 : 12,
-        top: useMobileLayout ? (isLandscape ? 5 : 60) : 40
-      ), 
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            Colors.black.withOpacity(0.98),
-            Colors.black.withOpacity(0.85),
-            Colors.black.withOpacity(0.4),
-            Colors.transparent,
-          ],
-          stops: const [0.0, 0.4, 0.7, 1.0],
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 24 : 48),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'EPISODIOS',
-                      style: TextStyle(
-                        color: const Color(0xFFEF7A1E), 
-                        fontSize: useMobileLayout ? (isLandscape ? 10 : 13) : 15,
-                        fontWeight: FontWeight.w900, 
-                        letterSpacing: 2
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'TEMPORADA ${widget.season}',
-                      style: TextStyle(
-                        color: Colors.white, 
-                        fontSize: useMobileLayout ? (isLandscape ? 15 : 18) : 26,
-                        fontWeight: FontWeight.w900
-                      ),
-                    ),
-                  ],
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: AurisIcon(AurisIcons.close, color: Colors.white, size: useMobileLayout ? (isLandscape ? 28 : 36) : 48),
-                  onPressed: widget.onClose,
-                ),
-              ],
-            ),
-          ),
-          
-          SizedBox(height: useMobileLayout ? 2 : 16),
-          
-          Stack(
-            children: [
-              SizedBox(
-                height: useMobileLayout ? (isLandscape ? 230 : 280) : 440, // Senior Fix: Ajustado a 230px en landscape para 2 líneas de texto
-                child: episodesAsync.when(
-                  data: (data) {
-                    if (data == null || data.episodes.isEmpty) {
-                      return const Center(child: Text('No hay episodios disponibles', style: TextStyle(color: Colors.white54)));
-                    }
-                    return ListView.builder(
-                      controller: _scrollController,
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      padding: EdgeInsets.only(
-                        left: useMobileLayout ? 24 : 48,
-                        right: useMobileLayout ? 24 : 48,
-                        top: isLandscape ? 5 : 10,
-                        bottom: 0,
-                      ),
-                      itemCount: data.episodes.length,
-                      itemBuilder: (context, index) {
-                        final ep = data.episodes[index];
-                        final isCurrent = ep.number.toString() == widget.currentEpisode;
-                        return _EpisodeCarouselItem(
-                          key: ValueKey('ep_${ep.number}'),
-                          number: ep.number,
-                          title: ep.title,
-                          thumbnail: ep.thumbnail,
-                          description: ep.description,
-                          isCurrent: isCurrent,
-                          onTap: () => widget.onEpisodeSelected(ep.number, ep.url, ep.title),
-                        );
-                      },
-                    );
-                  },
-                  loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
-                  error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
-                ),
-              ),
-
-              if (!useMobileLayout) ...[
-                Positioned(
-                  left: 0, 
-                  top: 0, 
-                  bottom: 180, // Senior Fix: Ajustado al área de la imagen
-                  child: AnimatedOpacity(
-                    opacity: _showLeftArrow ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: IgnorePointer(
-                      ignoring: !_showLeftArrow,
-                      child: Center(
-                        child: _CarouselArrow(isRight: false, onTap: () => _scroll(false)),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 0, 
-                  top: 0, 
-                  bottom: 180, // Senior Fix: Ajustado al área de la imagen
-                  child: AnimatedOpacity(
-                    opacity: _showRightArrow ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: IgnorePointer(
-                      ignoring: !_showRightArrow,
-                      child: Center(
-                        child: _CarouselArrow(isRight: true, onTap: () => _scroll(true)),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CarouselArrow extends StatefulWidget {
-  final bool isRight;
-  final VoidCallback onTap;
-
-  const _CarouselArrow({required this.isRight, required this.onTap});
-
-  @override
-  State<_CarouselArrow> createState() => _CarouselArrowState();
-}
-
-class _CarouselArrowState extends State<_CarouselArrow> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }),
-      onExit: (_) => WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _isHovered ? 1.2 : 1.0,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          child: Container(
-            width: 80,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: widget.isRight ? Alignment.centerLeft : Alignment.centerRight,
-                end: widget.isRight ? Alignment.centerRight : Alignment.centerLeft,
-                colors: [
-                  Colors.black.withOpacity(0.0),
-                  Colors.black.withOpacity(0.8),
-                ],
-              ),
-            ),
-            child: Center(
-              child: Icon(
-                widget.isRight ? Icons.arrow_forward_ios_rounded : Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 40,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EpisodeCarouselItem extends StatefulWidget {
-  final int number;
-  final String? title;
-  final String? thumbnail;
-  final String? description;
-  final bool isCurrent;
-  final VoidCallback onTap;
-
-  const _EpisodeCarouselItem({
-    super.key,
-    required this.number,
-    this.title,
-    this.thumbnail,
-    this.description,
-    required this.isCurrent,
-    required this.onTap,
-  });
-
-  @override
-  State<_EpisodeCarouselItem> createState() => _EpisodeCarouselItemState();
-}
-
-class _EpisodeCarouselItemState extends State<_EpisodeCarouselItem> {
-  bool _isHovered = false;
-  bool _isFocused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-
-    // Senior Fix: Forzamos layout móvil si la altura es reducida (Landscape en móviles)
-    final bool useMobileLayout = isMobile || screenHeight < 500;
-
-    // Senior UI Adaptive logic:
-    final double cardWidth = useMobileLayout ? (isLandscape ? 200.0 : 240.0) : 440.0;
-    final bool isActive = _isHovered || _isFocused;
-    
-    return Focus(
-      onFocusChange: (focused) => setState(() => _isFocused = focused),
-      child: MouseRegion(
-        onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
-        onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedScale(
-            scale: isActive ? 1.05 : 1.0,
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOut,
-            child: Container(
-              width: cardWidth,
-              margin: EdgeInsets.only(right: useMobileLayout ? 20 : 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(useMobileLayout ? 10 : 16),
-                        border: Border.all(
-                          color: widget.isCurrent ? const Color(0xFFEF7A1E) : (isActive ? Colors.white : Colors.white.withOpacity(0.1)), 
-                          width: widget.isCurrent ? (useMobileLayout ? 3 : 5) : (isActive ? 3 : 1)
-                        ),
-                        boxShadow: (widget.isCurrent || isActive) ? [
-                          BoxShadow(
-                            color: (widget.isCurrent ? const Color(0xFFEF7A1E) : Colors.white).withOpacity(0.4), 
-                            blurRadius: useMobileLayout ? 15 : 30,
-                            spreadRadius: 1
-                          )
-                        ] : [],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(useMobileLayout ? 8 : 13),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            if (widget.thumbnail != null && widget.thumbnail!.isNotEmpty)
-                              CachedNetworkImage(
-                                imageUrl: ApiEndpoints.proxyImage(widget.thumbnail!),
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
-                                errorWidget: (context, url, error) => Container(color: Colors.black26),
-                              )
-                            else
-                              Container(color: Colors.white.withOpacity(0.05), child: Icon(Icons.movie_outlined, color: Colors.white10, size: useMobileLayout ? 48 : 72)),
-                            
-                            if (widget.isCurrent)
-                              Positioned.fill(
-                                child: Container(
-                                  color: const Color(0xFFEF7A1E).withOpacity(0.15),
-                                ),
-                              ),
-                            
-
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Información del episodio
-                  Builder(
-                    builder: (context) {
-                      final String rawTitle = widget.title ?? "Episodio ${widget.number}";
-                      final bool startsWithNumber = rawTitle.startsWith('${widget.number}') ||
-                                                  rawTitle.startsWith('0${widget.number}') ||
-                                                  rawTitle.toLowerCase().startsWith('episodio') ||
-                                                  rawTitle.toLowerCase().startsWith('ep ') ||
-                                                  rawTitle.contains('${widget.number}ª');
-                      
-                      final String cleanTitle = startsWithNumber ? rawTitle : '${widget.number} . $rawTitle';
-
-                      return Text(
-                        cleanTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: widget.isCurrent || isActive ? Colors.white : Colors.white.withOpacity(0.9),
-                          fontSize: useMobileLayout ? (isLandscape ? 12 : 14) : 22,
-                          fontWeight: widget.isCurrent || isActive ? FontWeight.w900 : FontWeight.bold,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    widget.description ?? 'Sin descripción disponible para este episodio.',
-                    maxLines: useMobileLayout ? 2 : 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.55), 
-                      fontSize: useMobileLayout ? (isLandscape ? 10 : 11) : 17,
-                      height: 1.4,
-                      fontWeight: FontWeight.w500
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// -- YouTube-style compact settings panel
-// Alineado abajo-derecha, ancho reducido, filas compactas, sin padding excesivo.
-class _PlayerSidePanel extends StatelessWidget {
-  final String title;
-  final Widget child;
-  final VoidCallback onClose;
-  final double width;
-
-  const _PlayerSidePanel({
-    required this.title,
-    required this.child,
-    required this.onClose,
-    this.width = 300,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final bool useMobileLayout = isMobile || size.height < 500;
-
-    final double panelWidth = useMobileLayout
-        ? (isLandscape ? 260.0 : size.width * 0.78)
-        : width.clamp(240.0, 340.0);
-
-    final double maxHeight = size.height * (useMobileLayout ? 0.55 : 0.50);
-
-    return Align(
-      alignment: Alignment.bottomRight,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 12, bottom: 64),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Material(
-              color: const Color(0xF00F0F12),
-              elevation: 8,
-              shadowColor: Colors.black54,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: panelWidth,
-                  maxHeight: maxHeight,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header compacto
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: onClose,
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.07),
-                              ),
-                              child: const Icon(
-                                Icons.close_rounded,
-                                color: Colors.white54,
-                                size: 15,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(color: Colors.white12, height: 1),
-                    // Lista de opciones
-                    Flexible(child: child),
-                    const SizedBox(height: 4),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 class _NetflixProgressBar extends StatefulWidget {
   const _NetflixProgressBar({super.key});
   @override

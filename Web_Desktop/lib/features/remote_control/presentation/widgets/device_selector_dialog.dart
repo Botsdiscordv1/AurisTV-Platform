@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:auris_core/auris_core.dart';
 import '../providers/remote_control_provider.dart';
 import '../../data/models/remote_device.dart';
 
@@ -22,10 +23,10 @@ class DeviceSelectorDialog extends ConsumerWidget {
       ..sort((a, b) => b.lastSeen.compareTo(a.lastSeen));
 
     return Dialog(
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: const Color(0xFF0F0F0F),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
         width: 400,
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
         child: Column(
@@ -35,17 +36,34 @@ class DeviceSelectorDialog extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Conectar a un dispositivo',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    'Conectar a un dispositivo',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54),
-                  onPressed: () => Navigator.pop(context),
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Navigator.pop(context),
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Center(
+                        child: Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             if (devices.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
@@ -63,11 +81,11 @@ class DeviceSelectorDialog extends ConsumerWidget {
                   itemCount: devices.length,
                   itemBuilder: (context, index) {
                     final device = devices[index];
-                    return _DeviceTile(device: device);
+                    return _DeviceTile(device: device, autofocus: index == 0);
                   },
                 ),
               ),
-            const Divider(color: Colors.white10, height: 32),
+            const SizedBox(height: 12),
             _CurrentDeviceStatus(device: remoteState.currentDevice),
           ],
         ),
@@ -78,75 +96,64 @@ class DeviceSelectorDialog extends ConsumerWidget {
 
 class _DeviceTile extends ConsumerWidget {
   final RemoteDevice device;
-  const _DeviceTile({required this.device});
+  final bool autofocus;
+  const _DeviceTile({required this.device, this.autofocus = false});
+
+  Future<void> _connect(WidgetRef ref, BuildContext context) async {
+    final remoteNotifier = ref.read(remoteControlProvider.notifier);
+
+    // Senior Implementation: Enviar comando de apertura si el emisor tiene algo reproduciendo
+    final current = ref.read(remoteControlProvider).currentDevice;
+
+    if (current != null && current.mediaUrl != null) {
+      remoteNotifier.setActiveTarget(device.id); // Guardar dispositivo activo
+      await remoteNotifier.sendCommand(device.id, RemoteAction.openMedia, {
+        'params': {
+          'contentId': current.mediaTitle ?? 'Contenido Remoto',
+          'url': current.mediaUrl,
+          'source': current.mediaSource ?? '',
+          'metadataTitle': current.metadataTitle ?? '',
+          'banner': current.bannerUrl ?? '',
+          'category': current.category ?? 'anime',
+          // Podríamos pasar el positionMs actual para que el otro dispositivo reanude ahí
+          'startPosition': current.positionMs.toString(),
+        }
+      });
+    }
+
+    if (context.mounted) Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFFEF7A1E),
+        content: Text('Sincronizando con ${device.name}...', style: const TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isOnline = device.isOnline;
+    final isActiveTarget =
+        ref.watch(remoteControlProvider.select((s) => s.activeTargetDeviceId)) == device.id;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-      onTap: () async {
-        final remoteNotifier = ref.read(remoteControlProvider.notifier);
-        
-        // Intentamos obtener el estado actual del reproductor (si estamos en él)
-        // O simplemente enviamos un comando de "vincular"
-        
-        // Senior Implementation: Enviar comando de apertura si el emisor tiene algo reproduciendo
-        final current = ref.read(remoteControlProvider).currentDevice;
-        
-        if (current != null && current.mediaUrl != null) {
-          remoteNotifier.setActiveTarget(device.id); // Guardar dispositivo activo
-          await remoteNotifier.sendCommand(device.id, RemoteAction.openMedia, {
-            'params': {
-              'contentId': current.mediaTitle ?? 'Contenido Remoto',
-              'url': current.mediaUrl,
-              'source': current.mediaSource ?? '',
-              'metadataTitle': current.metadataTitle ?? '',
-              'banner': current.bannerUrl ?? '',
-              'category': current.category ?? 'anime',
-              // Podríamos pasar el positionMs actual para que el otro dispositivo reanude ahí
-              'startPosition': current.positionMs.toString(),
-            }
-          });
-        }
-        
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFFEF7A1E),
-            content: Text('Sincronizando con ${device.name}...', style: const TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        );
-      },
-      leading: Container(
-        width: 40, height: 40,
-        decoration: BoxDecoration(
-          color: isOnline ? Colors.green.withOpacity(0.1) : Colors.white10,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          _getDeviceIcon(device.type),
-          color: isOnline ? Colors.greenAccent : Colors.white24,
-          size: 20,
-        ),
-      ),
-      title: Text(device.name, style: const TextStyle(color: Colors.white, fontSize: 15)),
-      subtitle: Text(
-        isOnline ? (device.mediaTitle ?? 'En espera') : 'Offline',
-        style: TextStyle(color: isOnline ? Colors.greenAccent.withOpacity(0.7) : Colors.white24, fontSize: 12),
-      ),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white10, size: 14),
+    return AurisOptionCard(
+      title: device.name,
+      subtitle: isOnline ? (device.mediaTitle ?? 'En espera') : 'Offline',
+      icon: _getDeviceIcon(device.type),
+      isCurrent: isActiveTarget,
+      isAvailable: isOnline,
+      autofocus: autofocus,
+      onTap: () => _connect(ref, context),
     );
   }
 
-  IconData _getDeviceIcon(RemoteDeviceType type) {
+  String _getDeviceIcon(RemoteDeviceType type) {
     switch (type) {
-      case RemoteDeviceType.web: return Symbols.desktop_windows;
-      case RemoteDeviceType.android: return Symbols.airplay;
-      case RemoteDeviceType.windows: return Symbols.desktop_windows;
-      case RemoteDeviceType.ios: return Symbols.phone_iphone;
-      default: return Symbols.devices_other;
+      case RemoteDeviceType.web: return AurisIcons.desktop;
+      case RemoteDeviceType.android: return AurisIcons.mobile;
+      case RemoteDeviceType.windows: return AurisIcons.desktop;
+      case RemoteDeviceType.ios: return AurisIcons.mobile;
+      default: return AurisIcons.cast;
     }
   }
 }
