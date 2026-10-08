@@ -228,7 +228,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (title == null || title.isEmpty) {
         final eps = ref
             .read(episodesProvider(EpisodesParams(
-              url: widget.sourceUrl,
+              url: _seriesListUrl,
               source: widget.source,
               title: widget.title,
               season: widget.season,
@@ -246,6 +246,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// con la URL del episodio y recibe la respuesta cruda (números/URLs); sin
   /// esto la lista queda sin metadata. Si la ficha no se visitó devuelve la
   /// lista intacta.
+  /// URL de SERIE para listar episodios. El player recibe la URL del
+  /// episodio y con ella el backend devuelve lista incompleta (a veces solo
+  /// ese episodio); la ficha usa la URL de serie y ve todo. Se resuelve
+  /// desde las fuentes sincronizadas; fallback a la URL actual.
+  String get _seriesListUrl {
+    try {
+      final sources = ref.read(activeContentSourcesProvider);
+      final match = findSourceByName(sources, _currentSource) ??
+          (sources.isNotEmpty ? sources.first : null);
+      final url = match?.url ?? '';
+      if (url.isNotEmpty) return url;
+    } catch (_) {}
+    return widget.sourceUrl;
+  }
+
   List<EpisodeInfo> _enrichedEpisodes(List<EpisodeInfo> episodes) {
     if (episodes.isEmpty) return episodes;
     return ProgressiveContentNotifier.enrichWithSeriesMetadata(
@@ -469,7 +484,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (episodeThumb == null || episodeThumb == widget.bannerUrl) {
         final epsData = ref
             .read(episodesProvider(EpisodesParams(
-              url: widget.sourceUrl,
+              url: _seriesListUrl,
               source: widget.source,
               title: widget.title,
               season: widget.season,
@@ -1196,7 +1211,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildEpisodesSelectorContent({bool isSidebar = false}) {
     final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
+      url: _seriesListUrl,
       source: _currentSource,
       title: widget.title ?? '',
       season: widget.season ?? 1,
@@ -3022,7 +3037,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // NO usar ref.watch(episodesProvider) aquí: causaría rebuild antes de
     // _initPlayer (async en postFrameCallback), bloqueando la inicialización.
     ref.listen(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
+      url: _seriesListUrl,
       source: widget.source,
       title: widget.title,
       season: widget.season,
@@ -3457,7 +3472,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         return Consumer(
           builder: (context, ref, _) {
             final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
-              url: widget.sourceUrl,
+              url: _seriesListUrl,
               source: _currentSource,
               title: widget.title ?? '',
               season: widget.season ?? 1,
@@ -4363,7 +4378,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
         ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
+      url: _seriesListUrl,
       source: widget.source,
       title: widget.title,
       season: widget.season,
@@ -4830,7 +4845,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
         ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
+      url: _seriesListUrl,
       source: widget.source,
       title: widget.title,
       season: widget.season,

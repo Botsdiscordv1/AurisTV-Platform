@@ -122,6 +122,8 @@ class AurisTwoPanel extends StatelessWidget {
   }
 
   Widget _trap(Widget panel) {
+    // Sin onBack explícito, Back equivale a la X (onDismiss).
+    final VoidCallback back = onBack ?? onDismiss;
     return Focus(
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent || event is KeyRepeatEvent) {
@@ -130,7 +132,7 @@ class AurisTwoPanel extends StatelessWidget {
               key == LogicalKeyboardKey.goBack ||
               key == LogicalKeyboardKey.escape ||
               key == LogicalKeyboardKey.browserBack) {
-            onBack?.call();
+            back();
             return KeyEventResult.handled;
           }
           if (key == LogicalKeyboardKey.arrowRight) {
@@ -245,6 +247,21 @@ class _PanelCloseButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Focus(
       focusNode: focusNode,
+      // OK del mando (select) no tiene binding por defecto: se activa aquí.
+      // Solo KeyDown para no repetir el cierre al mantener pulsado.
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.numpadEnter ||
+              key == LogicalKeyboardKey.space) {
+            onClose();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
       child: Builder(
         builder: (context) {
           final bool isFocused = Focus.of(context).hasFocus;
@@ -261,14 +278,6 @@ class _PanelCloseButton extends StatelessWidget {
                     : Colors.white.withValues(alpha: 0.12),
                 border: isFocused
                     ? Border.all(color: Colors.white, width: 2)
-                    : null,
-                boxShadow: isFocused
-                    ? [
-                        BoxShadow(
-                          color: Colors.white.withValues(alpha: 0.35),
-                          blurRadius: 12,
-                        )
-                      ]
                     : null,
               ),
               child: Material(
