@@ -284,6 +284,7 @@ class _PanelCloseButton extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: onClose,
+                  focusColor: Colors.transparent,
                   borderRadius: BorderRadius.circular(22),
                   child: Center(
                     child: Icon(

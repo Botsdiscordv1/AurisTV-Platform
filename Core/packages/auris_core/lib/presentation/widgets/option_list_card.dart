@@ -58,6 +58,8 @@ class AurisOptionCard extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: isAvailable ? onTap : null,
+                  // Sin lavado del focusColor del tema: el foco se dibuja aquí.
+                  focusColor: Colors.transparent,
                   borderRadius: BorderRadius.circular(borderRadius),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

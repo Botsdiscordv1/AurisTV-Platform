@@ -82,19 +82,26 @@ class _HeroTitleState extends State<HeroTitle> {
   Widget _buildIdentity() {
     // 1. Prioridad Máxima: Logo Gráfico (Si existe, lo mostramos ya)
     if (widget.logo != null && widget.logo!.isNotEmpty) {
-      return ConstrainedBox(
+      // El box ocupa TODO el ancho desde el primer frame (igual que el
+      // placeholder saliente): si el logo entrara con su ancho natural, el
+      // AnimatedSwitcher lo centraría en el stage durante el crossfade y
+      // solo al retirarse el placeholder saltaría a la izquierda.
+      return SizedBox(
         key: const ValueKey('identity_logo'),
-        constraints: BoxConstraints(
-          maxWidth: widget.maxWidth,
-          maxHeight: widget.maxHeight,
-        ),
-        child: CachedNetworkImage(
-          imageUrl: ApiEndpoints.proxyImage(widget.logo, highQuality: true),
-          fit: BoxFit.contain,
-          alignment: Alignment.bottomLeft,
-          fadeInDuration: const Duration(milliseconds: 300),
-          placeholder: (_, __) => _buildPlaceholder(),
-          errorWidget: (_, __, ___) => _buildTextFallback(forced: true),
+        width: widget.maxWidth,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: widget.maxWidth,
+            maxHeight: widget.maxHeight,
+          ),
+          child: CachedNetworkImage(
+            imageUrl: ApiEndpoints.proxyImage(widget.logo, highQuality: true),
+            fit: BoxFit.contain,
+            alignment: Alignment.bottomLeft,
+            fadeInDuration: const Duration(milliseconds: 300),
+            placeholder: (_, __) => _buildPlaceholder(),
+            errorWidget: (_, __, ___) => _buildTextFallback(forced: true),
+          ),
         ),
       );
     }
