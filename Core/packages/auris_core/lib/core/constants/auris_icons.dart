@@ -33,6 +33,7 @@ class AurisIcons {
   static String get skipPrev => backwardStep;
   static String get fastForward => reiconSvg(Reicon.outline.fastForward);
   static String get trailer => reiconSvg(Reicon.outline.videoPlayH);
+  static String get trailerFilled => reiconSvg(Reicon.filled.videoPlayH);
   static String get videoLib => reiconSvg(Reicon.outline.videoLib);
   static String get episodes => reiconSvg(Reicon.outline.videoLib);
   static String get server => reiconSvg(Reicon.outline.ssd2);
@@ -127,6 +128,8 @@ class AurisIcons {
   static String get close => reiconSvg(Reicon.outline.x);
   static String get filter => reiconSvg(Reicon.outline.filter);
   static String get info => reiconSvg(Reicon.outline.infoCircle);
+  static String get moreH => reiconSvg(Reicon.outline.moreH);
+  static String get moreHFilled => reiconSvg(Reicon.filled.moreH);
   static String get chevronLeft => reiconSvg(Reicon.outline.chevronLeft);
   static String get chevronRight => reiconSvg(Reicon.outline.chevronRight);
   static String get chevronUp => reiconSvg(Reicon.outline.chevronUp);

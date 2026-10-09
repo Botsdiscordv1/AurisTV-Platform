@@ -17,6 +17,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
+import '../../../core/theme/app_theme.dart';
+import 'content_details_screen.dart';
 import 'episodes_detail_overlay.dart';
 
 // --- Galería Local Helpers ---
@@ -98,8 +100,8 @@ Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) 
   if (text == null || text.isEmpty) return const SizedBox.shrink();
   return Container(
     padding: EdgeInsets.symmetric(
-      horizontal: ResponsiveUtils.sp(context, small ? 5 : 8), 
-      vertical: ResponsiveUtils.sp(context, small ? 1.5 : 3)
+      horizontal: ResponsiveUtils.sp(context, small ? 4 : 8), 
+      vertical: ResponsiveUtils.sp(context, small ? 1 : 3)
     ),
     decoration: BoxDecoration(
       color: Colors.white.withValues(alpha: 0.1),
@@ -113,7 +115,7 @@ Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) 
       text,
       style: TextStyle(
         color: Colors.white, 
-        fontSize: small ? 10 : 13, 
+        fontSize: small ? 9 : 13, 
         fontWeight: FontWeight.w900,
       ),
     ),
@@ -251,6 +253,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   bool _showTitle = true; Timer? _titleHideTimer;
   bool _revealed = false;
   Timer? _revealTimeout;
+  final FocusNode _actionsRowFirstNode = FocusNode();
 
   void _startTitleHideTimer() {
     _titleHideTimer?.cancel();
@@ -351,6 +354,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   @override void dispose() { 
     _revealTimeout?.cancel();
+    _actionsRowFirstNode.dispose();
     _disposeController(); 
     super.dispose(); 
   }
@@ -422,7 +426,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 ),
                 Positioned(
                   left: ResponsiveUtils.horizontalPadding(context), 
-                  top: h * 0.12,
+                  top: h * 0.06,
                   bottom: 20, 
                   child: SizedBox(
                     width: 520 * (width / 1600.0).clamp(0.8, 1.2),
@@ -440,7 +444,11 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 
   Widget _buildNetflixContentColumn(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
-    final titleSize = ResponsiveUtils.sp(context, width < 1050 ? 22.0 : 36.0); 
+    final titleSize = ResponsiveUtils.sp(context, width < 1050 ? 22.0 : 36.0);
+    // Con logo presente la identidad ya la da el propio logo: el título
+    // original bajo él sobra (HeroTitle solo pinta logo o texto, nunca ambos).
+    final dynamic logo = d?.logo;
+    final bool hasLogo = logo is String && logo.isNotEmpty;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start, 
@@ -467,7 +475,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
                 ),
               ),
-              if (d is MovieDetail && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
+              if (d is MovieDetail && !hasLogo && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text(
                   d.originalTitle!,
@@ -489,7 +497,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         const SizedBox(height: 6),
         _buildCastInfo(d),
         const SizedBox(height: 6),
-        _buildCircularActions(context),
+        _buildCircularActions(context, d),
         const SizedBox(height: 4),
         Expanded(
           child: SingleChildScrollView(
@@ -497,19 +505,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildNetflixActionList(context),
-                if (widget.totalSeasons > 1) ...[
-                  const SizedBox(height: 8),
-                  SeasonSelector(
-                    data: SeasonSelectorData(
-                      currentSeason: widget.currentSeason,
-                      totalSeasons: widget.totalSeasons,
-                      onSeasonSelected: widget.onSeasonSelected,
-                      compact: false,
-                      enableFocus: true,
-                      scale: ResponsiveUtils.sp,
-                    ),
-                  ),
-                ],
                 if (widget.currentSource != null) ...[
                   const SizedBox(height: 8),
                   SourceChipsBar(sources: widget.sources, currentSource: widget.currentSource, onSourceSelected: widget.onSourceSelected, unavailableSources: widget.unavailableSources, season: widget.season),
@@ -522,19 +517,51 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     );
   }
 
-  Widget _buildCircularActions(BuildContext context) {
+  Widget _buildCircularActions(BuildContext context, dynamic d) {
     final size = ResponsiveUtils.sp(context, 42.0); 
     final iconSize = ResponsiveUtils.sp(context, 20.0); 
     final spacing = ResponsiveUtils.sp(context, 10.0);
+    final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
+    final bool isFav = ref.watch(favoritesProvider).any((f) => f.id == currentId);
     
     return Row(
       mainAxisSize: MainAxisSize.min, 
       children: [
-        _DetailIconButton(icon: AurisIcons.dislike, label: 'No es para mí', onPressed: () {}, size: size, iconSize: iconSize), 
+        _DetailIconButton(icon: AurisIcons.moreH, filledIcon: AurisIcons.moreHFilled, label: 'Detalles', autofocus: true, focusNode: _actionsRowFirstNode, onPressed: () => _openFullscreenDetails(d), size: size, iconSize: iconSize), 
+        if (_lastTrailerKey != null) ...[
+          SizedBox(width: spacing),
+          _DetailIconButton(icon: AurisIcons.trailer, filledIcon: AurisIcons.trailerFilled, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true), size: size, iconSize: iconSize),
+        ],
         SizedBox(width: spacing),
-        _DetailIconButton(icon: AurisIcons.like, label: 'Me gusta', onPressed: () {}, size: size, iconSize: iconSize), 
-        SizedBox(width: spacing),
-        _DetailIconButton(icon: AurisIcons.star, label: 'Me encanta', onPressed: () {}, size: size, iconSize: iconSize),
+        _DetailIconButton(
+          icon: isFav ? AurisIcons.verify : AurisIcons.addCircleOutline,
+          filledIcon: isFav ? null : AurisIcons.addCircleFilled,
+          label: isFav ? 'En mi lista' : 'Añadir a mi lista',
+          onPressed: () {
+            final user = ref.read(authProvider);
+            final item = FavoriteItem(
+              id: currentId,
+              title: widget.title,
+              posterUrl: widget.poster ?? '',
+              bannerUrl: widget.banner ?? '',
+              category: widget.category,
+              source: widget.source,
+              url: widget.url,
+              addedAt: DateTime.now(),
+              profileId: user?.activeProfileId ?? 'guest_profile',
+              kind: widget.kind,
+              year: widget.year,
+              type: widget.type,
+              season: widget.season,
+              // Todas las fuentes del detalle (paridad con search/home).
+              sources: flattenSources(
+                  ref.read(activeContentSourcesProvider)),
+            );
+            ref.read(favoritesProvider.notifier).toggleFavorite(item);
+          },
+          size: size,
+          iconSize: iconSize,
+        ),
         if (_trailerController != null && _showPlayer) ...[
           SizedBox(width: spacing),
           _DetailIconButton(
@@ -551,8 +578,43 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             iconSize: iconSize
           )
         ],
+        if (widget.totalSeasons > 1) ...[
+          SizedBox(width: spacing),
+          SeasonSelector(
+            data: SeasonSelectorData(
+              currentSeason: widget.currentSeason,
+              totalSeasons: widget.totalSeasons,
+              onSeasonSelected: widget.onSeasonSelected,
+              compact: true,
+              enableFocus: true,
+              scale: ResponsiveUtils.sp,
+            ),
+          ),
+        ],
       ],
     );
+  }
+
+  /// Pantalla fullscreen de detalles: fondo con el backdrop del contenido y
+  /// sinopsis completa (país y reparto incluidos).
+  void _openFullscreenDetails(dynamic d) {
+    final raw = DetailBackdropResolver.resolve(
+      detail: d,
+      bannerParam: widget.banner,
+      poster: widget.poster,
+      season: widget.currentSeason,
+    );
+    final background = raw != null ? ApiEndpoints.proxyImage(raw, highQuality: true) : null;
+    Navigator.of(context).push(PageRouteBuilder(
+      opaque: false,
+      barrierColor: Colors.black,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (_, __, ___) => ContentDetailsScreen(
+        title: widget.title,
+        detailData: d,
+        backgroundUrl: background,
+      ),
+    ));
   }
 
   Widget _buildNetflixMetaRow(dynamic detail) {
@@ -569,7 +631,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DefaultTextStyle(
-          style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
           child: Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 12,
@@ -590,7 +652,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         ),
         const SizedBox(height: 4),
         if (!_revealed) _SkeletonBox(width: ResponsiveUtils.sp(context, 200), height: ResponsiveUtils.sp(context, 16))
-        else Row(children: [_buildAgeBadge(context, cert, small: true), const SizedBox(width: 12), Expanded(child: Text(_getWarningText(cert), maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(color: const Color(0xFFA5A5AA), fontSize: 12, fontWeight: FontWeight.w500)))]),
+        else Row(children: [_buildAgeBadge(context, cert, small: true), const SizedBox(width: 12), Expanded(child: Text(_getWarningText(cert), maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(color: const Color(0xFFA5A5AA), fontSize: 11, fontWeight: FontWeight.w500)))]),
       ],
     );
   }
@@ -600,7 +662,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     if (d is AnimeDetail) castText = d.characters.take(3).map((c) => c.name).join(', ');
     else if (d is MovieDetail) castText = d.cast.take(3).map((c) => c.name).join(', ');
     if (castText.isEmpty) return const SizedBox.shrink();
-    return RichText(text: TextSpan(style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500), children: [const TextSpan(text: 'Cast: ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)), TextSpan(text: castText)]));
+    return RichText(text: TextSpan(style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500), children: [const TextSpan(text: 'Cast: ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)), TextSpan(text: castText)]));
   }
 
   Widget _buildNetflixActionList(BuildContext context) {
@@ -616,56 +678,26 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         children: [
           _NetflixListButton(
             icon: AurisIcons.play,
-            label: (latestHistory != null && !latestHistory.isFinished) 
-              ? (latestHistory.season != null ? 'Reanudar T${latestHistory.season}:EP ${latestHistory.episode}' : 'Reanudar Episodio ${latestHistory.episode}')
-              : 'Reproducir',
+            label: (latestHistory != null && !latestHistory.isFinished)
+                ? 'Reanudar la reproducción'
+                : 'Reproducir',
             progress: latestHistory?.progress,
             isPrimary: true,
-            autofocus: true,
+            onNavigateUp: () => _actionsRowFirstNode.requestFocus(),
             onPressed: widget.onPlay,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           // Solo con historial real (progreso > 3s): sin progreso no tiene
           // sentido ofrecer "desde el inicio".
           if (latestHistory != null &&
               latestHistory.positionInMilliseconds > 3000) ...[
             _NetflixListButton(icon: AurisIcons.restart, label: 'Reproducir desde el inicio', onPressed: widget.onPlay),
-            const SizedBox(height: 6),
-          ],
-          if (_lastTrailerKey != null) ...[
-            _NetflixListButton(icon: AurisIcons.trailer, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true)),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
           ],
           if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime')) ...[
             _NetflixListButton(icon: AurisIcons.episodes, label: 'Episodios y más', onPressed: () => widget.onShowEpisodes?.call()),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
           ],
-          _NetflixListButton(
-            icon: isFav ? AurisIcons.verify : AurisIcons.add,
-            label: isFav ? 'En mi lista' : 'Añadir a mi lista',
-            onPressed: () {
-              final user = ref.read(authProvider);
-              final item = FavoriteItem(
-                id: currentId,
-                title: widget.title,
-                posterUrl: widget.poster ?? '',
-                bannerUrl: widget.banner ?? '',
-                category: widget.category,
-                source: widget.source,
-                url: widget.url,
-                addedAt: DateTime.now(),
-                profileId: user?.activeProfileId ?? 'guest_profile',
-                kind: widget.kind,
-                year: widget.year,
-                type: widget.type,
-                season: widget.season,
-                // Todas las fuentes del detalle (paridad con search/home).
-                sources: flattenSources(
-                    ref.read(activeContentSourcesProvider)),
-              );
-              ref.read(favoritesProvider.notifier).toggleFavorite(item);
-            },
-          ),
         ],
       );
     });
@@ -674,7 +706,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   Widget _buildSynopsis(dynamic detail) {
     final text = detail?.overview ?? '';
     if (!_revealed && text.isEmpty) return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_SkeletonBox(width: ResponsiveUtils.sp(context, 400), height: ResponsiveUtils.sp(context, 16)), const SizedBox(height: 8), _SkeletonBox(width: ResponsiveUtils.sp(context, 380), height: ResponsiveUtils.sp(context, 16))]);
-    return Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14, height: 1.3, fontWeight: FontWeight.w500));
+    return Text(text, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, height: 1.2, fontWeight: FontWeight.w500));
   }
 
   Widget _buildUpperButtons(BuildContext context) {
@@ -683,8 +715,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 }
 
 class _DetailIconButton extends StatefulWidget {
-  final Object icon; final VoidCallback onPressed; final String label; final double? size; final double? iconSize; final Color? color;
-  const _DetailIconButton({required this.icon, required this.onPressed, required this.label, this.size, this.iconSize, this.color});
+  final Object icon; final Object? filledIcon; final VoidCallback onPressed; final String label; final double? size; final double? iconSize; final Color? color; final bool autofocus; final FocusNode? focusNode;
+  const _DetailIconButton({required this.icon, this.filledIcon, required this.onPressed, required this.label, this.size, this.iconSize, this.color, this.autofocus = false, this.focusNode});
   @override State<_DetailIconButton> createState() => _DetailIconButtonState();
 }
 
@@ -693,7 +725,10 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
   bool _isFocused = false;
   @override Widget build(BuildContext context) {
     final bool isActive = _isHovered || _isFocused;
+    final Object displayIcon = (isActive && widget.filledIcon != null) ? widget.filledIcon! : widget.icon;
     return Focus(
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.select)) {
@@ -712,9 +747,9 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
             child: IconButton(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               constraints: const BoxConstraints(),
-              icon: widget.icon is String
-                  ? AurisIcon(widget.icon as String, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24))
-                  : Icon(widget.icon as IconData?, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)), 
+              icon: displayIcon is String
+                  ? AurisIcon(displayIcon as String, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24))
+                  : Icon(displayIcon as IconData?, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)), 
               onPressed: widget.onPressed,
             )
           )
@@ -725,8 +760,8 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
 }
 
 class _NetflixListButton extends StatefulWidget {
-  final Object icon; final String label; final VoidCallback onPressed; final double? progress; final bool isPrimary; final bool autofocus;
-  const _NetflixListButton({required this.icon, required this.label, required this.onPressed, this.progress, this.isPrimary = false, this.autofocus = false});
+  final Object icon; final String label; final VoidCallback onPressed; final double? progress; final bool isPrimary; final bool autofocus; final VoidCallback? onNavigateUp;
+  const _NetflixListButton({required this.icon, required this.label, required this.onPressed, this.progress, this.isPrimary = false, this.autofocus = false, this.onNavigateUp});
   @override State<_NetflixListButton> createState() => _NetflixListButtonState();
 }
 
@@ -740,6 +775,10 @@ class _NetflixListButtonState extends State<_NetflixListButton> {
       onFocusChange: (f) => setState(() => _focused = f),
       // TV: OK explícito (InkWell no siempre activa con select en todos los firmwares).
       onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp && widget.onNavigateUp != null) {
+          widget.onNavigateUp!();
+          return KeyEventResult.handled;
+        }
         if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.select || event.logicalKey == LogicalKeyboardKey.space)) {
           widget.onPressed(); return KeyEventResult.handled;
         }
@@ -749,29 +788,29 @@ class _NetflixListButtonState extends State<_NetflixListButton> {
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         child: Container(
-          width: ResponsiveUtils.sp(context, 440),
-          height: ResponsiveUtils.sp(context, 36),
+          width: ResponsiveUtils.sp(context, 280),
+          height: ResponsiveUtils.sp(context, 30),
           decoration: BoxDecoration(color: isActive ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(8)),
           child: InkWell(
             onTap: widget.onPressed,
             borderRadius: BorderRadius.circular(8),
             child: Stack(alignment: Alignment.centerLeft, children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10), 
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(
                   children: [
                     widget.icon is String
-                        ? AurisIcon(widget.icon as String, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 22)
-                        : Icon(widget.icon as IconData?, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 22),
-                    const SizedBox(width: 8), 
+                        ? AurisIcon(widget.icon as String, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 20)
+                        : Icon(widget.icon as IconData?, color: isActive ? Colors.black : const Color(0xFFC8C8CE), size: 20),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        widget.label, 
-                        maxLines: 1, 
-                        overflow: TextOverflow.ellipsis, 
+                        widget.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: isActive ? Colors.black : const Color(0xFFC8C8CE), 
-                          fontSize: 14, 
+                          color: isActive ? Colors.black : const Color(0xFFC8C8CE),
+                          fontSize: 13,
                           fontWeight: FontWeight.w500
                         )
                       )
@@ -780,7 +819,7 @@ class _NetflixListButtonState extends State<_NetflixListButton> {
                 )
               ),
               if (widget.progress != null && widget.progress! > 0 && isActive)
-                Positioned(right: 16, child: Container(width: 70, height: 5, decoration: BoxDecoration(color: isActive ? Colors.black.withOpacity(0.15) : Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(3)), child: FractionallySizedBox(alignment: Alignment.centerLeft, widthFactor: widget.progress!.clamp(0.0, 1.0), child: Container(color: const Color(0xFFE50914))))),
+                Positioned(right: 16, child: Container(width: 70, height: 5, decoration: BoxDecoration(color: isActive ? Colors.black.withOpacity(0.15) : Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(3)), child: FractionallySizedBox(alignment: Alignment.centerLeft, widthFactor: widget.progress!.clamp(0.0, 1.0), child: Container(color: AppTheme.brand)))),
             ]),
           ),
         ),
@@ -892,7 +931,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         kind: widget.kind ?? widget.result?.kind, year: widget.year, type: widget.result?.type ?? widget.type, season: widget.season ?? widget.result?.season,
         onShowEpisodes: () {
           debugPrint('[perf] overlay push t=${DateTime.now().millisecondsSinceEpoch}');
-          Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSeasonSelected: (s) => ref.setSeason(detailParams, s), detailParams: detailParams, category: widget.category, title: widget.title, bannerUrl: heroBanner, onPlayEpisode: (ep, epSource, total) {
+          Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSeasonSelected: (s) => ref.setSeason(detailParams, s), detailParams: detailParams, category: widget.category, title: widget.title, logoUrl: detailData?.logo, bannerUrl: heroBanner, onPlayEpisode: (ep, epSource, total) {
             final epNum = ep.number; final effectiveSrc = epSource?.source ?? widget.source; final playEpisodesUrl = epSource?.url ?? widget.url; final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, detailState.currentSeason, epNum.toString());
             final epThumb = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
             context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${detailState.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=$total${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');

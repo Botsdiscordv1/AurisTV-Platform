@@ -111,7 +111,7 @@ class _SourceChipsBarState extends ConsumerState<SourceChipsBar> {
   }
 }
 
-class _SourceItem extends ConsumerWidget {
+class _SourceItem extends ConsumerStatefulWidget {
   final SearchResult source;
   final bool isSelected;
   final bool animate;
@@ -128,54 +128,84 @@ class _SourceItem extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SourceItem> createState() => _SourceItemState();
+}
+
+class _SourceItemState extends ConsumerState<_SourceItem> {
+  bool _focused = false;
+  bool _hovered = false;
+
+  bool get _isActive => _focused || _hovered;
+
+  @override
+  Widget build(BuildContext context) {
     // Senior Clean Fix: El watch de disponibilidad solo ocurre aquí, para el item específico.
-    if (source.source == 'AnimeD23') {
+    if (widget.source.source == 'AnimeD23') {
       final ok = ref.watch(d23SeasonCheckProvider((
-        url: source.url,
-        title: source.title,
-        fullTitle: source.metadataTitle,
+        url: widget.source.url,
+        title: widget.source.title,
+        fullTitle: widget.source.metadataTitle,
         category: 'anime',
-        season: season ?? source.season,
-        year: source.year,
+        season: widget.season ?? widget.source.season,
+        year: widget.source.year,
       ))).valueOrNull;
       
       if (ok == false) return const SizedBox.shrink();
     }
 
-    final label = simplifySourceName(source.source);
+    final label = simplifySourceName(widget.source.source);
     
     // Si no animamos, empezamos directamente en 1.0
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: animate ? 0.0 : 1.0, end: 1.0),
+      tween: Tween<double>(begin: widget.animate ? 0.0 : 1.0, end: 1.0),
       duration: const Duration(milliseconds: 420),
       curve: Curves.easeOutCubic,
       builder: (context, v, child) => Opacity(opacity: v, child: Transform.scale(scale: 0.95 + (0.05 * v), child: child)),
-      child: _chipBody(label),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Focus(
+          onFocusChange: (hasFocus) => setState(() => _focused = hasFocus),
+          // Mismo lenguaje que las pills del player: escala 0.95 → 1.0 al
+          // enfocar (anclada arriba) y píldora blanca con texto negro.
+          child: AnimatedScale(
+            scale: _isActive ? 1.0 : 0.95,
+            alignment: Alignment.topCenter,
+            duration: const Duration(milliseconds: 200),
+            child: _chipBody(label),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _chipBody(String label) {
-    final bg = isSelected ? Colors.white : Colors.transparent;
-    final fg = isSelected ? Colors.black : const Color(0xFFC8C8CE);
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        onTap: onTap,
+    final bool highlighted = _isActive || widget.isSelected;
+    return Container(
+      decoration: BoxDecoration(
+        color: highlighted ? Colors.white : Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(999),
-        focusColor: Colors.transparent,
-        hoverColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        splashColor: Colors.white.withOpacity(0.1),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: fg,
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        border: _isActive ? Border.all(color: Colors.white, width: 2) : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(999),
+          focusColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          splashColor: Colors.white.withOpacity(0.1),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: highlighted ? Colors.black : const Color(0xFFC8C8CE),
+                fontSize: 13,
+                fontWeight: highlighted ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
           ),
         ),

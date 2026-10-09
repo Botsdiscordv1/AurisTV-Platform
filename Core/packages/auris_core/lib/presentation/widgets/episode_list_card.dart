@@ -72,6 +72,7 @@ class AurisEpisodeListCard extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: onTap,
+                  focusColor: Colors.transparent,
                   borderRadius: BorderRadius.circular(borderRadius),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

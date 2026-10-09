@@ -178,8 +178,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isLoading = true;
   bool _isCompleted = false;
   StreamSubscription<bool>? _bufferingSubscription;
-  StreamSubscription<double>? _volumeSubscription;
-  DateTime? _lastManualVolumeTime;
 
   List<VideoTrackOption> _extractTracks = [];
   List<VideoTrackOption> _allTracks = [];
@@ -435,16 +433,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return;
     }
 
-    if (_volume <= 1.0) {
-      final double safeVol = double.parse(_volume.toStringAsFixed(2));
-      VolumeController.instance.setVolume(safeVol);
-      _player?.setVolume(100.0);
-    } else {
-      // Boost INTERNO del video (125-200%): no se toca el volumen del
-      // sistema, solo se amplifica el audio del reproductor (mpv tiene
-      // volume-max 200). Paridad con el GainNode de Web.
-      _player?.setVolume(_volume * 100);
-    }
+    // Volumen 0-200% = volumen INTERNO del vídeo, igual que el boost:
+    // nunca se escribe el volumen del sistema. Así 100% es la referencia
+    // del propio vídeo, el valor no lo pisa el sistema y el boost sigue
+    // funcionando aunque el volumen del sistema esté por debajo del 100%.
+    // (mpv `volume-max 200` ya está configurado al crear la plataforma).
+    _player?.setVolume(_volume * 100);
   }
 
   void _updateHistory({required int positionMs, required int durationMs, bool force = false}) {
@@ -638,29 +632,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
     
     if (_isMobileDevice) {
-      // Senior Volume Sync: Inicializar con el volumen real del sistema.
-      VolumeController.instance.getVolume().then((v) {
-        if (mounted) setState(() => _volume = v);
-      });
+      // El volumen del player (0-200%) es SIEMPRE el volumen interno del
+      // vídeo: no se lee ni se escribe el volumen del sistema, así el valor
+      // no salta con los botones físicos ni el sistema pisa el boost.
       VolumeController.instance.showSystemUI = true;
       
       // Senior Shield: Activar la intercepción nativa inmediatamente al entrar
       _setVolumeIntercept(true);
-
-      _volumeSubscription = VolumeController.instance.addListener((v) {
-        // Senior Elite Sync: Escudo de 1.5s para evitar el "eco" del hardware
-        if (_lastManualVolumeTime != null && 
-            DateTime.now().difference(_lastManualVolumeTime!).inMilliseconds < 1500) return;
-
-        if (mounted) {
-          if (_volume > 1.0 && v >= 0.99) return;
-
-          setState(() {
-            _volume = v;
-          });
-          _player?.setVolume(100.0);
-        }
-      });
     }
     
     _currentSourceUrl = widget.sourceUrl;
@@ -1084,6 +1062,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           color: Colors.transparent,
           child: InkWell(
             onTap: _toggleMute,
+            focusColor: Colors.transparent,
             hoverColor: Colors.white.withValues(alpha: 0.12),
             splashColor: Colors.white.withValues(alpha: 0.08),
             child: Row(
@@ -1320,8 +1299,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _setVolumePreset(double value) {
-    // Escudo anti-eco del listener de volumen físico (igual que el slider).
-    _lastManualVolumeTime = DateTime.now();
     setState(() => _volume = value);
     _applyVolume();
   }
@@ -1871,7 +1848,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _handleVolumeStep(double step) {
-    _lastManualVolumeTime = DateTime.now();
     _safeSetState(() {
       double currentSnapped = (_volume * 20).round() / 20.0;
       double nextVol = currentSnapped + step;
@@ -2971,7 +2947,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _historySaveTimer?.cancel();
     _holdTimer?.cancel();
     _bufferingDebounceTimer?.cancel();
-    _volumeSubscription?.cancel();
     _volumeControlChannel.setMethodCallHandler(null);
     
     if (_isMobileDevice && _isExiting) {
@@ -4211,6 +4186,52 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildMobilePillsLayer() {
+    // Pills según tipo de contenido: se arma la lista y se separa con un
+    // único hueco uniforme, así la separación es idéntica aunque se
+    // oculten cápsulas (movie / OP-ED) — antes la última pill doblaba
+    // el hueco (20px frente a 10px).
+    final pills = <Widget>[
+      _buildPillButton(
+        label: _currentSource.isNotEmpty ? _currentSource : 'Servidor',
+        icon: AurisIcons.server,
+        isSelected: _activeOverlay == PlayerOverlay.server,
+        onTap: _showServerSelector,
+        focusNode: _serverPillFocusNode,
+      ),
+    ];
+    if (!_isMovie) {
+      pills.add(
+        _buildPillButton(
+          label: _activeEpisode != null ? 'Ep. $_activeEpisode' : 'Episodios',
+          icon: AurisIcons.episodes,
+          isSelected: _activeOverlay == PlayerOverlay.episodes,
+          onTap: _showEpisodesPanel,
+          focusNode: _episodesPillFocusNode,
+        ),
+      );
+    }
+    if (!_isMovie && !_isOpEd) {
+      pills.add(
+        _buildPillButton(
+          label: 'Saltar OP/ED',
+          icon: AurisIcons.fastForward,
+          isSelected: false,
+          onTap: _skipOpEd,
+          focusNode: _opedPillFocusNode,
+        ),
+      );
+    }
+    pills.add(
+      _buildPillButton(
+        label: _currentLanguage ?? 'Audio / Subs',
+        icon: AurisIcons.subtitles,
+        isSelected: _activeOverlay == PlayerOverlay.language,
+        onTap: _showLanguageSelector,
+        focusNode: _languagePillFocusNode,
+      ),
+    );
+
+    const double gap = 10;
     return Positioned(
       bottom: 40,
       left: 0,
@@ -4218,47 +4239,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildPillButton(
-                label: _currentSource.isNotEmpty ? _currentSource : 'Servidor',
-                icon: AurisIcons.server,
-                isSelected: _activeOverlay == PlayerOverlay.server,
-                onTap: _showServerSelector,
-                focusNode: _serverPillFocusNode,
-              ),
-              const SizedBox(width: 10),
-              if (!_isMovie) ...[
-                _buildPillButton(
-                  label: _activeEpisode != null ? 'Ep. $_activeEpisode' : 'Episodios',
-                  icon: AurisIcons.episodes,
-                  isSelected: _activeOverlay == PlayerOverlay.episodes,
-                  onTap: _showEpisodesPanel,
-                  focusNode: _episodesPillFocusNode,
-                ),
-                const SizedBox(width: 10),
-              ],
-              if (!_isMovie && !_isOpEd) ...[
-                _buildPillButton(
-                  label: 'Saltar OP/ED',
-                  icon: AurisIcons.fastForward,
-                  isSelected: false,
-                  onTap: _skipOpEd,
-                  focusNode: _opedPillFocusNode,
-                ),
-                const SizedBox(width: 10),
-              ],
-              const SizedBox(width: 10),
-              _buildPillButton(
-                label: _currentLanguage ?? 'Audio / Subs',
-                icon: AurisIcons.subtitles,
-                isSelected: _activeOverlay == PlayerOverlay.language,
-                onTap: _showLanguageSelector,
-                focusNode: _languagePillFocusNode,
-              ),
-            ],
-          ),
+          for (int i = 0; i < pills.length; i++) ...[
+            if (i > 0) const SizedBox(width: gap),
+            pills[i],
+          ],
         ],
       ),
     );
@@ -4342,6 +4326,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         onTap: isCountdown 
                             ? (_isAutoplayResume ? _handleResumeAction : () => _navigateToEpisode(true))
                             : () => _navigateToEpisode(true),
+                        focusColor: Colors.transparent,
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 24, vertical: 10),
                           child: Row(
@@ -4568,14 +4553,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             return AnimatedScale(
               scale: isFocused ? 1.15 : 1.0,
               duration: const Duration(milliseconds: 200),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(size / 2),
-                  child: SizedBox(
-                    width: size,
-                    height: size,
+              child: Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  // Discreto como las pills inactivas (sin el lavado naranja
+                  // del focusColor del tema, neutralizado abajo).
+                  color: isFocused
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.transparent,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onTap,
+                    focusColor: Colors.transparent,
+                    borderRadius: BorderRadius.circular(size / 2),
                     child: Center(
                       child: icon is String
                           ? AurisIcon(
@@ -4602,17 +4596,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             child: Container(
               width: isCapsule ? (size * 1.4) : size, height: size,
               decoration: BoxDecoration(
-                color: isFocused ? const Color(0xFFEF7A1E) : (backgroundColor ?? Colors.black.withValues(alpha: 0.45)),
+                // Igual que las pills: blanco con foco, sin naranja.
+                color: isFocused ? Colors.white : (backgroundColor ?? Colors.black.withValues(alpha: 0.45)),
                 borderRadius: isCapsule ? BorderRadius.circular(size / 2) : null,
                 shape: isCapsule ? BoxShape.rectangle : BoxShape.circle,
                 border: isFocused ? Border.all(color: Colors.white, width: 2) : null,
-                boxShadow: isFocused ? [BoxShadow(color: const Color(0xFFEF7A1E).withOpacity(0.4), blurRadius: 12)] : null,
               ),
               padding: const EdgeInsets.all(4),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: onTap,
+                  focusColor: Colors.transparent,
                   borderRadius: BorderRadius.circular(size / 2),
                   hoverColor: Colors.white.withValues(alpha: 0.12),
                   splashColor: Colors.white.withValues(alpha: 0.08),
@@ -4852,6 +4847,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: onTap,
+                  focusColor: Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -5333,6 +5329,7 @@ class _RemoteMandoActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      focusColor: Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
