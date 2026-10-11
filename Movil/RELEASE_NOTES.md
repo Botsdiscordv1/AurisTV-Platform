@@ -1,25 +1,25 @@
 # 🚀 AurisTV v1.0.0 - Lanzamiento Oficial & Actualización Multiplataforma
 
-¡Nos complace anunciar una nueva actualización mayor de **AurisTV v1.0.0** con importantes mejoras en la interfaz de contenido de Android TV (`content_details_screen`), overlays de episodios, nuevos widgets de núcleo y optimizaciones en el reproductor multimedia (**Móvil, Android TV y Web/Desktop**)!
+¡Nos complace anunciar una nueva actualización mayor de **AurisTV v1.0.0** con importantes mejoras en la interfaz y navegación de Android TV (`main.dart`, `home_screen`, `search_screen`, `hero_banner`), optimizaciones en widgets de núcleo y estabilidad general en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
 
 ---
 
 ## ✨ Novedades y Características Principales
 
-- **Nueva Pantalla de Detalles de Contenido en TV (`content_details_screen` & `episodes_detail_overlay`):**
-  - Experiencia renovada y optimizada para navegación por control remoto en Android TV con detalles de series/películas y listado detallado de episodios.
-- **Mejoras en Widgets del Núcleo (`auris_core`):**
-  - Nuevos y refinados componentes en `adaptive_two_panel`, `episode_list_card`, `hero_title`, `option_list_card`, `source_chips_bar` y constantes de iconos (`auris_icons`).
-- **Optimizaciones en Reproductor Multimedia (`player_screen`):**
-  - Ajustes de estabilidad, control de video y eventos en las 3 plataformas principales.
+- **Optimización y Refactorización en Android TV (`main.dart`, `home_screen`, `search_screen`):**
+  - Mejoras profundas en la inicialización de la app, pantalla de inicio, búsqueda y transiciones optimizadas para control remoto en Android TV.
+- **Mejoras en Componentes Visuales de TV y Núcleo (`hero_banner`, `wide_content_row`, `focusable_poster_card`):**
+  - Refinamientos en tarjetas de póster con enfoque, banners principales y filas anchas de contenido.
+- **Actualización de Manifiesto y Dependencias (`AndroidManifest.xml`, `pubspec.yaml`):**
+  - Ajustes en permisos y configuración de Android TV, junto con sincronización de dependencias.
 - **Soporte Multiplataforma Unificado:**
-  - Sincronización completa de la lógica y la interfaz de usuario en Móvil, TV y Web/Desktop.
+  - Sincronización continua de la experiencia multimedia en Móvil, TV y Web/Desktop.
 
 ---
 
 ## 🛠️ Correcciones de Errores y Mejoras de Rendimiento
 
-- **Estabilidad de Navegación y Foco:** Corrección de transiciones y manejo de eventos de control remoto en la UI de Android TV.
+- **Estabilidad de Enfoque y Reproducción:** Ajustes en eventos de control remoto y reproducción multimedia.
 - **Empaquetado y Release:** Automatización limpia de compilación de APKs (Móvil y TV) e instalador de Windows.
 
 ---

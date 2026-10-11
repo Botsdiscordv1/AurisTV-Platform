@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:permission_handler/permission_handler.dart';
 
 import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
 import '../../../shared/widgets/focusable_poster_card.dart';
@@ -21,14 +23,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _searchController = TextEditingController();
   final _focusNode = FocusNode();
   final FocusNode _firstResultFocusNode = FocusNode();
+  final FocusNode _blurFocusNode = FocusNode();
   final String _selectedCategory = 'all';
   Timer? _debounce;
   String _currentQuery = '';
   bool _isFocused = false;
 
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
+  String _voiceStatus = '';
+
   @override
   void initState() {
     super.initState();
+    _initSpeech();
     _focusNode.addListener(() {
       setState(() => _isFocused = _focusNode.hasFocus);
     });
@@ -40,12 +48,82 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  Future<void> _initSpeech() async {
+    final status = await Permission.microphone.status;
+    if (!status.isGranted) {
+      final result = await Permission.microphone.request();
+      if (!result.isGranted) return;
+    }
+    final available = await _speech.initialize(
+      onError: (error) {
+        if (mounted) {
+          setState(() {
+            _isListening = false;
+            _voiceStatus = '';
+          });
+        }
+      },
+      onStatus: (status) {
+        if (mounted && status == 'done') {
+          setState(() {
+            _isListening = false;
+            _voiceStatus = '';
+          });
+        }
+      },
+    );
+    if (!available && mounted) {
+      setState(() => _voiceStatus = 'Micrófono no disponible');
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) setState(() => _isListening = false);
+      return;
+    }
+
+    if (!_speech.isAvailable) {
+      await _initSpeech();
+      if (!_speech.isAvailable) return;
+    }
+
+    setState(() {
+      _isListening = true;
+      _voiceStatus = 'Escuchando…';
+    });
+
+    _speech.listen(
+      localeId: 'es_ES',
+      listenFor: const Duration(seconds: 10),
+      pauseFor: const Duration(seconds: 3),
+      onResult: (result) {
+        if (!mounted) return;
+        if (result.finalResult) {
+          setState(() {
+            _isListening = false;
+            _voiceStatus = '';
+          });
+          final text = result.recognizedWords.trim();
+          if (text.isNotEmpty) {
+            _searchController.text = text;
+            _onSearchSubmitted(text);
+          }
+        } else {
+          setState(() => _voiceStatus = result.recognizedWords);
+        }
+      },
+    );
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
     _focusNode.dispose();
     _firstResultFocusNode.dispose();
+    _blurFocusNode.dispose();
     super.dispose();
   }
 
@@ -67,6 +145,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       setState(() => _currentQuery = query);
       ref.read(searchHistoryProvider.notifier).addQuery(query);
     }
+    _focusNode.unfocus();
+    _blurFocusNode.requestFocus();
   }
 
   void _clearSearch() {
@@ -119,6 +199,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(60, 40, 60, 16),
             child: Focus(
+              focusNode: _blurFocusNode,
               onKeyEvent: (node, event) {
                 if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
                   if (_firstResultFocusNode.canRequestFocus) {
@@ -177,7 +258,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         onSubmitted: _onSearchSubmitted,
                       ),
                     ),
-                    const Icon(Icons.mic_rounded, color: Colors.white70, size: 24),
+                    const SizedBox(width: 20),
+                    _buildMicButton(),
                     const SizedBox(width: 20),
                   ],
                 ),
@@ -193,7 +275,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 "Lo más buscado",
                 style: TextStyle(
                   color: Colors.white54,
-                  fontSize: 22,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -208,6 +290,37 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMicButton() {
+    return Focus(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select ||
+                event.logicalKey == LogicalKeyboardKey.space)) {
+          _toggleListening();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: _toggleListening,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _isListening ? const Color(0xFFEF7A1E).withOpacity(0.25) : Colors.transparent,
+          ),
+          child: Icon(
+            _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+            color: _isListening ? const Color(0xFFEF7A1E) : Colors.white70,
+            size: 24,
+          ),
+        ),
       ),
     );
   }
@@ -280,7 +393,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   : null,
               subtitle: meta.status,
               subtitleColor: meta.statusColor,
-              activeBorderColor: const Color(0xFFE91E63),
+              activeBorderColor: Colors.white,
+              titleFontSize: 11,
               showInfo: true,
               aspectRatio: 2/3,
               onTap: () => _onContentTap(result),
@@ -340,7 +454,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   : null,
               subtitle: meta.status,
               subtitleColor: meta.statusColor,
-              activeBorderColor: const Color(0xFFE91E63),
+              activeBorderColor: Colors.white,
+              titleFontSize: 11,
               showInfo: true,
               aspectRatio: 2/3,
               onTap: () => _onContentTap(result),

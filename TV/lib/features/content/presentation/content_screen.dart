@@ -737,19 +737,20 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
         return KeyEventResult.ignored;
       },
       child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true), 
-        onExit: (_) => setState(() => _isHovered = false), 
-        child: Tooltip(
-          message: widget.label, 
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: _FocusTooltip(
+          show: isActive,
+          label: widget.label,
           child: AnimatedScale(
-            scale: isActive ? 1.1 : 1.0, 
-            duration: const Duration(milliseconds: 200), 
+            scale: isActive ? 1.1 : 1.0,
+            duration: const Duration(milliseconds: 200),
             child: IconButton(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               constraints: const BoxConstraints(),
               icon: displayIcon is String
                   ? AurisIcon(displayIcon as String, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24))
-                  : Icon(displayIcon as IconData?, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)), 
+                  : Icon(displayIcon as IconData?, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)),
               onPressed: widget.onPressed,
             )
           )
@@ -965,5 +966,45 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       AspectRatio(aspectRatio: 3.2 / 1, child: Container(color: const Color(0xFF0B0B0D))),
       Positioned(left: 40, right: 40, bottom: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [const _SkeletonBox(width: 400, height: 80), const SizedBox(height: 24), Row(mainAxisSize: MainAxisSize.min, children: [const _SkeletonBox(width: 64, height: 56, borderRadius: 28), const SizedBox(width: 16), const _SkeletonBox(width: 64, height: 56, borderRadius: 28)]), const SizedBox(height: 24), Container(width: 220, height: 56, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8)))]))
     ]);
+  }
+}
+
+/// Tooltip que se muestra cuando el widget hijo tiene foco/hover (D-pad TV),
+/// en lugar del long-press del Tooltip nativo. Ubicado encima del botón.
+class _FocusTooltip extends StatelessWidget {
+  final bool show;
+  final String label;
+  final Widget child;
+  const _FocusTooltip({required this.show, required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.bottomCenter,
+      children: [
+        child,
+        Positioned(
+          bottom: 42,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: show ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 150),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  label,
+                  style: const TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

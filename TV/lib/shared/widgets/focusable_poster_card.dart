@@ -69,6 +69,8 @@ class FocusablePosterCard extends StatefulWidget {
   final double anchorInset;
   final FocusNode? focusNode;
   final FocusOnKeyEventCallback? onKeyEvent;
+  /// Tamaño de fuente del título. Si es null usa el valor por defecto.
+  final double? titleFontSize;
 
   const FocusablePosterCard({
     super.key,
@@ -88,6 +90,7 @@ class FocusablePosterCard extends StatefulWidget {
     this.anchorInset = 0.0,
     this.focusNode,
     this.onKeyEvent,
+    this.titleFontSize,
   });
 
   @override
@@ -309,7 +312,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                       animate: isMobile ? true : _isActive,
                       style: GoogleFonts.poppins(
                         color: _isActive ? Colors.white : Colors.white.withOpacity(0.95),
-                        fontSize: isMobile ? ResponsiveUtils.sp(context, 13) : 16,
+                        fontSize: widget.titleFontSize ?? (isMobile ? ResponsiveUtils.sp(context, 13) : 16),
                         fontWeight: FontWeight.w700,
                         height: 1.2,
                         letterSpacing: 0.2,

@@ -65,10 +65,15 @@ class AurisApp extends StatelessWidget {
       backButtonDispatcher: AppBackButtonDispatcher(appRouter),
       builder: (context, child) {
         if (child == null) return const SizedBox.shrink();
-        
-        return NotificationInitializer(
-          child: RemoteCommandListener(
-            child: child,
+
+        return Shortcuts(
+          shortcuts: const <ShortcutActivator, Intent>{
+            SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
+          },
+          child: NotificationInitializer(
+            child: RemoteCommandListener(
+              child: child,
+            ),
           ),
         );
       },
