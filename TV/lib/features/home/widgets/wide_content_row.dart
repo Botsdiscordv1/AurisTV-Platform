@@ -176,15 +176,17 @@ class _WideContentRowState extends State<WideContentRow>
               // de la ranura no se recorta.
               clipBehavior: Clip.none,
               children: [
-                LayoutBuilder(
+                  LayoutBuilder(
                   builder: (context, constraints) {
                     final bool hasSubtitle = widget.hasSubtitle ?? widget.items.any((i) => i.subtitle != null && i.subtitle!.isNotEmpty);
-                    final int subtitleLines = widget.items.any((i) => i.subtitle2 != null && i.subtitle2!.isNotEmpty) ? 2 : 1;
+                    // Reservar siempre el máximo (2 líneas) para que todas las
+                    // tarjetas compartan la misma altura de fila y las imágenes
+                    // queden alineadas sin importar cuántas líneas tenga cada una.
                     return SizedBox(
                       height: TVResponsiveUtils.bannerRowHeight(
                         context,
                         hasSubtitle: hasSubtitle,
-                        subtitleLines: subtitleLines,
+                        subtitleLines: 2,
                       ),
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
@@ -215,7 +217,8 @@ class _WideContentRowState extends State<WideContentRow>
                               final item = widget.items[index];
                               final bool isFocused = _focusedIndex == index;
                               
-                              return Center(
+                              return Align(
+                                alignment: Alignment.topCenter,
                                 child: FocusableWideCard(
                                   title: item.title,
                                   imageUrl: item.imageUrl,
@@ -345,7 +348,8 @@ class _WideContentRowState extends State<WideContentRow>
                         // original de la lista.
                         child: ExcludeFocus(
                           child: IgnorePointer(
-                            child: Center(
+                            child: Align(
+                              alignment: Alignment.topCenter,
                               // Fundido del contenido al cambiar de ranura
                               // (key por índice => un fundido por salto) que
                               // enmascara el cambio de póster durante el

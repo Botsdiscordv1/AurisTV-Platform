@@ -10,6 +10,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:permission_handler/permission_handler.dart';
 
 import 'package:auris_core/auris_core.dart' hide HeroBanner, FocusablePosterCard;
 import '../../../core/utils/web_utils.dart';
@@ -816,7 +818,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final historyAsync = ref.watch(playbackHistoryStateProvider);
+    final historyAsync = ref.watch(continueWatchingProvider);
 
     return historyAsync.when(
       data: (items) {
@@ -1030,6 +1032,9 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
 
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
+
   @override
   void initState() {
     super.initState();
@@ -1044,6 +1049,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
       duration: const Duration(milliseconds: 220),
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _initSpeech();
     _focusNode.addListener(() {
       if (mounted) {
         setState(() => _isFocused = _focusNode.hasFocus);
@@ -1081,15 +1087,52 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
     super.dispose();
   }
 
-  void _startVoiceSearch() {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Búsqueda por voz activada'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+  Future<void> _initSpeech() async {
+    final status = await Permission.microphone.status;
+    if (!status.isGranted) {
+      final result = await Permission.microphone.request();
+      if (!result.isGranted) return;
     }
+    await _speech.initialize(
+      onError: (error) {
+        if (mounted) setState(() => _isListening = false);
+      },
+      onStatus: (status) {
+        if (mounted && status == 'done') {
+          setState(() => _isListening = false);
+        }
+      },
+    );
+  }
+
+  Future<void> _startVoiceSearch() async {
+    if (_isListening) {
+      await _speech.stop();
+      if (mounted) setState(() => _isListening = false);
+      return;
+    }
+    if (!_speech.isAvailable) {
+      await _initSpeech();
+      if (!_speech.isAvailable) return;
+    }
+    if (!mounted) return;
+    setState(() => _isListening = true);
+    _speech.listen(
+      localeId: 'es_ES',
+      listenFor: const Duration(seconds: 10),
+      pauseFor: const Duration(seconds: 3),
+      onResult: (result) {
+        if (!mounted) return;
+        if (result.finalResult) {
+          setState(() => _isListening = false);
+          final text = result.recognizedWords.trim();
+          if (text.isNotEmpty) {
+            _searchController.text = text;
+            _onSearchSubmitted(text);
+          }
+        }
+      },
+    );
   }
 
   void _close() async {
@@ -1331,19 +1374,21 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
                           width: 56,
                           height: 56,
                           decoration: BoxDecoration(
-                            color: _isMicFocused
-                                ? Colors.transparent
-                                : const Color(0xFF1A1A1A),
+                            color: _isListening
+                                ? const Color(0xFFEF7A1E).withOpacity(0.25)
+                                : _isMicFocused
+                                    ? Colors.transparent
+                                    : const Color(0xFF1A1A1A),
                             border: Border.all(
-                              color: _isMicFocused
+                              color: _isListening || _isMicFocused
                                   ? const Color(0xFFEF7A1E)
                                   : Colors.white38,
-                              width: _isMicFocused ? 2.5 : 1.5,
+                              width: _isListening || _isMicFocused ? 2.5 : 1.5,
                             ),
                           ),
-                          child: const Icon(
-                            Icons.mic_rounded,
-                            color: Colors.white,
+                          child: Icon(
+                            _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                            color: _isListening ? const Color(0xFFEF7A1E) : Colors.white,
                             size: 26,
                           ),
                         ),
@@ -1361,7 +1406,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
                     'Lo más buscado',
                     style: TextStyle(
                         color: Colors.white54,
-                        fontSize: 22,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -1458,7 +1503,8 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
                   : null,
               subtitle: meta.status,
               subtitleColor: meta.statusColor,
-              activeBorderColor: const Color(0xFFE91E63),
+              activeBorderColor: Colors.white,
+              titleFontSize: 11,
               showInfo: true,
               aspectRatio: 2 / 3,
               onTap: () => _onContentTap(result),
@@ -1507,7 +1553,8 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
             badgeColor: meta.labelColor,
             subtitle: meta.status,
             subtitleColor: meta.statusColor,
-            activeBorderColor: const Color(0xFFE91E63),
+            activeBorderColor: Colors.white,
+            titleFontSize: 11,
             showInfo: true,
             aspectRatio: 2 / 3,
             onTap: () => _onContentTap(result),

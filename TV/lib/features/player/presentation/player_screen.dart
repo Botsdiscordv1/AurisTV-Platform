@@ -88,6 +88,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   late final FocusNode _headerFocusNode = FocusNode(debugLabel: "player_header");
   late final FocusNode _serverPillFocusNode = FocusNode(debugLabel: "pill_server");
   late final FocusNode _episodesPillFocusNode = FocusNode(debugLabel: "pill_episodes");
+  late final FocusNode _prevEpisodePillFocusNode = FocusNode(debugLabel: "pill_prev_episode");
+  late final FocusNode _nextEpisodePillFocusNode = FocusNode(debugLabel: "pill_next_episode");
   late final FocusNode _opedPillFocusNode = FocusNode(debugLabel: "pill_oped");
   late final FocusNode _languagePillFocusNode = FocusNode(debugLabel: "pill_language");
   late final FocusNode _sidePanelCloseNode = FocusNode(debugLabel: "sidepanel_close");
@@ -102,6 +104,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_allTracks.isEmpty) return '';
     final i = _selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0;
     return _allTracks[i].quality;
+  }
+
+  String get _currentLanguageLabel {
+    final q = _currentTrackQuality;
+    if (q.isNotEmpty) return q.toUpperCase();
+    if (_currentLanguage == 'LAT' || _currentLanguage == 'DUB') return 'DUB';
+    if (_currentLanguage == 'SUB') return 'SUB';
+    return _currentLanguage ?? 'Audio / Subs';
   }
 
   StreamSubscription<Tracks>? _tracksSubscription;
@@ -907,11 +917,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _activeOverlay = parent;
         _overlayParent = null;
       });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _sidePanelCloseNode.canRequestFocus) {
-          _sidePanelCloseNode.requestFocus();
-        }
-      });
       return;
     }
     setState(() => _activeOverlay = PlayerOverlay.none);
@@ -936,13 +941,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _startHideTimer();
       }
     });
-    if (_activeOverlay != PlayerOverlay.none) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _sidePanelCloseNode.canRequestFocus) {
-          _sidePanelCloseNode.requestFocus();
-        }
-      });
-    }
   }
 
   void _changeQuality(String quality) {
@@ -1277,11 +1275,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _overlayParent = PlayerOverlay.config;
       _activeOverlay = overlay;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _sidePanelCloseNode.canRequestFocus) {
-        _sidePanelCloseNode.requestFocus();
-      }
-    });
   }
 
   String _formatSpeed(double speed) =>
@@ -1365,42 +1358,61 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _startHideTimer();
       }
     });
-    if (_activeOverlay != PlayerOverlay.none) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _sidePanelCloseNode.canRequestFocus) {
-          _sidePanelCloseNode.requestFocus();
-        }
-      });
-    }
   }
 
   void _selectEpisodeFromPanel(EpisodeInfo ep) {
     final epNum = ep.number;
     if (epNum.toString() == _activeEpisode) return;
 
-    // Prioriza la URL del item o reconstruye con buildEpisodeUrl.
-    final String resolvedEpisodeUrl = ep.url.isNotEmpty
-        ? ep.url
-        : buildEpisodeUrl(_currentSourceUrl, _currentSource ?? '', epNum);
-
-    // Parar el player actual INMEDIATAMENTE para no arrastrar audio.
+    // Senior Autoplay Fix: Parar el player actual INMEDIATAMENTE para
+    // que no se siga escuchando el episodio anterior durante la carga del nuevo.
     _player?.stop();
+    if (_webViewController != null) {
+      _webViewController = null;
+    }
 
-    // Reemplazar la URL actual para limpiar historial de navegación.
-    final String newPath = '/player/${widget.contentId}';
-    final queryParameters = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
-    queryParameters['episode'] = epNum.toString();
-    queryParameters['url'] = resolvedEpisodeUrl;
-    queryParameters['skipResume'] = '1';
+    final sources = ref.read(activeContentSourcesProvider);
+    // Match tolerante + fallback a la primera fuente: si el nombre no matchea,
+    // reusar la URL actual re-extraería el episodio ANTERIOR (reiniciado).
+    final baseSource = findSourceByName(sources, _currentSource) ??
+        (sources.isNotEmpty ? sources.first : null);
 
-    // Invalidar el extractor para forzar una carga limpia.
-    ref.invalidate(extractProvider);
+    // Senior Navigation Fix: Calcular la URL del episodio destino ANTES de
+    // reemplazar la ruta. buildEpisodeUrl espera la URL BASE de la serie
+    // (baseSource.url), no la URL del episodio actual.
+    final String targetSourceUrl = baseSource != null
+        ? buildEpisodeUrl(baseSource.url, baseSource.source, epNum)
+        : (ep.url.isNotEmpty ? ep.url : _currentSourceUrl);
+
+    // Limpiar cualquier preload de autoplay apuntando a otro destino.
+    ref.read(playerPreloadControllerProvider).clearPreload();
 
     setState(() {
       _activeOverlay = PlayerOverlay.none;
       _overlayParent = null;
+      _hasInitialized = false;
+      _currentEpisode = epNum.toString();
+      _currentSourceUrl = targetSourceUrl;
+      _isStabilizing = true;
+      _skipResumeOnNextInit = true;
+      _resumePosition = 0;
+      _isAutoplayResume = false;
+      _hasResetPosition = false;
+      _showNextNotifier.value = false;
+      _autoplayCountdown = -1;
     });
-    context.replace(Uri(path: newPath, queryParameters: queryParameters).toString());
+
+    if (baseSource != null && baseSource.source == 'Aniyae') {
+      _resolveEpisodeUrl(baseSource, epNum);
+    }
+
+    // Reemplazar la URL del episodio en la ruta sin añadir entrada al historial.
+    final String newPath = '/player/${widget.contentId}';
+    final queryParams = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
+    queryParams['episode'] = epNum.toString();
+    queryParams['url'] = targetSourceUrl;
+    queryParams['skipResume'] = '1';
+    context.replace(Uri(path: newPath, queryParameters: queryParams).toString());
   }
 
   Widget _buildEpisodesSelectorContent({bool isSidebar = false}) {
@@ -1459,13 +1471,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _startHideTimer();
       }
     });
-    if (_activeOverlay != PlayerOverlay.none) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _sidePanelCloseNode.canRequestFocus) {
-          _sidePanelCloseNode.requestFocus();
-        }
-      });
-    }
   }
 
   void _showConfigMenu() {
@@ -1481,13 +1486,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _startHideTimer();
       }
     });
-    if (_activeOverlay != PlayerOverlay.none) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _sidePanelCloseNode.canRequestFocus) {
-          _sidePanelCloseNode.requestFocus();
-        }
-      });
-    }
   }
 
   @override
@@ -1548,6 +1546,34 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     } else {
       Navigator.of(context).pop();
     }
+  }
+
+  /// Suscripción (watch) para que la capa de pills se reconstruya cuando
+  /// carguen los episodios. Solo llamar desde build.
+  AsyncValue<EpisodesResponse?> _episodesAsync() => ref.watch(episodesProvider(EpisodesParams(
+        url: _seriesListUrl,
+        source: widget.source,
+        title: widget.title,
+        season: widget.season,
+      )));
+
+  /// Lógica pura: ¿hay episodio anterior/siguiente? Reutiliza el mismo criterio
+  /// que el overlay de autoplay. Usar valueOrNull/when sobre el AsyncValue.
+  ({bool hasPrev, bool hasNext}) _episodeNavBounds(AsyncValue<EpisodesResponse?> episodesAsync) {
+    final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
+    final bool hasPrev = currentNum > 1;
+    final bool hasNext = episodesAsync.when(
+      data: (data) {
+        if (data == null || data.episodes.isEmpty) {
+          if (widget.totalEpisodes != null) return currentNum < widget.totalEpisodes!;
+          return true;
+        }
+        return data.episodes.any((e) => e.number > currentNum);
+      },
+      loading: () => true,
+      error: (_, __) => true,
+    );
+    return (hasPrev: hasPrev, hasNext: hasNext);
   }
 
   void _navigateToEpisode(bool next) async {
@@ -2995,6 +3021,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _headerFocusNode.dispose();
     _serverPillFocusNode.dispose();
     _episodesPillFocusNode.dispose();
+    _prevEpisodePillFocusNode.dispose();
+    _nextEpisodePillFocusNode.dispose();
     _opedPillFocusNode.dispose();
     _languagePillFocusNode.dispose();
     _sidePanelCloseNode.dispose();
@@ -4126,7 +4154,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               trapFocus: true,
               onBack: _dismissSidePanel,
               railWidth: 460,
-              borderRadius: 40,
+              borderRadius: 16,
             ),
            
            if (_playbackError != null) 
@@ -4192,7 +4220,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // el hueco (20px frente a 10px).
     final pills = <Widget>[
       _buildPillButton(
-        label: _currentSource.isNotEmpty ? _currentSource : 'Servidor',
+        label: _currentSource.isNotEmpty ? simplifySourceName(_currentSource) : 'Servidor',
         icon: AurisIcons.server,
         isSelected: _activeOverlay == PlayerOverlay.server,
         onTap: _showServerSelector,
@@ -4209,6 +4237,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           focusNode: _episodesPillFocusNode,
         ),
       );
+      final nav = _episodeNavBounds(_episodesAsync());
+      if (nav.hasPrev) {
+        pills.add(
+          _buildPillButton(
+            label: 'Ant.',
+            icon: AurisIcons.skipPrev,
+            isSelected: false,
+            onTap: () => _navigateToEpisode(false),
+            focusNode: _prevEpisodePillFocusNode,
+          ),
+        );
+      }
+      if (nav.hasNext) {
+        pills.add(
+          _buildPillButton(
+            label: 'Sig.',
+            icon: AurisIcons.skipNext,
+            isSelected: false,
+            onTap: () => _navigateToEpisode(true),
+            focusNode: _nextEpisodePillFocusNode,
+          ),
+        );
+      }
     }
     if (!_isMovie && !_isOpEd) {
       pills.add(
@@ -4223,7 +4274,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
     pills.add(
       _buildPillButton(
-        label: _currentLanguage ?? 'Audio / Subs',
+        label: _currentLanguageLabel,
         icon: AurisIcons.subtitles,
         isSelected: _activeOverlay == PlayerOverlay.language,
         onTap: _showLanguageSelector,
@@ -4233,7 +4284,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     const double gap = 10;
     return Positioned(
-      bottom: 40,
+      bottom: 24,
       left: 0,
       right: 0,
       child: Row(
@@ -4761,7 +4812,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// traversal salta al timeline ancho en vez de a la pill vecina.
   List<FocusNode> get _pillTraversalOrder {
     final order = <FocusNode>[_serverPillFocusNode];
-    if (!_isMovie) order.add(_episodesPillFocusNode);
+    if (!_isMovie) {
+      order.add(_episodesPillFocusNode);
+      final nav = _episodeNavBounds(ref.read(episodesProvider(EpisodesParams(
+        url: _seriesListUrl,
+        source: widget.source,
+        title: widget.title,
+        season: widget.season,
+      ))));
+      if (nav.hasPrev) order.add(_prevEpisodePillFocusNode);
+      if (nav.hasNext) order.add(_nextEpisodePillFocusNode);
+    }
     if (!_isMovie && !_isOpEd) order.add(_opedPillFocusNode);
     order.add(_languagePillFocusNode);
     return order;
@@ -4850,7 +4911,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   focusColor: Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

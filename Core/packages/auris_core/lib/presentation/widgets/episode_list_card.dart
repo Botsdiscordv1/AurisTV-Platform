@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../data/models/server/episodes_response.dart';
@@ -11,7 +12,10 @@ import '../../data/models/server/episodes_response.dart';
 ///   [LayoutBuilder], lo multiplica por la densidad y pide a weserv el tamaño
 ///   justo (webp recortado) + acota el bitmap en RAM. Sin fijos: si la
 ///   plataforma cambia el ancho, la resolución lo sigue.
-/// - Foco D-pad / mouse con el lenguaje Auris (fondo blanco + texto negro).
+/// - Foco D-pad / mouse estilo TizenTube (misma lógica que
+///   EpisodesDetailOverlay): fondo SIEMPRE default y borde blanco de 2px
+///   ceñido al thumbnail mientras el foco está activo, que desaparece al
+///   perderlo. Sin cambio de color de fondo ni de textos.
 class AurisEpisodeListCard extends StatelessWidget {
   final EpisodeInfo ep;
   final bool isCurrent;
@@ -52,20 +56,32 @@ class AurisEpisodeListCard extends StatelessWidget {
 
     return Focus(
       autofocus: autofocus,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.numpadEnter ||
+              key == LogicalKeyboardKey.space) {
+            onTap();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
       child: Builder(
         builder: (context) {
           final bool isFocused = Focus.of(context).hasFocus;
-          final Color titleColor = isFocused ? Colors.black : Colors.white;
-          final Color subColor = isFocused ? Colors.black54 : Colors.white60;
-          final Color overColor =
-              isFocused ? Colors.black54 : (isCurrent ? accentColor : Colors.white38);
+          final Color titleColor = Colors.white;
+          final Color subColor = Colors.white60;
+          final Color overColor = isCurrent ? accentColor : Colors.white38;
           return AnimatedScale(
             scale: isFocused ? 1.02 : 1.0,
             duration: const Duration(milliseconds: 150),
             child: Container(
               margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
               decoration: BoxDecoration(
-                color: isFocused ? Colors.white : const Color(0xFF272727),
+                color: const Color(0xFF272727),
                 borderRadius: BorderRadius.circular(borderRadius),
               ),
               child: Material(
@@ -83,16 +99,25 @@ class AurisEpisodeListCard extends StatelessWidget {
                           child: AspectRatio(
                             aspectRatio: 16 / 9,
                             child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.05),
-                                borderRadius: BorderRadius.circular(10),
-                                border: isCurrent
-                                    ? Border.all(
-                                        color: isFocused ? Colors.black54 : accentColor,
-                                        width: 2,
-                                      )
-                                    : null,
-                              ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: isCurrent
+                                      ? Border.all(color: accentColor, width: 2)
+                                      : null,
+                                ),
+                              // Foco estilo TizenTube: borde blanco de 2px
+                              // ceñido al thumb (foreground: no desplaza ni
+                              // re-mide el bitmap, así no se re-pide la imagen).
+                              // El item actual conserva su borde naranja: el
+                              // foco blanco solo aplica fuera de él.
+                              foregroundDecoration: (isFocused && !isCurrent)
+                                  ? BoxDecoration(
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                          color: Colors.white, width: 2),
+                                    )
+                                  : null,
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: hasThumb
@@ -188,13 +213,13 @@ class AurisEpisodeListCard extends StatelessWidget {
                         if (isCurrent)
                           Icon(
                             Icons.check_rounded,
-                            color: isFocused ? Colors.black : Colors.white,
+                            color: Colors.white,
                             size: 22,
                           )
                         else
                           Icon(
                             Icons.chevron_right_rounded,
-                            color: isFocused ? Colors.black54 : Colors.white30,
+                            color: Colors.white30,
                             size: 20,
                           ),
                       ],

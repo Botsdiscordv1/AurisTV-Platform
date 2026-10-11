@@ -32,6 +32,7 @@ class AurisTwoPanel extends StatelessWidget {
   final double railWidth;
   final double breakpoint;
   final double margin;
+  final double panelGap;
   final double borderRadius;
   final bool lockAspect;
 
@@ -54,7 +55,8 @@ class AurisTwoPanel extends StatelessWidget {
     this.railWidth = 460,
     this.breakpoint = 800,
     this.margin = 32,
-    this.borderRadius = 20,
+    this.panelGap = 12,
+    this.borderRadius = 16,
     this.lockAspect = true,
     this.maxRailFraction = 0.35,
   });
@@ -86,20 +88,23 @@ class AurisTwoPanel extends StatelessWidget {
               curve: Curves.easeInOutCubic,
               padding: showRail
                   ? EdgeInsets.fromLTRB(
-                      margin, margin, effectiveRail + margin, margin)
+                      margin, margin, effectiveRail + panelGap, margin)
                   : EdgeInsets.zero,
-              child: ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(showRail ? borderRadius : 0),
-                child: (showRail && lockAspect)
-                    ? Center(
+              child: (showRail && lockAspect)
+                  ? Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(borderRadius),
                         child: AspectRatio(
                           aspectRatio: 16 / 9,
                           child: video,
                         ),
-                      )
-                    : video,
-              ),
+                      ),
+                    )
+                  : ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(showRail ? borderRadius : 0),
+                      child: video,
+                    ),
             ),
             ...videoOverlays,
             if (panelOpen)

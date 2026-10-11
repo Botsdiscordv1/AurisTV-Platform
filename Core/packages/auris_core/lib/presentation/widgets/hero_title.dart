@@ -75,6 +75,18 @@ class _HeroTitleState extends State<HeroTitle> {
       duration: const Duration(milliseconds: 600),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
+      // Alinear a la izquierda (topStart) en vez del centro por defecto: el
+      // layout del AnimatedSwitcher centraba el logo mientras coexistía con el
+      // placeholder saliente, y solo al retirarse este saltaba a la izquierda.
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          alignment: AlignmentDirectional.topStart,
+          children: <Widget>[
+            ...previousChildren,
+            if (currentChild != null) currentChild,
+          ],
+        );
+      },
       child: _buildIdentity(),
     );
   }

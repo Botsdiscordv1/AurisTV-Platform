@@ -757,23 +757,18 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
           SizedBox(
             height: TVResponsiveUtils.heroLogoHeight(context),
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.45,
-                maxHeight: TVResponsiveUtils.heroLogoHeight(context),
+            width: MediaQuery.of(context).size.width * 0.45,
+            child: CachedNetworkImage(
+              key: ValueKey('logo_tv_${item.id}'),
+              imageUrl: item.logoUrl!,
+              fit: BoxFit.contain,
+              alignment: Alignment.bottomLeft,
+              fadeInDuration: const Duration(milliseconds: 100),
+              placeholder: (context, url) => SizedBox(
+                height: TVResponsiveUtils.heroLogoHeight(context),
+                width: MediaQuery.of(context).size.width * 0.45,
               ),
-              child: CachedNetworkImage(
-                key: ValueKey('logo_tv_${item.id}'),
-                imageUrl: item.logoUrl!,
-                fit: BoxFit.contain,
-                alignment: Alignment.bottomLeft,
-                fadeInDuration: const Duration(milliseconds: 100),
-                placeholder: (context, url) => Container(
-                  height: TVResponsiveUtils.heroLogoHeight(context),
-                  color: Colors.white.withOpacity(0.04),
-                ),
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
-              ),
+              errorWidget: (_, __, ___) => const SizedBox.shrink(),
             ),
           )
         else
@@ -1015,9 +1010,9 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
 
   Widget _buildDotsIndicator(double bottom) {
     return Positioned(
-      bottom: bottom, left: 0, right: 0,
+      bottom: bottom, left: 0, right: 24,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: List.generate(widget.items.length, (index) {
           final isCurrent = (_backgroundIndex % widget.items.length) == index;
           return AnimatedContainer(
@@ -1032,7 +1027,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   }
 }
 
-class _BannerButton extends StatelessWidget {
+class _BannerButton extends StatefulWidget {
   final VoidCallback onPressed;
   final String icon;
   final String label;
@@ -1048,25 +1043,31 @@ class _BannerButton extends StatelessWidget {
     this.focusNode,
   });
 
+  @override State<_BannerButton> createState() => _BannerButtonState();
+}
+
+class _BannerButtonState extends State<_BannerButton> {
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      autofocus: autofocus,
-      focusNode: focusNode, // Vinculamos el nodo
-      icon: AurisIcon(icon, size: 20, color: isPrimary ? Colors.black : Colors.white), // Reducido de 24
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)), // Reducido de 15
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? Colors.white : Colors.white10,
-        foregroundColor: isPrimary ? Colors.black : Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8), // Reducido de 20x12
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    return Focus(
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
+      child: ElevatedButton.icon(
+        onPressed: widget.onPressed,
+        icon: AurisIcon(widget.icon, size: 20, color: widget.isPrimary ? Colors.black : Colors.white),
+        label: Text(widget.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: widget.isPrimary ? Colors.white : Colors.white10,
+          foregroundColor: widget.isPrimary ? Colors.black : Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        ),
       ),
     );
   }
 }
 
-class _BannerIconButton extends StatelessWidget {
+class _BannerIconButton extends StatefulWidget {
   final String icon;
   final String label;
   final VoidCallback onPressed;
@@ -1080,20 +1081,34 @@ class _BannerIconButton extends StatelessWidget {
     this.focusNode,
   });
 
+  @override State<_BannerIconButton> createState() => _BannerIconButtonState();
+}
+
+class _BannerIconButtonState extends State<_BannerIconButton> {
+  bool _focused = false;
+
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: label,
-      child: IconButton.filledTonal(
-        focusNode: focusNode,
-        onPressed: isLoading ? null : onPressed,
-        icon: isLoading 
-          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-          : AurisIcon(icon, size: 18, color: Colors.white), // Reducido de 22
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.white10, 
-          foregroundColor: Colors.white, 
-          padding: const EdgeInsets.all(7) // Reducido de 10
+    return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _focused = f),
+      child: AnimatedScale(
+        scale: _focused ? 1.12 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        child: Tooltip(
+          message: widget.label,
+          child: IconButton.filledTonal(
+            onPressed: widget.isLoading ? null : widget.onPressed,
+            icon: widget.isLoading
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+              : AurisIcon(widget.icon, size: 18, color: Colors.white),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white10, 
+              foregroundColor: Colors.white, 
+              padding: const EdgeInsets.all(7)
+            ),
+          ),
         ),
       ),
     );

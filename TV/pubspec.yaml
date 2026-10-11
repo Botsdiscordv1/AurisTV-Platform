@@ -38,6 +38,9 @@ dependencies:
   path_provider: ^2.1.4
   collection: ^1.18.0
 
+  # Reconocimiento de voz (búsqueda por voz)
+  speech_to_text: ^7.5.0
+
   # Autenticación y Almacenamiento Seguro
   supabase_flutter: ^2.6.0
   flutter_appauth: ^6.0.0

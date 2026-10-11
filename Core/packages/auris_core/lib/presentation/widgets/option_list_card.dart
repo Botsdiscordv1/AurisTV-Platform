@@ -32,10 +32,10 @@ class AurisOptionCard extends StatelessWidget {
     this.isCurrent = false,
     this.isAvailable = true,
     this.autofocus = false,
-    this.titleSize = 15,
-    this.subtitleSize = 12,
-    this.iconSize = 22,
-    this.borderRadius = 16,
+    this.titleSize = 14,
+    this.subtitleSize = 11,
+    this.iconSize = 20,
+    this.borderRadius = 10,
   });
 
   @override
@@ -49,7 +49,7 @@ class AurisOptionCard extends StatelessWidget {
             scale: isFocused ? 1.02 : 1.0,
             duration: const Duration(milliseconds: 150),
             child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+              margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
               decoration: BoxDecoration(
                 color: isFocused ? Colors.white : const Color(0xFF272727),
                 borderRadius: BorderRadius.circular(borderRadius),
@@ -62,7 +62,7 @@ class AurisOptionCard extends StatelessWidget {
                   focusColor: Colors.transparent,
                   borderRadius: BorderRadius.circular(borderRadius),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     child: Row(
                       children: [
                         icon is String
