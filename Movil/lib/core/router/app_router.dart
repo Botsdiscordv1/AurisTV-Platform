@@ -158,6 +158,8 @@ final GoRouter appRouter = GoRouter(
         final totalSeasons =
             int.tryParse(state.uri.queryParameters['totalSeasons'] ?? '');
         final sectionId = state.uri.queryParameters['sectionId'];
+        final extraResult =
+            state.extra is SearchResult ? state.extra as SearchResult : null;
         return ContentScreen(
           title: title,
           source: source,
@@ -172,6 +174,7 @@ final GoRouter appRouter = GoRouter(
           kind: kind,
           totalSeasons: totalSeasons,
           sectionId: sectionId,
+          result: extraResult,
         );
       },
     ),

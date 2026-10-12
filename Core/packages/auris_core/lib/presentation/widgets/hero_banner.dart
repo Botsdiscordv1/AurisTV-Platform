@@ -81,15 +81,25 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     });
   }
 
+  int _bgMemCacheWidth() {
+    final mq = MediaQuery.of(context);
+    return (mq.size.width * mq.devicePixelRatio).round().clamp(640, 1920);
+  }
+
   void _precacheNextImage() {
     if (widget.items.length < 2) return;
-    // Precargamos la imagen del siguiente banner para una transición suave (Zero-Lag)
     final nextIndex = (_backgroundIndex + 1) % widget.items.length;
     final nextItem = widget.items[nextIndex];
-    
-    final imageUrl = ApiEndpoints.proxyImage(nextItem.bannerUrl ?? nextItem.posterUrl, highQuality: true);
-    if (imageUrl.isNotEmpty) {
-      precacheImage(CachedNetworkImageProvider(imageUrl), context);
+
+    final imageUrl = nextItem.bannerUrl ?? nextItem.posterUrl;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      precacheImage(
+        ResizeImage(
+          CachedNetworkImageProvider(imageUrl),
+          width: _bgMemCacheWidth(),
+        ),
+        context,
+      );
     }
   }
 
@@ -552,7 +562,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         width: double.infinity,
         height: double.infinity,
         alignment: Alignment.topCenter,
-        filterQuality: FilterQuality.high, // Senior Fix: Máxima fidelidad para banners 4K/Desktop
+        memCacheWidth: _bgMemCacheWidth(),
+        filterQuality: MediaQuery.of(context).size.width < 1600
+            ? FilterQuality.medium
+            : FilterQuality.high, // Senior Fix: Alta fidelidad solo en 4K/Desktop
       ),
     );
   }
@@ -800,13 +813,19 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                           maxWidth: MediaQuery.of(context).size.width * 0.7,
                           maxHeight: ResponsiveUtils.heroLogoHeight(context),
                         ),
-                        child: CachedNetworkImage(
-                          key: ValueKey('logo_mob_${item.id}'),
-                          imageUrl: item.logoUrl!, 
-                          fit: BoxFit.contain,
-                          alignment: Alignment.bottomLeft,
-                          fadeInDuration: const Duration(milliseconds: 200),
-                        ),
+                        child: Builder(builder: (context) {
+                          final mq = MediaQuery.of(context);
+                          return CachedNetworkImage(
+                            key: ValueKey('logo_mob_${item.id}'),
+                            imageUrl: item.logoUrl!,
+                            fit: BoxFit.contain,
+                            alignment: Alignment.bottomLeft,
+                            fadeInDuration: const Duration(milliseconds: 200),
+                            memCacheWidth: (mq.size.width * 0.7 * mq.devicePixelRatio)
+                                .round()
+                                .clamp(320, 1280),
+                          );
+                        }),
                       ),
                     )
                   : Text(
@@ -976,26 +995,33 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         ),
         SizedBox(height: isIntermediate ? 8 : 16),
 
-        // 2. EL LOGO / TÍTULO (altura reservada siempre: sin esto la caja
-        // colapsa a 0 hasta que carga y el hero salta)
+        // 2. EL LOGO / TÍTULO (altura y ancho reservados siempre: sin esto la
+        // caja colapsa al ancho natural del logo y el hero salta al cargar;
+        // el ancho fijo + placeholder igual que en TV evita el salto y mantiene
+        // la caja anclada a la izquierda durante todo el crossfade).
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
-          SizedBox(
-            height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
-            child: Container(
-              constraints: BoxConstraints(
-                // Senior Fix: En tablets reducimos el ancho para dejar aire a los lados
-                maxWidth: screenWidth * (isTablet ? 0.30 : (isIntermediate ? 0.35 : 0.38)),
-                maxHeight: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
-              ),
+          Builder(builder: (context) {
+            final dpr = MediaQuery.of(context).devicePixelRatio;
+            // Senior Fix: En tablets reducimos el ancho para dejar aire a los lados
+            final logoWidth = screenWidth * (isTablet ? 0.30 : (isIntermediate ? 0.35 : 0.38));
+            return SizedBox(
+              height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
+              width: logoWidth,
               child: CachedNetworkImage(
                 key: ValueKey('logo_${item.id}'),
-                imageUrl: item.logoUrl!, 
-                fit: BoxFit.contain, 
+                imageUrl: item.logoUrl!,
+                fit: BoxFit.contain,
                 alignment: Alignment.bottomLeft,
                 fadeInDuration: const Duration(milliseconds: 100),
+                memCacheWidth: (logoWidth * dpr).round().clamp(320, 1280),
+                placeholder: (context, url) => SizedBox(
+                  height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
+                  width: logoWidth,
+                ),
+                errorWidget: (_, __, ___) => const SizedBox.shrink(),
               ),
-            ),
-          )
+            );
+          })
         else
           Text(
             item.title.toUpperCase(), 

@@ -272,12 +272,16 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     int? season,
     String? source,
     bool triggerOpen = true,
+    // TV gestiona su propio Player/VideoController: con createPlayer=false el
+    // provider solo registra la sesión (historial/remote/fuentes) sin crear un
+    // 2.º motor de vídeo oculto que en TV nunca se usa para render (~50-100MB).
+    bool createPlayer = true,
     List<SearchResult>? sources,
     // Título ya resuelto por el player para el display T1:E1 "x": se guarda
     // tal cual en el historial al salir (sin depender del timing del sync).
     String? episodeTitle,
   }) async {
-    initPlayerIfNeeded();
+    if (createPlayer) initPlayerIfNeeded();
     
     final bool isSameContent = state.currentItem?.id == item.id;
     final bool isSameUrl = state.url == url;

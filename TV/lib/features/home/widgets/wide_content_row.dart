@@ -105,10 +105,14 @@ class _WideContentRowState extends State<WideContentRow>
     if (!mounted || !_scrollController.hasClients) return;
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
-    setState(() {
-      _canScrollLeft = currentScroll > 5;
-      _canScrollRight = maxScroll > currentScroll + 5;
-    });
+    final canLeft = currentScroll > 5;
+    final canRight = maxScroll > currentScroll + 5;
+    if (canLeft != _canScrollLeft || canRight != _canScrollRight) {
+      setState(() {
+        _canScrollLeft = canLeft;
+        _canScrollRight = canRight;
+      });
+    }
   }
 
   void _scroll(double offset) {

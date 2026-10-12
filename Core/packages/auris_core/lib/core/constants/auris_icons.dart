@@ -36,6 +36,9 @@ class AurisIcons {
   static String get trailerFilled => reiconSvg(Reicon.filled.videoPlayH);
   static String get videoLib => reiconSvg(Reicon.outline.videoLib);
   static String get episodes => reiconSvg(Reicon.outline.videoLib);
+  static String get episodesFilled => reiconSvg(Reicon.filled.videoLib);
+  static String get docText => reiconSvg(Reicon.outline.docText);
+  static String get docTextFilled => reiconSvg(Reicon.filled.docText);
   static String get server => reiconSvg(Reicon.outline.ssd2);
   static String get subtitles => reiconSvg(Reicon.outline.subtitles);
   static String get language => reiconSvg(Reicon.outline.subtitles);
@@ -126,6 +129,7 @@ class AurisIcons {
 
   // Sistema / TV D-Pad y Cierre
   static String get close => reiconSvg(Reicon.outline.x);
+  static String get closeFilled => reiconSvg(Reicon.filled.x);
   static String get filter => reiconSvg(Reicon.outline.filter);
   static String get info => reiconSvg(Reicon.outline.infoCircle);
   static String get moreH => reiconSvg(Reicon.outline.moreH);

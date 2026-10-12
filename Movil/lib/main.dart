@@ -19,6 +19,10 @@ import 'features/remote_control/data/models/remote_device.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final imageCache = PaintingBinding.instance.imageCache;
+  imageCache.maximumSizeBytes = 64 << 20;
+  imageCache.maximumSize = 500;
+
   // Configuración de la interfaz del sistema (Edge-to-Edge)
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -125,7 +129,11 @@ class PipVideoContainer extends ConsumerWidget {
                   controls: NoVideoControls,
                 )
               : (posterUrl != null
-                  ? Image.network(posterUrl, fit: BoxFit.cover)
+                  ? Image.network(
+                      posterUrl,
+                      fit: BoxFit.cover,
+                      cacheWidth: 640,
+                    )
                   : const SizedBox.shrink()),
         ),
       ),

@@ -97,14 +97,25 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
     });
   }
 
+  int _bgMemCacheWidth() {
+    final mq = MediaQuery.of(context);
+    return (mq.size.width * mq.devicePixelRatio).round().clamp(640, 1920);
+  }
+
   void _precacheNextImage() {
     if (widget.items.length < 2) return;
     final nextIndex = (_backgroundIndex + 1) % widget.items.length;
     final nextItem = widget.items[nextIndex];
-    
-    final imageUrl = ApiEndpoints.proxyImage(nextItem.bannerUrl ?? nextItem.posterUrl, highQuality: true);
-    if (imageUrl.isNotEmpty) {
-      precacheImage(CachedNetworkImageProvider(imageUrl), context);
+
+    final imageUrl = nextItem.bannerUrl ?? nextItem.posterUrl;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      precacheImage(
+        ResizeImage(
+          CachedNetworkImageProvider(imageUrl),
+          width: _bgMemCacheWidth(),
+        ),
+        context,
+      );
     }
   }
 
@@ -560,7 +571,10 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
         width: double.infinity,
         height: double.infinity,
         alignment: Alignment.topCenter,
-        filterQuality: FilterQuality.high,
+        memCacheWidth: _bgMemCacheWidth(),
+        filterQuality: MediaQuery.of(context).size.width < 1600
+            ? FilterQuality.medium
+            : FilterQuality.high,
       ),
     );
   }
@@ -755,22 +769,27 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
 
         // 2. Logo / Título
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
-          SizedBox(
-            height: TVResponsiveUtils.heroLogoHeight(context),
-            width: MediaQuery.of(context).size.width * 0.45,
-            child: CachedNetworkImage(
-              key: ValueKey('logo_tv_${item.id}'),
-              imageUrl: item.logoUrl!,
-              fit: BoxFit.contain,
-              alignment: Alignment.bottomLeft,
-              fadeInDuration: const Duration(milliseconds: 100),
-              placeholder: (context, url) => SizedBox(
-                height: TVResponsiveUtils.heroLogoHeight(context),
-                width: MediaQuery.of(context).size.width * 0.45,
+          Builder(builder: (context) {
+            final dpr = MediaQuery.of(context).devicePixelRatio;
+            final logoWidth = MediaQuery.of(context).size.width * 0.45;
+            return SizedBox(
+              height: TVResponsiveUtils.heroLogoHeight(context),
+              width: logoWidth,
+              child: CachedNetworkImage(
+                key: ValueKey('logo_tv_${item.id}'),
+                imageUrl: item.logoUrl!,
+                fit: BoxFit.contain,
+                alignment: Alignment.bottomLeft,
+                fadeInDuration: const Duration(milliseconds: 100),
+                memCacheWidth: (logoWidth * dpr).round().clamp(320, 1280),
+                placeholder: (context, url) => SizedBox(
+                  height: TVResponsiveUtils.heroLogoHeight(context),
+                  width: logoWidth,
+                ),
+                errorWidget: (_, __, ___) => const SizedBox.shrink(),
               ),
-              errorWidget: (_, __, ___) => const SizedBox.shrink(),
-            ),
-          )
+            );
+          })
         else
           Text(
             item.title.toUpperCase(), 

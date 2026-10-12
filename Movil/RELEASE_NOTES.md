@@ -1,25 +1,27 @@
 # 🚀 AurisTV v1.0.0 - Lanzamiento Oficial & Actualización Multiplataforma
 
-¡Nos complace anunciar una nueva actualización mayor de **AurisTV v1.0.0** con importantes mejoras en la interfaz y navegación de Android TV (`main.dart`, `home_screen`, `search_screen`, `hero_banner`), optimizaciones en widgets de núcleo y estabilidad general en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
+¡Nos complace anunciar una nueva actualización mayor de **AurisTV v1.0.0** con importantes mejoras en el enrutamiento de navegación (`app_router` con soporte para `SearchResult` extra), optimizaciones en el reproductor multimedia, proveedores de reproducción activa y refinamientos visuales en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
 
 ---
 
 ## ✨ Novedades y Características Principales
 
-- **Optimización y Refactorización en Android TV (`main.dart`, `home_screen`, `search_screen`):**
-  - Mejoras profundas en la inicialización de la app, pantalla de inicio, búsqueda y transiciones optimizadas para control remoto en Android TV.
-- **Mejoras en Componentes Visuales de TV y Núcleo (`hero_banner`, `wide_content_row`, `focusable_poster_card`):**
-  - Refinamientos en tarjetas de póster con enfoque, banners principales y filas anchas de contenido.
-- **Actualización de Manifiesto y Dependencias (`AndroidManifest.xml`, `pubspec.yaml`):**
-  - Ajustes en permisos y configuración de Android TV, junto con sincronización de dependencias.
+- **Enrutamiento y Navegación Avanzada (`app_router`):**
+  - Soporte actualizado para pasar `SearchResult` como argumento `extra` en la navegación hacia `ContentScreen`.
+- **Mejoras en Reproductor y Proveedores (`player_screen`, `active_player_provider`):**
+  - Refinamientos en la gestión del reproductor activo, estabilidad de reproducción y gestos en Móvil, TV y Web/Desktop.
+- **Actualizaciones en Widgets del Núcleo (`auris_core`):**
+  - Mejoras en tarjetas anchas con enfoque (`focusable_wide_card`), banners de héroe (`hero_banner`), mini barra de reproductor (`mini_player_bar`) y constantes de iconos (`auris_icons`).
+- **Refinamiento en Pantallas de Inicio y Contenido (`home_screen`, `search_screen`, `content_screen`):**
+  - Ajustes de UI y transiciones fluidas en las interfaces de usuario de Móvil y Android TV.
 - **Soporte Multiplataforma Unificado:**
-  - Sincronización continua de la experiencia multimedia en Móvil, TV y Web/Desktop.
+  - Sincronización continua de la experiencia multimedia en las 3 plataformas principales.
 
 ---
 
 ## 🛠️ Correcciones de Errores y Mejoras de Rendimiento
 
-- **Estabilidad de Enfoque y Reproducción:** Ajustes en eventos de control remoto y reproducción multimedia.
+- **Estabilidad de Estado:** Ajustes en la inicialización y reactividad de providers compartidos.
 - **Empaquetado y Release:** Automatización limpia de compilación de APKs (Móvil y TV) e instalador de Windows.
 
 ---
