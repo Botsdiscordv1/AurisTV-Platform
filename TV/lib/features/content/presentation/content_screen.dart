@@ -14,10 +14,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
 import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/tv_responsive_utils.dart';
 import 'content_details_screen.dart';
 import 'episodes_detail_overlay.dart';
 
@@ -216,6 +217,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final int? year;
   final String? type;
   final VoidCallback? onShowEpisodes;
+  final AsyncValue<Map<String, List<RelatedInfo>>> relations;
 
   const _ContentHeader({
     required this.title, 
@@ -243,6 +245,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
     this.year,
     this.type,
     this.onShowEpisodes,
+    required this.relations,
   });
 
   @override ConsumerState<_ContentHeader> createState() => _ContentHeaderState();
@@ -504,11 +507,11 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildNetflixActionList(context),
                 if (widget.currentSource != null) ...[
                   const SizedBox(height: 8),
                   SourceChipsBar(sources: widget.sources, currentSource: widget.currentSource, onSourceSelected: widget.onSourceSelected, unavailableSources: widget.unavailableSources, season: widget.season),
                 ],
+                _buildRelatedCarousel(),
               ],
             ),
           ),
@@ -523,14 +526,31 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final spacing = ResponsiveUtils.sp(context, 10.0);
     final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
     final bool isFav = ref.watch(favoritesProvider).any((f) => f.id == currentId);
+    final latestHistory = ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title);
     
     return Row(
       mainAxisSize: MainAxisSize.min, 
       children: [
-        _DetailIconButton(icon: AurisIcons.moreH, filledIcon: AurisIcons.moreHFilled, label: 'Detalles', autofocus: true, focusNode: _actionsRowFirstNode, onPressed: () => _openFullscreenDetails(d), size: size, iconSize: iconSize), 
-        if (_lastTrailerKey != null) ...[
+        _DetailIconButton(
+          icon: AurisIcons.play,
+          filledIcon: AurisIcons.playFilled,
+          label: (latestHistory != null && !latestHistory.isFinished) ? 'Reanudar' : 'Reproducir',
+          autofocus: true,
+          focusNode: _actionsRowFirstNode,
+          onPressed: widget.onPlay,
+          size: size,
+          iconSize: iconSize,
+        ),
+        if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime')) ...[
           SizedBox(width: spacing),
-          _DetailIconButton(icon: AurisIcons.trailer, filledIcon: AurisIcons.trailerFilled, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true), size: size, iconSize: iconSize),
+          _DetailIconButton(
+            icon: AurisIcons.episodes,
+            filledIcon: AurisIcons.episodesFilled,
+            label: 'Episodios y más',
+            onPressed: () => widget.onShowEpisodes?.call(),
+            size: size,
+            iconSize: iconSize,
+          ),
         ],
         SizedBox(width: spacing),
         _DetailIconButton(
@@ -562,6 +582,12 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           size: size,
           iconSize: iconSize,
         ),
+        SizedBox(width: spacing),
+        _DetailIconButton(icon: AurisIcons.docText, filledIcon: AurisIcons.docTextFilled, label: 'Detalles', onPressed: () => _openFullscreenDetails(d), size: size, iconSize: iconSize), 
+        if (_lastTrailerKey != null) ...[
+          SizedBox(width: spacing),
+          _DetailIconButton(icon: AurisIcons.trailer, filledIcon: AurisIcons.trailerFilled, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true), size: size, iconSize: iconSize),
+        ],
         if (_trailerController != null && _showPlayer) ...[
           SizedBox(width: spacing),
           _DetailIconButton(
@@ -588,6 +614,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               compact: true,
               enableFocus: true,
               scale: ResponsiveUtils.sp,
+              height: ResponsiveUtils.sp(context, 30),
+              fontSize: ResponsiveUtils.sp(context, 12),
             ),
           ),
         ],
@@ -665,42 +693,39 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     return RichText(text: TextSpan(style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500), children: [const TextSpan(text: 'Cast: ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)), TextSpan(text: castText)]));
   }
 
-  Widget _buildNetflixActionList(BuildContext context) {
-    return Consumer(builder: (context, ref, child) {
-      final historyManager = ref.watch(playbackHistoryStateProvider.notifier);
-      final latestHistory = historyManager.getLatestWatched(widget.title);
-      final favorites = ref.watch(favoritesProvider);
-      final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
-      final bool isFav = favorites.any((f) => f.id == currentId);
-      
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _NetflixListButton(
-            icon: AurisIcons.play,
-            label: (latestHistory != null && !latestHistory.isFinished)
-                ? 'Reanudar la reproducción'
-                : 'Reproducir',
-            progress: latestHistory?.progress,
-            isPrimary: true,
-            onNavigateUp: () => _actionsRowFirstNode.requestFocus(),
-            onPressed: widget.onPlay,
-          ),
-          const SizedBox(height: 4),
-          // Solo con historial real (progreso > 3s): sin progreso no tiene
-          // sentido ofrecer "desde el inicio".
-          if (latestHistory != null &&
-              latestHistory.positionInMilliseconds > 3000) ...[
-            _NetflixListButton(icon: AurisIcons.restart, label: 'Reproducir desde el inicio', onPressed: widget.onPlay),
-            const SizedBox(height: 4),
-          ],
-          if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime')) ...[
-            _NetflixListButton(icon: AurisIcons.episodes, label: 'Episodios y más', onPressed: () => widget.onShowEpisodes?.call()),
-            const SizedBox(height: 4),
-          ],
-        ],
-      );
-    });
+  Widget _buildRelatedCarousel() {
+    return widget.relations.when(
+      data: (relations) {
+        final List<RelatedInfo> all = [
+          ...?relations['franchise'],
+          ...?relations['recommended'],
+          ...?relations['similar'],
+        ];
+        if (all.isEmpty) return const SizedBox.shrink();
+
+        String normalize(String t) => t
+            .replaceAll(RegExp(r'\s*\([Ss]erie\)'), '')
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+        final Map<String, RelatedInfo> unique = {};
+        for (final r in all) {
+          final key = normalize(r.title);
+          if (key.isNotEmpty && !unique.containsKey(key)) unique[key] = r;
+        }
+        final items = unique.values.toList();
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        return _RelatedCarousel(
+          items: items,
+          category: widget.category,
+          sourceFallback: widget.currentSource?.source ?? widget.source,
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
   }
 
   Widget _buildSynopsis(dynamic detail) {
@@ -930,6 +955,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       body: _ContentHeader(
         title: widget.title, source: widget.source, url: widget.url, category: widget.category, poster: ApiEndpoints.proxyImage(currentSource?.thumbnail), banner: heroBanner, detailAsync: detailState.detail, currentSource: currentSource, sources: detailState.allSources, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSourceSelected: (index) => ref.setSource(detailParams, detailState.allSources[index]), onSeasonSelected: (s) => ref.setSeason(detailParams, s), 
         kind: widget.kind ?? widget.result?.kind, year: widget.year, type: widget.result?.type ?? widget.type, season: widget.season ?? widget.result?.season,
+        relations: detailState.relations,
         onShowEpisodes: () {
           debugPrint('[perf] overlay push t=${DateTime.now().millisecondsSinceEpoch}');
           Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSeasonSelected: (s) => ref.setSeason(detailParams, s), detailParams: detailParams, category: widget.category, title: widget.title, logoUrl: detailData?.logo, bannerUrl: heroBanner, onPlayEpisode: (ep, epSource, total) {
@@ -966,6 +992,189 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       AspectRatio(aspectRatio: 3.2 / 1, child: Container(color: const Color(0xFF0B0B0D))),
       Positioned(left: 40, right: 40, bottom: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [const _SkeletonBox(width: 400, height: 80), const SizedBox(height: 24), Row(mainAxisSize: MainAxisSize.min, children: [const _SkeletonBox(width: 64, height: 56, borderRadius: 28), const SizedBox(width: 16), const _SkeletonBox(width: 64, height: 56, borderRadius: 28)]), const SizedBox(height: 24), Container(width: 220, height: 56, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8)))]))
     ]);
+  }
+}
+
+/// Carrusel horizontal D-pad de contenido relacionado (sin cabecera).
+/// Combina franquicia + recomendados + similares en una sola fila compacta
+/// por debajo de las píldoras de fuente.
+class _RelatedCarousel extends StatefulWidget {
+  final List<RelatedInfo> items;
+  final String category;
+  final String sourceFallback;
+  const _RelatedCarousel({required this.items, required this.category, required this.sourceFallback});
+
+  @override
+  State<_RelatedCarousel> createState() => _RelatedCarouselState();
+}
+
+class _RelatedCarouselState extends State<_RelatedCarousel> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isHovered = false;
+  bool _canScrollLeft = false;
+  bool _canScrollRight = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+  }
+
+  @override
+  void didUpdateWidget(covariant _RelatedCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.items.length != oldWidget.items.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+    }
+  }
+
+  void _updateScrollIndicators() {
+    if (!mounted || !_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.offset;
+    final canLeft = currentScroll > 5;
+    final canRight = maxScroll > currentScroll + 5;
+    if (canLeft != _canScrollLeft || canRight != _canScrollRight) {
+      setState(() {
+        _canScrollLeft = canLeft;
+        _canScrollRight = canRight;
+      });
+    }
+  }
+
+  void _scroll(double offset) {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final target = (_scrollController.offset + offset).clamp(0.0, maxScroll);
+    _scrollController.animateTo(target, duration: const Duration(milliseconds: 800), curve: Curves.easeOutQuart);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _openRelated(RelatedInfo r) {
+    final sName = r.source ?? widget.sourceFallback;
+    final result = SearchResult(
+      title: r.title,
+      url: r.url,
+      source: sName,
+      quality: 'HD',
+      thumbnail: r.cover,
+      slug: r.slug,
+      metadataTitle: r.title,
+      year: r.year,
+      sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
+    );
+    final uri = '/content/${Uri.encodeComponent(r.title)}'
+        '?source=${Uri.encodeComponent(sName)}'
+        '&category=${Uri.encodeComponent(widget.category)}'
+        '&url=${Uri.encodeComponent(r.url)}'
+        '&metadataTitle=${Uri.encodeComponent(r.title)}';
+    context.push(uri, extra: result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) return const SizedBox.shrink();
+
+    final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
+    final double cardWidth = TVResponsiveUtils.posterWidth(context);
+    final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: false);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            SizedBox(
+              height: rowHeight,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  _updateScrollIndicators();
+                  return false;
+                },
+                child: ListView.separated(
+                  controller: _scrollController,
+                  physics: const ClampingScrollPhysics(),
+                  cacheExtent: 1000,
+                  clipBehavior: Clip.none,
+                  scrollDirection: Axis.horizontal,
+                  primary: false,
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  itemCount: widget.items.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 14),
+                  itemBuilder: (context, index) {
+                    final r = widget.items[index];
+                    return SizedBox(
+                      width: cardWidth,
+                      child: FocusablePosterCard(
+                        key: ValueKey(r.url),
+                        title: r.title,
+                        posterUrl: r.cover,
+                        showInfo: false,
+                        onTap: () => _openRelated(r),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Positioned(
+              left: horizontalPadding - 25,
+              top: 10,
+              bottom: 60,
+              child: ExcludeFocus(
+                excluding: !(_isHovered && _canScrollLeft),
+                child: AnimatedOpacity(
+                  opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: IgnorePointer(
+                    ignoring: !(_isHovered && _canScrollLeft),
+                    child: Center(
+                      child: NavArrow(
+                        icon: Icons.arrow_back_ios_new,
+                        useBackground: true,
+                        enableScale: false,
+                        onTap: () => _scroll(-600),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: horizontalPadding - 25,
+              top: 10,
+              bottom: 60,
+              child: ExcludeFocus(
+                excluding: !(_isHovered && _canScrollRight),
+                child: AnimatedOpacity(
+                  opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: IgnorePointer(
+                    ignoring: !(_isHovered && _canScrollRight),
+                    child: Center(
+                      child: NavArrow(
+                        icon: Icons.arrow_forward_ios,
+                        useBackground: true,
+                        enableScale: false,
+                        onTap: () => _scroll(600),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

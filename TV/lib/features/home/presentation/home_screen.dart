@@ -150,56 +150,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     }
   }
 
-  List<Widget> _buildEditorialRows(
-    AsyncValue<List<EditorialRow>> editorials,
-    String category, {
-    bool includeMovies = false,
-    String movieCategory = 'anime_movies',
-  }) {
-    return editorials.when(
-      data: (rows) {
-        final list = <Widget>[];
-        for (final row in rows) {
-          if (row.isMovie && !includeMovies) continue;
-          if (row.items.isEmpty) continue;
-          
-          final targetCat = (category == 'inicio') ? 'inicio' : (row.isMovie ? movieCategory : category);
-
-          if (row.format == SectionPresentation.wide) {
-            list.add(SliverToBoxAdapter(
-              child: RepaintBoundary(
-                child: WideContentRow(
-                  title: row.title,
-                  items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
-                  onItemTap: (wideItem) => openTVDetails(context, wideItem.originalItem as MediaItem, targetCat),
-                ),
-              ),
-            ));
-          } else {
-            list.add(SliverToBoxAdapter(
-              child: RepaintBoundary(
-                child: EditorialContentRow(
-                  title: row.title,
-                  subtitle: row.subtitle,
-                  items: row.items,
-                  badge: row.badge,
-                  onItemTap: (item) => openTVDetails(context, item, targetCat),
-                ),
-              ),
-            ));
-          }
-        }
-        return list;
-      },
-      loading: () => List.generate(3, (index) => const SliverToBoxAdapter(
-        child: RowSkeleton(isWide: false),
-      )),
-      error: (err, _) => [
-        SliverToBoxAdapter(child: Center(child: Text('Error editorial: $err', style: const TextStyle(color: Colors.white24)))),
-      ],
-    );
-  }
-
   Widget _buildSection(ComposedHomeSection section, double horizontalPadding) {
     switch (section.type) {
       case HomeSectionType.continueWatching:
@@ -323,9 +273,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
     final layoutAsync = ref.watch(homeLayoutProvider);
     final heroBannerItemsAsync = ref.watch(heroBannerItemsProvider(currentCategory));
-    final editorialRowsAsync = ref.watch(editorialRowsProvider(currentCategory));
 
-    if (!editorialRowsAsync.isLoading && !_splashRemoved) {
+    if (!layoutAsync.isLoading && !_splashRemoved) {
       _splashRemoved = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         WebUtils.removeSplashScreen();

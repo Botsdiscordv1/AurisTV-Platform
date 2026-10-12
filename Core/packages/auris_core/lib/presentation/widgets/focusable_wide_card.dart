@@ -338,13 +338,17 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
-                                CuredNetworkImage(
-                                  imageUrl: widget.imageUrl,
-                                  fit: BoxFit.cover,
-                                  filterQuality: FilterQuality.medium,
-                                  placeholder: (context, url) => Container(color: Colors.white10),
-                                  errorWidget: (context, url, error) => Center(child: AurisIcon(AurisIcons.trailer, color: Colors.white24, size: 24)),
-                                ),                                Positioned.fill(
+                                Builder(builder: (context) {
+                                  final dpr = MediaQuery.of(context).devicePixelRatio;
+                                  return CuredNetworkImage(
+                                    imageUrl: widget.imageUrl,
+                                    fit: BoxFit.cover,
+                                    filterQuality: FilterQuality.medium,
+                                    memCacheWidth: (widget.width * dpr).round().clamp(1, 2048),
+                                    placeholder: (context, url) => Container(color: Colors.white10),
+                                    errorWidget: (context, url, error) => Center(child: AurisIcon(AurisIcons.trailer, color: Colors.white24, size: 24)),
+                                  );
+                                }),                                Positioned.fill(
                                   child: IgnorePointer(
                                     child: DecoratedBox(
                                       decoration: BoxDecoration(
@@ -366,23 +370,29 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                     child: SizedBox(
                                       height: widget.height * 0.35,
                                       width: widget.width * 0.65,
-                                      child: CachedNetworkImage(
-                                        imageUrl: widget.logoUrl!,
-                                        width: widget.width * 0.65,
-                                        height: widget.height * 0.35,
-                                        fit: BoxFit.contain,
-                                        alignment: Alignment.bottomLeft,
-                                        filterQuality: FilterQuality.medium,
-                                        fadeInDuration:
-                                            const Duration(milliseconds: 150),
-                                        placeholder: (context, url) => Container(
+                                      child: Builder(builder: (context) {
+                                        final dpr = MediaQuery.of(context).devicePixelRatio;
+                                        return CachedNetworkImage(
+                                          imageUrl: widget.logoUrl!,
                                           width: widget.width * 0.65,
                                           height: widget.height * 0.35,
-                                          color: Colors.white.withOpacity(0.04),
-                                        ),
-                                        errorWidget: (_, __, ___) =>
-                                            const SizedBox.shrink(),
-                                      ),
+                                          fit: BoxFit.contain,
+                                          alignment: Alignment.bottomLeft,
+                                          filterQuality: FilterQuality.medium,
+                                          memCacheWidth: (widget.width * 0.65 * dpr)
+                                              .round()
+                                              .clamp(320, 1280),
+                                          fadeInDuration:
+                                              const Duration(milliseconds: 150),
+                                          placeholder: (context, url) => Container(
+                                            width: widget.width * 0.65,
+                                            height: widget.height * 0.35,
+                                            color: Colors.white.withOpacity(0.04),
+                                          ),
+                                          errorWidget: (_, __, ___) =>
+                                              const SizedBox.shrink(),
+                                        );
+                                      }),
                                     ),
                                   )
                                 else

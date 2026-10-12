@@ -141,12 +141,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void _onSearchSubmitted(String value) {
     _debounce?.cancel();
     final query = value.trim();
+    // unfocus ANTES de cualquier setState: si el rebuild toca al TextField
+    // con foco y conexión de input activa, Android detecta un cambio en la
+    // composing region y reinicia el IME (cierra y reabre el teclado).
+    _focusNode.unfocus();
     if (query.isNotEmpty) {
       setState(() => _currentQuery = query);
       ref.read(searchHistoryProvider.notifier).addQuery(query);
     }
-    _focusNode.unfocus();
-    _blurFocusNode.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_firstResultFocusNode.canRequestFocus) {
+        _firstResultFocusNode.requestFocus();
+      }
+    });
   }
 
   void _clearSearch() {
@@ -236,7 +244,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         textAlign: TextAlign.left,
                         textAlignVertical: TextAlignVertical.center,
                         style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-                        textCapitalization: TextCapitalization.sentences,
                         inputFormatters: [CapitalizeFirstLetterFormatter()],
                         decoration: InputDecoration(
                           hintText: 'Busca una serie, película o episodio',

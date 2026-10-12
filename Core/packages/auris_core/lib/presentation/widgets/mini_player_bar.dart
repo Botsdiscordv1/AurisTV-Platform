@@ -397,7 +397,17 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                                     fill: Colors.black,
                                     controls: NoVideoControls,
                                   )
-                                : Image.network(item.posterUrl, fit: BoxFit.cover),
+                                : Image.network(
+                                    item.posterUrl,
+                                    fit: BoxFit.cover,
+                                    cacheWidth: (MediaQuery.of(context)
+                                                .size
+                                                .width *
+                                            MediaQuery.of(context)
+                                                .devicePixelRatio)
+                                        .round()
+                                        .clamp(320, 1280),
+                                  ),
                           ),
 
                           // CAPA TAP-TOGGLE (solo controles móviles): en desktop el
@@ -438,7 +448,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: AurisIcon(AurisIcons.close,
+                                        icon: AurisIcon(AurisIcons.closeFilled,
                                             color: Colors.white, size: 28),
                                         onPressed: () => ref
                                             .read(activePlayerProvider.notifier)
@@ -552,7 +562,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                   top: 10, right: 10,
                   child: GestureDetector(
                     onTap: () => ref.read(activePlayerProvider.notifier).stop(),
-                    child: AurisIcon(AurisIcons.close, color: Colors.white, size: 26),
+                    child: AurisIcon(AurisIcons.closeFilled, color: Colors.white, size: 26),
                   ),
                 ),
                 
@@ -566,7 +576,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                       builder: (context, snapshot) {
                         final playing = snapshot.data ?? false;
                         return AurisIcon(
-                          playing ? AurisIcons.pause : AurisIcons.play,
+                          playing ? AurisIcons.pauseFilled : AurisIcons.playFilled,
                           color: Colors.white,
                           size: 64,
                         );
@@ -603,7 +613,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
               child: IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: AurisIcon(AurisIcons.close, color: Colors.white, size: 20),
+                icon: AurisIcon(AurisIcons.closeFilled, color: Colors.white, size: 20),
                 onPressed: () => ref.read(activePlayerProvider.notifier).stop(),
               ),
             ),
@@ -618,7 +628,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                     icon: AurisIcon(
-                      playing ? AurisIcons.pause : AurisIcons.play,
+                      playing ? AurisIcons.pauseFilled : AurisIcons.playFilled,
                       color: Colors.white.withOpacity(0.9),
                       size: 20,
                     ),
@@ -1030,7 +1040,10 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
                 image: (ep.thumbnail != null && ep.thumbnail!.isNotEmpty) 
-                  ? DecorationImage(image: NetworkImage(ep.thumbnail!), fit: BoxFit.cover)
+                  ? DecorationImage(
+                      image: ResizeImage(NetworkImage(ep.thumbnail!), width: 240),
+                      fit: BoxFit.cover,
+                    )
                   : null,
                 color: Colors.white10,
               ),

@@ -14,6 +14,10 @@ import 'features/remote_control/data/models/remote_device.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final imageCache = PaintingBinding.instance.imageCache;
+  imageCache.maximumSizeBytes = 64 << 20;
+  imageCache.maximumSize = 500;
+
   // Senior TV Optimization: Forzamos el modo inmersivo total para televisores.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   SystemChrome.setPreferredOrientations([

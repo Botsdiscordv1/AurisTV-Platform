@@ -98,7 +98,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return _allTracks[i].quality;
   }
 
-  StreamSubscription<Tracks>? _tracksSubscription;
   WebViewController? _webViewController;
   bool _hasInitialized = false;
 
@@ -366,11 +365,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_player == null || !mounted) return;
     
     final now = DateTime.now().millisecondsSinceEpoch;
-    // Throttling: solo cada 3 segundos para comandos fluidos pero eficientes
-    // EXCEPCIÓN: Si los tracks acaban de cargar, forzamos reporte.
-    final bool tracksLoaded = _allTracks.isNotEmpty;
-    
-    if (now - _lastRemoteUpdateMs < 3000 && !tracksLoaded) return;
+    if (now - _lastRemoteUpdateMs < 3000) return;
     _lastRemoteUpdateMs = now;
 
     ref.read(remoteControlProvider.notifier).updateStatus(
@@ -1259,22 +1254,59 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final epNum = ep.number;
     if (epNum.toString() == _activeEpisode) return;
 
-    final String resolvedEpisodeUrl = ep.url.isNotEmpty
-        ? ep.url
-        : buildEpisodeUrl(_currentSourceUrl, _currentSource ?? '', epNum);
-
+    // Senior Autoplay Fix: Parar el player actual INMEDIATAMENTE para
+    // que no se siga escuchando el episodio anterior durante la carga del nuevo.
     _player?.stop();
+    if (_webViewController != null) {
+      _webViewController = null;
+    }
 
-    final String newPath = '/player/${widget.contentId}';
-    final queryParameters = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
-    queryParameters['episode'] = epNum.toString();
-    queryParameters['url'] = resolvedEpisodeUrl;
-    queryParameters['skipResume'] = '1';
+    final sources = ref.read(activeContentSourcesProvider);
+    // Match tolerante + fallback a la primera fuente: si el nombre no matchea,
+    // reusar la URL actual re-extraería el episodio ANTERIOR (reiniciado).
+    final baseSource = findSourceByName(sources, _currentSource) ??
+        (sources.isNotEmpty ? sources.first : null);
+
+    // Senior Navigation Fix: Calcular la URL del episodio destino ANTES de
+    // recargar. buildEpisodeUrl espera la URL BASE de la serie (baseSource.url),
+    // no la URL del episodio actual.
+    final String targetSourceUrl = baseSource != null
+        ? buildEpisodeUrl(baseSource.url, baseSource.source, epNum)
+        : (ep.url.isNotEmpty ? ep.url : _currentSourceUrl);
+
+    // Limpiar cualquier preload de autoplay apuntando a otro destino.
+    ref.read(playerPreloadControllerProvider).clearPreload();
+    _autoplayTimer?.cancel();
 
     ref.invalidate(extractProvider);
 
-    setState(() => _activeOverlay = PlayerOverlay.none);
-    context.replace(Uri(path: newPath, queryParameters: queryParameters).toString());
+    setState(() {
+      _activeOverlay = PlayerOverlay.none;
+      _hasInitialized = false;
+      _currentEpisode = epNum.toString();
+      _currentSourceUrl = targetSourceUrl;
+      _isStabilizing = true;
+      _skipResumeOnNextInit = true;
+      _resumePosition = 0;
+      _isAutoplayResume = false;
+      _hasResetPosition = false;
+      _showNextNotifier.value = false;
+      _autoplayCountdown = -1;
+    });
+
+    if (baseSource != null && baseSource.source == 'Aniyae') {
+      _resolveEpisodeUrl(baseSource, epNum);
+    }
+
+    // Senior Fix (Autoplay): NO usamos context.replace. GoRouter usa la URI como
+    // page key, así que cambiar solo la query recreaba el State del PlayerScreen:
+    // el State nuevo creaba un 2º Player mientras el dispose del viejo hacía
+    // stop()+dispose() del 1º. Los dos players peleaban por el surface/GL de
+    // Android y el nuevo quedaba en pausa (cargaba duration pero no reproducía).
+    // Recargamos in-place: el setState de arriba pone _hasInitialized=false y
+    // cambia _currentSourceUrl, el extractProvider re-extrae y su rama data
+    // llama _initPlayer, que REUTILIZA el _player actual (if (_player == null)),
+    // igual que _switchTrack/_switchSource — así nunca hay dos players.
   }
 
   Widget _buildEpisodesSelectorContent({bool isSidebar = false}) {
@@ -2418,10 +2450,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('cache', 'yes');
         platform.setProperty('cache-on-disk', 'no');
         
-        // Colchón de RAM profundo (512MB para soportar saltos adelante/atrás sin redescarga)
-        platform.setProperty('demuxer-max-bytes', '536870912');
-        platform.setProperty('demuxer-max-back-bytes', '134217728'); // 128MB de caché hacia atrás
-        platform.setProperty('demuxer-readahead-secs', '180'); // 3 minutos de lectura anticipada
+        platform.setProperty('demuxer-max-bytes', '134217728');
+        platform.setProperty('demuxer-max-back-bytes', '33554432');
+        platform.setProperty('demuxer-readahead-secs', '30');
         
         platform.setProperty('video-sync', 'display-resample');
         platform.setProperty('mc', '0.1');
@@ -2438,7 +2469,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('stream-buffer-size', '16MiB');
         
         platform.setProperty('vd-lavc-threads', '4');
-        platform.setProperty('hwdec', 'no'); // Senior Fix: Software decoding para evitar frames rotos y parpadeos
+        platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: HW con fallback seguro (estilo YouTube); si falla, mpv cae a SW
         platform.setProperty('tls-verify', 'no');
         
         // Eliminamos agresividad en fflags que causaba frames rotos
@@ -2457,17 +2488,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // --- FLUJO SEQUENCIAL DE ALTA ESTABILIDAD (SOLO NATIVO) ---
     if (!kIsWeb) {
-      debugPrint('[player] 1. STOP & CLEAN');
-      await player.stop();
-      
-      debugPrint('[player] 2. OPEN NEW SOURCE (play: false)');
-      // Senior Fix: Para MP4 convencionales, forzar recarga total del demuxer
+      // Senior Fix: NO llamamos player.stop() antes de open(). stop() destruye
+      // el contexto de vídeo (vo/EGL) y open() no logra recrearlo, provocando
+      // "Failed initializing any suitable GPU context" y rompiendo el seek/play
+      // en el cambio de episodio. open() gestiona la transición internamente
+      // reutilizando la salida de vídeo.
+      //
+      // Senior Fix: Si NO hay que reanudar (video nuevo desde 0) abrimos con
+      // play: true para que arranque directo. Abrir con play: false y luego
+      // llamar play() dejaba el episodio en pausa en HLS nativo.
+      final bool needsResumeSeek = _resumePosition > 3000;
+      debugPrint('[player] 2. OPEN NEW SOURCE (play: ${!needsResumeSeek})');
       await player.open(
         Media(
           videoUrl,
           httpHeaders: finalHeaders,
         ), 
-        play: false
+        play: !needsResumeSeek
       );
       
       debugPrint('[player] 3. WAIT UNTIL PARSED (Polling duration)');
@@ -2477,7 +2514,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         timeout++;
       }
       
-      if (_resumePosition > 3000) {
+      if (needsResumeSeek) {
         debugPrint('[player] 4. RESUME SEEK to $_resumePosition (Duration: ${player.state.duration})');
         // Senior Fix: Seek absoluto forzado después de que el demuxer está listo.
         // Si mpv lo pierde, _resumeSeekWhenReady (tras el play) verifica y reintenta.
@@ -2485,15 +2522,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // Senior: Retardo mayor para estabilización de hardware tras fallo de codec
         await Future.delayed(const Duration(milliseconds: 1200));
       } else {
-        debugPrint('[player] 4. NEW VIDEO (Start from 0)');
-        // Garantía 0:00 (1/2): el seek puede fallar en silencio con el
-        // demuxer frío (visto en logs como command-error). Verificar +
-        // reintentar acotado antes del play.
-        for (int i = 0; i < 3; i++) {
-          await player.seek(Duration.zero);
-          await Future.delayed(const Duration(milliseconds: 300));
-          if (player.state.position.inMilliseconds <= 1500) break;
-        }
+        debugPrint('[player] 4. NEW VIDEO (Start from 0, play: true)');
+        // Senior Fix: Un stream recién abierto ya arranca en 0. No hacemos
+        // seek(Duration.zero): mientras el vo aún inicializa, ese seek falla
+        // ("error running command _command(seek, 0.0000, absolute)") y rompe
+        // la reproducción en el cambio de episodio.
         _watchZeroStart(player, _resumeSeekGen);
         // Ocultar video hasta verificar primer frame sano (ver campo).
         if (mounted) {
@@ -2859,6 +2892,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _indicatorTimer?.cancel();
     _historySaveTimer?.cancel();
     _bufferingDebounceTimer?.cancel();
+    _volumeExitTimer?.cancel();
+    _centerIndicatorTimer?.cancel();
+    _skipVisualTimer?.cancel();
     _volumeSubscription?.cancel();
     _volumeControlChannel.setMethodCallHandler(null);
     
@@ -2874,6 +2910,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _logSubscription?.cancel();
     _playingSubscription?.cancel();
     _ytController?.close();
+    try {
+      _webViewController?.loadRequest(Uri.parse('about:blank'));
+    } catch (_) {}
+    _webViewController = null;
 
     final ms = _player?.state.position.inMilliseconds ?? 0;
     final duration = _player?.state.duration.inMilliseconds ?? 0;

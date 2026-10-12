@@ -27,12 +27,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ValueNotifier<bool> _showTopBarNotifier = ValueNotifier<bool>(true);
   bool _isScrolled = false;
   double _lastOffset = 0;
+  bool _splashRemoved = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
     _checkForUpdate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) ref.read(homePrefetchProvider);
+      });
+    });
   }
 
   void _checkForUpdate() {
@@ -123,62 +129,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Push directo (sin post-frame): diferirlo dejaba la navegación colgada
     // si la app estaba idle (sin frames), y solo avanzaba al hacer scroll.
     if (context.mounted) context.push(uri, extra: item.toContentSeed());
-  }
-
-  List<Widget> _buildEditorialRows(
-    AsyncValue<List<EditorialRow>> editorials,
-    void Function(BuildContext, MediaItem, String) onTap,
-    String category, {
-    bool includeMovies = false,
-    String movieCategory = 'anime_movies',
-  }) {
-    return editorials.when(
-      data: (rows) {
-        final list = <Widget>[];
-        for (final row in rows) {
-          if (row.isMovie && !includeMovies) continue;
-          if (row.items.isEmpty) continue;
-          
-          // Senior Logic: Si estamos en inicio, no forzamos subcategorías de películas
-          // para que el ruteo sea 100% dinámico por MediaItem.
-          final targetCat = (category == 'inicio') ? 'inicio' : (row.isMovie ? movieCategory : category);
-
-          if (row.format == SectionPresentation.wide) {
-            list.add(SliverToBoxAdapter(
-              child: RepaintBoundary(
-                child: WideContentRow(
-                  title: row.title,
-                  subtitle: row.subtitle,
-                  items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
-                  verMas: row.verMas,
-                  onItemTap: (wideItem) => onTap(context, wideItem.originalItem as MediaItem, targetCat),
-                ),
-              ),
-            ));
-          } else {
-            list.add(SliverToBoxAdapter(
-              child: RepaintBoundary(
-                child: EditorialContentRow(
-                  title: row.title,
-                  subtitle: row.subtitle,
-                  items: row.items,
-                  badge: row.badge,
-                  verMas: row.verMas,
-                  onItemTap: (item) => onTap(context, item, targetCat),
-                ),
-              ),
-            ),);
-          }
-        }
-        return list;
-      },
-      loading: () => List.generate(3, (index) => const SliverToBoxAdapter(
-        child: const RowSkeleton(isWide: false),
-      )),
-      error: (err, _) => [
-        SliverToBoxAdapter(child: Center(child: Text('Error editorial: $err', style: const TextStyle(color: Colors.white24)))),
-      ],
-    );
   }
 
   Widget _buildSection(ComposedHomeSection section, double horizontalPadding) {
@@ -388,35 +338,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     
-    // Senior Performance: Disparamos la precarga de todas las categorías en segundo plano.
-    // Usamos un delay más largo para dar prioridad absoluta al HeroBanner y contenido inicial.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) ref.read(homePrefetchProvider);
-      });
-    });
-    
     // Providers de datos reales
     final layoutAsync = ref.watch(homeLayoutProvider);
     final heroBannerItemsAsync = ref.watch(heroBannerItemsProvider(currentCategory));
-    final trendingAsync = ref.watch(trendingListProvider(currentCategory));
-    final recentAsync = ref.watch(recentEpisodesProvider);
-    final movieTrendingAsync = ref.watch(trendingListProvider('películas'));
-    final animeMoviesAsync = ref.watch(animeMoviesProvider);
-    final editorialRowsAsync = ref.watch(editorialRowsProvider(currentCategory));
-
-    // Senior Logic: Una vez que el provider deja de estar en carga (ya sea éxito o error),
-    // mandamos la señal al index.html para desvanecer y eliminar el Splash Screen.
-    if (!editorialRowsAsync.isLoading) {
+    
+    if (!layoutAsync.isLoading && !_splashRemoved) {
+      _splashRemoved = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         WebUtils.removeSplashScreen();
       });
     }
-
-    // Datos con fallback automático a MockData para que el diseño NUNCA se rompa
-    final trendingItems = (trendingAsync.valueOrNull != null && trendingAsync.valueOrNull!.isNotEmpty)
-        ? trendingAsync.valueOrNull!
-        : MockData.anime;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D), // Senior Recomienda: Rich Black para evitar OLED Smearing
