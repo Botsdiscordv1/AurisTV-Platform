@@ -172,8 +172,6 @@ class _SkeletonBox extends StatelessWidget {
 
 // --- SUB-WIDGETS ---
 
-// _SeasonSelector removed - using SeasonSelector from auris_core
-
 class _ServerSelector extends ConsumerStatefulWidget {
   final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season;
   const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources, this.season});
@@ -1936,17 +1934,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           synopsis: _buildSynopsis(detailData),
           selectors: (!isMovieCategory && (displayTotalSeasons > 0 || currentSource != null)) ? Row(
             children: [
-              if (!isMovieCategory && displayTotalSeasons > 0)
-                SeasonSelector(
-                  data: SeasonSelectorData(
-                    currentSeason: currentSeason,
-                    totalSeasons: displayTotalSeasons > 0 ? displayTotalSeasons : 1,
-                    onSeasonSelected: (s) => ref.setSeason(detailParams, s),
-                    compact: true,
-                    totalEpisodes: episodesAsync.valueOrNull?.response?.total ?? _lastEpisodes?.response?.total,
-                  ),
-                ),
-              if (!isMovieCategory && displayTotalSeasons > 0 && currentSource != null) const SizedBox(width: 12),
               if (currentSource != null)
                 Expanded(
                   child: SourceChipsBar(
@@ -2667,7 +2654,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                       clipBehavior: Clip.none, // Senior Fix: Permite escalado sin recorte
                       padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
                       itemCount: widget.items.length,
-                      separatorBuilder: (_, __) => SizedBox(width: isMobile ? 8 : 24),
+                      separatorBuilder: (_, __) => SizedBox(width: isMobile ? 10 : 24),
                       itemBuilder: (context, index) {
                         final item = widget.items[index];
                         return SizedBox(

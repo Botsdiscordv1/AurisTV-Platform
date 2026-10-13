@@ -97,9 +97,12 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final isCompactDesktop = width >= 800 && width < 1100;
     
-    final double posterHeight = ResponsiveUtils.posterHeight(context);
-    final double cardWidth = ResponsiveUtils.posterWidth(context);
-    final double rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false); // Senior Fix: showInfo is false in Home
+    final double cardWidth = context.useMobileLayout
+        ? ResponsiveUtils.posterWidth(context)
+        : webPosterGridCellWidth(context);
+    final double posterHeight = (cardWidth * 1.5).roundToDouble();
+    const double posterFocusZoom = 1.10;
+    final double rowHeight = posterHeight * posterFocusZoom + 12;
 
     return Padding(
       padding: EdgeInsets.only(bottom: context.useMobileLayout ? 12 : 24), // Senior Fix: Ajustado para paridad con Wide
@@ -187,7 +190,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Zero padding
                       itemCount: widget.items.length,
-                      separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 24),
+                      separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 24),
                       itemBuilder: (context, index) {
                         final item = widget.items[index];
                         return Focus(
@@ -203,14 +206,17 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                           },
                           child: SizedBox(
                             width: cardWidth,
-                            child: FocusablePosterCard(
-                              key: ValueKey(item.id),
-                              title: item.title,
-                              posterUrl: item.posterUrl,
-                              rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
-                              subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : null, // Senior: Ocultar año
-                              showInfo: false,
-                              onTap: () => widget.onItemTap(item),
+                            height: rowHeight,
+                            child: Center(
+                              child: FocusablePosterCard(
+                                key: ValueKey(item.id),
+                                title: item.title,
+                                posterUrl: item.posterUrl,
+                                rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
+                                subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : null, // Senior: Ocultar año
+                                showInfo: false,
+                                onTap: () => widget.onItemTap(item),
+                              ),
                             ),
                           ),
                         );
@@ -241,8 +247,8 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                 if (!isMobile)
                   Positioned(
                     left: horizontalPadding - 25, 
-                    top: 10,
-                    bottom: 90,
+                    top: 0,
+                    bottom: 0,
                     child: AnimatedOpacity(
                       opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
                       duration: const Duration(milliseconds: 300),
@@ -264,8 +270,8 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                 if (!isMobile)
                   Positioned(
                     right: horizontalPadding - 25,
-                    top: 10,
-                    bottom: 90,
+                    top: 0,
+                    bottom: 0,
                     child: AnimatedOpacity(
                       opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
                       duration: const Duration(milliseconds: 300),

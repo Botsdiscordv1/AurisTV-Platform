@@ -511,20 +511,18 @@ class _SearchResultsGrid extends ConsumerWidget {
         if (results.isEmpty) return _buildNoResultsPlaceholder(context, query, onContentTap);
 
         final isMobile = ResponsiveUtils.isMobile(context);
-        final screenWidth = MediaQuery.sizeOf(context).width;
-
-        int crossAxisCount = isMobile ? 3 : (screenWidth / 180).round().clamp(5, 9);
+        final gridMetrics = webPosterGridMetrics(context);
 
         final notifier = ref.read(notifierProvider.notifier);
 
         return RepaintBoundary(
           child: GridView.builder(
             key: const ValueKey('results_grid'),
-            padding: EdgeInsets.fromLTRB(isMobile ? 16 : 24, 8, isMobile ? 16 : 24, 40),
+            padding: EdgeInsets.fromLTRB(gridMetrics.padding, 8, gridMetrics.padding, 40),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
+              crossAxisCount: gridMetrics.columns,
               childAspectRatio: isMobile ? 0.54 : 0.54,
-              crossAxisSpacing: isMobile ? 12 : 20,
+              crossAxisSpacing: gridMetrics.spacing,
               mainAxisSpacing: isMobile ? 12 : 16,
             ),
             // "Ver más": footer con spinner o disparo de la siguiente página.

@@ -114,14 +114,16 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
 
     final isMobile = context.useMobileLayout;
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final cardWidth = ResponsiveUtils.bannerWidth(context);
-    final cardHeight = ResponsiveUtils.bannerHeight(context);
+    final cardWidth = ResponsiveUtils.bannerWidth(context) * (isMobile ? 0.90 : 1.0);
+    const cardAspect = 16 / 9;
+    final cardHeight = (cardWidth / cardAspect).roundToDouble();
     
     // Senior Fix: Detectar si alguna tarjeta tiene subtítulo para ajustar la altura de la fila y ganar espacio vertical.
     final bool hasSubtitles = widget.items.any((item) => item.subtitle != null && item.subtitle!.isNotEmpty);
     // 2 líneas si algún item trae segunda línea ("Quedan X" bajo "T1:E7 . Título").
     final int subtitleLines = widget.items.any((item) => item.subtitle2 != null && item.subtitle2!.isNotEmpty) ? 2 : 1;
-    final rowHeight = ResponsiveUtils.bannerRowHeight(context, hasSubtitle: hasSubtitles, subtitleLines: subtitleLines);
+    final rowHeight = ResponsiveUtils.bannerRowHeight(context, hasSubtitle: hasSubtitles, subtitleLines: subtitleLines)
+        - (ResponsiveUtils.bannerHeight(context) - cardHeight);
 
     return Padding(
       padding: EdgeInsets.only(bottom: context.useMobileLayout ? 12 : 24), // Senior Fix: Ajustado para paridad con Poster
@@ -223,7 +225,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                           scrollDirection: Axis.horizontal,
                           padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px vertical
                           itemCount: widget.items.length,
-                          separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 24),
+                          separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 24),
                           itemBuilder: (context, index) {
                             final item = widget.items[index];
                             
@@ -239,6 +241,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                               badgeOverlay: item.badgeOverlay,
                               width: cardWidth,
                               height: cardHeight,
+                              aspectRatio: cardAspect,
                               onTap: () => widget.onItemTap(item),
                               onDelete: item.onDelete,
                             );

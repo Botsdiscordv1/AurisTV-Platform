@@ -274,7 +274,7 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
                   padding: const EdgeInsets.fromLTRB(4, 1, 4, 0),
                   child: Row(
                     children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 9),
+                      AurisIcon(AurisIcons.star, color: Colors.amber, size: 9),
                       const SizedBox(width: 4),
                       Text(
                         formatRating(widget.media.rating) ?? '0.0',

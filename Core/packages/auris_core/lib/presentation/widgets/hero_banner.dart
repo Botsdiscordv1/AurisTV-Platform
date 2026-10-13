@@ -815,15 +815,19 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                         ),
                         child: Builder(builder: (context) {
                           final mq = MediaQuery.of(context);
-                          return CachedNetworkImage(
-                            key: ValueKey('logo_mob_${item.id}'),
-                            imageUrl: item.logoUrl!,
-                            fit: BoxFit.contain,
-                            alignment: Alignment.bottomLeft,
-                            fadeInDuration: const Duration(milliseconds: 200),
-                            memCacheWidth: (mq.size.width * 0.7 * mq.devicePixelRatio)
-                                .round()
-                                .clamp(320, 1280),
+                          final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
+                          return LogoToneFilter(
+                            imageUrl: logoUrl,
+                            child: CachedNetworkImage(
+                              key: ValueKey('logo_mob_${item.id}'),
+                              imageUrl: logoUrl,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.bottomLeft,
+                              fadeInDuration: const Duration(milliseconds: 200),
+                              memCacheWidth: (mq.size.width * 0.7 * mq.devicePixelRatio)
+                                  .round()
+                                  .clamp(320, 1280),
+                            ),
                           );
                         }),
                       ),
@@ -1004,21 +1008,25 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             final dpr = MediaQuery.of(context).devicePixelRatio;
             // Senior Fix: En tablets reducimos el ancho para dejar aire a los lados
             final logoWidth = screenWidth * (isTablet ? 0.30 : (isIntermediate ? 0.35 : 0.38));
+            final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
             return SizedBox(
               height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
               width: logoWidth,
-              child: CachedNetworkImage(
-                key: ValueKey('logo_${item.id}'),
-                imageUrl: item.logoUrl!,
-                fit: BoxFit.contain,
-                alignment: Alignment.bottomLeft,
-                fadeInDuration: const Duration(milliseconds: 100),
-                memCacheWidth: (logoWidth * dpr).round().clamp(320, 1280),
-                placeholder: (context, url) => SizedBox(
-                  height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
-                  width: logoWidth,
+              child: LogoToneFilter(
+                imageUrl: logoUrl,
+                child: CachedNetworkImage(
+                  key: ValueKey('logo_${item.id}'),
+                  imageUrl: logoUrl,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomLeft,
+                  fadeInDuration: const Duration(milliseconds: 100),
+                  memCacheWidth: (logoWidth * dpr).round().clamp(320, 1280),
+                  placeholder: (context, url) => SizedBox(
+                    height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
+                    width: logoWidth,
+                  ),
+                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
                 ),
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
               ),
             );
           })

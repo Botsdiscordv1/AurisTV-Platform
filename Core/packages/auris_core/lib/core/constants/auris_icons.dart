@@ -108,7 +108,7 @@ class AurisIcons {
   static String get add => reiconSvg(Reicon.outline.add);
   static String get addCircleOutline => reiconSvg(Reicon.outline.addCircle);
   static String get addCircleFilled => reiconSvg(Reicon.filled.addCircle);
-  static String get star => reiconSvg(Reicon.outline.star);
+  static String get star => reiconSvg(Reicon.filled.star);
   static String get bell => reiconSvg(Reicon.outline.bell);
   static String get settings => reiconSvg(Reicon.outline.setting2);
   static String get setting => reiconSvg(Reicon.outline.setting2);

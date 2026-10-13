@@ -245,6 +245,7 @@ class _RemoteMiniPlayer extends ConsumerWidget {
                     width: 48,
                     height: 48,
                     fit: BoxFit.cover,
+                    memCacheWidth: (48 * MediaQuery.of(context).devicePixelRatio).round().clamp(64, 512),
                   ),
                 ),
               ),

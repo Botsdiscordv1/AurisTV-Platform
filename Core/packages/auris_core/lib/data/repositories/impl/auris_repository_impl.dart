@@ -486,7 +486,8 @@ class AurisRepositoryImpl implements AurisRepository {
     if (malId != null) params['malId'] = malId;
     if (metadataTitle != null) params['metadataTitle'] = metadataTitle;
     if (year != null) params['year'] = year;
-    if (season != null) params['season'] = season;
+    final int? detailSeason = seasonForRequest(season, url);
+    if (detailSeason != null) params['season'] = detailSeason;
     if (kind != null) params['kind'] = kind;
     if (type != null) params['type'] = type;
     if (imgSize != null) params['img'] = imgSize;
@@ -1024,9 +1025,10 @@ class AurisRepositoryImpl implements AurisRepository {
     if (source == 'YouTube' || url.contains('youtube.com') || url.contains('youtu.be')) {
       return EpisodesResponse(episodes: const [], source: source, url: url, slug: '', total: 0);
     }
-    // Senior Fix: Si el cliente no pasó season, intentamos inferirlo de la URL 
-    // antes de enviar la petición al servidor para ayudar al IdentityResolver.
-    final int? effectiveSeason = season ?? extractSeason(url);
+    // Solo se envía la temporada si aporta información (ver seasonForRequest):
+    // en URLs sin temporada (corts "-part-2", slugs genéricos) la página ya es
+    // la pedida y mandar season hace que el server la re-resuelva.
+    final int? effectiveSeason = seasonForRequest(season, url);
     
     String effectiveUrl = url;
     if (effectiveSeason != null && effectiveSeason <= 1) {

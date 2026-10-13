@@ -171,13 +171,19 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   Widget _buildStandardRow(bool isMobile, double horizontalPadding) {
+    final double cardWidth = context.useMobileLayout
+        ? ResponsiveUtils.posterWidth(context)
+        : webPosterGridCellWidth(context);
+    final double posterHeight = (cardWidth * 1.5).roundToDouble();
+    const double posterFocusZoom = 1.10;
+    final double rowHeight = posterHeight * posterFocusZoom + 12;
     return MouseRegion(
       onEnter: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = true); }); },
       onExit: (_) { if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) setState(() => _isHovered = false); }); },
       child: Stack(
         children: [
           SizedBox(
-            height: ResponsiveUtils.rowHeight(context, hasInfo: false),
+            height: rowHeight,
             child: _buildFadedWrapper(
               horizontalPadding: horizontalPadding,
               child: ListView.separated(
@@ -187,19 +193,22 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px
                 itemCount: widget.items.length,
-                separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 18),
+                separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 18),
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
                   return SizedBox(
-                    width: ResponsiveUtils.posterWidth(context),
-                    child: FocusablePosterCard(
-                      key: ValueKey(item.id),
-                      title: item.title,
-                      posterUrl: item.posterUrl,
-                      rating: formatRating(item.rating),
-                      subtitle: null, // Senior Fix: Ocultar año en editorial
-                      showInfo: false,
-                      onTap: () => widget.onItemTap(item),
+                    width: cardWidth,
+                    height: rowHeight,
+                    child: Center(
+                      child: FocusablePosterCard(
+                        key: ValueKey(item.id),
+                        title: item.title,
+                        posterUrl: item.posterUrl,
+                        rating: formatRating(item.rating),
+                        subtitle: null, // Senior Fix: Ocultar año en editorial
+                        showInfo: false,
+                        onTap: () => widget.onItemTap(item),
+                      ),
                     ),
                   );
                 },
@@ -213,7 +222,12 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   Widget _buildMythicalTopRow(bool isMobile, double horizontalPadding) {
-    final double posterHeight = ResponsiveUtils.posterHeight(context);
+    final double cardWidth = context.useMobileLayout
+        ? ResponsiveUtils.posterWidth(context)
+        : webPosterGridCellWidth(context);
+    final double posterHeight = (cardWidth * 1.5).roundToDouble();
+    const double posterFocusZoom = 1.10;
+    final double rowHeight = posterHeight * posterFocusZoom + 12;
     final double titleAreaHeight = 0; // Senior Fix: Eliminado offset ya que no hay títulos debajo
     
     return Padding(
@@ -289,7 +303,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
             child: Stack(
               children: [
                 SizedBox(
-                  height: ResponsiveUtils.rowHeight(context, hasInfo: false), // Senior: Unificado con posters estándar
+                  height: rowHeight,
                   child: _buildFadedWrapper(
                     horizontalPadding: horizontalPadding,
                     child: ListView.builder(
@@ -301,13 +315,21 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                       itemCount: widget.items.length.clamp(0, 10),
                       itemBuilder: (context, index) {
                         final item = widget.items[index];
-                        return TopItem(
-                          key: ValueKey('top_${item.id}'),
-                          index: index,
-                          item: item,
-                          height: posterHeight,
-                          textOffset: 0,
-                          onTap: () => widget.onItemTap(item),
+                        return SizedBox(
+                          height: rowHeight,
+                          child: Center(
+                            child: SizedBox(
+                              height: posterHeight,
+                              child: TopItem(
+                                key: ValueKey('top_${item.id}'),
+                                index: index,
+                                item: item,
+                                height: posterHeight,
+                                textOffset: 0,
+                                onTap: () => widget.onItemTap(item),
+                              ),
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -331,7 +353,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     return [
       Positioned(
         left: horizontalPadding - 25,
-        top: 0, bottom: 90, // Senior Fix: Centrado sobre el póster, ignorando el área de texto
+        top: 0, bottom: 0, // Senior Fix: Centrado sobre el póster
         child: AnimatedOpacity(
           opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 300),
@@ -349,7 +371,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       ),
       Positioned(
         right: horizontalPadding - 25,
-        top: 0, bottom: 90, // Senior Fix: Centrado sobre el póster
+        top: 0, bottom: 0, // Senior Fix: Centrado sobre el póster
         child: AnimatedOpacity(
           opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 300),

@@ -98,14 +98,20 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
 
     final isMobile = context.isMobile;
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final cardWidth = ResponsiveUtils.bannerWidth(context);
-    final cardHeight = ResponsiveUtils.bannerHeight(context);
+    final cardScale = context.useMobileLayout ? 0.90 : 1.13;
+    final cardWidth = ResponsiveUtils.bannerWidth(context) * cardScale;
+    const cardAspect = 16 / 9;
+    final cardHeight = (cardWidth / cardAspect).roundToDouble();
+    const double bannerFocusZoom = 1.06;
+    final double focusAllowance = cardHeight * (bannerFocusZoom - 1);
 
     // Senior Fix: Detectar si alguna tarjeta tiene subtítulo para ajustar la altura de la fila y ganar espacio vertical.
     final bool hasSubtitles = widget.items.any((item) => item.subtitle != null && item.subtitle!.isNotEmpty);
     // 2 líneas si algún item trae segunda línea ("Quedan X" bajo "T1:E7 . Título").
     final int subtitleLines = widget.items.any((item) => item.subtitle2 != null && item.subtitle2!.isNotEmpty) ? 2 : 1;
-    final rowHeight = ResponsiveUtils.bannerRowHeight(context, hasSubtitle: hasSubtitles, subtitleLines: subtitleLines);
+    final rowHeight = ResponsiveUtils.bannerRowHeight(context, hasSubtitle: hasSubtitles, subtitleLines: subtitleLines)
+        - (ResponsiveUtils.bannerHeight(context) - cardHeight)
+        + focusAllowance;
 
     return Padding(
       padding: EdgeInsets.only(bottom: context.useMobileLayout ? 12 : 24), // Senior Fix: Ajustado para paridad con Poster
@@ -202,24 +208,32 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px vertical
                       itemCount: widget.items.length,
-                      separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 24),
+                      separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 24),
                       itemBuilder: (context, index) {
                         final item = widget.items[index];
-                        return FocusableWideCard(
-                          key: ValueKey('wide_${item.id}_${item.title}'),
-                          title: item.title,
-                          imageUrl: item.imageUrl,
-                          logoUrl: item.logoUrl,
-                          progress: item.progress,
-                          subtitle: item.subtitle,
-                          subtitle2: item.subtitle2,
-                          favoriteItem: item.favoriteItem,
-                          rating: item.rating,
-                          badgeOverlay: item.badgeOverlay,
+                        return SizedBox(
                           width: cardWidth,
-                          height: cardHeight,
-                          onTap: () => widget.onItemTap(item),
-                          onDelete: item.onDelete,
+                          height: rowHeight,
+                          child: Padding(
+                            padding: EdgeInsets.only(top: focusAllowance),
+                            child: FocusableWideCard(
+                              key: ValueKey('wide_${item.id}_${item.title}'),
+                              title: item.title,
+                              imageUrl: item.imageUrl,
+                              logoUrl: item.logoUrl,
+                              progress: item.progress,
+                              subtitle: item.subtitle,
+                              subtitle2: item.subtitle2,
+                              favoriteItem: item.favoriteItem,
+                              rating: item.rating,
+                              badgeOverlay: item.badgeOverlay,
+                              width: cardWidth,
+                              height: cardHeight,
+                              aspectRatio: cardAspect,
+                              onTap: () => widget.onItemTap(item),
+                              onDelete: item.onDelete,
+                            ),
+                          ),
                         );
                       },
                     );
@@ -246,8 +260,8 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                 if (!isMobile) ...[
                   Positioned(
                     left: horizontalPadding - 25, 
-                    top: 10, 
-                    bottom: 105, // Senior Fix: Ajustado para centrar en 240px de imagen
+                    top: focusAllowance,
+                    bottom: rowHeight - focusAllowance - cardHeight,
                     child: AnimatedOpacity(
                       opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
                       duration: const Duration(milliseconds: 300),
@@ -265,8 +279,8 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                   ),
                   Positioned(
                     right: horizontalPadding - 25, 
-                    top: 10, 
-                    bottom: 105, // Senior Fix: Ajustado para centrar en 240px de imagen
+                    top: focusAllowance,
+                    bottom: rowHeight - focusAllowance - cardHeight,
                     child: AnimatedOpacity(
                       opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
                       duration: const Duration(milliseconds: 300),

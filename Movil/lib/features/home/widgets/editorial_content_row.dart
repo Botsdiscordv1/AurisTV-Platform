@@ -185,7 +185,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                 clipBehavior: Clip.none, // Senior: Asegura visibilidad de sombras sin padding
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px
                 itemCount: widget.items.length,
-                separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 18),
+                separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 18),
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
                   return SizedBox(
