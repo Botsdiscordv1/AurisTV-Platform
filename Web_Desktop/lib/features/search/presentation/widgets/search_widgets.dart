@@ -422,11 +422,12 @@ class _StandardDiscoveryCardState extends State<_StandardDiscoveryCard> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: ApiEndpoints.proxyImage(widget.item.thumbnail, fallbackUrl: widget.item.tmdbThumbnail),
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        filterQuality: FilterQuality.medium,
+                        child: CachedNetworkImage(
+                          imageUrl: ApiEndpoints.proxyImage(widget.item.thumbnail, fallbackUrl: widget.item.tmdbThumbnail),
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          memCacheWidth: (widget.width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
+                          filterQuality: FilterQuality.medium,
                         placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
                         errorWidget: (context, url, error) => Container(
                           color: Colors.white10,
@@ -735,10 +736,11 @@ class _TrendingPosterCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(4),
-                  child: CachedNetworkImage(
-                    imageUrl: ApiEndpoints.proxyImage(item.thumbnail),
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.low, // Senior: Rendimiento Web
+                    child: CachedNetworkImage(
+                      imageUrl: ApiEndpoints.proxyImage(item.thumbnail),
+                      fit: BoxFit.cover,
+                      memCacheWidth: (posterWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
+                      filterQuality: FilterQuality.low, // Senior: Rendimiento Web
                     placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.05)),
                     errorWidget: (context, url, error) => Container(
                       color: Colors.white10,

@@ -70,7 +70,14 @@ class _UnifiedContentInputNotifier extends StateNotifier<_UnifiedContentInput> {
 
 final _inputProvider = StateNotifierProvider.autoDispose
     .family<_UnifiedContentInputNotifier, _UnifiedContentInput, UnifiedDetailParams>((ref, params) {
-  final initialSeason = params.season ?? extractSeason(params.url) ?? extractSeason(params.title) ?? 1;
+  // La temporada solo se infiere de la URL (es lo que el server respeta). El
+  // título NO manda: "Part 2"/"Act II" en el nombre hacía pedir una temporada
+  // que el server re-resolvía sustituyendo la URL del cour por la temporada
+  // completa. En corts (URL "-part-N") tampoco se infiere del título.
+  final initialSeason = params.season ??
+      seasonFromUrl(params.url) ??
+      (urlIsCourPage(params.url) ? null : extractSeason(params.title)) ??
+      1;
   String? seedKey;
   if (params.initialSources?.isNotEmpty ?? false) {
     seedKey = '${params.initialSources!.first.source}|${params.initialSources!.first.url}';
@@ -209,12 +216,10 @@ final unifiedContentProvider = Provider.autoDispose
       url: selected.url,
       source: selected.source,
       category: params.category,
-      title: input.season > 1 
-          ? seasonTitleFor(stripSeasonSuffix(params.title), input.season) 
-          : stripSeasonSuffix(params.title),
-      metadataTitle: params.metadataTitle != null 
-          ? (input.season > 1 ? seasonTitleFor(stripSeasonSuffix(params.metadataTitle!), input.season) : stripSeasonSuffix(params.metadataTitle!))
-          : stripSeasonSuffix(params.title),
+      // Título tal cual (sin stripSeasonSuffix/seasonTitleFor): el server
+      // normaliza su propio titleKey y así el nombre real viaja entero.
+      title: params.title,
+      metadataTitle: params.metadataTitle ?? params.title,
       season: input.season,
       year: params.year,
       tmdbId: detailData?.anime?.tmdbId ?? int.tryParse(detailData?.movie?.tmdbId ?? ''),
@@ -482,17 +487,13 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
   }
   /// Clave de [_seriesMetadataCache] reconstruida desde fuera (p. ej. el
   /// player). Replica EXACTO la construcción de títulos de ProgressiveParams
-  /// (stripSeasonSuffix + seasonTitleFor en S>1) y la preferencia de
-  /// _getSeriesKey (metadataTitle sobre title). Solo lectura: no altera el
+  /// (título tal cual, sin stripSeasonSuffix/seasonTitleFor) y la preferencia
+  /// de _getSeriesKey (metadataTitle sobre title). Solo lectura: no altera el
   /// comportamiento de la ficha.
   static String seriesKeyFor({String? title, String? metadataTitle, required int season}) {
-    final t0 = stripSeasonSuffix(title ?? '');
-    final m0 = (metadataTitle ?? '').trim().isNotEmpty
-        ? stripSeasonSuffix(metadataTitle!)
-        : t0;
-    final t = season > 1 ? seasonTitleFor(t0, season) : t0;
-    final m = season > 1 ? seasonTitleFor(m0, season) : m0;
-    final norm = (m.isNotEmpty ? m : t).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final t0 = (title ?? '').trim();
+    final m0 = (metadataTitle ?? '').trim().isNotEmpty ? metadataTitle!.trim() : t0;
+    final norm = (m0.isNotEmpty ? m0 : t0).toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     return '$norm:s$season';
   }
 

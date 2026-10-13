@@ -193,7 +193,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                           scrollDirection: Axis.horizontal,
                           padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Zero padding
                           itemCount: widget.items.length,
-                          separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 24),
+                          separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 24),
                           itemBuilder: (context, index) {
                             final item = widget.items[index];
                             return Focus(

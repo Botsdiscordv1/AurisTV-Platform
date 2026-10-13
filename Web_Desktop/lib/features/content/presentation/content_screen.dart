@@ -85,8 +85,6 @@ class _SkeletonBox extends StatelessWidget {
 
 
 
-// _SeasonSelector removed - using SeasonSelector from auris_core
-
 class _ServerSelector extends ConsumerStatefulWidget {
   final SearchResult currentSource; final List<SearchResult> sources; final Function(int) onSourceSelected; final bool compact; final Set<String>? unavailableSources; final int? season; final double? width; final double? height; final double? fontSize;
   const _ServerSelector({required this.currentSource, required this.sources, required this.onSourceSelected, this.compact = false, this.unavailableSources, this.season, this.width, this.height, this.fontSize});
@@ -276,11 +274,12 @@ class _CastCardState extends ConsumerState<_CastCard> {
                     ],
                   ),
                   child: ClipOval(
-                    child: CachedNetworkImage(
+                    child: LayoutBuilder(builder: (context, constraints) => CachedNetworkImage(
                       imageUrl: widget.person.profile ?? '',
                       fit: BoxFit.cover,
                       // Senior Fix: Ajuste de alineamiento vertical para centrar mejor los rostros
                       alignment: const Alignment(0, -0.35),
+                      memCacheWidth: (constraints.maxWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
                       placeholder: (context, url) => Container(
                         decoration: const BoxDecoration(
                           color: Colors.white10,
@@ -294,7 +293,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
                         ),
                         child: AurisIcon(AurisIcons.user, color: Colors.white24, size: 40),
                       ),
-                    ),
+                    )),
                   ),
                 ),
               ),
@@ -542,15 +541,20 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                                 children: [
                                   AspectRatio(
                                     aspectRatio: 16 / 9,
-                                    child: CachedNetworkImage(
-                                      imageUrl: widget.imageUrl,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (_, __, ___) => CachedNetworkImage(
-                                        imageUrl: widget.fallbackImageUrl,
+                                    child: LayoutBuilder(builder: (context, constraints) {
+                                      final memCache = (constraints.maxWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048);
+                                      return CachedNetworkImage(
+                                        imageUrl: widget.imageUrl,
                                         fit: BoxFit.cover,
-                                        errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
-                                      ),
-                                    ),
+                                        memCacheWidth: memCache,
+                                        errorWidget: (_, __, ___) => CachedNetworkImage(
+                                          imageUrl: widget.fallbackImageUrl,
+                                          fit: BoxFit.cover,
+                                          memCacheWidth: memCache,
+                                          errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
+                                        ),
+                                      );
+                                    }),
                                   ),
                                   if (widget.progress != null && widget.progress! > 0)
                                     Positioned(
@@ -738,9 +742,11 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                             child: CachedNetworkImage(
                               imageUrl: widget.imageUrl,
                               fit: BoxFit.cover,
+                              memCacheWidth: (ResponsiveUtils.sp(context, 160) * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
                               errorWidget: (_, __, ___) => CachedNetworkImage(
                                 imageUrl: widget.fallbackImageUrl,
                                 fit: BoxFit.cover,
+                                memCacheWidth: (ResponsiveUtils.sp(context, 160) * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
                                 errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
                               ),
                             ),
@@ -859,15 +865,20 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                       borderRadius: BorderRadius.circular(8),
                       child: AspectRatio(
                         aspectRatio: 16 / 9,
-                        child: CachedNetworkImage(
-                          imageUrl: widget.imageUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => CachedNetworkImage(
-                            imageUrl: widget.fallbackImageUrl,
+                        child: LayoutBuilder(builder: (context, constraints) {
+                          final memCache = (constraints.maxWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048);
+                          return CachedNetworkImage(
+                            imageUrl: widget.imageUrl,
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
-                          ),
-                        ),
+                            memCacheWidth: memCache,
+                            errorWidget: (_, __, ___) => CachedNetworkImage(
+                              imageUrl: widget.fallbackImageUrl,
+                              fit: BoxFit.cover,
+                              memCacheWidth: memCache,
+                              errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
+                            ),
+                          );
+                        }),
                       ),
                     ),
                     if (widget.progress != null && widget.progress! > 0)
@@ -1043,7 +1054,12 @@ class _ThemeCardState extends State<_ThemeCard> {
                   scale: isSelected ? 1.15 : 1.0, 
                   duration: const Duration(milliseconds: 600),
                   curve: Curves.easeOutQuart,
-                  child: CachedNetworkImage(imageUrl: img!, fit: BoxFit.cover, errorWidget: (_, __, ___) => Container(color: Colors.white10)),
+                  child: LayoutBuilder(builder: (context, constraints) => CachedNetworkImage(
+                    imageUrl: img!,
+                    fit: BoxFit.cover,
+                    memCacheWidth: (constraints.maxWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
+                    errorWidget: (_, __, ___) => Container(color: Colors.white10),
+                  )),
                 ),
                 
                 // Gradiente Dinómico
@@ -1600,6 +1616,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
           child: CachedNetworkImage(
             imageUrl: platform.logo ?? '',
             fit: BoxFit.cover,
+            memCacheWidth: (size * MediaQuery.of(context).devicePixelRatio).round().clamp(64, 1024),
             errorWidget: (_, __, ___) => Center(
               child: Text(
                 platform.providerName.isNotEmpty ? platform.providerName.substring(0, 1).toUpperCase() : '?',
@@ -2122,7 +2139,7 @@ void _openPlayer(PlayerScreen player) {
           Row(
             children: [
               if (r > 0) ...[
-                const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
+                AurisIcon(AurisIcons.star, color: Colors.amber, size: 18),
                 const SizedBox(width: 4),
                 Text(formatRating(r) ?? 'N/A', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
                 const SizedBox(width: 12)
@@ -2248,7 +2265,7 @@ void _openPlayer(PlayerScreen player) {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.star_rounded, color: Color(0xFFFACC15), size: 22),
+                          AurisIcon(AurisIcons.star, color: const Color(0xFFFACC15), size: 22),
                           const SizedBox(width: 4),
                           Text(
                             formatRating(r) ?? 'N/A',
@@ -3343,18 +3360,6 @@ void _openPlayer(PlayerScreen player) {
         synopsis: _buildSynopsis(detailData, isCompact: !isMobile && width < 1200),
         selectors: (!isMovieCategory && (resolvedTotalSeasons > 0 || currentSource != null)) ? Row(
           children: [
-            if (!isMovieCategory && resolvedTotalSeasons > 0) ...[
-              SeasonSelector(
-                data: SeasonSelectorData(
-                  currentSeason: currentSeason,
-                  totalSeasons: resolvedTotalSeasons > 0 ? resolvedTotalSeasons : 1,
-                  onSeasonSelected: (s) => ref.setSeason(detailParams, s),
-                  compact: true,
-                  totalEpisodes: epData?.total,
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
             if (currentSource != null)
               _ServerSelector(
                 currentSource: currentSource,
@@ -3478,6 +3483,7 @@ void _openPlayer(PlayerScreen player) {
                                     imageUrl: heroBanner,
                                     fit: BoxFit.cover,
                                     alignment: Alignment.topCenter,
+                                    memCacheWidth: (width * 0.82 * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 4096),
                                     fadeInDuration: const Duration(milliseconds: 300),
                                     errorWidget: (_, __, ___) => Container(color: Colors.black12),
                                   ),
@@ -3718,24 +3724,6 @@ void _openPlayer(PlayerScreen player) {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (!isMovieCategory && totalSeasons > 0) ...[
-                                    SizedBox(
-                                      width: selectorWidth,
-                                      child: SeasonSelector(
-                                        data: SeasonSelectorData(
-                                          currentSeason: currentSeason,
-                                          totalSeasons: totalSeasons > 0 ? totalSeasons : 1,
-                                          onSeasonSelected: (s) => ref.setSeason(detailParams, s),
-                                          compact: isCompactHeader,
-                                          width: selectorWidth,
-                                          height: selectorH,
-                                          fontSize: selectorFontSize,
-                                          totalEpisodes: epData?.total,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                  ],
                                   if (currentSource != null)
                                     SizedBox(
                                       width: selectorWidth,
@@ -4450,7 +4438,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                     clipBehavior: Clip.none, 
                     padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
                     itemCount: widget.items.length,
-                    separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 8 : 24),
+                    separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 24),
                     itemBuilder: (context, index) {
                       final item = widget.items[index];
                       return SizedBox(
@@ -4540,6 +4528,7 @@ class _InfoCard extends StatelessWidget {
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: double.infinity,
+                memCacheWidth: (width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
                 errorWidget: (_, __, ___) => Container(
                   color: Colors.white10,
                   child: AurisIcon(AurisIcons.user, color: Colors.white24, size: width * 0.35),
@@ -4982,12 +4971,13 @@ class _GalleryItemState extends State<_GalleryItem> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    CachedNetworkImage(
+                    LayoutBuilder(builder: (context, constraints) => CachedNetworkImage(
                       imageUrl: url,
                       fit: widget.image.type == "logo" ? BoxFit.contain : BoxFit.cover,
+                      memCacheWidth: (constraints.maxWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
                       placeholder: (_, __) => Container(color: Colors.white10),
                       errorWidget: (_, __, ___) => Container(color: Colors.white10),
-                    ),
+                    )),
                     if (!isMobile && _isHovered)
                       Container(color: Colors.black26),
                     Positioned(

@@ -77,6 +77,41 @@ int? extractSeason(String? s) {
   return null;
 }
 
+/// true si la URL apunta a un cour/parcial ("-part-2", "-parte-1"): esa página
+/// YA es específica, así que su slug no codifica una temporada completa.
+bool urlIsCourPage(String? url) {
+  final u = (url ?? '').split('?').first.split('#').first.trimRight();
+  return u.isNotEmpty && RegExp(r'[-_](?:part|parte)[-_]?\d+/*$', caseSensitive: false).hasMatch(u);
+}
+
+/// Temporada que codifica la URL de la fuente (espejo de seasonFromUrl del
+/// servidor: "-3rd-season" → 3, "-season-2" → 2, "-ii" → 2). Única diferencia
+/// con el server: en un cour devuelve null, porque ahí la URL ya es la página
+/// pedida y re-resolver la temporada sustituye el cour por la temporada entera.
+int? seasonFromUrl(String? url) {
+  final u = (url ?? '').split('?').first.split('#').first.trimRight();
+  if (u.isEmpty || urlIsCourPage(u)) return null;
+  final m = RegExp(r'[-/#](\d{1,2})(?:st|nd|rd|th)?-?(?:season|temporada)', caseSensitive: false).firstMatch(u) ??
+      RegExp(r'[-/#](?:season|temporada)-(\d{1,2})', caseSensitive: false).firstMatch(u);
+  if (m != null) return int.tryParse(m.group(1)!);
+  final rm = RegExp(r'[-/#]([ivx]{1,4})(?=$|[/?#_-])', caseSensitive: false).firstMatch(u);
+  if (rm == null) return null;
+  const roman = <String, int>{
+    'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6, 'vii': 7, 'viii': 8, 'ix': 9, 'x': 10,
+  };
+  return roman[rm.group(1)!.toLowerCase()];
+}
+
+/// Temporada que debe viajar en la query del servidor. La S1 solo se envía si
+/// la URL codifica otra temporada (para que el server la resuelva a la base);
+/// si la URL no declara ninguna, la página ya es la S1 y no se envía nada, así
+/// el server sirve la URL tal cual en vez de re-resolverla.
+int? seasonForRequest(int? season, String? url) {
+  if (season == null) return null;
+  if (season > 1) return season;
+  return seasonFromUrl(url) == null ? null : season;
+}
+
 String stripSeasonSuffix(String title) {
   if (title.isEmpty) return title;
   final tLower = title.toLowerCase();

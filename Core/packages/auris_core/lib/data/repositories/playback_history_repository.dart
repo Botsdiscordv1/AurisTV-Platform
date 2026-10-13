@@ -135,6 +135,9 @@ class SupabasePlaybackHistoryRepository implements PlaybackHistoryRepository {
           type: metadata['type'],
           year: metadata['year'] != null ? int.tryParse(metadata['year'].toString()) : null,
           episodeTitle: metadata['episode_title'] as String?,
+          totalEpisodes: metadata['total_episodes'] != null
+              ? int.tryParse(metadata['total_episodes'].toString())
+              : null,
           dismissed: metadata['dismissed'] as bool? ?? false,
           alternativeSources: metadata['alternative_sources'] != null
               ? (metadata['alternative_sources'] as List<dynamic>)
@@ -180,6 +183,7 @@ class SupabasePlaybackHistoryRepository implements PlaybackHistoryRepository {
           'type': history.type,
           'year': history.year,
           'episode_title': history.episodeTitle,
+          'total_episodes': history.totalEpisodes,
           'dismissed': history.dismissed,
           'alternative_sources': history.alternativeSources?.map((e) => e.toJson()).toList(),
         },

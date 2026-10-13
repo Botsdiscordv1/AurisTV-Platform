@@ -19,24 +19,186 @@ final playbackHistoryStateProvider = AsyncNotifierProvider<PlaybackHistoryNotifi
 });
 
 /// Provider especializado para el carrusel de "Continuar Viendo"
-/// Filtra completados Y descartados manualmente (dismissed), agrupa por serie
-/// para mostrar solo el último episodio y mantiene el orden cronológico.
-/// Lo descartado sigue vivo en el Historial (biblioteca).
+/// Agrupa por obra y se queda con la entrada MÁS RECIENTE de cada una.
+/// - Entrada sin completar → se muestra tal cual.
+/// - Entrada completada → se muestra el SIGUIENTE episodio si sabemos que
+///   existe: totalEpisodes conocido o la obra aparece en el calendario; si no
+///   (series normales sin datos) la obra sale de Continuar Viendo y sigue
+///   viva en el Historial de la biblioteca. Último episodio conocido → fuera.
+/// - Si el calendario tiene ese episodio próximo a estrenarse, la tarjeta
+///   cambia a modo "próximo estreno" con su fecha/hora ([upcomingAiringAt]).
+/// - Descartada a mano (dismissed) → no se muestra.
 final continueWatchingProvider = Provider<AsyncValue<List<PlaybackHistory>>>((ref) {
   final historyAsync = ref.watch(playbackHistoryStateProvider);
-  
+  final schedule = ref.watch(scheduleProvider).valueOrNull;
+
   return historyAsync.whenData((list) {
-    final Set<String> seenContentIds = {};
-    return list.where((h) {
-      if (h.isCompleted) return false;
-      if (h.dismissed) return false;
-      // Senior Logic: Solo mostramos la entrada más reciente para cada serie/contenido
-      if (seenContentIds.contains(h.contentId)) return false;
-      seenContentIds.add(h.contentId);
-      return true;
-    }).toList();
+    final Map<String, PlaybackHistory> latestByContent = {};
+    for (final h in list) {
+      final prev = latestByContent[h.contentId];
+      if (prev == null || h.updatedAt.isAfter(prev.updatedAt)) {
+        latestByContent[h.contentId] = h;
+      }
+    }
+    final items = <PlaybackHistory>[];
+    for (final h in latestByContent.values) {
+      if (h.dismissed) continue;
+      if (!h.isCompleted) {
+        items.add(h);
+        continue;
+      }
+      final next = _nextEpisodeEntry(h, schedule);
+      if (next != null) items.add(next);
+    }
+    return items..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   });
 });
+
+/// Entrada sintética del episodio siguiente para la fila de Continuar Viendo
+/// (posición 0, sin título de episodio: no se conoce hasta abrir el detalle).
+/// Si el calendario marca ese episodio como aún no estrenado, se adjunta su
+/// fecha ([PlaybackHistory.upcomingAiringAt]) para el subtítulo de la tarjeta.
+PlaybackHistory? _nextEpisodeEntry(
+    PlaybackHistory h, ScheduleResponse? schedule) {
+  final total = h.totalEpisodes;
+  final ep = _episodeNumber(h.episode);
+  if (ep == null || ep <= 0) return null;
+  final int nextEp = ep + 1;
+  final match = _scheduleMatch(h, schedule, nextEp);
+  final int nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  final int? upcoming = (match.airingAt != null && match.airingAt! > nowSec)
+      ? match.airingAt
+      : null;
+
+  final bool hasMore = (total != null && total > 0)
+      ? ep < total
+      : match.showKnown;
+  if (upcoming == null && !hasMore) {
+    debugPrint('[CV] sin tarjeta "${h.title}" ep=$nextEp '
+        'show=${match.showKnown} total=$total');
+    return null;
+  }
+
+  return PlaybackHistory(
+    contentId: h.contentId,
+    season: h.season,
+    episode: '$nextEp',
+    positionInMilliseconds: 0,
+    durationInMilliseconds: 0,
+    updatedAt: h.updatedAt,
+    title: h.title,
+    metadataTitle: h.metadataTitle,
+    posterUrl: h.posterUrl,
+    bannerUrl: h.bannerUrl,
+    logoUrl: h.logoUrl,
+    category: h.category,
+    source: h.source,
+    url: h.url,
+    alternativeSources: h.alternativeSources,
+    kind: h.kind,
+    type: h.type,
+    year: h.year,
+    progress: 0.0,
+    isCompleted: false,
+    profileId: h.profileId,
+    totalEpisodes: total,
+    upcomingAiringAt: upcoming,
+  );
+}
+
+/// Busca la obra en el calendario (por URL/slug, o por título con `contains`
+/// bidireccional como en el resto del repo). Devuelve `airingAt` del episodio
+/// [nextEp] y si la obra aparece aunque sea con otro episodio.
+({int? airingAt, bool showKnown}) _scheduleMatch(
+    PlaybackHistory h, ScheduleResponse? schedule, int nextEp) {
+  const none = (airingAt: null, showKnown: false);
+  if (schedule == null) return none;
+  final wanted = <String>{_normalizeTitle(h.title), _normalizeTitle(h.metadataTitle)}
+    ..remove('');
+  final url = _normalizeUrl(h.url);
+  if (wanted.isEmpty && url.isEmpty) return none;
+
+  int? airingAt;
+  bool showKnown = false;
+  for (final day in schedule.days) {
+    for (final item in day.items) {
+      if (!_sameShow(item, wanted, url)) continue;
+      showKnown = true;
+      if (item.episode == nextEp || item.nextEpisode == nextEp) {
+        airingAt ??= item.airingAt;
+      }
+    }
+  }
+  return (airingAt: airingAt, showKnown: showKnown);
+}
+
+bool _sameShow(ScheduleItem item, Set<String> wanted, String url) {
+  final itemUrl = _normalizeUrl(item.url);
+  if (url.isNotEmpty &&
+      itemUrl.isNotEmpty &&
+      url.length >= 6 &&
+      itemUrl.length >= 6 &&
+      (itemUrl.contains(url) || url.contains(itemUrl))) {
+    return true;
+  }
+  if (wanted.isEmpty) return false;
+  final names = <String>{
+    _normalizeTitle(item.title),
+    _normalizeTitle(item.romaji),
+    _normalizeTitle(item.english),
+    _normalizeTitle(item.scrapedTitle),
+    for (final s in item.synonyms) _normalizeTitle(s),
+  }..remove('');
+  for (final n in names) {
+    for (final w in wanted) {
+      if (_titleMatches(n, w)) return true;
+    }
+  }
+  return false;
+}
+
+/// Igualdad o `contains` bidireccional (sólo si ambos son legibles).
+bool _titleMatches(String a, String b) {
+  if (a == b) return true;
+  if (a.length < 4 || b.length < 4) return false;
+  return a.contains(b) || b.contains(a);
+}
+
+String _normalizeUrl(String? raw) {
+  if (raw == null || raw.isEmpty) return '';
+  var s = raw.toLowerCase().trim();
+  final q = s.indexOf('?');
+  if (q != -1) s = s.substring(0, q);
+  s = s.replaceFirst(RegExp(r'^[a-z]+://'), '');
+  final slash = s.indexOf('/');
+  if (slash != -1) s = s.substring(slash + 1);
+  s = s.replaceAll(RegExp(r'[^a-z0-9/]'), '');
+  while (s.endsWith('/')) {
+    s = s.substring(0, s.length - 1);
+  }
+  return s;
+}
+
+/// Extrae el número de episodio de strings tipo "9", "Ep 9", "T1:E9"
+/// (se queda con la última cifra, para no confundir la temporada).
+int? _episodeNumber(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  final direct = int.tryParse(raw.trim());
+  if (direct != null) return direct;
+  final matches = RegExp(r'\d+').allMatches(raw).toList();
+  if (matches.isEmpty) return null;
+  return int.tryParse(matches.last.group(0)!);
+}
+
+String _normalizeTitle(String? raw) {
+  var s = (raw ?? '').toLowerCase();
+  const from = 'áàäâéèëêíìïîóòöôúùüûñ';
+  const to = 'aaaaeeeeiiiioooouuuunc';
+  for (var i = 0; i < from.length; i++) {
+    s = s.replaceAll(from[i], to[i]);
+  }
+  return s.replaceAll(RegExp(r'[^a-z0-9]'), '').trim();
+}
 
 class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
   Timer? _throttleTimer;
@@ -96,6 +258,7 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     String? type,
     int? year,
     String? episodeTitle,
+    int? totalEpisodes,
     bool force = false,
   }) {
     // [PlaybackHistory] Red de seguridad definitiva contra OP/ED en el historial
@@ -162,6 +325,7 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       type: type ?? existingHistory?.type,
       year: year ?? existingHistory?.year,
       episodeTitle: episodeTitle ?? existingHistory?.episodeTitle,
+      totalEpisodes: totalEpisodes ?? existingHistory?.totalEpisodes,
       profileId: profileId,
     );
 
@@ -322,7 +486,18 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     final profileId = user?.activeProfileId ?? 'guest_profile';
     final key =
         PlaybackHistory.generateKey(contentId, season, episode, profileId: profileId);
-    final index = _memoryCache.indexWhere((h) => h.key == key);
+    int index = _memoryCache.indexWhere((h) => h.key == key);
+    if (index == -1) {
+      int latest = -1;
+      for (var i = 0; i < _memoryCache.length; i++) {
+        final h = _memoryCache[i];
+        if (h.contentId != contentId) continue;
+        if (latest == -1 || h.updatedAt.isAfter(_memoryCache[latest].updatedAt)) {
+          latest = i;
+        }
+      }
+      index = latest;
+    }
     if (index == -1) return;
     _memoryCache[index] = _memoryCache[index]
         .copyWith(dismissed: true, updatedAt: DateTime.now());

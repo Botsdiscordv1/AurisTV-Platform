@@ -365,10 +365,13 @@ class _HistoryCard extends StatelessWidget {
                               maxWidth: 180,
                               maxHeight: 60,
                             ),
-                            child: CachedNetworkImage(
+                            child: LogoToneFilter(
                               imageUrl: ApiEndpoints.proxyImage(logoUrl!),
-                              fit: BoxFit.contain,
-                              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                              child: CachedNetworkImage(
+                                imageUrl: ApiEndpoints.proxyImage(logoUrl!),
+                                fit: BoxFit.contain,
+                                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                              ),
                             ),
                           ),
                         ),

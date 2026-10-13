@@ -341,12 +341,15 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                                       height: (effectiveWidth / 1.77) * 0.35,
                                       width: effectiveWidth * 0.65,
                                       alignment: Alignment.bottomLeft,
+                                    child: LogoToneFilter(
+                                      imageUrl: ApiEndpoints.proxyImage(logoUrl),
                                       child: CachedNetworkImage(
                                         imageUrl: ApiEndpoints.proxyImage(logoUrl),
                                         fit: BoxFit.contain,
                                         filterQuality: FilterQuality.medium,
                                         errorWidget: (_, __, ___) => const SizedBox.shrink(),
                                       ),
+                                    ),
                                     ),
                                   )
                                 else

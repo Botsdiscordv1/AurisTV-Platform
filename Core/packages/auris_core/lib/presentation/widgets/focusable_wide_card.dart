@@ -25,6 +25,7 @@ class FocusableWideCard extends ConsumerStatefulWidget {
   final FavoriteItem? favoriteItem;
   final double width;
   final double height;
+  final double aspectRatio;
 
   const FocusableWideCard({
     super.key,
@@ -41,6 +42,7 @@ class FocusableWideCard extends ConsumerStatefulWidget {
     this.badgeOverlay,
     this.width = 440,
     this.height = 248,
+    this.aspectRatio = 16 / 9,
   });
 
   @override
@@ -319,7 +321,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AspectRatio(
-                      aspectRatio: 16 / 9,
+                      aspectRatio: widget.aspectRatio,
                       child: AnimatedScale(
                         scale: isSelected ? 1.06 : 1.0,
                         duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
@@ -354,8 +356,8 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
                                           begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                                          colors: [Colors.transparent, Colors.black.withOpacity(isSelected ? 0.7 : 0.5)],
-                                          stops: const [0.6, 1.0],
+                                          colors: [Colors.transparent, Colors.black.withValues(alpha: isSelected ? 0.8 : 0.7)],
+                                          stops: const [0.48, 1.0],
                                         ),
                                       ),
                                     ),
@@ -372,25 +374,29 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                       width: widget.width * 0.65,
                                       child: Builder(builder: (context) {
                                         final dpr = MediaQuery.of(context).devicePixelRatio;
-                                        return CachedNetworkImage(
-                                          imageUrl: widget.logoUrl!,
-                                          width: widget.width * 0.65,
-                                          height: widget.height * 0.35,
-                                          fit: BoxFit.contain,
-                                          alignment: Alignment.bottomLeft,
-                                          filterQuality: FilterQuality.medium,
-                                          memCacheWidth: (widget.width * 0.65 * dpr)
-                                              .round()
-                                              .clamp(320, 1280),
-                                          fadeInDuration:
-                                              const Duration(milliseconds: 150),
-                                          placeholder: (context, url) => Container(
+                                        final logoUrl = ApiEndpoints.proxyImage(widget.logoUrl);
+                                        return LogoToneFilter(
+                                          imageUrl: logoUrl,
+                                          child: CachedNetworkImage(
+                                            imageUrl: logoUrl,
                                             width: widget.width * 0.65,
                                             height: widget.height * 0.35,
-                                            color: Colors.white.withOpacity(0.04),
+                                            fit: BoxFit.contain,
+                                            alignment: Alignment.bottomLeft,
+                                            filterQuality: FilterQuality.medium,
+                                            memCacheWidth: (widget.width * 0.65 * dpr)
+                                                .round()
+                                                .clamp(320, 1280),
+                                            fadeInDuration:
+                                                const Duration(milliseconds: 150),
+                                            placeholder: (context, url) => Container(
+                                              width: widget.width * 0.65,
+                                              height: widget.height * 0.35,
+                                              color: Colors.white.withOpacity(0.04),
+                                            ),
+                                            errorWidget: (_, __, ___) =>
+                                                const SizedBox.shrink(),
                                           ),
-                                          errorWidget: (_, __, ___) =>
-                                              const SizedBox.shrink(),
                                         );
                                       }),
                                     ),

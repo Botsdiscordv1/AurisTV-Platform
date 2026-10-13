@@ -124,7 +124,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> {
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(Icons.star, color: Color(0xFFFFC107), size: 10),
+                                            AurisIcon(AurisIcons.star, color: const Color(0xFFFFC107), size: 10),
                                             const SizedBox(width: 4),
                                             Text(formatRating(widget.media.rating) ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
                                           ],

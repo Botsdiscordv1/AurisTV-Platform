@@ -58,6 +58,8 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
 
   bool get isSelected => widget.forceSelected || _isHovered || _isFocused;
 
+  String get _logoUrl => ApiEndpoints.proxyImage(widget.logoUrl);
+
   @override
   void dispose() {
     // Si esta tarjeta desaparece con el foco (cambio de ítems/categoría),
@@ -147,8 +149,8 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                                      colors: [Colors.transparent, Colors.black.withOpacity(isSelected ? 0.7 : 0.5)],
-                                      stops: const [0.6, 1.0],
+                                      colors: [Colors.transparent, Colors.black.withValues(alpha: isSelected ? 0.8 : 0.7)],
+                                      stops: const [0.48, 1.0],
                                     ),
                                   ),
                                 ),
@@ -163,20 +165,23 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                 child: SizedBox(
                                   height: widget.height * 0.35,
                                   width: widget.width * 0.65,
-                                  child: CachedNetworkImage(
-                                    imageUrl: widget.logoUrl!,
-                                    width: widget.width * 0.65,
-                                    height: widget.height * 0.35,
-                                    fit: BoxFit.contain,
-                                    alignment: Alignment.bottomLeft,
-                                    filterQuality: FilterQuality.medium,
-                                    fadeInDuration: const Duration(milliseconds: 150),
-                                    placeholder: (context, url) => Container(
+                                  child: LogoToneFilter(
+                                    imageUrl: _logoUrl,
+                                    child: CachedNetworkImage(
+                                      imageUrl: _logoUrl,
                                       width: widget.width * 0.65,
                                       height: widget.height * 0.35,
-                                      color: Colors.white.withOpacity(0.04),
+                                      fit: BoxFit.contain,
+                                      alignment: Alignment.bottomLeft,
+                                      filterQuality: FilterQuality.medium,
+                                      fadeInDuration: const Duration(milliseconds: 150),
+                                      placeholder: (context, url) => Container(
+                                        width: widget.width * 0.65,
+                                        height: widget.height * 0.35,
+                                        color: Colors.white.withOpacity(0.04),
+                                      ),
+                                      errorWidget: (_, __, ___) => const SizedBox.shrink(),
                                     ),
-                                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
                                   ),
                                 ),
                               )

@@ -75,13 +75,17 @@ String libraryRemainingText(PlaybackHistory h, {bool colon = false}) {
 }
 
 /// Subtítulo para la sección Historial: contexto del último visionado
-/// (ej. "T2 E7 • Quedan 12 min", "Quedan 1 h", "Vista").
+/// (ej. "T2 E7 • Completado", "T2 E7 • Quedan 12 min", "Completado").
 String libraryHistorySubtitle(PlaybackHistory h) {
   final parts = <String>[];
   if (!libraryIsMovieish(h) && h.episode != null && h.episode!.isNotEmpty) {
     final seasonPart =
         (h.season != null && h.season! > 1) ? 'T${h.season} ' : '';
     parts.add('$seasonPart E${h.episode}');
+  }
+  if (h.isCompleted) {
+    parts.add('Completado');
+    return parts.join(' • ');
   }
   final remaining = libraryRemainingText(h);
   if (remaining.isNotEmpty) {
@@ -122,7 +126,17 @@ SearchResult? historyToSeed(PlaybackHistory h) {
 /// Subtítulo de Continuar Viendo en 2 líneas (no-películas):
 /// line1 = "T1:E7 · Título del episodio" (o "T1:E7" sin título / genérico),
 /// line2 = "Quedan X" (o null). Películas y sin episodio → (remaining, null).
+/// Entrada sintética de estreno próximo → line1 "T1:E8", line2 "Estreno: ...".
 ({String line1, String? line2}) continueCardSubtitle(PlaybackHistory h) {
+  final upcoming = h.upcomingAiringAt;
+  if (upcoming != null) {
+    final season = h.season ?? 1;
+    final ep = h.episode ?? '';
+    return (
+      line1: ep.isNotEmpty ? 'T$season:E$ep' : '',
+      line2: 'Estreno: ${formatAiringLabel(upcoming)}',
+    );
+  }
   final remaining = libraryRemainingText(h);
   if (libraryIsMovieish(h)) return (line1: remaining, line2: null);
   if (h.episode == null || h.episode!.isEmpty) {
@@ -137,6 +151,24 @@ SearchResult? historyToSeed(PlaybackHistory h) {
       epTitle.isNotEmpty ? 'T$season:E$ep · $epTitle' : 'T$season:E$ep';
   final remaining2 = libraryRemainingText(h, colon: true);
   return (line1: line1, line2: remaining2.isNotEmpty ? remaining2 : null);
+}
+
+/// "hoy 21:30", "mañana 21:30" o "jue 16 oct · 21:30" en hora local.
+String formatAiringLabel(int airingAtSeconds, {DateTime? now}) {
+  final air = DateTime.fromMillisecondsSinceEpoch(airingAtSeconds * 1000);
+  final current = now ?? DateTime.now();
+  final time =
+      '${air.hour.toString().padLeft(2, '0')}:${air.minute.toString().padLeft(2, '0')}';
+  bool sameDay(DateTime d) =>
+      d.year == air.year && d.month == air.month && d.day == air.day;
+  if (sameDay(current)) return 'Hoy $time';
+  if (sameDay(current.add(const Duration(days: 1)))) return 'Mañana $time';
+  const weekdays = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+  const months = [
+    'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic'
+  ];
+  return '${weekdays[air.weekday - 1]} ${air.day} ${months[air.month - 1]} · $time';
 }
 
 // ── Mi Lista ──

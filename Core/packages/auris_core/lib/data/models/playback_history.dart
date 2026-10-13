@@ -26,6 +26,10 @@ class PlaybackHistory {
   /// Se guarda al reproducir (con la lista de episodios) para mostrar
   /// "T1:E7 . Título" sin depender de red al pintar la tarjeta.
   final String? episodeTitle;
+  final int? totalEpisodes;
+  /// Sólo en memoria (no se serializa): marca una entrada sintética del
+  /// episodio siguiente con fecha de estreno conocida (calendario).
+  final int? upcomingAiringAt;
 
   final double progress;
   final bool isCompleted;
@@ -55,6 +59,8 @@ class PlaybackHistory {
     this.type,
     this.year,
     this.episodeTitle,
+    this.totalEpisodes,
+    this.upcomingAiringAt,
     double? progress,
     bool? isCompleted,
     this.profileId,
@@ -86,6 +92,7 @@ class PlaybackHistory {
       'type': type,
       'year': year,
       'episodeTitle': episodeTitle,
+      'totalEpisodes': totalEpisodes,
       'progress': progress,
       'isCompleted': isCompleted,
       'profileId': profileId,
@@ -130,6 +137,7 @@ class PlaybackHistory {
       type: json['type'] as String?,
       year: json['year'] != null ? int.tryParse(json['year'].toString()) : null,
       episodeTitle: json['episodeTitle'] as String?,
+      totalEpisodes: int.tryParse(json['totalEpisodes']?.toString() ?? ''),
       progress: json['progress'] != null ? double.tryParse(json['progress'].toString()) : calcProgress,
       isCompleted: json['isCompleted'] as bool? ?? (calcProgress > 0.95),
       dismissed: json['dismissed'] as bool? ?? false,
@@ -171,6 +179,8 @@ class PlaybackHistory {
     String? type,
     int? year,
     String? episodeTitle,
+    int? totalEpisodes,
+    int? upcomingAiringAt,
     double? progress,
     bool? isCompleted,
     String? profileId,
@@ -196,6 +206,8 @@ class PlaybackHistory {
       type: type ?? this.type,
       year: year ?? this.year,
       episodeTitle: episodeTitle ?? this.episodeTitle,
+      totalEpisodes: totalEpisodes ?? this.totalEpisodes,
+      upcomingAiringAt: upcomingAiringAt ?? this.upcomingAiringAt,
       progress: progress ?? this.progress,
       isCompleted: isCompleted ?? this.isCompleted,
       profileId: profileId ?? this.profileId,

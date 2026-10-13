@@ -772,21 +772,25 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
           Builder(builder: (context) {
             final dpr = MediaQuery.of(context).devicePixelRatio;
             final logoWidth = MediaQuery.of(context).size.width * 0.45;
+            final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
             return SizedBox(
               height: TVResponsiveUtils.heroLogoHeight(context),
               width: logoWidth,
-              child: CachedNetworkImage(
-                key: ValueKey('logo_tv_${item.id}'),
-                imageUrl: item.logoUrl!,
-                fit: BoxFit.contain,
-                alignment: Alignment.bottomLeft,
-                fadeInDuration: const Duration(milliseconds: 100),
-                memCacheWidth: (logoWidth * dpr).round().clamp(320, 1280),
-                placeholder: (context, url) => SizedBox(
-                  height: TVResponsiveUtils.heroLogoHeight(context),
-                  width: logoWidth,
+              child: LogoToneFilter(
+                imageUrl: logoUrl,
+                child: CachedNetworkImage(
+                  key: ValueKey('logo_tv_${item.id}'),
+                  imageUrl: logoUrl,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomLeft,
+                  fadeInDuration: const Duration(milliseconds: 100),
+                  memCacheWidth: (logoWidth * dpr).round().clamp(320, 1280),
+                  placeholder: (context, url) => SizedBox(
+                    height: TVResponsiveUtils.heroLogoHeight(context),
+                    width: logoWidth,
+                  ),
+                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
                 ),
-                errorWidget: (_, __, ___) => const SizedBox.shrink(),
               ),
             );
           })

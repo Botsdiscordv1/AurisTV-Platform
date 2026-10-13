@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/api/api_endpoints.dart';
+import 'logo_tone.dart';
 
 class HeroTitle extends StatefulWidget {
   final String title;
@@ -98,6 +99,7 @@ class _HeroTitleState extends State<HeroTitle> {
       // placeholder saliente): si el logo entrara con su ancho natural, el
       // AnimatedSwitcher lo centraría en el stage durante el crossfade y
       // solo al retirarse el placeholder saltaría a la izquierda.
+      final imageUrl = ApiEndpoints.proxyImage(widget.logo, highQuality: true);
       return SizedBox(
         key: const ValueKey('identity_logo'),
         width: widget.maxWidth,
@@ -106,13 +108,16 @@ class _HeroTitleState extends State<HeroTitle> {
             maxWidth: widget.maxWidth,
             maxHeight: widget.maxHeight,
           ),
-          child: CachedNetworkImage(
-            imageUrl: ApiEndpoints.proxyImage(widget.logo, highQuality: true),
-            fit: BoxFit.contain,
-            alignment: Alignment.bottomLeft,
-            fadeInDuration: const Duration(milliseconds: 300),
-            placeholder: (_, __) => _buildPlaceholder(),
-            errorWidget: (_, __, ___) => _buildTextFallback(forced: true),
+          child: LogoToneFilter(
+            imageUrl: imageUrl,
+            child: CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.contain,
+              alignment: Alignment.bottomLeft,
+              fadeInDuration: const Duration(milliseconds: 300),
+              placeholder: (_, __) => _buildPlaceholder(),
+              errorWidget: (_, __, ___) => _buildTextFallback(forced: true),
+            ),
           ),
         ),
       );

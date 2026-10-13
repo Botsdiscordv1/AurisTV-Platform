@@ -12,8 +12,6 @@ class EpisodesDetailOverlay extends ConsumerStatefulWidget {
   final List<SearchResult> sources;
   final SearchResult? currentSource;
   final int totalSeasons;
-  final int currentSeason;
-  final ValueChanged<int> onSeasonSelected;
   /// Params del provider unificado: el overlay observa en VIVO (episodios +
   /// themes progresivos). Pasar el AsyncValue como snapshot lo dejaba
   /// congelado (spinner eterno si se abría antes de resolver, sin updates
@@ -33,8 +31,6 @@ class EpisodesDetailOverlay extends ConsumerStatefulWidget {
     required this.sources,
     this.currentSource,
     required this.totalSeasons,
-    required this.currentSeason,
-    required this.onSeasonSelected,
     required this.detailParams,
     required this.category,
     required this.title,
@@ -223,7 +219,7 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
 
   List<Map<String, dynamic>> _menuItems() {
     return [
-      {'id': _menuEpisodes, 'label': widget.totalSeasons > 1 ? 'Temporada ${widget.currentSeason}' : 'Episodios', 'icon': Icons.layers_outlined},
+      {'id': _menuEpisodes, 'label': 'Episodios', 'icon': Icons.layers_outlined},
       if (_showExtrasMenu) {'id': _menuExtras, 'label': 'Opening/Ending', 'icon': Icons.movie_outlined},
     ];
   }

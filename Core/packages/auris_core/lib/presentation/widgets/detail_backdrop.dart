@@ -60,6 +60,7 @@ class DetailBackdrop extends StatelessWidget {
                   imageUrl: imageUrl!,
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
+                  memCacheWidth: (width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 4096),
                   fadeInDuration: const Duration(milliseconds: 300),
                   errorWidget: (_, __, ___) => Container(color: Colors.black12),
                 ),
