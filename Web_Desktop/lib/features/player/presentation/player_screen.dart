@@ -528,6 +528,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       source: widget.source,
       url: _currentSourceUrl,
       alternativeSources: ref.read(activeContentSourcesProvider),
+      totalEpisodes: widget.totalEpisodes,
       force: force,
     );
   }
@@ -555,6 +556,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         source: widget.source,
         url: _currentSourceUrl,
         alternativeSources: _groupedSources.values.expand((e) => e).toList(),
+        totalEpisodes: widget.totalEpisodes,
         force: true,
       );
       hn.flush();
@@ -592,6 +594,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   String? _playbackError;
   String _lastVideoUrl = '';
   Map<String, String> _lastVideoHeaders = const {};
+  // Contador de refreshes de extract por URLs firmadas expiradas (vimeos rota
+  // host+tokens por extract). Máx 2 re-extracciones con backoff; después, UI error.
+  int _extractRefreshCount = 0;
+  static const int _kMaxExtractRefresh = 2;
 
   static const _volumeControlChannel = MethodChannel('auristv/volume');
   
@@ -1206,6 +1212,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _hasResetPosition = false;
       _isStabilizing = true;
       _extractTracks = [];
+      _extractRefreshCount = 0;
     });
   }
 
@@ -1536,6 +1543,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _hasResetPosition = false;
       _showNextNotifier.value = false;
       _autoplayCountdown = -1;
+      _extractRefreshCount = 0;
     });
 
     if (baseSource != null && baseSource.source == 'Aniyae') {
@@ -2164,6 +2172,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               _playbackError = null;
               _isLoading = false;
               _webNeedsInteraction = false;
+              _extractRefreshCount = 0;
             });
             _applyVolume();
           }
@@ -2193,8 +2202,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
 
       if (errorMsg.contains('DEMUXER_ERROR') || errorMsg.contains('COULD_NOT_PARSE')) {
-        debugPrint('[player recovery] Detectada URL expirada o error de demuxer ($errorMsg). Re-extrayendo...');
-        _retryPlayback();
+        // La URL firmada murió (tokens vimeos rotan por extract). Re-extraer
+        // con backoff en vez de reintentar la misma URL en loop (eso generaba
+        // la tormenta de 403s en el server). Trailers/YouTube no expiran:
+        // esos sí reintentan la misma URL como antes.
+        if (!_isTrailer && _extractRefreshCount < _kMaxExtractRefresh) {
+          _extractRefreshCount++;
+          final wait = Duration(seconds: _extractRefreshCount == 1 ? 2 : 5);
+          debugPrint('[player recovery] URL expirada? Refresh extract #$_extractRefreshCount en ${wait.inSeconds}s...');
+          Future.delayed(wait, () {
+            if (!mounted) return;
+            ref.invalidate(extractProvider);
+            setState(() {
+              _hasInitialized = false;
+              _isLoading = true;
+              _playbackError = null;
+              _extractTracks = [];
+            });
+          });
+        } else {
+          debugPrint('[player recovery] Sin más refreshes (intentos agotados o trailer). Reintentando misma URL...');
+          _retryPlayback();
+        }
         return;
       }
 
@@ -2393,6 +2422,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 bannerUrl: widget.bannerUrl,
                 category: widget.category,
                 source: widget.source,
+                totalEpisodes: widget.totalEpisodes,
                 force: true,
               );
             }
@@ -3152,6 +3182,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     child: CachedNetworkImage(
                       imageUrl: ApiEndpoints.proxyImage(widget.bannerUrl),
                       fit: BoxFit.cover,
+                      memCacheWidth: (constraints.maxWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 4096),
                     ),
                   ),
                 ),
