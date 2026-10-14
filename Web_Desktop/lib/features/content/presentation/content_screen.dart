@@ -3427,16 +3427,16 @@ void _openPlayer(PlayerScreen player) {
     required bool isMovieCategory,
   }) {
     // Senior Responsive Desktop Architecture: Dimensiones fluidas continuas para cualquier resolución de pantalla (Laptops -> 4K Ultrawide)
-    final double headerH = (width / 2.8).clamp(480.0, 620.0);
+    final double headerH = (width / 2.8).clamp(480.0, 540.0);
     final double overlayLeftPadding = 60.0; // Alineado permanentemente a 60px con los tabs inferiores en cualquier tamaño de ventana desktop
     final double synopsisWidth = (width * 0.46).clamp(400.0, 760.0);
     final double logoMaxWidth = (width * 0.32).clamp(320.0, 600.0);
-    final double logoMaxHeight = (headerH * (isCompactHeader ? 0.20 : 0.25)).clamp(80.0, 140.0);
+    final double logoMaxHeight = (headerH * (isCompactHeader ? 0.20 : 0.25)).clamp(75.0, 120.0);
     final double titleSize = (width * 0.028).clamp(30.0, 52.0);
     final double topPadding = isCompactHeader 
-        ? (headerH * 0.22).clamp(70.0, 105.0) 
-        : (headerH * 0.16).clamp(65.0, 95.0);
-    final double headerGap = isCompactHeader ? 8.0 : 18.0;
+        ? (headerH * 0.22).clamp(60.0, 95.0) 
+        : (headerH * 0.16).clamp(55.0, 85.0);
+    final double headerGap = isCompactHeader ? 8.0 : 16.0;
     final double gapLogoToMeta = headerGap;
     final double gapMetaToSynopsis = headerGap;
     final double gapSynopsisToActions = headerGap;
@@ -3671,84 +3671,84 @@ void _openPlayer(PlayerScreen player) {
                             minHeight: 0,
                             maxHeight: 1200,
                             child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                            // Logo
-                            AnimatedOpacity(
-                              duration: const Duration(milliseconds: 1200),
-                              curve: Curves.easeInOut,
-                              opacity: _revealed ? 1.0 : 0.0,
-                              child: HeroTitle(
-                                title: widget.title,
-                                logo: detailData?.logo,
-                                logoReady: detailAsync.hasValue,
-                                maxWidth: logoMaxWidth,
-                                maxHeight: (detailData?.logo != null && detailData!.logo!.isNotEmpty) ? logoMaxHeight : (titleSize * 2.2),
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: titleSize,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.0,
-                                  letterSpacing: 2,
-                                  shadows: const [
-                                    Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4),
-                                    Shadow(color: Colors.black54, offset: Offset(4, 4), blurRadius: 10),
-                                  ]
-                                )
-                              ),
-                            ),
-                            SizedBox(height: gapLogoToMeta),
-                            if (detailData != null) ...[
-                              _buildMetaRow(detailData, isCompact: isCompactHeader, kind: detailParams.kind),
-                              SizedBox(height: gapMetaToSynopsis),
-                              SizedBox(
-                                width: synopsisWidth,
-                                child: _buildSynopsis(detailData, isCompact: isCompactHeader, isScrollable: true),
-                              ),
-                            ],
-                            SizedBox(height: gapSynopsisToActions),
-                            // Botones de acción
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 8,
-                              crossAxisAlignment: WrapCrossAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                _buildMainActionButton(context, isCompact: isCompactHeader),
-                                _buildCircularActions(context, isCompact: isCompactHeader),
+                                // Logo
+                                AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 1200),
+                                  curve: Curves.easeInOut,
+                                  opacity: _revealed ? 1.0 : 0.0,
+                                  child: HeroTitle(
+                                    title: widget.title,
+                                    logo: detailData?.logo,
+                                    logoReady: detailAsync.hasValue,
+                                    maxWidth: logoMaxWidth,
+                                    maxHeight: (detailData?.logo != null && detailData!.logo!.isNotEmpty) ? logoMaxHeight : (titleSize * 2.2),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: titleSize,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.0,
+                                      letterSpacing: 2,
+                                      shadows: const [
+                                        Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4),
+                                        Shadow(color: Colors.black54, offset: Offset(4, 4), blurRadius: 10),
+                                      ]
+                                    )
+                                  ),
+                                ),
+                                SizedBox(height: gapLogoToMeta),
+                                if (detailData != null) ...[
+                                  _buildMetaRow(detailData, isCompact: isCompactHeader, kind: detailParams.kind),
+                                  SizedBox(height: gapMetaToSynopsis),
+                                  SizedBox(
+                                    width: synopsisWidth,
+                                    child: _buildSynopsis(detailData, isCompact: isCompactHeader, isScrollable: true),
+                                  ),
+                                ],
+                                SizedBox(height: gapSynopsisToActions),
+                                // Botones de acción
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 8,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    _buildMainActionButton(context, isCompact: isCompactHeader),
+                                    _buildCircularActions(context, isCompact: isCompactHeader),
+                                  ],
+                                ),
+                                SizedBox(height: gapActionsToSelectors),
+                                // Selectores
+                                if (!isMovieCategory && (totalSeasons > 0 || currentSource != null))
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (currentSource != null)
+                                        SizedBox(
+                                          width: selectorWidth,
+                                          child: _ServerSelector(
+                                            currentSource: currentSource,
+                                            sources: activeSources,
+                                            onSourceSelected: (index) => ref.setSource(detailParams, activeSources[index]),
+                                            compact: isCompactHeader,
+                                            width: selectorWidth,
+                                            height: selectorH,
+                                            fontSize: selectorFontSize,
+                                            season: widget.year,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                               ],
                             ),
-                            SizedBox(height: gapActionsToSelectors),
-                            // Selectores
-                            if (!isMovieCategory && (totalSeasons > 0 || currentSource != null))
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (currentSource != null)
-                                    SizedBox(
-                                      width: selectorWidth,
-                                      child: _ServerSelector(
-                                        currentSource: currentSource,
-                                        sources: activeSources,
-                                        onSourceSelected: (index) => ref.setSource(detailParams, activeSources[index]),
-                                        compact: isCompactHeader,
-                                        width: selectorWidth,
-                                        height: selectorH,
-                                        fontSize: selectorFontSize,
-                                        season: widget.year,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                  ],
                 ),
               ),
-            ),
 
               // 2. CONTENIDO INFERIOR (Tabs y Episodios)
               SliverPadding(
@@ -3825,53 +3825,61 @@ void _openPlayer(PlayerScreen player) {
         ])),
       ]);
     }
-    return Stack(clipBehavior: Clip.hardEdge, children: [
-      AspectRatio(aspectRatio: 2.8 / 1, child: Container(color: const Color(0xFF0B0B0D))),
-      Positioned(
-        left: 40, right: 40, bottom: 24,
-        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            SizedBox(
-              width: 800,
-              child: _SkeletonBox(width: 500, height: 60),
+    final double width = MediaQuery.sizeOf(context).width;
+    final double headerH = (width / 2.8).clamp(480.0, 540.0);
+    final double overlayLeftPadding = 60.0;
+    final bool isCompactHeader = context.breakpoint < Breakpoint.lg || MediaQuery.sizeOf(context).height < 900;
+    final double topPadding = isCompactHeader 
+        ? (headerH * 0.22).clamp(60.0, 95.0) 
+        : (headerH * 0.16).clamp(55.0, 85.0);
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: headerH),
+      child: Stack(
+        children: [
+          Positioned.fill(child: Container(color: const Color(0xFF0B0B0D))),
+          Padding(
+            padding: EdgeInsets.only(
+              left: overlayLeftPadding,
+              top: topPadding,
+              bottom: 24,
+              right: 32,
             ),
-            const SizedBox(height: 24),
-            Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _SkeletonBox(width: 64, height: 56, borderRadius: 28),
-                const SizedBox(width: 16),
-                _SkeletonBox(width: 64, height: 56, borderRadius: 28),
-                const SizedBox(width: 16),
-                _SkeletonBox(width: 64, height: 56, borderRadius: 28),
-                const SizedBox(width: 16),
-                _SkeletonBox(width: 64, height: 56, borderRadius: 28),
+                _SkeletonBox(width: 420, height: 60),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _SkeletonBox(width: 60, height: 20),
+                    const SizedBox(width: 12),
+                    _SkeletonBox(width: 80, height: 20),
+                    const SizedBox(width: 12),
+                    _SkeletonBox(width: 50, height: 20),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _SkeletonBox(width: 600, height: 40),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    _SkeletonBox(width: 180, height: 52, borderRadius: 26),
+                    const SizedBox(width: 12),
+                    _SkeletonBox(width: 52, height: 52, borderRadius: 26),
+                    const SizedBox(width: 12),
+                    _SkeletonBox(width: 52, height: 52, borderRadius: 26),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _SkeletonBox(width: 280, height: 42),
               ],
             ),
-            const SizedBox(height: 24),
-            Container(width: 220, height: 56, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8))),
-          ]),
-          const Spacer(),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              _RatingSkeleton(width: 52, height: 20),
-              const SizedBox(width: 12),
-              _SkeletonBox(width: 60, height: 20),
-              const SizedBox(width: 8),
-              _SkeletonBox(width: 40, height: 20),
-            ]),
-            const SizedBox(height: 12),
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              _SkeletonBox(width: 80, height: 18),
-              const SizedBox(width: 12),
-              _SkeletonBox(width: 50, height: 18),
-              const SizedBox(width: 8),
-              _SkeletonBox(width: 30, height: 18),
-            ]),
-          ]),
-        ]),
+          ),
+        ],
       ),
-    ]);
+    );
   }
 
   Widget _buildSynopsisSkeleton(BuildContext context) {

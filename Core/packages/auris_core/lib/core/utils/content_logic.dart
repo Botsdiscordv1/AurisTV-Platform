@@ -145,6 +145,34 @@ String stripSeasonSuffix(String title) {
   return title.trim();
 }
 
+/// Igual que [stripSeasonSuffix] pero preserva el marcador de parte/cour
+/// ("Part 2", "Parte 1", "Cour 2"). El detail del servidor de anime resuelve
+/// el nodo de identidad correcto con ese marcador (ej. Diamond no Ace act II
+/// Second Season Part 2 vs la S2 base); el strip aquí dejaba la petición sin
+/// "Part 2" y el server devolvía la entrada del cour anterior. Los numerales
+/// romanos solo se quitan si cierran el título ("Youjo Senki II") para no
+/// romper títulos como "Act II".
+String stripSeasonSuffixKeepPart(String title) {
+  if (title.isEmpty) return title;
+  final tLower = title.toLowerCase();
+
+  final keywordPatterns = [
+    RegExp(r'\s*\d+(?:st|nd|rd|th)?\s*(?:season|temporada).*', caseSensitive: false),
+    RegExp(r'\s*(?:season|temporada)\s*\d+.*', caseSensitive: false),
+    RegExp(r'\s+final\s*season.*', caseSensitive: false),
+    RegExp(r'\s+s\d+\b', caseSensitive: false),
+  ];
+
+  for (var p in keywordPatterns) {
+    if (p.hasMatch(tLower)) return title.replaceAll(p, '').trim();
+  }
+
+  final romanEnd = RegExp(r'\s+(?:ii|iii|iv|v)$', caseSensitive: false);
+  if (romanEnd.hasMatch(title)) return title.replaceAll(romanEnd, '').trim();
+
+  return title.trim();
+}
+
 String seasonTitleFor(String baseTitle, int season) {
   if (season <= 1) return baseTitle.trim();
   const ordinals = {2: '2nd', 3: '3rd', 4: '4th', 5: '5th', 6: '6th', 7: '7th', 8: '8th', 9: '9th', 10: '10th'};

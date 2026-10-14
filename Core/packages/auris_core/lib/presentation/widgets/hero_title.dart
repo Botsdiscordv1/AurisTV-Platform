@@ -103,11 +103,9 @@ class _HeroTitleState extends State<HeroTitle> {
       return SizedBox(
         key: const ValueKey('identity_logo'),
         width: widget.maxWidth,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: widget.maxWidth,
-            maxHeight: widget.maxHeight,
-          ),
+        height: widget.maxHeight,
+        child: Align(
+          alignment: Alignment.bottomLeft,
           child: LogoToneFilter(
             imageUrl: imageUrl,
             child: CachedNetworkImage(
@@ -133,11 +131,10 @@ class _HeroTitleState extends State<HeroTitle> {
   }
 
   Widget _buildPlaceholder() {
-    final bool isTextOnly = widget.logo == null || widget.logo!.isEmpty;
     return SizedBox(
       key: const ValueKey('identity_placeholder'),
       width: widget.maxWidth,
-      height: isTextOnly ? (widget.maxHeight * 0.6) : widget.maxHeight,
+      height: widget.maxHeight,
     );
   }
 
@@ -145,12 +142,16 @@ class _HeroTitleState extends State<HeroTitle> {
     return SizedBox(
       key: const ValueKey('identity_text'),
       width: widget.maxWidth,
-      child: Text(
-        widget.title.toUpperCase(),
-        style: widget.style,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.left,
+      height: widget.maxHeight,
+      child: Align(
+        alignment: Alignment.bottomLeft,
+        child: Text(
+          widget.title.toUpperCase(),
+          style: widget.style,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.left,
+        ),
       ),
     );
   }
