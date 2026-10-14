@@ -2247,7 +2247,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           debugPrint('[player recovery] URL expirada? Refresh extract #$_extractRefreshCount en ${wait.inSeconds}s...');
           Future.delayed(wait, () {
             if (!mounted) return;
-            ref.invalidate(extractProvider);
+            // Invalidar SOLO esta instancia (no toda la familia): invalidar la
+            // familia reconstruía Consumers defunctos de otras pantallas
+            // (prefetch) → crash markNeedsBuild. Lee estado actual por si el
+            // usuario cambió de servidor en la espera.
+            try {
+              ref.invalidate(extractProvider(ExtractParams(
+                url: _currentSourceUrl,
+                source: _currentSource,
+                category: widget.category,
+              )));
+            } catch (_) {
+              ref.invalidate(extractProvider);
+            }
             setState(() {
               _hasInitialized = false;
               _isLoading = true;
