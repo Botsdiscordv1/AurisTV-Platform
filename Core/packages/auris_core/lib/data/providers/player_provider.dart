@@ -138,8 +138,8 @@ final unifiedContentDetailProvider =
   } else if (isStrictAnime) {
     // Consulta al servidor de anime para series de TV
     anime = await repo.getAnimeDetail(
-      title: cleanTitleForDisplay(stripSeasonSuffix(params.title)),
-      metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle!)) : null,
+      title: cleanTitleForDisplay(stripSeasonSuffixKeepPart(params.title)),
+      metadataTitle: params.metadataTitle != null ? cleanTitleForDisplay(stripSeasonSuffixKeepPart(params.metadataTitle!)) : null,
       year: effectiveYear,
       season: params.season,
       kind: params.kind ?? 'anime',
