@@ -3122,7 +3122,7 @@ void _openPlayer(PlayerScreen player) {
       final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
       final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
       final episodesCrossAxisCount = isMobile ? 1 : (width < 700 ? 2 : (width < 1150 ? 3 : (width < 1550 ? 4 : (width < 2100 ? 5 : 6))));
-      final episodesAspectRatio = isMobile ? 1.15 : (width < 1150 ? 0.98 : 1.01);
+      final episodesAspectRatio = isMobile ? 1.15 : 0.95;
 
       final detailParams = UnifiedDetailParams(
         title: widget.title,
@@ -3168,7 +3168,7 @@ void _openPlayer(PlayerScreen player) {
       final epBundle = episodesAsync.maybeWhen(data: (d) => d, orElse: () => null);
       final epData = epBundle?.response;
 
-      final dataReady = detailAsync.hasValue || activeSources.isNotEmpty;
+      final dataReady = activeSources.isNotEmpty;
       if (dataReady && !_showContent) {
         _loadTimer?.cancel();
         _loadTimer = null;
@@ -3358,7 +3358,7 @@ void _openPlayer(PlayerScreen player) {
         mainAction: _buildMainActionButton(context, isMobile: isMobile),
         secondaryActions: _buildCircularActions(context, isMobile: isMobile),
         synopsis: _buildSynopsis(detailData, isCompact: !isMobile && width < 1200),
-        selectors: (!isMovieCategory && (resolvedTotalSeasons > 0 || currentSource != null)) ? Row(
+        selectors: (resolvedTotalSeasons > 0 || currentSource != null) ? Row(
           children: [
             if (currentSource != null)
               _ServerSelector(
@@ -3427,7 +3427,7 @@ void _openPlayer(PlayerScreen player) {
     required bool isMovieCategory,
   }) {
     // Senior Responsive Desktop Architecture: Dimensiones fluidas continuas para cualquier resolución de pantalla (Laptops -> 4K Ultrawide)
-    final double headerH = (width / 2.8).clamp(480.0, 540.0);
+    final double headerH = (width / 2.6).clamp(500.0, 560.0);
     final double overlayLeftPadding = 60.0; // Alineado permanentemente a 60px con los tabs inferiores en cualquier tamaño de ventana desktop
     final double synopsisWidth = (width * 0.46).clamp(400.0, 760.0);
     final double logoMaxWidth = (width * 0.32).clamp(320.0, 600.0);
@@ -3657,7 +3657,7 @@ void _openPlayer(PlayerScreen player) {
                       // BOTONES SUPERIORES (Integrados en el header para que se desplacen con el scroll)
                       _buildUpperButtons(context, desktopTop: 45),
 
-                      // OVERLAY DE INFORMACIÓN (FIJO ESPACIOSO / NO SCROLLEABLE)
+                      // OVERLAY DE INFORMACIÓN (Flujo natural top-to-bottom seguro contra desbordes)
                       Positioned.fill(
                         child: Padding(
                           padding: EdgeInsets.only(
@@ -3706,6 +3706,26 @@ void _openPlayer(PlayerScreen player) {
                                     width: synopsisWidth,
                                     child: _buildSynopsis(detailData, isCompact: isCompactHeader, isScrollable: true),
                                   ),
+                                ] else ...[
+                                  Row(
+                                    children: [
+                                      _SkeletonBox(width: 60, height: 20),
+                                      const SizedBox(width: 12),
+                                      _SkeletonBox(width: 80, height: 20),
+                                      const SizedBox(width: 12),
+                                      _SkeletonBox(width: 50, height: 20),
+                                    ],
+                                  ),
+                                  SizedBox(height: gapMetaToSynopsis),
+                                  Row(
+                                    children: [
+                                      _SkeletonBox(width: 50, height: 22, borderRadius: 4),
+                                      const SizedBox(width: 12),
+                                      _SkeletonBox(width: 350, height: 16),
+                                    ],
+                                  ),
+                                  SizedBox(height: gapMetaToSynopsis),
+                                  _SkeletonBox(width: synopsisWidth, height: 96),
                                 ],
                                 SizedBox(height: gapSynopsisToActions),
                                 // Botones de acción
@@ -3720,7 +3740,7 @@ void _openPlayer(PlayerScreen player) {
                                 ),
                                 SizedBox(height: gapActionsToSelectors),
                                 // Selectores
-                                if (!isMovieCategory && (totalSeasons > 0 || currentSource != null))
+                                if (totalSeasons > 0 || currentSource != null)
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -3842,15 +3862,15 @@ void _openPlayer(PlayerScreen player) {
             padding: EdgeInsets.only(
               left: overlayLeftPadding,
               top: topPadding,
-              bottom: 24,
               right: 32,
+              bottom: 24,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 _SkeletonBox(width: 420, height: 60),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 Row(
                   children: [
                     _SkeletonBox(width: 60, height: 20),
@@ -3860,12 +3880,14 @@ void _openPlayer(PlayerScreen player) {
                     _SkeletonBox(width: 50, height: 20),
                   ],
                 ),
-                const SizedBox(height: 16),
-                _SkeletonBox(width: 600, height: 40),
                 const SizedBox(height: 18),
+                _SkeletonBox(width: double.infinity, height: 16),
+                const SizedBox(height: 8),
+                _SkeletonBox(width: 500, height: 16),
+                const SizedBox(height: 24),
                 Row(
                   children: [
-                    _SkeletonBox(width: 180, height: 52, borderRadius: 26),
+                    _SkeletonBox(width: 180, height: 52, borderRadius: 12),
                     const SizedBox(width: 12),
                     _SkeletonBox(width: 52, height: 52, borderRadius: 26),
                     const SizedBox(width: 12),
@@ -3873,7 +3895,7 @@ void _openPlayer(PlayerScreen player) {
                   ],
                 ),
                 const SizedBox(height: 18),
-                _SkeletonBox(width: 280, height: 42),
+                _SkeletonBox(width: 220, height: 42, borderRadius: 8),
               ],
             ),
           ),
