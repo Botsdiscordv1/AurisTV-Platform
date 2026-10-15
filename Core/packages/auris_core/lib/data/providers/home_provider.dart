@@ -307,6 +307,64 @@ class HomeLayoutSection {
 
 /// Senior: Orchestrator for the Home Screen layout.
 /// Totalmente reactivo y asíncrono en múltiples etapas para máxima velocidad (UX Instantánea).
+/// Clave de deduplicación de secciones insensible a acentos/mayúsculas.
+///
+/// Motivo: la misma sección llega por dos rutas con títulos que solo difieren
+/// en la tilde — el editorial (`getEditorial`, que inyecta el TOP10 desde
+/// `/api/home/top10/personalized`, "Top 10 Animes del Dia") y `user/home`
+/// ("Top 10 Animes del Día"). Al deduplicar por título exacto se servían DOS
+/// secciones TOP10 en el home de Animes, y encima ganaba la de `user/home`
+/// (3 items) en lugar de la del endpoint (10 items).
+String _normalizeSectionTitle(String? title) {
+  if (title == null || title.isEmpty) return '';
+  return title
+      .toLowerCase()
+      .replaceAll('á', 'a')
+      .replaceAll('à', 'a')
+      .replaceAll('ä', 'a')
+      .replaceAll('â', 'a')
+      .replaceAll('é', 'e')
+      .replaceAll('è', 'e')
+      .replaceAll('ë', 'e')
+      .replaceAll('ê', 'e')
+      .replaceAll('í', 'i')
+      .replaceAll('ì', 'i')
+      .replaceAll('ï', 'i')
+      .replaceAll('î', 'i')
+      .replaceAll('ó', 'o')
+      .replaceAll('ò', 'o')
+      .replaceAll('ö', 'o')
+      .replaceAll('ô', 'o')
+      .replaceAll('ú', 'u')
+      .replaceAll('ù', 'u')
+      .replaceAll('ü', 'u')
+      .replaceAll('û', 'u')
+      .replaceAll('ñ', 'n')
+      .trim();
+}
+
+/// Reemplaza las secciones TOP10 de `personalized` por las homólogas de `raw`
+/// (misma sección, título que solo difiere en la tilde), conservando la
+/// posición. Así manda el endpoint `/api/home/top10/personalized` — que viaja
+/// en el editorial — y no la copia de `user/home`. Si `raw` no trae TOP10
+/// (p.ej. falló el editorial) se conserva la de `personalized` como fallback.
+List<HomeLayoutSection> _replaceTop10WithEndpoint(
+  List<HomeLayoutSection> personalized,
+  List<HomeLayoutSection> raw,
+) {
+  final rawTop10 = <String, HomeLayoutSection>{};
+  for (final s in raw) {
+    if (s.presentation == SectionPresentation.top10 && (s.title ?? '').isNotEmpty) {
+      rawTop10[_normalizeSectionTitle(s.title)] = s;
+    }
+  }
+  if (rawTop10.isEmpty) return personalized;
+  return personalized.map((s) {
+    if (s.presentation != SectionPresentation.top10 || (s.title ?? '').isEmpty) return s;
+    return rawTop10[_normalizeSectionTitle(s.title)] ?? s;
+  }).toList();
+}
+
 final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async* {
   final currentCategory = ref.watch(homeCategoryProvider);
   final repo = ref.watch(aurisRepositoryProvider);
@@ -338,8 +396,17 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
 
   void addUniqueSections(List<HomeLayoutSection> newSections) {
     for (final s in newSections) {
-      if (s.title != null && sectionTitles.add(s.title!)) {
+      final String key = _normalizeSectionTitle(s.title);
+      if (s.title != null && sectionTitles.add(key)) {
         rawSections.add(s);
+      } else if (s.presentation == SectionPresentation.top10) {
+        // La TOP10 del editorial (viene del endpoint /api/home/top10/personalized)
+        // es la fuente canónica: pisa a la copia de user/home que pudo haber
+        // llegado desde caché en la ETAPA 1, manteniendo su posición.
+        final idx = rawSections.indexWhere((x) =>
+            x.presentation == SectionPresentation.top10 &&
+            _normalizeSectionTitle(x.title) == key);
+        if (idx != -1) rawSections[idx] = s;
       } else if (s.type == HomeSectionType.continueWatching) {
         if (!rawSections.any((x) => x.type == HomeSectionType.continueWatching)) {
           rawSections.add(s);
@@ -401,9 +468,16 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
   // --- ETAPA 3: PERSONALIZACIÓN (Lenta ~4-10s) ---
   final homeResponse = await userHomeFuture;
   if (homeResponse.sections.isNotEmpty) {
-    final personalizedSections = _mapResponseToLayout(homeResponse, currentCategory);
+    // user/home trae su propia copia del TOP10 ("Top 10 Animes del Día", con
+    // tilde, ~3 items) que duplicaba a la del editorial/endpoint ("Top 10
+    // Animes del Dia", sin tilde, 10 items): se reemplaza por la del endpoint
+    // conservando la posición, y luego el dedupe normalizado deja UNA sola.
+    final personalizedSections = _replaceTop10WithEndpoint(
+      _mapResponseToLayout(homeResponse, currentCategory),
+      rawSections,
+    );
     await box.put(cacheKey, homeResponse.toJson());
-    
+
     if (currentCategory == 'inicio') {
       final combinedInterleaved = _interleaveInicioSections([
         personalizedSections,
@@ -414,11 +488,11 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
       final List<HomeLayoutSection> finalSections = [];
       final Set<String> finalTitles = {};
       for (final s in personalizedSections) {
-        if (s.title != null && finalTitles.add(s.title!)) finalSections.add(s);
+        if (s.title != null && finalTitles.add(_normalizeSectionTitle(s.title))) finalSections.add(s);
         else if (s.type == HomeSectionType.continueWatching) finalSections.add(s);
       }
       for (final s in rawSections) {
-        if (s.title != null && !finalTitles.contains(s.title)) finalSections.add(s);
+        if (s.title != null && !finalTitles.contains(_normalizeSectionTitle(s.title))) finalSections.add(s);
       }
       yield SectionComposer.compose(finalSections);
     }

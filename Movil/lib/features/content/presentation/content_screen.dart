@@ -1932,7 +1932,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ),
           secondaryActions: _buildCircularActions(context, isMobile: isMobile, poster: currentSource?.thumbnail, banner: heroBanner),
           synopsis: _buildSynopsis(detailData),
-          selectors: (!isMovieCategory && (displayTotalSeasons > 0 || currentSource != null)) ? Row(
+          selectors: (displayTotalSeasons > 0 || currentSource != null) ? Row(
             children: [
               if (currentSource != null)
                 Expanded(

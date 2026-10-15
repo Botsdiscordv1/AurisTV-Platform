@@ -1029,18 +1029,8 @@ class AurisRepositoryImpl implements AurisRepository {
     // en URLs sin temporada (corts "-part-2", slugs genéricos) la página ya es
     // la pedida y mandar season hace que el server la re-resuelva.
     final int? effectiveSeason = seasonForRequest(season, url);
-    
-    String effectiveUrl = url;
-    if (effectiveSeason != null && effectiveSeason <= 1) {
-      effectiveUrl = effectiveUrl
-          .replaceAll(RegExp(r'-(?:2nd|3rd|4th|\d+th)-season', caseSensitive: false), '')
-          .replaceAll(RegExp(r'-season-\d+', caseSensitive: false), '')
-          .replaceAll(RegExp(r'-temporada-\d+', caseSensitive: false), '')
-          .replaceAll(RegExp(r'-\d+da-temporada', caseSensitive: false), '')
-          .replaceAll(RegExp(r'-s\d+', caseSensitive: false), '');
-    }
 
-    final params = <String, dynamic>{'url': effectiveUrl, 'source': source};
+    final params = <String, dynamic>{'url': url, 'source': source};
     
     if (title != null) params['title'] = title;
     if (fullTitle != null) params['fullTitle'] = fullTitle;
