@@ -1652,7 +1652,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         const SizedBox(width: 8),
       ],
       _DetailIconButton(
-        icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.add,
+        icon: isFav ? AurisIcons.bookmarkMinusFilled : AurisIcons.add,
         label: isFav ? 'En mi lista' : 'Mi lista',
         onPressed: () {
           final user = ref.read(authProvider);

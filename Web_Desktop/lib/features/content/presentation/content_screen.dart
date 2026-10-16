@@ -2686,7 +2686,7 @@ void _openPlayer(PlayerScreen player) {
         ],
 
         _DetailIconButton(
-          icon: isFav ? AurisIcons.verify : AurisIcons.add,
+          icon: isFav ? AurisIcons.bookmarkMinusFilled : AurisIcons.add,
           label: isMobile ? 'Mi lista' : (isFav ? 'En mi lista' : 'Mi lista'),
           onPressed: () {
             final item = FavoriteItem(

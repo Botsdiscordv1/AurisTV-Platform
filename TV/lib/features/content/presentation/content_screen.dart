@@ -552,7 +552,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         ],
         SizedBox(width: spacing),
         _DetailIconButton(
-          icon: isFav ? AurisIcons.verify : AurisIcons.addCircleOutline,
+          icon: isFav ? AurisIcons.bookmarkMinusFilled : AurisIcons.addCircleOutline,
           filledIcon: isFav ? null : AurisIcons.addCircleFilled,
           label: isFav ? 'En mi lista' : 'Añadir a mi lista',
           onPressed: () {
