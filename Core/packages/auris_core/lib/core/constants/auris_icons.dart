@@ -105,6 +105,7 @@ class AurisIcons {
   // Usuario, Favoritos y Acciones (Outline / Filled)
   static String get bookmarkOutline => reiconSvg(Reicon.outline.bookmark);
   static String get bookmarkFilled => reiconSvg(Reicon.filled.bookmark);
+  static String get bookmarkMinusFilled => reiconSvg(Reicon.filled.bookmarkMinus);
   static String get add => reiconSvg(Reicon.outline.add);
   static String get addCircleOutline => reiconSvg(Reicon.outline.addCircle);
   static String get addCircleFilled => reiconSvg(Reicon.filled.addCircle);
