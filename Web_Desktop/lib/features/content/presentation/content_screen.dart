@@ -4477,7 +4477,6 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                           key: ValueKey('related_${item.title}_${item.poster}'),
                           title: item.title,
                           posterUrl: item.poster,
-                          subtitle: item.subtitle,
                           rating: item.rating,
                           showInfo: true,
                           onTap: item.onTap,

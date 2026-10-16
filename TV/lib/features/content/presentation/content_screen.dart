@@ -505,10 +505,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (widget.currentSource != null) ...[
-                  const SizedBox(height: 8),
-                  SourceChipsBar(sources: widget.sources, currentSource: widget.currentSource, onSourceSelected: widget.onSourceSelected, unavailableSources: widget.unavailableSources, season: widget.season),
-                ],
                 _buildRelatedCarousel(),
               ],
             ),
@@ -526,83 +522,104 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final bool isFav = ref.watch(favoritesProvider).any((f) => f.id == currentId);
     final latestHistory = ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title);
     
-    return Row(
-      mainAxisSize: MainAxisSize.min, 
-      children: [
-        _DetailIconButton(
-          icon: AurisIcons.play,
-          filledIcon: AurisIcons.playFilled,
-          label: (latestHistory != null && !latestHistory.isFinished) ? 'Reanudar' : 'Reproducir',
-          autofocus: true,
-          focusNode: _actionsRowFirstNode,
-          onPressed: widget.onPlay,
-          size: size,
-          iconSize: iconSize,
-        ),
-        if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime')) ...[
-          SizedBox(width: spacing),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min, 
+        children: [
           _DetailIconButton(
-            icon: AurisIcons.episodes,
-            filledIcon: AurisIcons.episodesFilled,
-            label: 'Episodios y más',
-            onPressed: () => widget.onShowEpisodes?.call(),
+            icon: AurisIcons.play,
+            filledIcon: AurisIcons.playFilled,
+            label: (latestHistory != null && !latestHistory.isFinished) ? 'Reanudar' : 'Reproducir',
+            autofocus: true,
+            focusNode: _actionsRowFirstNode,
+            onPressed: widget.onPlay,
             size: size,
             iconSize: iconSize,
           ),
-        ],
-        SizedBox(width: spacing),
-        _DetailIconButton(
-          icon: isFav ? AurisIcons.bookmarkMinusFilled : AurisIcons.addCircleOutline,
-          filledIcon: isFav ? null : AurisIcons.addCircleFilled,
-          label: isFav ? 'En mi lista' : 'Añadir a mi lista',
-          onPressed: () {
-            final user = ref.read(authProvider);
-            final item = FavoriteItem(
-              id: currentId,
-              title: widget.title,
-              posterUrl: widget.poster ?? '',
-              bannerUrl: widget.banner ?? '',
-              category: widget.category,
-              source: widget.source,
-              url: widget.url,
-              addedAt: DateTime.now(),
-              profileId: user?.activeProfileId ?? 'guest_profile',
-              kind: widget.kind,
-              year: widget.year,
-              type: widget.type,
-              season: widget.season,
-              // Todas las fuentes del detalle (paridad con search/home).
-              sources: flattenSources(
-                  ref.read(activeContentSourcesProvider)),
-            );
-            ref.read(favoritesProvider.notifier).toggleFavorite(item);
-          },
-          size: size,
-          iconSize: iconSize,
-        ),
-        SizedBox(width: spacing),
-        _DetailIconButton(icon: AurisIcons.docText, filledIcon: AurisIcons.docTextFilled, label: 'Detalles', onPressed: () => _openFullscreenDetails(d), size: size, iconSize: iconSize), 
-        if (_lastTrailerKey != null) ...[
-          SizedBox(width: spacing),
-          _DetailIconButton(icon: AurisIcons.trailer, filledIcon: AurisIcons.trailerFilled, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true), size: size, iconSize: iconSize),
-        ],
-        if (_trailerController != null && _showPlayer) ...[
+          if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime')) ...[
+            SizedBox(width: spacing),
+            _DetailIconButton(
+              icon: AurisIcons.episodes,
+              filledIcon: AurisIcons.episodesFilled,
+              label: 'Episodios y más',
+              onPressed: () => widget.onShowEpisodes?.call(),
+              size: size,
+              iconSize: iconSize,
+            ),
+          ],
           SizedBox(width: spacing),
           _DetailIconButton(
-            icon: _isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp, 
-            label: _isMuted ? 'Activar audio' : 'Silenciar', 
-            onPressed: () { 
-              setState(() { 
-                _isMuted = !_isMuted; 
-                if (_isMuted) _trailerController?.mute(); 
-                else { _trailerController?.unmute(); _trailerController!.setVolume(100); } 
-              }); 
-            }, 
-            size: size, 
-            iconSize: iconSize
-          )
+            icon: isFav ? AurisIcons.bookmarkMinusFilled : AurisIcons.addCircleOutline,
+            filledIcon: isFav ? null : AurisIcons.addCircleFilled,
+            label: isFav ? 'En mi lista' : 'Añadir a mi lista',
+            onPressed: () {
+              final user = ref.read(authProvider);
+              final item = FavoriteItem(
+                id: currentId,
+                title: widget.title,
+                posterUrl: widget.poster ?? '',
+                bannerUrl: widget.banner ?? '',
+                category: widget.category,
+                source: widget.source,
+                url: widget.url,
+                addedAt: DateTime.now(),
+                profileId: user?.activeProfileId ?? 'guest_profile',
+                kind: widget.kind,
+                year: widget.year,
+                type: widget.type,
+                season: widget.season,
+                // Todas las fuentes del detalle (paridad con search/home).
+                sources: flattenSources(
+                    ref.read(activeContentSourcesProvider)),
+              );
+              ref.read(favoritesProvider.notifier).toggleFavorite(item);
+            },
+            size: size,
+            iconSize: iconSize,
+          ),
+          SizedBox(width: spacing),
+          _DetailIconButton(icon: AurisIcons.docText, filledIcon: AurisIcons.docTextFilled, label: 'Detalles', onPressed: () => _openFullscreenDetails(d), size: size, iconSize: iconSize), 
+          if (_lastTrailerKey != null) ...[
+            SizedBox(width: spacing),
+            _DetailIconButton(icon: AurisIcons.trailer, filledIcon: AurisIcons.trailerFilled, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true), size: size, iconSize: iconSize),
+          ],
+          if (_trailerController != null && _showPlayer) ...[
+            SizedBox(width: spacing),
+            _DetailIconButton(
+              icon: _isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp, 
+              label: _isMuted ? 'Activar audio' : 'Silenciar', 
+              onPressed: () { 
+                setState(() { 
+                  _isMuted = !_isMuted; 
+                  if (_isMuted) _trailerController?.mute(); 
+                  else { _trailerController?.unmute(); _trailerController!.setVolume(100); } 
+                }); 
+              }, 
+              size: size, 
+              iconSize: iconSize
+            )
+          ],
+          if (widget.currentSource != null) ...[
+            SizedBox(width: spacing * 1.5),
+            SourceChipsBar(
+              sources: widget.sources,
+              currentSource: widget.currentSource,
+              onSourceSelected: widget.onSourceSelected,
+              unavailableSources: widget.unavailableSources,
+              season: widget.season,
+              embedded: true,
+              fontSize: ResponsiveUtils.sp(context, 13.0),
+              // Misma altura real que los _DetailIconButton:
+              // iconSize (20sp) + padding vertical del IconButton (4+4=8sp).
+              chipHeight: iconSize + ResponsiveUtils.sp(context, 8.0),
+              chipPadding: EdgeInsets.symmetric(
+                horizontal: ResponsiveUtils.sp(context, 14.0),
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 

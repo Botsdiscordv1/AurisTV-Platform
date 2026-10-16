@@ -53,6 +53,30 @@ List<PlaybackHistory> historyEntriesForContent(
 bool libraryIsMovieish(PlaybackHistory h) =>
     isMovieLike(h.category, h.title, h.durationInMilliseconds);
 
+/// Filtro de Continuar Viendo por pestaña de Home (UI).
+/// Centralizado en Core para que Movil/TV/Web_Desktop compartan la misma lógica.
+/// - animes: incluye 'anime' y 'movie_anime' (películas de anime viven en esta pestaña).
+/// - películas: movie-like SIN 'anime' (movie_anime no se cuela aquí).
+/// - series: contiene 'serie' o 'tv'.
+/// - kdrama: contiene 'kdrama' o 'dorama'.
+/// - inicio u otro: sin filtro (muestra todo).
+bool continueWatchingMatchesCategory(PlaybackHistory h, String uiCategory) {
+  final c = (h.category ?? '').toLowerCase();
+  switch (uiCategory) {
+    case 'animes':
+      return c.contains('anime');
+    case 'películas':
+      return (c.contains('movie') || c.contains('pelicula') || c.contains('película')) &&
+          !c.contains('anime');
+    case 'series':
+      return c.contains('serie') || c.contains('tv');
+    case 'kdrama':
+      return c.contains('kdrama') || c.contains('dorama');
+    default:
+      return true;
+  }
+}
+
 /// Título para tarjeta: limpia "Ep N •" en pelis. En series NO se antepone
 /// "Ep X" (ya va en el subtítulo "T1:E7 · Título" o "T2 E7 • ...").
 String libraryDisplayTitle(PlaybackHistory h) {

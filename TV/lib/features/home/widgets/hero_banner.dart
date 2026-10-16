@@ -60,8 +60,13 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   bool _isVisible = true;
 
   bool _isFocused = false; 
+  bool _isTransitioning = false;
 
   final FocusNode _playButtonFocusNode = FocusNode(); 
+  final FocusNode _favButtonFocusNode = FocusNode();
+  final FocusNode _detailsButtonFocusNode = FocusNode();
+  final FocusNode _trailerButtonFocusNode = FocusNode();
+  final FocusNode _muteButtonFocusNode = FocusNode();
   final FocusNode _prevButtonFocusNode = FocusNode();
   final FocusNode _nextButtonFocusNode = FocusNode();
 
@@ -137,6 +142,10 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
     _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
     _playButtonFocusNode.dispose();
+    _favButtonFocusNode.dispose();
+    _detailsButtonFocusNode.dispose();
+    _trailerButtonFocusNode.dispose();
+    _muteButtonFocusNode.dispose();
     _prevButtonFocusNode.dispose();
     _nextButtonFocusNode.dispose();
     _stopAutoPlay();
@@ -148,6 +157,21 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   MediaItem? get _currentContentItem {
     if (_contentIndex == -1) return null;
     return widget.items[_contentIndex % widget.items.length];
+  }
+
+  List<FocusNode> _getActiveActionFocusNodes(MediaItem item) {
+    final nodes = <FocusNode>[_playButtonFocusNode, _favButtonFocusNode, _detailsButtonFocusNode];
+    if (item.trailerKey != null && item.trailerKey!.isNotEmpty) {
+      nodes.add(_trailerButtonFocusNode);
+    }
+    if (_showTrailerLayer && _videoReady) {
+      nodes.add(_muteButtonFocusNode);
+    }
+    if (widget.items.length > 1) {
+      nodes.add(_prevButtonFocusNode);
+      nodes.add(_nextButtonFocusNode);
+    }
+    return nodes;
   }
 
   String? _lastNavButton; // 'prev', 'next', o null
@@ -173,6 +197,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   void _runCinematicSequence(int nextIndex) {
     if (widget.items.isEmpty || !_isAppActive) return;
 
+    _isTransitioning = true;
     _delayTimer?.cancel();
     _fadeTimer?.cancel();
     _disposeController();
@@ -192,15 +217,23 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
       
       _delayTimer = Timer(const Duration(milliseconds: 350), () {
         if (!mounted || !_isAppActive) return;
-        if (mounted) setState(() => _contentIndex = nextIndex);
+        if (mounted) setState(() {
+          _contentIndex = nextIndex;
+        });
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          if (_lastNavButton == 'prev' && _prevButtonFocusNode.canRequestFocus) {
-            _prevButtonFocusNode.requestFocus();
-          } else if (_lastNavButton == 'next' && _nextButtonFocusNode.canRequestFocus) {
-            _nextButtonFocusNode.requestFocus();
+          _isTransitioning = false;
+          if (_isFocused) {
+            if (_lastNavButton == 'prev' && _prevButtonFocusNode.canRequestFocus) {
+              _prevButtonFocusNode.requestFocus();
+            } else if (_lastNavButton == 'next' && _nextButtonFocusNode.canRequestFocus) {
+              _nextButtonFocusNode.requestFocus();
+            } else if (!_playButtonFocusNode.hasFocus) {
+              _playButtonFocusNode.requestFocus();
+            }
           }
+          _lastNavButton = null;
         });
 
         _delayTimer = Timer(const Duration(seconds: 1), () {
@@ -437,16 +470,17 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                 }
               });
             } else {
-              _startAutoPlay();
-              if (mounted) setState(() => _isFocused = false);
+              if (!_isTransitioning) {
+                _startAutoPlay();
+                if (mounted) setState(() => _isFocused = false);
+              }
             }
           },
           onKeyEvent: (node, event) {
             // D-pad desde los botones del hero (burbujea hasta este contenedor):
             // - Arriba: salto directo a la cápsula activa del topbar.
-            // - Abajo: primer elemento de la fila de abajo (típicamente el
-            //   único/primo de Continuar Viendo). El resto se ignora para no
-            //   interferir con botones.
+            // - Abajo: primer elemento de la fila de abajo.
+            // - Derecha: si estamos en el último botón de la fila, consumimos el evento para que no baje al carrusel inferior.
             if (event is KeyDownEvent) {
               if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
                 final target = widget.pillFocusNode;
@@ -457,6 +491,22 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
               } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
                 if (TvDirectionalFocus.focusFirstBelow()) {
                   return KeyEventResult.handled;
+                }
+              } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                final contentItem = _currentContentItem;
+                if (contentItem != null) {
+                  final activeNodes = _getActiveActionFocusNodes(contentItem);
+                  if (activeNodes.isNotEmpty && activeNodes.last.hasFocus) {
+                    return KeyEventResult.handled;
+                  }
+                }
+              } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                final contentItem = _currentContentItem;
+                if (contentItem != null) {
+                  final activeNodes = _getActiveActionFocusNodes(contentItem);
+                  if (activeNodes.isNotEmpty && activeNodes.first.hasFocus) {
+                    return KeyEventResult.handled;
+                  }
                 }
               }
             }
@@ -940,6 +990,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                             .watch(favoritesProvider)
                             .any((f) => f.id == item.id);
                         return _BannerIconButton(
+                          focusNode: _favButtonFocusNode,
                           icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.add,
                           label: isFav ? 'En mi lista' : 'Mi lista',
                           onPressed: () {
@@ -956,10 +1007,16 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                         );
                       }),
                       const SizedBox(width: 12),
-                      _BannerIconButton(icon: AurisIcons.info, label: 'Detalles', onPressed: () => widget.onDetails(item)),
+                      _BannerIconButton(
+                        focusNode: _detailsButtonFocusNode,
+                        icon: AurisIcons.info, 
+                        label: 'Detalles', 
+                        onPressed: () => widget.onDetails(item)
+                      ),
                       if (item.trailerKey != null) ...[
                         const SizedBox(width: 12),
                         _BannerIconButton(
+                          focusNode: _trailerButtonFocusNode,
                           icon: (kIsWeb && _showTrailerLayer) ? AurisIcons.close : AurisIcons.trailer,
                           label: 'Tráiler',
                           isLoading: _isTrailerLoading,
@@ -989,6 +1046,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                         Consumer(builder: (context, ref, _) {
                           final isMuted = ref.watch(heroBannerMutedProvider);
                           return _BannerIconButton(
+                            focusNode: _muteButtonFocusNode,
                             icon: isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp,
                             label: isMuted ? 'Activar audio' : 'Silenciar',
                             onPressed: () => ref.read(heroBannerMutedProvider.notifier).state = !isMuted,

@@ -544,7 +544,6 @@ List<HomeLayoutSection> _mapResponseToLayout(HomeResponse response, String categ
   layout.add(HomeLayoutSection(
     type: HomeSectionType.continueWatching,
     presentation: SectionPresentation.wide,
-    data: category == 'animes' ? 'anime' : null,
   ));
 
   SectionPresentation? lastPresentation;
@@ -772,7 +771,6 @@ Future<List<HomeLayoutSection>> _getEditorialFallback(Ref ref, String category) 
   layout.add(HomeLayoutSection(
     type: HomeSectionType.continueWatching,
     presentation: SectionPresentation.wide,
-    data: category == 'animes' ? 'anime' : null,
   ));
   layout.add(const HomeLayoutSection(
     type: HomeSectionType.top10Global, 

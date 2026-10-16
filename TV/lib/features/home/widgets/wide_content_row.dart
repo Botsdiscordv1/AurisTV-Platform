@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart' hide FocusableWideCard;
 import '../../../core/utils/tv_responsive_utils.dart';
@@ -40,6 +41,8 @@ class WideContentRow extends StatefulWidget {
   final List<WideContentItem> items;
   final void Function(WideContentItem item) onItemTap;
   final bool? hasSubtitle;
+  final bool Function()? onArrowRightOnLast;
+  final bool Function()? onArrowLeftOnFirst;
 
   const WideContentRow({
     super.key,
@@ -48,6 +51,8 @@ class WideContentRow extends StatefulWidget {
     required this.items,
     required this.onItemTap,
     this.hasSubtitle,
+    this.onArrowRightOnLast,
+    this.onArrowLeftOnFirst,
   });
 
   @override
@@ -63,6 +68,7 @@ class _WideContentRowState extends State<WideContentRow>
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
   int? _focusedIndex;
+  late List<FocusNode> _itemFocusNodes;
   // La copia de overlay arranca sin seleccionar (sin borde durante el vuelo)
   // y se selecciona al aterrizar: el realce florece con el glide, no antes.
   bool _overlaySelected = false;
@@ -78,6 +84,7 @@ class _WideContentRowState extends State<WideContentRow>
   @override
   void initState() {
     super.initState();
+    _initFocusNodes();
     _glideCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
@@ -94,8 +101,43 @@ class _WideContentRowState extends State<WideContentRow>
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
   }
 
+  void _initFocusNodes() {
+    _itemFocusNodes = List.generate(widget.items.length, (_) => FocusNode());
+  }
+
+  @override
+  void didUpdateWidget(covariant WideContentRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.items.length != oldWidget.items.length) {
+      for (final node in _itemFocusNodes) {
+        node.dispose();
+      }
+      _initFocusNodes();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+    }
+  }
+
+  bool focusFirstCard() {
+    if (_itemFocusNodes.isNotEmpty && _itemFocusNodes.first.canRequestFocus) {
+      _itemFocusNodes.first.requestFocus();
+      return true;
+    }
+    return false;
+  }
+
+  bool focusLastCard() {
+    if (_itemFocusNodes.isNotEmpty && _itemFocusNodes.last.canRequestFocus) {
+      _itemFocusNodes.last.requestFocus();
+      return true;
+    }
+    return false;
+  }
+
   @override
   void dispose() {
+    for (final node in _itemFocusNodes) {
+      node.dispose();
+    }
     _glideCtrl.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -224,6 +266,18 @@ class _WideContentRowState extends State<WideContentRow>
                               return Align(
                                 alignment: Alignment.topCenter,
                                 child: FocusableWideCard(
+                                  key: ValueKey(item.id),
+                                  focusNode: _itemFocusNodes[index],
+                                  onKeyEvent: (node, event) {
+                                    if (event is KeyDownEvent) {
+                                      if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
+                                        if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
+                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
+                                        if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
+                                      }
+                                    }
+                                    return KeyEventResult.ignored;
+                                  },
                                   title: item.title,
                                   imageUrl: item.imageUrl,
                                   logoUrl: item.logoUrl,

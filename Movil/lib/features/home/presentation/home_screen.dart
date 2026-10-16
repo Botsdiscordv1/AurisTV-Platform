@@ -1283,19 +1283,17 @@ class _LanguageItemState extends State<_LanguageItem> {
 
 class _ContinueWatchingSection extends ConsumerWidget {
   final double horizontalPadding;
-  final String? categoryFilter;
-  const _ContinueWatchingSection({required this.horizontalPadding, this.categoryFilter});
+  const _ContinueWatchingSection({required this.horizontalPadding});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final continueWatchingAsync = ref.watch(continueWatchingProvider);
+    final uiCategory = ref.watch(homeCategoryProvider);
 
     return continueWatchingAsync.when(
       data: (items) {
-        // Senior Logic: Aplicar filtro de categoría si se solicita (ej: 'anime')
-        final filteredItems = categoryFilter == null
-            ? items
-            : items.where((h) => h.category?.toLowerCase() == categoryFilter!.toLowerCase()).toList();
+        final filteredItems =
+            items.where((h) => continueWatchingMatchesCategory(h, uiCategory)).toList();
 
         if (filteredItems.isEmpty) return const SizedBox.shrink();
 
