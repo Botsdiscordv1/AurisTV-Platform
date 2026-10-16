@@ -28,6 +28,8 @@ class FocusableWideCard extends StatefulWidget {
   /// tarjeta original, así que esta fuerza el estado seleccionado (borde,
   /// gradiente, realce) aunque el nodo no tenga foco.
   final bool forceSelected;
+  final FocusNode? focusNode;
+  final FocusOnKeyEventCallback? onKeyEvent;
 
   const FocusableWideCard({
     super.key,
@@ -46,6 +48,8 @@ class FocusableWideCard extends StatefulWidget {
     this.onFocusChanged,
     this.forceInvisible = false,
     this.forceSelected = false,
+    this.focusNode,
+    this.onKeyEvent,
   });
 
   @override
@@ -74,6 +78,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
     return Opacity(
       opacity: widget.forceInvisible ? 0.0 : 1.0,
       child: Focus(
+      focusNode: widget.focusNode,
       onFocusChange: (focused) {
         setState(() => _isFocused = focused);
         widget.onFocusChanged?.call(focused);
@@ -86,6 +91,10 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
         }
       },
       onKeyEvent: (node, event) {
+        if (widget.onKeyEvent != null) {
+          final res = widget.onKeyEvent!(node, event);
+          if (res != KeyEventResult.ignored) return res;
+        }
         if (event is KeyDownEvent) {
           if (event.logicalKey == LogicalKeyboardKey.enter ||
               event.logicalKey == LogicalKeyboardKey.select ||

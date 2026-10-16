@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
@@ -12,6 +13,8 @@ class ContentRow extends StatefulWidget {
   final List<MediaItem> items;
   final double horizontalPadding;
   final void Function(MediaItem item) onItemTap;
+  final bool Function()? onArrowRightOnLast;
+  final bool Function()? onArrowLeftOnFirst;
 
   const ContentRow({
     super.key,
@@ -20,6 +23,8 @@ class ContentRow extends StatefulWidget {
     required this.items,
     required this.onItemTap,
     this.horizontalPadding = 48.0,
+    this.onArrowRightOnLast,
+    this.onArrowLeftOnFirst,
   });
 
   @override
@@ -33,12 +38,18 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
   bool _isHovered = false;
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
+  late List<FocusNode> _itemFocusNodes;
 
   @override
   void initState() {
     super.initState();
+    _initFocusNodes();
     // Verificación inicial después del primer frame para activar la flecha derecha si hay contenido
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+  }
+
+  void _initFocusNodes() {
+    _itemFocusNodes = List.generate(widget.items.length, (_) => FocusNode());
   }
 
   @override
@@ -46,8 +57,28 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     super.didUpdateWidget(oldWidget);
     // Recalcular indicadores si la lista de ítems cambia (ej: tras carga de API)
     if (widget.items.length != oldWidget.items.length) {
+      for (final node in _itemFocusNodes) {
+        node.dispose();
+      }
+      _initFocusNodes();
       WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
     }
+  }
+
+  bool focusFirstCard() {
+    if (_itemFocusNodes.isNotEmpty && _itemFocusNodes.first.canRequestFocus) {
+      _itemFocusNodes.first.requestFocus();
+      return true;
+    }
+    return false;
+  }
+
+  bool focusLastCard() {
+    if (_itemFocusNodes.isNotEmpty && _itemFocusNodes.last.canRequestFocus) {
+      _itemFocusNodes.last.requestFocus();
+      return true;
+    }
+    return false;
   }
 
   void _updateScrollIndicators() {
@@ -83,6 +114,9 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
 
   @override
   void dispose() {
+    for (final node in _itemFocusNodes) {
+      node.dispose();
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -92,7 +126,6 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     super.build(context); // Requerido por AutomaticKeepAliveClientMixin
     if (widget.items.isEmpty) return const SizedBox.shrink();
 
-    final width = MediaQuery.of(context).size.width;
     final isMobile = false; // Forzado para TV
     final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
     
@@ -140,7 +173,8 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                 const SizedBox(height: 16), // Gap ampliado: deja respirar el pop-out del póster enfocado
               ],
             ),
-          ),          MouseRegion(
+          ),
+          MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
             child: Stack(
@@ -158,10 +192,6 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                         },
                         child: Focus(
                           canRequestFocus: false, // La lista no atrapa el foco
-                          // skipTraversal eliminado para permitir que el motor vea los posters internos
-                          // Foco entra a la sección -> anclarla debajo del
-                          // topbar. this.context = la fila (título incluido);
-                          // el context del builder sería el LayoutBuilder.
                           onFocusChange: (focused) {
                             if (focused && mounted) {
                               TvScroll.anchorSectionBelowTopbar(this.context);
@@ -183,6 +213,17 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                                 width: cardWidth,
                                 child: FocusablePosterCard(
                                   key: ValueKey(item.id),
+                                  focusNode: _itemFocusNodes[index],
+                                  onKeyEvent: (node, event) {
+                                    if (event is KeyDownEvent) {
+                                      if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
+                                        if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
+                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
+                                        if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
+                                      }
+                                    }
+                                    return KeyEventResult.ignored;
+                                  },
                                   title: item.title,
                                   posterUrl: item.posterUrl,
                                   rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
@@ -199,13 +240,12 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                   }
                 ),
                 
-                // Flecha Izquierda (excluida del D-pad cuando está oculta:
-                // invisible + enfocable = trampa de foco, igual que en el hero)
+                // Flecha Izquierda
                 if (!isMobile)
                   Positioned(
                     left: horizontalPadding - 25,
                     top: 10,
-                    bottom: 60, // Ajustado para nuevo posterHeight
+                    bottom: 60,
                     child: ExcludeFocus(
                       excluding: !(_isHovered && _canScrollLeft),
                       child: AnimatedOpacity(
@@ -226,12 +266,12 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                     ),
                   ),
 
-                // Flecha Derecha (excluida del D-pad cuando está oculta)
+                // Flecha Derecha
                 if (!isMobile)
                   Positioned(
                     right: horizontalPadding - 25,
                     top: 10,
-                    bottom: 60, // Ajustado para nuevo posterHeight
+                    bottom: 60,
                     child: ExcludeFocus(
                       excluding: !(_isHovered && _canScrollRight),
                       child: AnimatedOpacity(

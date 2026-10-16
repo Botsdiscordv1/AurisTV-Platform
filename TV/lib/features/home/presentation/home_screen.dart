@@ -99,6 +99,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   bool _isScrolled = false;
   bool _splashRemoved = false;
   bool _isTopBarFocused = false;
+  bool _isAppStartup = true;
+  final List<GlobalKey> _sectionRowKeys = [];
   final FocusNode _searchIconFocusNode = FocusNode();
   final FocusNode _overlaySearchFocusNode = FocusNode();
   bool _showSearch = false;
@@ -150,10 +152,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     }
   }
 
-  Widget _buildSection(ComposedHomeSection section, double horizontalPadding) {
+  Widget _buildSection(
+    ComposedHomeSection section, 
+    double horizontalPadding, {
+    Key? key,
+    bool Function()? onArrowRightOnLast,
+    bool Function()? onArrowLeftOnFirst,
+  }) {
     switch (section.type) {
       case HomeSectionType.continueWatching:
-        return _ContinueWatchingSection(horizontalPadding: horizontalPadding);
+        return _ContinueWatchingSection(
+          key: key,
+          horizontalPadding: horizontalPadding,
+          onArrowRightOnLast: onArrowRightOnLast,
+          onArrowLeftOnFirst: onArrowLeftOnFirst,
+        );
 
       case HomeSectionType.editorial:
       case HomeSectionType.discovery:
@@ -161,79 +174,130 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
         if (row.format == SectionPresentation.top10) {
           return RepaintBoundary(
             child: EditorialContentRow(
+              key: key,
               title: row.title,
               subtitle: row.subtitle,
               items: row.items,
               badge: row.badge,
               forceTopDesign: true,
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+              onArrowRightOnLast: onArrowRightOnLast,
+              onArrowLeftOnFirst: onArrowLeftOnFirst,
             ),
           );
         } else if (row.format == SectionPresentation.wide) {
           return RepaintBoundary(
             child: WideContentRow(
+              key: key,
               title: row.title,
               subtitle: row.subtitle,
               items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
               onItemTap: (wideItem) => openTVDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
+              onArrowRightOnLast: onArrowRightOnLast,
+              onArrowLeftOnFirst: onArrowLeftOnFirst,
             ),
           );
         } else {
           return RepaintBoundary(
             child: EditorialContentRow(
+              key: key,
               title: row.title,
               subtitle: row.subtitle,
               items: row.items,
               badge: row.badge,
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+              onArrowRightOnLast: onArrowRightOnLast,
+              onArrowLeftOnFirst: onArrowLeftOnFirst,
             ),
           );
         }
 
       case HomeSectionType.top10Global:
-        return _Top10Section(title: section.title ?? 'Top 10 de hoy', horizontalPadding: horizontalPadding);
+        return _Top10Section(
+          key: key,
+          title: section.title ?? 'Top 10 de hoy', 
+          horizontalPadding: horizontalPadding,
+          onArrowRightOnLast: onArrowRightOnLast,
+          onArrowLeftOnFirst: onArrowLeftOnFirst,
+        );
 
       case HomeSectionType.recentlyAdded:
-        return _RecentlyAddedSection(title: section.title ?? 'ReciÃ©n aÃ±adido', horizontalPadding: horizontalPadding);
+        return _RecentlyAddedSection(
+          key: key,
+          title: section.title ?? 'Recién añadido', 
+          horizontalPadding: horizontalPadding,
+          onArrowRightOnLast: onArrowRightOnLast,
+          onArrowLeftOnFirst: onArrowLeftOnFirst,
+        );
 
       case HomeSectionType.trendingAnime:
-        return _TrendingSection(category: 'animes', title: section.title ?? 'Animes en tendencia', horizontalPadding: horizontalPadding);
+        return _TrendingSection(
+          key: key,
+          category: 'animes', 
+          title: section.title ?? 'Animes en tendencia', 
+          horizontalPadding: horizontalPadding,
+          onArrowRightOnLast: onArrowRightOnLast,
+          onArrowLeftOnFirst: onArrowLeftOnFirst,
+        );
 
       case HomeSectionType.trendingMovies:
-        return _TrendingSection(category: 'pelÃ­culas', title: section.title ?? 'PelÃ­culas destacadas', horizontalPadding: horizontalPadding, isWide: true);
+        return _TrendingSection(
+          key: key,
+          category: 'películas', 
+          title: section.title ?? 'Películas destacadas', 
+          horizontalPadding: horizontalPadding, 
+          isWide: true,
+          onArrowRightOnLast: onArrowRightOnLast,
+          onArrowLeftOnFirst: onArrowLeftOnFirst,
+        );
 
       case HomeSectionType.recentEpisodes:
-        return _RecentEpisodesSection(title: section.title ?? 'Estrenos (Hoy)', horizontalPadding: horizontalPadding);
+        return _RecentEpisodesSection(
+          key: key,
+          title: section.title ?? 'Estrenos (Hoy)', 
+          horizontalPadding: horizontalPadding,
+          onArrowRightOnLast: onArrowRightOnLast,
+          onArrowLeftOnFirst: onArrowLeftOnFirst,
+        );
 
       case HomeSectionType.recommendation:
         final row = section.data as EditorialRow;
         if (row.format == SectionPresentation.top10) {
           return RepaintBoundary(
             child: EditorialContentRow(
+              key: key,
               title: row.title,
               subtitle: row.subtitle,
               items: row.items,
               badge: row.badge,
               forceTopDesign: true,
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+              onArrowRightOnLast: onArrowRightOnLast,
+              onArrowLeftOnFirst: onArrowLeftOnFirst,
             ),
           );
         } else if (row.format == SectionPresentation.wide) {
           return RepaintBoundary(
             child: WideContentRow(
+              key: key,
               title: row.title,
               subtitle: row.subtitle,
               items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
               onItemTap: (wideItem) => openTVDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
+              onArrowRightOnLast: onArrowRightOnLast,
+              onArrowLeftOnFirst: onArrowLeftOnFirst,
             ),
           );
         } else {
           return RepaintBoundary(
             child: ContentRow(
+              key: key,
               title: row.title,
               subtitle: row.subtitle,
               items: row.items,
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+              onArrowRightOnLast: onArrowRightOnLast,
+              onArrowLeftOnFirst: onArrowLeftOnFirst,
             ),
           );
         }
@@ -301,11 +365,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                 data: (displayItems) {
                   if (displayItems.isEmpty) return const SliverToBoxAdapter(child: HeroBannerSkeleton());
 
+                  final bool shouldAutofocus = _isAppStartup && currentCategory == 'inicio';
+                  if (shouldAutofocus) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => _isAppStartup = false);
+                    });
+                  }
+
                   return SliverToBoxAdapter(
                     child: RepaintBoundary(
                       child: HeroBanner(
                         key: _heroKey,
-                        autofocus: true,
+                        autofocus: shouldAutofocus,
                         items: displayItems,
                         currentCategory: currentCategory,
                         // D-pad arriba desde el hero -> cÃ¡psula activa del topbar.
@@ -347,19 +418,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
               const SliverToBoxAdapter(child: SizedBox(height: 0)), // Reducido de 8 a 0 para pegar mÃ¡s las filas al Hero
 
-              // 2. Contenido dinÃ¡mico
+              // 2. Contenido dinámico
               if (currentCategory == 'inicio') 
                 layoutAsync.when(
-                  data: (sections) => SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        return RepaintBoundary(
-                          child: _buildSection(sections[index], horizontalPadding),
-                        );
-                      },
-                      childCount: sections.length,
-                    ),
-                  ),
+                  data: (sections) {
+                    while (_sectionRowKeys.length < sections.length) {
+                      _sectionRowKeys.add(GlobalKey());
+                    }
+                    if (_sectionRowKeys.length > sections.length) {
+                      _sectionRowKeys.length = sections.length;
+                    }
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          return RepaintBoundary(
+                            child: _buildSection(
+                              sections[index], 
+                              horizontalPadding,
+                              key: _sectionRowKeys[index],
+                              onArrowRightOnLast: index + 1 < sections.length
+                                  ? () {
+                                      final state = _sectionRowKeys[index + 1].currentState;
+                                      if (state != null) {
+                                        try {
+                                          return (state as dynamic).focusFirstCard() == true;
+                                        } catch (_) {}
+                                      }
+                                      return false;
+                                    }
+                                  : null,
+                              onArrowLeftOnFirst: index > 0
+                                  ? () {
+                                      final state = _sectionRowKeys[index - 1].currentState;
+                                      if (state != null) {
+                                        try {
+                                          return (state as dynamic).focusLastCard() == true;
+                                        } catch (_) {}
+                                      }
+                                      return false;
+                                    }
+                                  : null,
+                            ),
+                          );
+                        },
+                        childCount: sections.length,
+                      ),
+                    );
+                  },
                   loading: () => SliverToBoxAdapter(
                     child: Column(
                       children: List.generate(3, (index) => const RowSkeleton()),
@@ -369,16 +474,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                 )
               else
                 layoutAsync.when(
-                  data: (sections) => SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        return RepaintBoundary(
-                          child: _buildSection(sections[index], horizontalPadding),
-                        );
-                      },
-                      childCount: sections.length,
-                    ),
-                  ),
+                  data: (sections) {
+                    while (_sectionRowKeys.length < sections.length) {
+                      _sectionRowKeys.add(GlobalKey());
+                    }
+                    if (_sectionRowKeys.length > sections.length) {
+                      _sectionRowKeys.length = sections.length;
+                    }
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          return RepaintBoundary(
+                            child: _buildSection(
+                              sections[index], 
+                              horizontalPadding,
+                              key: _sectionRowKeys[index],
+                              onArrowRightOnLast: index + 1 < sections.length
+                                  ? () {
+                                      final state = _sectionRowKeys[index + 1].currentState;
+                                      if (state != null) {
+                                        try {
+                                          return (state as dynamic).focusFirstCard() == true;
+                                        } catch (_) {}
+                                      }
+                                      return false;
+                                    }
+                                  : null,
+                              onArrowLeftOnFirst: index > 0
+                                  ? () {
+                                      final state = _sectionRowKeys[index - 1].currentState;
+                                      if (state != null) {
+                                        try {
+                                          return (state as dynamic).focusLastCard() == true;
+                                        } catch (_) {}
+                                      }
+                                      return false;
+                                    }
+                                  : null,
+                            ),
+                          );
+                        },
+                        childCount: sections.length,
+                      ),
+                    );
+                  },
                   loading: () => SliverToBoxAdapter(
                     child: Column(
                       children: List.generate(3, (index) => const RowSkeleton()),
@@ -762,24 +901,31 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
 
 class _ContinueWatchingSection extends ConsumerWidget {
   final double horizontalPadding;
-  final String? categoryFilter;
-  const _ContinueWatchingSection({required this.horizontalPadding, this.categoryFilter});
+  final bool Function()? onArrowRightOnLast;
+  final bool Function()? onArrowLeftOnFirst;
+  const _ContinueWatchingSection({
+    super.key,
+    required this.horizontalPadding,
+    this.onArrowRightOnLast,
+    this.onArrowLeftOnFirst,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync = ref.watch(continueWatchingProvider);
+    final uiCategory = ref.watch(homeCategoryProvider);
 
     return historyAsync.when(
       data: (items) {
-        // Senior Logic: Filtrar por categorÃ­a si se especifica
-        final filteredItems = categoryFilter == null
-            ? items
-            : items.where((h) => h.category?.toLowerCase() == categoryFilter!.toLowerCase()).toList();
+        final filteredItems =
+            items.where((h) => continueWatchingMatchesCategory(h, uiCategory)).toList();
 
         if (filteredItems.isEmpty) return const SizedBox.shrink();
 
         return WideContentRow(
           title: 'Continuar Viendo',
+          onArrowRightOnLast: onArrowRightOnLast,
+          onArrowLeftOnFirst: onArrowLeftOnFirst,
           items: filteredItems.take(10).map((h) {
             // LÃ³gica centralizada en Core (library_providers): solo diseÃ±o aquÃ­.
             final bool isMovieish = libraryIsMovieish(h);
@@ -837,7 +983,15 @@ class _ContinueWatchingSection extends ConsumerWidget {
 class _Top10Section extends ConsumerWidget {
   final String title;
   final double horizontalPadding;
-  const _Top10Section({required this.title, required this.horizontalPadding});
+  final bool Function()? onArrowRightOnLast;
+  final bool Function()? onArrowLeftOnFirst;
+  const _Top10Section({
+    super.key,
+    required this.title,
+    required this.horizontalPadding,
+    this.onArrowRightOnLast,
+    this.onArrowLeftOnFirst,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -849,6 +1003,8 @@ class _Top10Section extends ConsumerWidget {
         badge: EditorialBadge.mythical,
         forceTopDesign: true,
         onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+        onArrowRightOnLast: onArrowRightOnLast,
+        onArrowLeftOnFirst: onArrowLeftOnFirst,
       ),
       loading: () => const RowSkeleton(),
       error: (_, __) => const SizedBox.shrink(),
@@ -859,7 +1015,15 @@ class _Top10Section extends ConsumerWidget {
 class _RecentlyAddedSection extends ConsumerWidget {
   final String title;
   final double horizontalPadding;
-  const _RecentlyAddedSection({required this.title, required this.horizontalPadding});
+  final bool Function()? onArrowRightOnLast;
+  final bool Function()? onArrowLeftOnFirst;
+  const _RecentlyAddedSection({
+    super.key,
+    required this.title,
+    required this.horizontalPadding,
+    this.onArrowRightOnLast,
+    this.onArrowLeftOnFirst,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -870,6 +1034,8 @@ class _RecentlyAddedSection extends ConsumerWidget {
         items: items,
         horizontalPadding: horizontalPadding,
         onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+        onArrowRightOnLast: onArrowRightOnLast,
+        onArrowLeftOnFirst: onArrowLeftOnFirst,
       ),
       loading: () => const RowSkeleton(),
       error: (_, __) => const SizedBox.shrink(),
@@ -882,7 +1048,17 @@ class _TrendingSection extends ConsumerWidget {
   final String title;
   final double horizontalPadding;
   final bool isWide;
-  const _TrendingSection({required this.category, required this.title, required this.horizontalPadding, this.isWide = false});
+  final bool Function()? onArrowRightOnLast;
+  final bool Function()? onArrowLeftOnFirst;
+  const _TrendingSection({
+    super.key,
+    required this.category,
+    required this.title,
+    required this.horizontalPadding,
+    this.isWide = false,
+    this.onArrowRightOnLast,
+    this.onArrowLeftOnFirst,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -892,6 +1068,8 @@ class _TrendingSection extends ConsumerWidget {
         if (isWide) {
           return WideContentRow(
             title: title,
+            onArrowRightOnLast: onArrowRightOnLast,
+            onArrowLeftOnFirst: onArrowLeftOnFirst,
             items: items.map((m) {
               final rawSub = m.subtitle;
               final isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
@@ -909,6 +1087,8 @@ class _TrendingSection extends ConsumerWidget {
           items: items,
           horizontalPadding: horizontalPadding,
           onItemTap: (item) => openTVDetails(context, item, category),
+          onArrowRightOnLast: onArrowRightOnLast,
+          onArrowLeftOnFirst: onArrowLeftOnFirst,
         );
       },
       loading: () => RowSkeleton(isWide: isWide),
@@ -920,7 +1100,15 @@ class _TrendingSection extends ConsumerWidget {
 class _RecentEpisodesSection extends ConsumerWidget {
   final String title;
   final double horizontalPadding;
-  const _RecentEpisodesSection({required this.title, required this.horizontalPadding});
+  final bool Function()? onArrowRightOnLast;
+  final bool Function()? onArrowLeftOnFirst;
+  const _RecentEpisodesSection({
+    super.key,
+    required this.title,
+    required this.horizontalPadding,
+    this.onArrowRightOnLast,
+    this.onArrowLeftOnFirst,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -928,6 +1116,8 @@ class _RecentEpisodesSection extends ConsumerWidget {
     return asyncData.when(
       data: (items) => WideContentRow(
         title: title,
+        onArrowRightOnLast: onArrowRightOnLast,
+        onArrowLeftOnFirst: onArrowLeftOnFirst,
         items: items.map((m) {
           final rawSub = m.subtitle;
           final isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());

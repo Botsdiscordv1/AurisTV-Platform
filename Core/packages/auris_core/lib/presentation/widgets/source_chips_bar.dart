@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/source_utils.dart';
@@ -19,6 +20,17 @@ class SourceChipsBar extends ConsumerStatefulWidget {
   final void Function(int) onSourceSelected;
   final Set<String>? unavailableSources;
   final int? season;
+  /// Tamaño de fuente de los chips (null = 13 por defecto).
+  final double? fontSize;
+  /// Padding interno de cada chip (null = 14x8 por defecto).
+  final EdgeInsetsGeometry? chipPadding;
+  /// Altura fija de cada chip (null = altura intrínseca del texto+padding).
+  /// Usado en TV para equiparar la altura de los botones de acción (42sp).
+  final double? chipHeight;
+  /// Si es true, no envuelve en SingleChildScrollView (el padre gestiona el
+  /// scroll). Usado en TV para embeber los chips al final de la fila de
+  /// botones de acción con la misma jerarquía visual.
+  final bool embedded;
 
   const SourceChipsBar({
     super.key,
@@ -27,6 +39,10 @@ class SourceChipsBar extends ConsumerStatefulWidget {
     required this.onSourceSelected,
     this.unavailableSources,
     this.season,
+    this.fontSize,
+    this.chipPadding,
+    this.chipHeight,
+    this.embedded = false,
   });
 
   @override ConsumerState<SourceChipsBar> createState() => _SourceChipsBarState();
@@ -70,42 +86,49 @@ class _SourceChipsBarState extends ConsumerState<SourceChipsBar> {
     final indices = _groupedIndices();
     if (indices.isEmpty) return const SizedBox.shrink();
 
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int idx = 0; idx < indices.length; idx++) ...[
+          Builder(builder: (context) {
+            final i = indices[idx];
+            final name = simplifySourceName(widget.sources[i].source);
+            final bool isNew = !_seen.contains(name);
+            if (isNew) {
+              // Agregamos a seen de forma segura en el siguiente frame si es necesario, 
+              // pero para la lógica de animación, basta con saber que no estaba.
+              // Senior Elite: Usamos un post-frame para actualizar el Set sin romper el build.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && !_seen.contains(name)) {
+                  setState(() => _seen.add(name));
+                }
+              });
+            }
+
+            return _SourceItem(
+              key: ValueKey('item_${widget.sources[i].source}_${widget.sources[i].url}'),
+              source: widget.sources[i],
+              isSelected: widget.currentSource != null && widget.sources[i].url == widget.currentSource!.url,
+              animate: isNew,
+              season: widget.season,
+              fontSize: widget.fontSize,
+              chipPadding: widget.chipPadding,
+              chipHeight: widget.chipHeight,
+              onTap: () => widget.onSourceSelected(i),
+            );
+          }),
+          if (idx < indices.length - 1) const SizedBox(width: 8),
+        ],
+      ],
+    );
+
+    if (widget.embedded) return row;
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (int idx = 0; idx < indices.length; idx++) ...[
-              Builder(builder: (context) {
-                final i = indices[idx];
-                final name = simplifySourceName(widget.sources[i].source);
-                final bool isNew = !_seen.contains(name);
-                if (isNew) {
-                  // Agregamos a seen de forma segura en el siguiente frame si es necesario, 
-                  // pero para la lógica de animación, basta con saber que no estaba.
-                  // Senior Elite: Usamos un post-frame para actualizar el Set sin romper el build.
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted && !_seen.contains(name)) {
-                      setState(() => _seen.add(name));
-                    }
-                  });
-                }
-
-                return _SourceItem(
-                  key: ValueKey('item_${widget.sources[i].source}_${widget.sources[i].url}'),
-                  source: widget.sources[i],
-                  isSelected: widget.currentSource != null && widget.sources[i].url == widget.currentSource!.url,
-                  animate: isNew,
-                  season: widget.season,
-                  onTap: () => widget.onSourceSelected(i),
-                );
-              }),
-              if (idx < indices.length - 1) const SizedBox(width: 8),
-            ],
-          ],
-        ),
+        child: row,
       ),
     );
   }
@@ -116,6 +139,9 @@ class _SourceItem extends ConsumerStatefulWidget {
   final bool isSelected;
   final bool animate;
   final int? season;
+  final double? fontSize;
+  final EdgeInsetsGeometry? chipPadding;
+  final double? chipHeight;
   final VoidCallback onTap;
 
   const _SourceItem({
@@ -124,6 +150,9 @@ class _SourceItem extends ConsumerStatefulWidget {
     required this.isSelected,
     required this.animate,
     this.season,
+    this.fontSize,
+    this.chipPadding,
+    this.chipHeight,
     required this.onTap,
   });
 
@@ -166,6 +195,18 @@ class _SourceItemState extends ConsumerState<_SourceItem> {
         onExit: (_) => setState(() => _hovered = false),
         child: Focus(
           onFocusChange: (hasFocus) => setState(() => _focused = hasFocus),
+          // TV: OK explícito (InkWell no siempre activa con select en todos
+          // los firmwares). Mismo patrón que _DetailIconButton/_NetflixListButton.
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent &&
+                (event.logicalKey == LogicalKeyboardKey.enter ||
+                    event.logicalKey == LogicalKeyboardKey.select ||
+                    event.logicalKey == LogicalKeyboardKey.space)) {
+              widget.onTap();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
           // Mismo lenguaje que las pills del player: escala 0.95 → 1.0 al
           // enfocar (anclada arriba) y píldora blanca con texto negro.
           child: AnimatedScale(
@@ -181,7 +222,31 @@ class _SourceItemState extends ConsumerState<_SourceItem> {
 
   Widget _chipBody(String label) {
     final bool highlighted = _isActive || widget.isSelected;
+    // Con altura fija (TV): solo padding horizontal + Center (la altura la
+    // gobierna chipHeight).
+    final bool fixedHeight = widget.chipHeight != null;
+    final EdgeInsetsGeometry padding;
+    if (fixedHeight) {
+      final ep = widget.chipPadding;
+      padding = EdgeInsets.symmetric(
+        horizontal: ep is EdgeInsets ? ep.left : 14,
+      );
+    } else {
+      padding = widget.chipPadding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 8);
+    }
+
+    final Widget text = Text(
+      label,
+      style: TextStyle(
+        color: highlighted ? Colors.black : const Color(0xFFC8C8CE),
+        fontSize: widget.fontSize ?? 13,
+        fontWeight: highlighted ? FontWeight.w700 : FontWeight.w500,
+        height: 1.0,
+      ),
+    );
+
     return Container(
+      height: widget.chipHeight,
       decoration: BoxDecoration(
         color: highlighted ? Colors.white : Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(999),
@@ -197,17 +262,9 @@ class _SourceItemState extends ConsumerState<_SourceItem> {
           hoverColor: Colors.transparent,
           highlightColor: Colors.transparent,
           splashColor: Colors.white.withOpacity(0.1),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: highlighted ? Colors.black : const Color(0xFFC8C8CE),
-                fontSize: 13,
-                fontWeight: highlighted ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ),
+          child: fixedHeight
+              ? Center(child: Padding(padding: padding, child: text))
+              : Padding(padding: padding, child: text),
         ),
       ),
     );

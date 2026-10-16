@@ -835,11 +835,13 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                   : Text(
                       item.title.toUpperCase(), 
                       style: TextStyle(
-                        fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.sm ? 22 : 26), 
+                        fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.sm ? 18 : 22), 
                         fontWeight: FontWeight.w900, 
                         color: Colors.white, 
                         height: 1.1
-                      )
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
             ),
             const SizedBox(width: 12),
@@ -1034,15 +1036,17 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           Text(
             item.title.toUpperCase(), 
             style: TextStyle(
-              fontSize: titleFontSize * (isIntermediate ? 0.9 : 1.2), 
+              fontSize: titleFontSize * (isIntermediate ? 0.65 : 0.85), 
               fontWeight: FontWeight.w900, 
               color: Colors.white, 
-              height: 0.9,
-              letterSpacing: -1,
+              height: 1.0,
+              letterSpacing: -0.5,
               shadows: [
                 Shadow(color: Colors.black.withOpacity(0.5), offset: const Offset(0, 4), blurRadius: 10)
               ]
-            )
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         
         SizedBox(height: isIntermediate ? 10 : 16),

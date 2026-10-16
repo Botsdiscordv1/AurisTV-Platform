@@ -5011,6 +5011,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           ),
                           onPressed: _toggleFullscreen,
                         ),
+                        if (!_useVideoFitCycle) ...[
+                          IconButton(
+                            iconSize: iconSize,
+                            icon: AurisIcon(
+                              _videoFit == BoxFit.contain
+                                ? AurisIcons.aspectRatioSquare
+                                : (_videoFit == BoxFit.fill ? AurisIcons.expand : AurisIcons.exitFullscreen),
+                              color: Colors.white,
+                            ),
+                            onPressed: _cycleVideoFit,
+                          ),
+                        ],
                         if (!_isMobileDevice) ...[
                           SizedBox(width: spacing),
                           _buildPlayPauseButton(size: playSize),

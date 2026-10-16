@@ -117,6 +117,116 @@ final animeThemesProvider = FutureProvider.autoDispose
   );
 });
 
+/// --- RELATIONS MULTI-FUENTE (PROGRESIVAS) ---
+/// Clave de dedupe: título normalizado (sin "(Serie)", sin acentos/puntuación).
+String _relationDedupeKey(RelatedInfo rel) => rel.title
+    .replaceAll(RegExp(r'\s*\([Ss]erie\)'), '')
+    .trim()
+    .toLowerCase()
+    .replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+/// Clasifica relaciones crudas en el mapa de UI (franchise/similar/recommended).
+UnifiedRelationsMap classifyUnifiedRelations(Iterable<RelatedInfo> relations) {
+  final Map<String, RelatedInfo> franchiseMap = {};
+  final Map<String, RelatedInfo> similarMap = {};
+  final Map<String, RelatedInfo> recommendedMap = {};
+  for (var rel in relations) {
+    final key = _relationDedupeKey(rel);
+    final type = rel.relation.toLowerCase();
+    final bool isStrictFranchise = rel.category == 'franquicia' ||
+        type.contains('precuela') ||
+        type.contains('secuela') ||
+        type.contains('historia paralela') ||
+        type.contains('ova') ||
+        type.contains('ona') ||
+        type.contains('spin-off');
+    final bool isSimilar = rel.category == 'relacionado' ||
+        type.contains('similar') ||
+        type.contains('género');
+    if (isStrictFranchise) {
+      franchiseMap[key] = rel;
+    } else if (isSimilar) {
+      similarMap[key] = rel;
+    } else {
+      recommendedMap[key] = rel;
+    }
+  }
+  return {
+    'franchise': franchiseMap.values.toList(),
+    'similar': similarMap.values.toList(),
+    'recommended': recommendedMap.values.toList(),
+  };
+}
+
+/// Notifier multi-fuente: lanza `getRelations` para cada fuente del detalle
+/// EN PARALELO y fusiona progresivamente (dedupe first-wins por título
+/// normalizado) conforme llega cada respuesta. No espera a que terminen todas.
+/// Idempotente: `updateSources` solo lanza fuentes cuya clave `source|url`
+/// no se haya lanzado aún.
+class _MultiSourceRelationsNotifier
+    extends StateNotifier<AsyncValue<UnifiedRelationsMap>> {
+  final Ref ref;
+  final Map<String, RelatedInfo> _all = {};
+  final Set<String> _launched = {};
+  int _pending = 0;
+  bool _emittedFirst = false;
+
+  _MultiSourceRelationsNotifier(this.ref) : super(const AsyncValue.loading());
+
+  void updateSources(List<SearchResult> sources,
+      {required String category, required bool isAnimeCategory}) {
+    if (!mounted) return;
+    final repo = ref.read(aurisRepositoryProvider);
+    for (final src in sources) {
+      if (src.url.isEmpty) continue;
+      final key = '${src.source}|${src.url}';
+      if (!_launched.add(key)) continue;
+      _pending++;
+      repo
+          .getRelations(
+            src.url,
+            source: isAnimeCategory ? src.source : null,
+            category: category,
+          )
+          .timeout(const Duration(seconds: 10))
+          .then((relList) {
+            if (!mounted) return;
+            _pending--;
+            if (relList.isNotEmpty) {
+              for (var rel
+                  in relList.map((r) => r.copyWith(source: src.source))) {
+                _all.putIfAbsent(_relationDedupeKey(rel), () => rel);
+              }
+              _emittedFirst = true;
+              state = AsyncValue.data(classifyUnifiedRelations(_all.values));
+            } else if (!_emittedFirst && _pending == 0) {
+              _emittedFirst = true;
+              state = const AsyncValue.data({});
+            }
+          })
+          .catchError((_) {
+            if (!mounted) return;
+            _pending--;
+            if (!_emittedFirst && _pending == 0) {
+              _emittedFirst = true;
+              state = const AsyncValue.data({});
+            }
+          });
+    }
+    // Ninguna fuente válida lanzada → estado vacío (no quedarse en loading).
+    if (_pending == 0 && !_emittedFirst && _launched.isEmpty) {
+      state = const AsyncValue.data({});
+    }
+  }
+}
+
+/// Relations multi-fuente progresivas (todas las fuentes en paralelo, fusión
+/// conforme llega cada una). Compartido por las 3 apps vía unifiedContentProvider.
+final multiSourceRelationsProvider = StateNotifierProvider.autoDispose<
+    _MultiSourceRelationsNotifier, AsyncValue<UnifiedRelationsMap>>((ref) {
+  return _MultiSourceRelationsNotifier(ref);
+});
+
 /// --- PROVEEDOR MAESTRO UNIFICADO (V14 - SELECTION LOCK) ---
 final unifiedContentProvider = Provider.autoDispose
     .family<UnifiedContentState, UnifiedDetailParams>((ref, params) {
@@ -200,10 +310,27 @@ final unifiedContentProvider = Provider.autoDispose
       ? (allSources.firstWhereOrNull((s) => '${s.source}|${s.url}' == effectiveKey) ?? (allSources.isNotEmpty ? allSources.first : null))
       : (allSources.isNotEmpty ? allSources.first : null);
 
-  // 6. Carga Progresiva (Paso 1: Fast -> Paso 2: Full + Cast + Relations -> Paso 3: Merge)
+  // 6. Carga Progresiva (Paso 1: Fast -> Paso 2: Full + Cast -> Paso 3: Merge)
+  // Relations: multi-fuente progresivas (todas las fuentes en paralelo,
+  // fusión conforme llega cada una). No dependen de la fuente activa.
   AsyncValue<GroupedEpisodesResult?> episodesAsync = const AsyncValue.loading();
   AsyncValue<List<CastInfo>> castAsync = const AsyncValue.loading();
-  AsyncValue<UnifiedRelationsMap> relationsAsync = const AsyncValue.loading();
+  final AsyncValue<UnifiedRelationsMap> relationsAsync =
+      ref.watch(multiSourceRelationsProvider);
+
+  final isAnimeCat = params.category.toLowerCase().contains('anime') ||
+      params.category.toLowerCase().contains('movie_anime');
+  if (allSources.isNotEmpty) {
+    Future.microtask(() {
+      try {
+        ref.read(multiSourceRelationsProvider.notifier).updateSources(
+              allSources,
+              category: params.category,
+              isAnimeCategory: isAnimeCat,
+            );
+      } catch (_) {}
+    });
+  }
 
   if (selected != null) {
     final detailData = detailAsync.valueOrNull;
@@ -230,7 +357,6 @@ final unifiedContentProvider = Provider.autoDispose
 
     episodesAsync = progState.episodes;
     castAsync = progState.cast;
-    relationsAsync = progState.relations;
   }
 
   // OP/ED aparte del detail: no bloquean la ficha (AnimeThemes podía colgar
@@ -376,23 +502,19 @@ class ProgressiveParams {
 class ProgressiveContentState {
   final AsyncValue<GroupedEpisodesResult?> episodes;
   final AsyncValue<List<CastInfo>> cast;
-  final AsyncValue<UnifiedRelationsMap> relations;
 
   const ProgressiveContentState({
     this.episodes = const AsyncValue.loading(),
     this.cast = const AsyncValue.loading(),
-    this.relations = const AsyncValue.loading(),
   });
 
   ProgressiveContentState copyWith({
     AsyncValue<GroupedEpisodesResult?>? episodes,
     AsyncValue<List<CastInfo>>? cast,
-    AsyncValue<UnifiedRelationsMap>? relations,
   }) {
     return ProgressiveContentState(
       episodes: episodes ?? this.episodes,
       cast: cast ?? this.cast,
-      relations: relations ?? this.relations,
     );
   }
 }
@@ -607,7 +729,6 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
         state = state.copyWith(
           episodes: AsyncValue.error(err, st),
           cast: const AsyncValue.data([]),
-          relations: const AsyncValue.data({}),
         );
         return;
       }
@@ -694,7 +815,6 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
 
     // Paso 2 — Solo DESPUÉS de pintar el paso 1, dispara en background (paralelo entre sí)
     final effectiveTmdbId = fastRes.tmdbId ?? _params.tmdbId;
-    final isAnimeCategory = _params.category.toLowerCase().contains('anime') || _params.category.toLowerCase().contains('movie_anime');
 
     // A) GET /api/episodes?url={U}&source={S}&title={T}&fullTitle={FT}&season={N}&year={Y}[&tmdbId={id}]
     final fullEpisodesTask = () async {
@@ -856,62 +976,7 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       }
     }();
 
-    // C) Relations → movies: GET /api/relations?url={U} | anime: GET /api/relations?url={U}&source={S}
-    final relationsTask = () async {
-      try {
-        final relList = await repo.getRelations(
-          _params.url,
-          source: isAnimeCategory ? _params.source : null,
-          category: _params.category,
-        ).timeout(const Duration(seconds: 10));
-
-        if (!mounted) return;
-
-        if (relList.isEmpty) {
-          state = state.copyWith(relations: const AsyncValue.data({}));
-          return;
-        }
-
-        final Map<String, RelatedInfo> franchiseMap = {};
-        final Map<String, RelatedInfo> similarMap = {};
-        final Map<String, RelatedInfo> recommendedMap = {};
-
-        for (var rel in relList) {
-          final key = rel.title.replaceAll(RegExp(r'\s*\([Ss]erie\)'), '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-          final type = rel.relation.toLowerCase();
-
-          bool isStrictFranchise = rel.category == 'franquicia' ||
-                                   type.contains('precuela') ||
-                                   type.contains('secuela') ||
-                                   type.contains('historia paralela') ||
-                                   type.contains('ova') ||
-                                   type.contains('ona') ||
-                                   type.contains('spin-off');
-
-          bool isSimilar = rel.category == 'relacionado' ||
-                           type.contains('similar') ||
-                           type.contains('género');
-
-          if (isStrictFranchise) franchiseMap[key] = rel;
-          else if (isSimilar) similarMap[key] = rel;
-          else recommendedMap[key] = rel;
-        }
-
-        final relMap = {
-          'franchise': franchiseMap.values.toList(),
-          'similar': similarMap.values.toList(),
-          'recommended': recommendedMap.values.toList(),
-        };
-
-        state = state.copyWith(relations: AsyncValue.data(relMap));
-      } catch (e) {
-        debugPrint('[ProgressiveContent] Task C (Relations) failed or timed out: $e');
-        if (!mounted) return;
-        state = state.copyWith(relations: const AsyncValue.data({}));
-      }
-    }();
-
-    await Future.wait([fullEpisodesTask, castTask, relationsTask]);
+    await Future.wait([fullEpisodesTask, castTask]);
   }
 
   /// Overlay solo de título/sinopsis desde el cache Hive local.

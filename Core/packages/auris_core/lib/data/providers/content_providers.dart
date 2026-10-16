@@ -251,22 +251,6 @@ class GroupedEpisodesParams {
 String episodesSignature(String selectedUrl, int? season) =>
     '$selectedUrl|${season ?? 0}';
 
-class UnifiedRelationsParams {
-  final List<SearchResult> sources;
-  final String signature;
-
-  const UnifiedRelationsParams({required this.sources, required this.signature});
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is UnifiedRelationsParams &&
-          signature == other.signature;
-
-  @override
-  int get hashCode => signature.hashCode;
-}
-
 class GroupedEpisodesResult {
   final EpisodesResponse response;
   final List<SearchResult?> sources;
@@ -612,48 +596,6 @@ final AutoDisposeFutureProviderFamily<PlayerEpisodesState, ({String url, String 
     isLoading: false,
   );
 });
-
-final unifiedRelationsProvider = StateNotifierProvider.autoDispose.family<_UnifiedRelationsNotifier, AsyncValue<UnifiedRelationsMap>, UnifiedRelationsParams>((ref, params) {
-  return _UnifiedRelationsNotifier(ref, params.sources);
-});
-
-class _UnifiedRelationsNotifier extends StateNotifier<AsyncValue<UnifiedRelationsMap>> {
-  final Ref ref; final List<SearchResult> sources; final Map<String, RelatedInfo> _allRelationsMap = {};
-  _UnifiedRelationsNotifier(this.ref, this.sources) : super(const AsyncValue.loading()) { _load(); }
-
-  void _load() async {
-    if (sources.isEmpty) { state = const AsyncValue.data({}); return; }
-    int finished = 0;
-    for (final src in sources) {
-      ref.read(episodesProvider(EpisodesParams(url: src.url, source: src.source, category: 'anime', season: src.season)).future).then((EpisodesResponse? res) {
-        finished++; if (!mounted || res == null) return;
-        if (res.relations.isNotEmpty) {
-          final relationsWithSource = res.relations.map((r) => r.copyWith(source: src.source)).toList();
-          _updateWithRelations(relationsWithSource);
-        } else if (finished == sources.length && state is AsyncLoading) { state = const AsyncValue.data({}); }
-      }).catchError((_) {
-        finished++; if (mounted && finished == sources.length && state is AsyncLoading) { state = const AsyncValue.data({}); }
-        return null;
-      });
-    }
-  }
-
-  void _updateWithRelations(List<RelatedInfo> newRelations) {
-    final Map<String, RelatedInfo> franchiseMap = {}; final Map<String, RelatedInfo> similarMap = {}; final Map<String, RelatedInfo> recommendedMap = {};
-    for (var rel in newRelations) {
-      final key = rel.title.replaceAll(RegExp(r'\s*\([Ss]erie\)'), '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-      if (!_allRelationsMap.containsKey(key)) _allRelationsMap[key] = rel;
-    }
-    for (var rel in _allRelationsMap.values) {
-      final key = rel.title.replaceAll(RegExp(r'\s*\([Ss]erie\)'), '').trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-      final type = rel.relation.toLowerCase();
-      bool isStrictFranchise = rel.category == 'franquicia' || type.contains('precuela') || type.contains('secuela') || type.contains('historia paralela') || type.contains('ova') || type.contains('ona') || type.contains('spin-off');
-      bool isSimilar = rel.category == 'relacionado' || type.contains('similar') || type.contains('género');
-      if (isStrictFranchise) franchiseMap[key] = rel; else if (isSimilar) similarMap[key] = rel; else recommendedMap[key] = rel;
-    }
-    state = AsyncValue.data({'franchise': franchiseMap.values.toList(), 'similar': similarMap.values.toList(), 'recommended': recommendedMap.values.toList()});
-  }
-}
 
 /// Guardia anti-variantes: si las fuentes curadas (calendario/búsqueda) ya
 /// cubren una familia (JKAnime, AnimeAV1...), un descubierto de la MISMA

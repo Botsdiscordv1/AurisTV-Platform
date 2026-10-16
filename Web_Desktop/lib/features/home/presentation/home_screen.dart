@@ -179,12 +179,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildSection(ComposedHomeSection section, double horizontalPadding) {
     if (section.type == HomeSectionType.continueWatching) {
-      // Pass category filter if provided in data hint from provider
-      final String? categoryFilter = section.data is String ? section.data as String : null;
-      return _ContinueWatchingSection(
-        horizontalPadding: horizontalPadding,
-        categoryFilter: categoryFilter
-      );
+      return _ContinueWatchingSection(horizontalPadding: horizontalPadding);
     }
 
     final SectionSeeMore? verMas = section.data is EditorialRow ? (section.data as EditorialRow).verMas : null;
@@ -902,19 +897,17 @@ class _LanguageButtonState extends State<_LanguageButton> {
 
 class _ContinueWatchingSection extends ConsumerWidget {
   final double horizontalPadding;
-  final String? categoryFilter;
-  const _ContinueWatchingSection({required this.horizontalPadding, this.categoryFilter});
+  const _ContinueWatchingSection({required this.horizontalPadding});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final continueWatchingAsync = ref.watch(continueWatchingProvider);
+    final uiCategory = ref.watch(homeCategoryProvider);
 
     return continueWatchingAsync.when(
       data: (items) {
-        // Senior Logic: Aplicar filtro de categoría si se solicita (ej: 'anime')
-        final filteredItems = categoryFilter == null
-            ? items
-            : items.where((h) => h.category?.toLowerCase() == categoryFilter!.toLowerCase()).toList();
+        final filteredItems =
+            items.where((h) => continueWatchingMatchesCategory(h, uiCategory)).toList();
 
         if (filteredItems.isEmpty) return const SizedBox.shrink();
 

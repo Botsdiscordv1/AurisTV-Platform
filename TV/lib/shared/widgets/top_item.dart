@@ -9,6 +9,8 @@ class TopItem extends StatelessWidget {
   final double height;
   final double textOffset;
   final VoidCallback onTap;
+  final FocusNode? focusNode;
+  final FocusOnKeyEventCallback? onKeyEvent;
 
   const TopItem({
     super.key,
@@ -17,6 +19,8 @@ class TopItem extends StatelessWidget {
     required this.height,
     required this.textOffset,
     required this.onTap,
+    this.focusNode,
+    this.onKeyEvent,
   });
 
   @override
@@ -119,6 +123,8 @@ class TopItem extends StatelessWidget {
               width: posterWidth,
               child: FocusablePosterCard(
                 key: ValueKey(item.id),
+                focusNode: focusNode,
+                onKeyEvent: onKeyEvent,
                 title: item.title,
                 posterUrl: item.posterUrl,
                 rating: formatRating(item.rating),

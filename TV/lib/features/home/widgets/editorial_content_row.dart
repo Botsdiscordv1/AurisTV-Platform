@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
 import '../../../core/utils/tv_responsive_utils.dart';
@@ -14,6 +15,8 @@ class EditorialContentRow extends StatefulWidget {
   final EditorialBadge badge;
   final bool forceTopDesign;
   final void Function(MediaItem item) onItemTap;
+  final bool Function()? onArrowRightOnLast;
+  final bool Function()? onArrowLeftOnFirst;
 
   const EditorialContentRow({
     super.key,
@@ -23,6 +26,8 @@ class EditorialContentRow extends StatefulWidget {
     required this.badge,
     required this.onItemTap,
     this.forceTopDesign = false,
+    this.onArrowRightOnLast,
+    this.onArrowLeftOnFirst,
   });
 
   @override
@@ -36,12 +41,46 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   bool _isHovered = false;
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
+  late List<FocusNode> _itemFocusNodes;
 
   @override
   void initState() {
     super.initState();
+    _initFocusNodes();
     _scrollController.addListener(_updateScrollIndicators);
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+  }
+
+  void _initFocusNodes() {
+    _itemFocusNodes = List.generate(widget.items.length, (_) => FocusNode());
+  }
+
+  @override
+  void didUpdateWidget(covariant EditorialContentRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.items.length != oldWidget.items.length) {
+      for (final node in _itemFocusNodes) {
+        node.dispose();
+      }
+      _initFocusNodes();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+    }
+  }
+
+  bool focusFirstCard() {
+    if (_itemFocusNodes.isNotEmpty && _itemFocusNodes.first.canRequestFocus) {
+      _itemFocusNodes.first.requestFocus();
+      return true;
+    }
+    return false;
+  }
+
+  bool focusLastCard() {
+    if (_itemFocusNodes.isNotEmpty && _itemFocusNodes.last.canRequestFocus) {
+      _itemFocusNodes.last.requestFocus();
+      return true;
+    }
+    return false;
   }
 
   void _updateScrollIndicators() {
@@ -75,6 +114,9 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
 
   @override
   void dispose() {
+    for (final node in _itemFocusNodes) {
+      node.dispose();
+    }
     _scrollController.removeListener(_updateScrollIndicators);
     _scrollController.dispose();
     super.dispose();
@@ -175,6 +217,17 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                       width: cardWidth,
                       child: FocusablePosterCard(
                         key: ValueKey(item.id),
+                        focusNode: _itemFocusNodes[index],
+                        onKeyEvent: (node, event) {
+                          if (event is KeyDownEvent) {
+                            if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
+                              if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
+                            } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
+                              if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
+                            }
+                          }
+                          return KeyEventResult.ignored;
+                        },
                         title: item.title,
                         posterUrl: item.posterUrl,
                         rating: formatRating(item.rating),
@@ -265,11 +318,23 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                         itemCount: widget.items.length.clamp(0, 10),
                         itemBuilder: (context, index) {
                           final item = widget.items[index];
+                          final int itemCount = widget.items.length.clamp(0, 10);
                           return TopItem(
                             index: index,
                             item: item,
                             height: posterHeight,
                             textOffset: 0,
+                            focusNode: _itemFocusNodes[index],
+                            onKeyEvent: (node, event) {
+                              if (event is KeyDownEvent) {
+                                if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == itemCount - 1) {
+                                  if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
+                                } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
+                                  if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
+                                }
+                              }
+                              return KeyEventResult.ignored;
+                            },
                             onTap: () => widget.onItemTap(item),
                           );
                         },
