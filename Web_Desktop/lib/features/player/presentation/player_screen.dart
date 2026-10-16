@@ -2084,6 +2084,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     videoUrl = ApiEndpoints.fixUrl(videoUrl);
     final bool isHls = videoUrl.contains('.m3u8');
 
+    // Config remota de playback: dispara la descarga (no bloquea) y usa los
+    // valores actuales; si aún no cargó, defaults = valores hardcodeados previos.
+    final pcfg = ref.read(playbackConfigProvider).valueOrNull ?? PlaybackConfig.defaults;
+    PlaybackTelemetry.instance.configure(pcfg);
+    PlaybackTelemetry.instance.beginSession();
+
     // Senior Quality Fix: Guardar el stream base para poder volver a "Automático".
     _currentStreamUrl = videoUrl;
     _currentStreamHeaders = headers;
@@ -2265,6 +2271,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // esos sí reintentan la misma URL como antes.
         if (!_isTrailer && _extractRefreshCount < _kMaxExtractRefresh) {
           _extractRefreshCount++;
+          PlaybackTelemetry.instance.markError('AURI1002');
           final wait = Duration(seconds: _extractRefreshCount == 1 ? 2 : 5);
           debugPrint('[player recovery] URL expirada? Refresh extract #$_extractRefreshCount en ${wait.inSeconds}s...');
           Future.delayed(wait, () {
@@ -2302,12 +2309,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
 
       debugPrint('[player] error: $message');
+      final errInfo = describePlaybackError(message);
+      PlaybackTelemetry.instance.markError(errInfo.code);
       Future.delayed(const Duration(milliseconds: 1200), () {
         if (!mounted) return;
         if (player.state.playing) return;
         setState(() {
           _isLoading = false;
-          _playbackError = message;
+          _playbackError = errInfo.display;
         });
       });
     });
@@ -2335,6 +2344,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (!mounted) return;
       _reportStatusToRemote(); // Reportar a Auris Remote
       final ms = pos.inMilliseconds;
+      if (ms > 0) PlaybackTelemetry.instance.markFirstFrame();
       final duration = player.state.duration.inMilliseconds;
 
       // Senior UI Fix: la carga termina cuando la posición avanza de verdad
@@ -2441,11 +2451,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
 
     _bufferingSubscription = player.stream.buffering.listen((buffering) {
+      if (buffering) {
+        PlaybackTelemetry.instance.markBufferingStart();
+      } else {
+        PlaybackTelemetry.instance.markBufferingEnd();
+      }
       if (!mounted) return;
       if (player.state.playing && buffering) return;
       _bufferingDebounceTimer?.cancel();
       if (buffering) {
-        _bufferingDebounceTimer = Timer(const Duration(milliseconds: 2500), () {
+        _bufferingDebounceTimer = Timer(Duration(milliseconds: pcfg.bufferingDebounceMs), () {
           if (mounted) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) setState(() => _isLoading = true);
@@ -2517,10 +2532,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('video-sync', 'audio'); 
         platform.setProperty('mc', '0'); 
         platform.setProperty('autosync', '30'); 
-        platform.setProperty('audio-buffer', '3'); 
+        platform.setProperty('audio-buffer', '${pcfg.audioBufferSecWeb}'); 
         platform.setProperty('volume-max', '200');
         platform.setProperty('cache-pause', 'yes'); 
-        platform.setProperty('stream-buffer-size', '10MiB'); 
+        platform.setProperty('stream-buffer-size', pcfg.streamBufferSizeWeb); 
         platform.setProperty('vd-lavc-threads', '8'); 
         platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: Usar auto-safe para evitar bloqueos si el codec falla
         platform.setProperty('tls-verify', 'no');
@@ -2919,6 +2934,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _finalSaveOnDispose(ms, duration);
     }
     
+    PlaybackTelemetry.instance.endSession();
     _historyNotifier?.flush();
 
     WidgetsBinding.instance.removeObserver(this);

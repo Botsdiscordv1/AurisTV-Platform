@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:collection/collection.dart';
 import '../../auris_core.dart';
+import 'playback_config_provider.dart';
 import 'playback_history_provider.dart';
 
 enum PlayerUIState { none, mini, full, pip }
@@ -122,9 +123,11 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
   void initPlayerIfNeeded() {
     if (state.player != null) return;
 
+    // Knob de server (GET /api/client-config); si aún no cargó, el default
+    // es exactamente el bufferSize anterior hardcodeado (32 MiB).
     final player = Player(
-      configuration: const PlayerConfiguration(
-        bufferSize: 32 * 1024 * 1024,
+      configuration: PlayerConfiguration(
+        bufferSize: playbackConfigSync(ref).bufferSizeBytes,
       ),
     );
     
