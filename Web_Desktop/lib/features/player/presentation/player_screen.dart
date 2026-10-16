@@ -95,7 +95,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return _allTracks[i].quality;
   }
 
-  // StreamSubscription<Tracks>? _tracksSubscription;
+  StreamSubscription<Tracks>? _tracksSubscription;
+  /// Marca el stream para el que ya elegimos audio (evita re-forzar si el
+  /// usuario cambia de pista manualmente).
+  String? _audioAutoSelectedForUrl;
   WebViewController? _webViewController;
   bool _hasInitialized = false;
 
@@ -2018,6 +2021,52 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
+  /// ¿La pista de audio es Español? (por language normalizado o por título).
+  bool _isSpanishAudio(AudioTrack? t) {
+    if (t == null) return false;
+    final lang = (t.language ?? '').toLowerCase().trim();
+    final title = (t.title ?? '').toLowerCase().trim();
+    if (lang == 'es' ||
+        lang == 'spa' ||
+        lang == 'esp' ||
+        lang.startsWith('es-') ||
+        lang.startsWith('es_') ||
+        lang.startsWith('spa') ||
+        lang.startsWith('esp')) {
+      return true;
+    }
+    return title.contains('español') ||
+        title.contains('espanol') ||
+        title.contains('castellano') ||
+        title.contains('latino') ||
+        title.contains('spanish') ||
+        title == 'spa' ||
+        title == 'esp' ||
+        title == 'es';
+  }
+
+  /// Selecciona automáticamente Español cuando el contenedor trae varias pistas
+  /// de audio (ej: HLS con EXT-X-MEDIA ES DEFAULT + EN). Se aplica una vez por
+  /// stream para no pelear con un cambio manual del usuario.
+  void _maybeAutoSelectSpanishAudio(Player player, Tracks tracks) {
+    if (_isTrailer || _isOpEd) return;
+    final autos =
+        tracks.audio.where((t) => t.id != 'auto' && t.id != 'no').toList();
+    if (autos.length <= 1) return;
+    final key = _currentStreamUrl;
+    if (_audioAutoSelectedForUrl == key) return;
+    if (_isSpanishAudio(player.state.track.audio)) {
+      _audioAutoSelectedForUrl = key;
+      return;
+    }
+    final es = autos.firstWhereOrNull(_isSpanishAudio);
+    if (es == null) return;
+    _audioAutoSelectedForUrl = key;
+    debugPrint(
+        '[player audio] auto-ES: id=${es.id} title=${es.title} lang=${es.language}');
+    player.setAudioTrack(es);
+  }
+
   Future<void> _initPlayer(String videoUrl, [Map<String, String> headers = const {}]) async {
     // Senior Youtube Fix: Detectar URLs de YouTube para usar el player especializado
     // y evitar errores del motor nativo (MPV) sin yt-dlp.
@@ -2160,6 +2209,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _errorSubscription?.cancel();
     _logSubscription?.cancel();
     _playingSubscription?.cancel();
+    _tracksSubscription?.cancel();
+    _audioAutoSelectedForUrl = null;
 
     // Si el video arranca a reproducirse (p.ej. tras un error de codec no
     // fatal en una pista de audio), retiramos cualquier cartel de error.
@@ -2184,6 +2235,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           clearLoad();
         }
       }
+    });
+
+    // Audio multi-pista (HLS EXT-X-MEDIA ES/EN): mpv arranca con la primera
+    // pista; forzamos Español una vez aparecen las pistas reales.
+    _tracksSubscription = player.stream.tracks.listen((tracks) {
+      if (mounted) _maybeAutoSelectSpanishAudio(player, tracks);
     });
 
     _errorSubscription = player.stream.error.listen((message) {
@@ -2849,6 +2906,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _errorSubscription?.cancel();
     _logSubscription?.cancel();
     _playingSubscription?.cancel();
+    _tracksSubscription?.cancel();
     _ytController?.close();
 
     final ms = _player?.state.position.inMilliseconds ?? 0;
