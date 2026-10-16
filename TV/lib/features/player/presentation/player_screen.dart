@@ -2367,6 +2367,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // en el PC); hay que apuntar a la IP real de la LAN para que el dispositivo
     // pueda llegar al servidor.
     videoUrl = ApiEndpoints.fixUrl(videoUrl);
+
+    // Config remota de playback: dispara la descarga (no bloquea) y usa los
+    // valores actuales; si aún no cargó, defaults = valores hardcodeados previos.
+    final pcfg = ref.read(playbackConfigProvider).valueOrNull ?? PlaybackConfig.defaults;
+    PlaybackTelemetry.instance.setPlatformOverride('tv');
+    PlaybackTelemetry.instance.configure(pcfg);
+    PlaybackTelemetry.instance.beginSession();
+
     final bool isHls = videoUrl.contains('.m3u8');
 
     // Senior Quality Fix: Guardar el stream base para poder volver a "Automático".
@@ -2496,6 +2504,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // esos sí reintentan la misma URL como antes.
         if (!_isTrailer && _extractRefreshCount < _kMaxExtractRefresh) {
           _extractRefreshCount++;
+          PlaybackTelemetry.instance.markError('AURI1002');
           final wait = Duration(seconds: _extractRefreshCount == 1 ? 2 : 5);
           debugPrint('[player recovery] URL expirada? Refresh extract #$_extractRefreshCount en ${wait.inSeconds}s...');
           Future.delayed(wait, () {
@@ -2533,12 +2542,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
 
       debugPrint('[player] error: $message');
+      final errInfo = describePlaybackError(message);
+      PlaybackTelemetry.instance.markError(errInfo.code);
       Future.delayed(const Duration(milliseconds: 1200), () {
         if (!mounted) return;
         if (player.state.playing) return;
         setState(() {
           _isLoading = false;
-          _playbackError = message;
+          _playbackError = errInfo.display;
         });
       });
     });
@@ -2566,6 +2577,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (!mounted) return;
       _reportStatusToRemote(); // Reportar a Auris Remote
       final ms = pos.inMilliseconds;
+      if (ms > 0) PlaybackTelemetry.instance.markFirstFrame();
       final duration = player.state.duration.inMilliseconds;
 
       // Senior UI Fix: la carga termina cuando la posición avanza de verdad
@@ -2670,11 +2682,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
 
     _bufferingSubscription = player.stream.buffering.listen((buffering) {
+      if (buffering) {
+        PlaybackTelemetry.instance.markBufferingStart();
+      } else {
+        PlaybackTelemetry.instance.markBufferingEnd();
+      }
       if (!mounted) return;
       if (player.state.playing && buffering) return;
       _bufferingDebounceTimer?.cancel();
       if (buffering) {
-        _bufferingDebounceTimer = Timer(const Duration(milliseconds: 2500), () {
+        _bufferingDebounceTimer = Timer(Duration(milliseconds: pcfg.bufferingDebounceMs), () {
           if (mounted) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) setState(() => _isLoading = true);
@@ -2752,12 +2769,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('autosync', '1'); 
         
         // Colchón de audio estable (5s)
-        platform.setProperty('audio-buffer', '5'); 
+        platform.setProperty('audio-buffer', '${pcfg.audioBufferSecFor(kIsWeb)}'); 
         platform.setProperty('volume-max', '200');
         platform.setProperty('cache-pause', 'yes'); 
         
         // Bloque de lectura equilibrado
-        platform.setProperty('stream-buffer-size', '16MiB'); 
+        platform.setProperty('stream-buffer-size', pcfg.streamBufferSizeFor(kIsWeb)); 
         
         platform.setProperty('vd-lavc-threads', '8'); 
         platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: HW con fallback seguro (estilo YouTube); si falla, mpv cae a SW
@@ -3115,6 +3132,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _finalSaveOnDispose(ms, duration);
     }
     
+    PlaybackTelemetry.instance.endSession();
     _historyNotifier?.flush();
 
     WidgetsBinding.instance.removeObserver(this);
