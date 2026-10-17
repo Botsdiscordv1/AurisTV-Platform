@@ -1565,6 +1565,25 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     return null;
   }
 
+  /// Categoría/kind efectivos para el player. Si el detalle resolvió una
+  /// película de anime (movie_anime) aunque el card traiga kind/type 'anime',
+  /// se propaga para que el player oculte episodios y el historial reabra
+  /// como movie_anime (no como anime).
+  ({String category, String? kind}) _effectivePlayerMeta(bool isMovieish) {
+    if (!isMovieish) {
+      return (category: widget.category ?? 'anime', kind: widget.kind ?? widget.result?.kind);
+    }
+    final bool animeCtx = widget.category == 'anime' ||
+        widget.category == 'movie_anime' ||
+        widget.kind == 'movie_anime' ||
+        widget.result?.kind == 'movie_anime' ||
+        widget.result?.type == 'movie_anime' ||
+        widget.type == 'movie_anime' ||
+        widget.type == 'anime';
+    final String cat = animeCtx ? 'movie_anime' : 'movie';
+    return (category: cat, kind: cat);
+  }
+
   String _formatRuntime(int? minutes) {
     if (minutes == null || minutes == 0) return 'N/A';
     if (minutes < 60) return '$minutes min';
@@ -2451,6 +2470,7 @@ void _openPlayer(PlayerScreen player) {
         ),
         highQuality: true,
       );
+      final meta = _effectivePlayerMeta(detailState.isMovieish);
 
       if (detailState.isMovieish) {
         final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Película', thumbnail: ApiEndpoints.proxyImage(currentSource?.thumbnail));
@@ -2460,8 +2480,8 @@ void _openPlayer(PlayerScreen player) {
           source: effectiveSrc,
           episode: '1',
           serverName: simplifySourceName(effectiveSrc),
-          category: widget.category,
-          kind: widget.kind,
+          category: meta.category,
+          kind: meta.kind,
           year: widget.year,
           totalEpisodes: 1,
           posterUrl: currentSource?.thumbnail,
@@ -2484,8 +2504,8 @@ void _openPlayer(PlayerScreen player) {
           season: history?.season ?? detailState.currentSeason,
           serverName: simplifySourceName(epSource?.source ?? effectiveSrc),
           startPosition: history?.positionInMilliseconds,
-          category: widget.category,
-          kind: widget.kind,
+          category: meta.category,
+          kind: meta.kind,
           year: widget.year,
           totalEpisodes: epData?.total ?? 0,
           title: detailState.seasonTitle ?? widget.title,
@@ -3961,6 +3981,7 @@ void _openPlayer(PlayerScreen player) {
           if (franchiseSource.isNotEmpty)
             SliverToBoxAdapter(
               child: _RelatedCarouselRow(
+                key: const ValueKey('related_franchise'),
                 title: 'Franquicia y Secuelas',
                 hPadding: context.isDesktop ? 0 : hPadding,
                 items: _unifyAndDeduplicate(
@@ -3972,6 +3993,7 @@ void _openPlayer(PlayerScreen player) {
           if (recommendedSource.isNotEmpty)
             SliverToBoxAdapter(
               child: _RelatedCarouselRow(
+                key: const ValueKey('related_recommended'),
                 title: 'Te recomendamos',
                 hPadding: context.isDesktop ? 0 : hPadding,
                 items: _unifyAndDeduplicate(
@@ -3984,6 +4006,7 @@ void _openPlayer(PlayerScreen player) {
           if (similarSource.isNotEmpty)
             SliverToBoxAdapter(
               child: _RelatedCarouselRow(
+                key: const ValueKey('related_similar'),
                 title: 'Similares a ${cleanTitleForDisplay(stripSeasonSuffix(widget.title))}',
                 hPadding: context.isDesktop ? 0 : hPadding,
                 items: _unifyAndDeduplicate(
@@ -4366,6 +4389,7 @@ class _RelatedCarouselRow extends StatefulWidget {
   final List<_RelatedCardData> items;
 
   const _RelatedCarouselRow({
+    super.key,
     required this.title,
     required this.hPadding,
     required this.items,
@@ -4385,6 +4409,16 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+  }
+
+  @override
+  void didUpdateWidget(covariant _RelatedCarouselRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Relations progresivas: la lista crece conforme llegan fuentes. Sin esto
+    // las flechas no aparecen hasta recrear el widget (salir y volver).
+    if (widget.items.length != oldWidget.items.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+    }
   }
 
   void _updateScrollIndicators() {

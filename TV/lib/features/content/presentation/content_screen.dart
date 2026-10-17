@@ -207,6 +207,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final bool showRatingSkeleton;
   final bool isLoadingSources;
   final int totalSeasons; 
+  final bool isMovieish;
   final int currentSeason; 
   final String? inferredSeasonAirDate;
   final PlaybackHistory? latestHistory;
@@ -234,6 +235,7 @@ class _ContentHeader extends ConsumerStatefulWidget {
     this.showRatingSkeleton = false,
     this.isLoadingSources = false,
     required this.totalSeasons, 
+    this.isMovieish = false,
     required this.currentSeason, 
     this.inferredSeasonAirDate,
     this.latestHistory,
@@ -438,6 +440,12 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               ]);
             }),
           ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildRelatedCarousel(),
+          ),
           Positioned.fill(child: _buildUpperButtons(context)),
         ]),
       ),
@@ -499,17 +507,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         _buildCastInfo(d),
         const SizedBox(height: 6),
         _buildCircularActions(context, d),
-        const SizedBox(height: 4),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildRelatedCarousel(),
-              ],
-            ),
-          ),
-        ),
       ]
     );
   }
@@ -537,7 +534,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             size: size,
             iconSize: iconSize,
           ),
-          if (widget.totalSeasons > 1 || (widget.category != 'movie' && widget.category != 'movie_anime')) ...[
+          if (!widget.isMovieish) ...[
             SizedBox(width: spacing),
             _DetailIconButton(
               icon: AurisIcons.episodes,
@@ -885,6 +882,24 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     // [Intelligence] Tracking de personalización al entrar a la pantalla
     ref.watch(detailViewTrackerProvider(detailParams));
 
+    // El detalle puede resolver una película de anime (movie_anime) aunque el
+    // card llegue con kind/type 'anime' (datos del server). Propagar esa
+    // naturaleza al player y al historial: sin esto el player mostraba
+    // episodios y al reabrir se pedía /detail/anime en vez de /detail/movie.
+    final bool _animeCtx = widget.category == 'anime' ||
+        widget.category == 'movie_anime' ||
+        widget.kind == 'movie_anime' ||
+        widget.result?.kind == 'movie_anime' ||
+        widget.result?.type == 'movie_anime' ||
+        widget.type == 'movie_anime' ||
+        widget.type == 'anime';
+    final String playCategory = detailState.isMovieish
+        ? (_animeCtx ? 'movie_anime' : 'movie')
+        : (widget.category ?? 'anime');
+    final String? playKind = detailState.isMovieish
+        ? (_animeCtx ? 'movie_anime' : 'movie')
+        : (widget.kind ?? widget.result?.kind);
+
     // Senior Sync Fix: Sincronizar fuentes con el player de forma segura (sin microtasks)
     ref.listen<UnifiedContentState>(unifiedContentProvider(detailParams), (prev, next) {
       if (next.allSources.isNotEmpty) {
@@ -953,7 +968,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D), 
       body: _ContentHeader(
-        title: widget.title, source: widget.source, url: widget.url, category: widget.category, poster: ApiEndpoints.proxyImage(currentSource?.thumbnail), banner: heroBanner, detailAsync: detailState.detail, currentSource: currentSource, sources: detailState.allSources, totalSeasons: detailState.totalSeasons, currentSeason: detailState.currentSeason, onSourceSelected: (index) => ref.setSource(detailParams, detailState.allSources[index]), 
+        title: widget.title, source: widget.source, url: widget.url, category: widget.category, poster: ApiEndpoints.proxyImage(currentSource?.thumbnail), banner: heroBanner, detailAsync: detailState.detail, currentSource: currentSource, sources: detailState.allSources, totalSeasons: detailState.totalSeasons, isMovieish: detailState.isMovieish, currentSeason: detailState.currentSeason, onSourceSelected: (index) => ref.setSource(detailParams, detailState.allSources[index]), 
         kind: widget.kind ?? widget.result?.kind, year: widget.year, type: widget.result?.type ?? widget.type, season: widget.season ?? widget.result?.season,
         relations: detailState.relations,
         onShowEpisodes: () {
@@ -961,7 +976,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, detailParams: detailParams, category: widget.category, title: widget.title, logoUrl: detailData?.logo, bannerUrl: heroBanner, onPlayEpisode: (ep, epSource, total) {
             final epNum = ep.number; final effectiveSrc = epSource?.source ?? widget.source; final playEpisodesUrl = epSource?.url ?? widget.url; final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, detailState.currentSeason, epNum.toString());
             final epThumb = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
-            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${detailState.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=$total${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
+            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${detailState.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=$playCategory&totalEpisodes=$total${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${playKind != null && playKind.isNotEmpty ? '&kind=${Uri.encodeComponent(playKind)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
           })));
         },
         inferredSeasonAirDate: detailState.episodes.valueOrNull?.response.seasonAirDate, 
@@ -972,7 +987,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           final playEpisodesUrl = playSource?.url ?? widget.url;
           if (detailState.isMovieish) {
             final ep = EpisodeInfo(number: 1, id: 0, url: playEpisodesUrl, title: 'Película', thumbnail: ApiEndpoints.proxyImage(playSource?.thumbnail));
-            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1)}&episode=1&serverName=${simplifySourceName(effectiveSrc)}&startPosition=&category=${widget.category}&totalEpisodes=1${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
+            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, 1)}&episode=1&serverName=${simplifySourceName(effectiveSrc)}&startPosition=&category=$playCategory&totalEpisodes=1${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(playSource?.thumbnail ?? '')}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${playKind != null && playKind.isNotEmpty ? '&kind=${Uri.encodeComponent(playKind)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
             return;
           }
           final latest = ref.read(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull;
@@ -981,7 +996,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           final epSource = detailState.episodes.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
           final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
           final epThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
-          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? detailState.currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData?.total ?? 0}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
+          context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? detailState.currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=$playCategory&totalEpisodes=${epData?.total ?? 0}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${playKind != null && playKind.isNotEmpty ? '&kind=${Uri.encodeComponent(playKind)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
         }
       ),
     );
@@ -1082,7 +1097,7 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
 
     final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
     final double cardWidth = TVResponsiveUtils.posterWidth(context);
-    final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: false);
+    final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: true);
 
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -1117,7 +1132,7 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
                         key: ValueKey(r.url),
                         title: r.title,
                         posterUrl: r.cover,
-                        showInfo: false,
+                        showInfo: true,
                         onTap: () => _openRelated(r),
                       ),
                     );

@@ -127,12 +127,15 @@ class AdaptiveDetailLayout extends StatelessWidget {
                               contentPadding, 
                               isWide ? 24 : 12
                             ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                logo!,
-                              ],
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  logo!,
+                                ],
+                              ),
                             ),
                           ),
                         ),

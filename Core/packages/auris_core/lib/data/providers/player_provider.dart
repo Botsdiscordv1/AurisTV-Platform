@@ -103,7 +103,11 @@ final unifiedContentDetailProvider =
                              rawKind == 'pelicula' || 
                              rawKind == 'movie_anime' ||
                              rawType == 'movie_anime' ||
-                             rawType == 'movie';
+                             rawType == 'movie' ||
+                             // La propia categoría 'movie_anime' basta para forzar
+                             // getMovieDetail aunque el card traiga kind/type 'anime'
+                             // (datos del server): si no, se pedía /detail/anime.
+                             params.category.toLowerCase().trim() == 'movie_anime';
 
   // Senior Fix: Extraer año explícito desde los parámetros o inferirlo del título ("Movie (2009)") o URL si es nulo
   int? effectiveYear = params.year;

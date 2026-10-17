@@ -1,25 +1,25 @@
 # 🚀 AurisTV v1.0.1 - Actualización Mayor & Mejoras Multiplataforma
 
-¡Nos complace anunciar el lanzamiento de **AurisTV v1.0.1**! Esta actualización trae consigo importantes mejoras de estabilidad, optimizaciones en los proveedores de contenido y reproductor, y refinamientos de interfaz en todas las plataformas (**Móvil, Android TV y Web/Desktop**).
+¡Nos complace anunciar una nueva iteración de **AurisTV v1.0.1** con importantes mejoras en el historial de reproducción (`playback_history`, `playback_history_provider`), reproductor (`player_provider`, `player_screen`), diseño de detalles adaptativos (`adaptive_detail_layout`) y optimizaciones en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
 
 ---
 
 ## ✨ Novedades y Características Principales
 
-- **Optimización de Proveedores y Contenido (`auris_core`):**
-  - Mejoras profundas en la gestión de bibliotecas, proveedores de inicio (`home_provider`), noticieros de contenido unificado (`unified_content_notifier`) y repositorios principales.
-- **Refinamiento en Filas de Contenido y Hero Banners (`content_row`, `editorial_content_row`, `wide_content_row`, `hero_banner`):**
-  - Tarjetas de póster con enfoque (`focusable_wide_card`), elementos destacados (`top_item`) y filas editoriales optimizadas para una navegación ultra fluida en Android TV y Móvil.
-- **Mejoras en Pantallas de Contenido y Reproducción (`content_screen`, `player_screen`):**
-  - Ajustes de diseño adaptativo, control multimedia y transiciones en Móvil, TV y Web/Desktop.
-- **Soporte Multiplataforma Sincronizado:**
-  - Versión unificada `1.0.1+1` en Móvil, Android TV y Web/Desktop.
+- **Mejoras en Historial y Proveedores de Reproducción (`playback_history`, `player_provider`):**
+  - Optimizaciones avanzadas en el seguimiento de reproducción, persistencia y control de reproductor activo en `auris_core`.
+- **Diseño Adaptativo de Detalles (`adaptive_detail_layout` & `hero_title`):**
+  - Refinamientos en la disposición de detalles de contenido y títulos de héroe adaptados para diferentes tamaños de pantalla.
+- **Optimizaciones en Pantallas de Contenido y Reproducción (`content_screen`, `player_screen`):**
+  - Ajustes de estabilidad, control multimedia y transiciones en Móvil, TV y Web/Desktop.
+- **Soporte Multiplataforma Unificado (`v1.0.1+1`):**
+  - Sincronización completa de la experiencia multimedia en Móvil, TV y Web/Desktop.
 
 ---
 
 ## 🛠️ Correcciones de Errores y Mejoras de Rendimiento
 
-- **Estabilidad de Estado:** Correcciones en la reactividad de providers y manejo de ciclos de vida.
+- **Estabilidad de Estado y Reproducción:** Correcciones en la reactividad de providers y manejo de eventos táctiles/control remoto.
 - **Empaquetado y Release:** Automatización limpia de compilación de APKs (Móvil y TV) e instalador ZIP de Windows.
 
 ---
