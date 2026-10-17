@@ -208,7 +208,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px vertical
                       itemCount: widget.items.length,
-                      separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 24),
+                      separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 12 : 20),
                       itemBuilder: (context, index) {
                         final item = widget.items[index];
                         return SizedBox(

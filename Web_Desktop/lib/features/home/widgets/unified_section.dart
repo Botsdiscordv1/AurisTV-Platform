@@ -14,6 +14,7 @@ class UnifiedSection extends StatelessWidget {
   final SectionSeeMore? verMas;
   final void Function(MediaItem item) onItemTap;
   final void Function(MediaItem item)? onItemDelete;
+  final bool hideWideSubtitle;
 
   const UnifiedSection({
     super.key,
@@ -25,6 +26,7 @@ class UnifiedSection extends StatelessWidget {
     this.verMas,
     required this.onItemTap,
     this.onItemDelete,
+    this.hideWideSubtitle = false,
   });
 
   @override
@@ -96,7 +98,7 @@ class UnifiedSection extends StatelessWidget {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: m.logoUrl,
-      subtitle: m.subtitle,
+      subtitle: hideWideSubtitle ? null : m.subtitle,
       rating: _formatRating(m.rating),
       badgeOverlay: badgeOverlay,
       onDelete: onItemDelete != null ? () => onItemDelete!(m) : null,

@@ -70,7 +70,7 @@ class _ScheduleBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    final hPadding = ResponsiveUtils.horizontalPadding(context);
+    final hPadding = TVResponsiveUtils.horizontalPadding(context);
 
     // Crear días filtrados: solo items disponibles en fuentes
     final filteredDays = schedule.days.map((day) {
@@ -80,6 +80,9 @@ class _ScheduleBody extends StatelessWidget {
 
     // Calcular el total real sumando los items de cada día
     final actualTotal = filteredDays.fold<int>(0, (sum, day) => sum + day.items.length);
+    
+    // Primera fila con contenido: al abrir la pantalla, su tarjeta 1 toma el foco.
+    final int firstFilledIndex = filteredDays.indexWhere((d) => d.items.isNotEmpty);
     
     // Título dinámico
     final String displayTitle = (schedule.season.isEmpty || schedule.year == 0)
@@ -105,9 +108,9 @@ class _ScheduleBody extends StatelessWidget {
                         displayTitle.toUpperCase(),
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: isMobile ? 20 : 36,
+                          fontSize: TVResponsiveUtils.sp(context, 26),
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
+                          letterSpacing: 1.5,
                         ),
                       ),
                       const SizedBox(width: 24),
@@ -175,7 +178,7 @@ class _ScheduleBody extends StatelessWidget {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final day = filteredDays[index];
-                return ScheduleRow(day: day, isToday: day.isToday);
+                return ScheduleRow(day: day, isToday: day.isToday, autofocus: index == firstFilledIndex);
               },
               childCount: filteredDays.length,
             ),
@@ -191,8 +194,10 @@ class _ScheduleBody extends StatelessWidget {
 class ScheduleRow extends StatefulWidget {
   final ScheduleDay day;
   final bool isToday;
+  /// Al abrir la pantalla, la primera tarjeta de esta fila toma el foco.
+  final bool autofocus;
 
-  const ScheduleRow({super.key, required this.day, required this.isToday});
+  const ScheduleRow({super.key, required this.day, required this.isToday, this.autofocus = false});
 
   @override
   State<ScheduleRow> createState() => _ScheduleRowState();
@@ -203,17 +208,36 @@ class _ScheduleRowState extends State<ScheduleRow> {
   bool _isHovered = false;
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
+  late List<FocusNode> _itemFocusNodes;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+    _initFocusNodes();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateScrollIndicators();
+      if (widget.autofocus) _focusFirstCard();
+    });
+  }
+
+  void _initFocusNodes() {
+    _itemFocusNodes = List.generate(widget.day.items.length, (_) => FocusNode());
+  }
+
+  void _focusFirstCard() {
+    if (!mounted || _itemFocusNodes.isEmpty) return;
+    final node = _itemFocusNodes.first;
+    if (node.canRequestFocus) node.requestFocus();
   }
 
   @override
   void didUpdateWidget(covariant ScheduleRow oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.day.items.length != oldWidget.day.items.length) {
+      for (final node in _itemFocusNodes) {
+        node.dispose();
+      }
+      _initFocusNodes();
       WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
     }
   }
@@ -251,6 +275,9 @@ class _ScheduleRowState extends State<ScheduleRow> {
 
   @override
   void dispose() {
+    for (final node in _itemFocusNodes) {
+      node.dispose();
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -259,14 +286,14 @@ class _ScheduleRowState extends State<ScheduleRow> {
   Widget build(BuildContext context) {
     if (widget.day.items.isEmpty) return const SizedBox.shrink();
     final isMobile = ResponsiveUtils.isMobile(context);
-    final hPadding = ResponsiveUtils.horizontalPadding(context);
+    final hPadding = TVResponsiveUtils.horizontalPadding(context);
 
     final double cardWidth = TVResponsiveUtils.posterWidth(context);
     final double posterHeight = TVResponsiveUtils.posterHeight(context);
     final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: true);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isMobile ? 12 : 32),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -336,7 +363,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                         vertical: 0
                       ),
                       itemCount: widget.day.items.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      separatorBuilder: (_, __) => const SizedBox(width: 14),
                       itemBuilder: (context, index) {
                         final item = widget.day.items[index];
                         final metaTitle = item.romaji ?? item.english ?? item.title;
@@ -344,6 +371,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                         return SizedBox(
                           width: cardWidth,
                           child: FocusablePosterCard(
+                            focusNode: _itemFocusNodes[index],
                             title: item.title,
                             posterUrl: ApiEndpoints.proxyImage(item.coverImage),
                             airingOverlay: item.airingAt != null
@@ -397,17 +425,20 @@ class _ScheduleRowState extends State<ScheduleRow> {
                   left: 0,
                   top: 0,
                   height: posterHeight,
-                  child: AnimatedOpacity(
-                    opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: IgnorePointer(
-                      ignoring: !(_isHovered && _canScrollLeft),
-                      child: Center(
-                        child: NavArrow(
-                          icon: Icons.arrow_back_ios_new,
-                          useBackground: true,
-                          enableScale: false,
-                          onTap: () => _scroll(-600),
+                  child: ExcludeFocus(
+                    excluding: !(_isHovered && _canScrollLeft),
+                    child: AnimatedOpacity(
+                      opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 300),
+                      child: IgnorePointer(
+                        ignoring: !(_isHovered && _canScrollLeft),
+                        child: Center(
+                          child: NavArrow(
+                            icon: Icons.arrow_back_ios_new,
+                            useBackground: true,
+                            enableScale: false,
+                            onTap: () => _scroll(-600),
+                          ),
                         ),
                       ),
                     ),
@@ -419,17 +450,20 @@ class _ScheduleRowState extends State<ScheduleRow> {
                   right: 0,
                   top: 0,
                   height: posterHeight,
-                  child: AnimatedOpacity(
-                    opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: IgnorePointer(
-                      ignoring: !(_isHovered && _canScrollRight),
-                      child: Center(
-                        child: NavArrow(
-                          icon: Icons.arrow_forward_ios,
-                          useBackground: true,
-                          enableScale: false,
-                          onTap: () => _scroll(600),
+                  child: ExcludeFocus(
+                    excluding: !(_isHovered && _canScrollRight),
+                    child: AnimatedOpacity(
+                      opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 300),
+                      child: IgnorePointer(
+                        ignoring: !(_isHovered && _canScrollRight),
+                        child: Center(
+                          child: NavArrow(
+                            icon: Icons.arrow_forward_ios,
+                            useBackground: true,
+                            enableScale: false,
+                            onTap: () => _scroll(600),
+                          ),
                         ),
                       ),
                     ),

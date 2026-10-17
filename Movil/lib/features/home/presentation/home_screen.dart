@@ -297,6 +297,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   WideContentItem _wideItemFromMedia(MediaItem m, {Widget? badgeOverlay}) {
     final bool isMovieish = m.type == MediaType.movie || m.card?.kind == 'movie_anime';
+    final bool isHomeInicio = ref.read(homeCategoryProvider) == 'inicio';
     return WideContentItem(
       id: m.id,
       title: m.title,
@@ -306,7 +307,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: m.logoUrl,
-      subtitle: m.subtitle,
+      subtitle: isHomeInicio ? null : m.subtitle,
       rating: formatRating(m.rating),
       badgeOverlay: badgeOverlay,
       originalItem: m,

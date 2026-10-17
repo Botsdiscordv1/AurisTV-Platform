@@ -200,6 +200,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                 onFocusChange: (focused) {
                   if (focused && mounted) {
                     TvScroll.anchorSectionBelowTopbar(this.context);
+                    TvScroll.anchorSectionBelowTopbarDeferred(this.context);
                   }
                 },
                 child: ListView.separated(
@@ -210,7 +211,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                   primary: false, 
                   padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
                   itemCount: widget.items.length,
-                  separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 16),
+                  separatorBuilder: (_, __) => const SizedBox(width: 14),
                   itemBuilder: (context, index) {
                     final item = widget.items[index];
                     return SizedBox(
@@ -307,6 +308,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                       onFocusChange: (focused) {
                         if (focused && mounted) {
                           TvScroll.anchorSectionBelowTopbar(this.context);
+                          TvScroll.anchorSectionBelowTopbarDeferred(this.context);
                         }
                       },
                       child: ListView.builder(

@@ -7,6 +7,7 @@ import '../../../core/utils/url_utils.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'package:auristv_web/core/router/app_router.dart';
 import 'package:auris_core/auris_core.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 
 final _scheduleProvider = FutureProvider<ScheduleResponse>((ref) async {
@@ -270,6 +271,14 @@ class _ScheduleRowState extends State<ScheduleRow> {
     final isMobile = ResponsiveUtils.isMobile(context);
     final hPadding = ResponsiveUtils.horizontalPadding(context);
 
+    final double cardWidth = ResponsiveUtils.posterWidth(context);
+    final double posterHeight = (cardWidth * 1.5).roundToDouble();
+    const double posterFocusZoom = 1.10;
+    final double posterZoneHeight = posterHeight * posterFocusZoom + 12.0;
+    final double titleGap = isMobile ? ResponsiveUtils.sp(context, 8) : 8.0;
+    final double titleHeight = isMobile ? ResponsiveUtils.sp(context, 22) : 28.0;
+    final double carouselHeight = posterZoneHeight + titleGap + titleHeight + 4.0;
+
     return Padding(
       padding: EdgeInsets.only(bottom: isMobile ? 8 : 12),
       child: Column(
@@ -323,7 +332,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
             child: Stack(
               children: [
                 SizedBox(
-                  height: ResponsiveUtils.rowHeight(context, hasInfo: true), 
+                  height: carouselHeight,
                   child: NotificationListener<ScrollNotification>(
                     onNotification: (notification) {
                       _updateScrollIndicators();
@@ -340,57 +349,87 @@ class _ScheduleRowState extends State<ScheduleRow> {
                         vertical: 0
                       ),
                       itemCount: widget.day.items.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 20),
                       itemBuilder: (context, index) {
                         final item = widget.day.items[index];
                         final metaTitle = item.romaji ?? item.english ?? item.title;
                         final itemYear = item.year ?? (item.airingAt != null ? DateTime.fromMillisecondsSinceEpoch(item.airingAt! * 1000).year : null);
                         return SizedBox(
-                          width: ResponsiveUtils.posterWidth(context),
-                          child: FocusablePosterCard(
-                            title: item.title,
-                            posterUrl: ApiEndpoints.proxyImage(item.coverImage),
-                            airingOverlay: item.airingAt != null
-                                ? AiringCountdownBadge(
-                                    airingAt: item.airingAt!,
-                                    aired: item.aired,
-                                    premiereStatus: item.premiereStatus,
-                                    premiereDeltaMin: item.premiereDeltaMin,
-                                  )
-                                : null,
-                            subtitle: _buildSubtitle(item),
-                            rating: formatRating(item.averageScore),
-                            onTap: () {
-                              final uri = UrlUtils.buildShareableUri(
-                                title: item.title,
-                                source: item.source ?? '',
-                                url: item.url ?? '',
-                                category: 'anime',
-                                year: itemYear,
-                                quality: item.quality,
-                                type: item.type,
-                                from: '/horario',
-                              );
-                              
-                              context.push(uri, extra: SearchResult(
-                                title: item.title,
-                                source: item.source ?? '',
-                                url: item.url ?? '',
-                                thumbnail: ApiEndpoints.proxyImage(item.coverImage),
-                                quality: item.quality ?? 'HD',
-                                kind: 'anime',
-                                type: item.type,
-                                slug: item.slug,
-                                year: itemYear,
-                                sources: item.sources.map((s) => SourceItem(
-                                  source: s.source,
-                                  url: s.url,
-                                  quality: s.quality,
-                                  slug: s.slug,
-                                  type: s.type,
-                                )).toList(),
-                              ));
-                            },
+                          width: cardWidth,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(
+                                height: posterZoneHeight,
+                                child: Center(
+                                  child: FocusablePosterCard(
+                                    title: item.title,
+                                    posterUrl: ApiEndpoints.proxyImage(item.coverImage),
+                                    airingOverlay: item.airingAt != null
+                                        ? AiringCountdownBadge(
+                                            airingAt: item.airingAt!,
+                                            aired: item.aired,
+                                            premiereStatus: item.premiereStatus,
+                                            premiereDeltaMin: item.premiereDeltaMin,
+                                          )
+                                        : null,
+                                    subtitle: _buildSubtitle(item),
+                                    rating: formatRating(item.averageScore),
+                                    showInfo: false,
+                                    onTap: () {
+                                      final uri = UrlUtils.buildShareableUri(
+                                        title: item.title,
+                                        source: item.source ?? '',
+                                        url: item.url ?? '',
+                                        category: 'anime',
+                                        year: itemYear,
+                                        quality: item.quality,
+                                        type: item.type,
+                                        from: '/horario',
+                                      );
+
+                                      context.push(uri, extra: SearchResult(
+                                        title: item.title,
+                                        source: item.source ?? '',
+                                        url: item.url ?? '',
+                                        thumbnail: ApiEndpoints.proxyImage(item.coverImage),
+                                        quality: item.quality ?? 'HD',
+                                        kind: 'anime',
+                                        type: item.type,
+                                        slug: item.slug,
+                                        year: itemYear,
+                                        sources: item.sources.map((s) => SourceItem(
+                                          source: s.source,
+                                          url: s.url,
+                                          quality: s.quality,
+                                          slug: s.slug,
+                                          type: s.type,
+                                        )).toList(),
+                                      ));
+                                    },
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: titleGap),
+                              SizedBox(
+                                height: titleHeight,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: MarqueeText(
+                                    text: item.title,
+                                    animate: isMobile,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white.withOpacity(0.95),
+                                      fontSize: ResponsiveUtils.posterTitleFontSize(context),
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.2,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       },
@@ -402,7 +441,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                 Positioned(
                   left: 0,
                   top: 0,
-                  height: ResponsiveUtils.posterHeight(context), 
+                  height: posterZoneHeight,
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),
@@ -424,7 +463,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                 Positioned(
                   right: 0,
                   top: 0,
-                  height: ResponsiveUtils.posterHeight(context), 
+                  height: posterZoneHeight,
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),

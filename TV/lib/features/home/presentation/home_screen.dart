@@ -178,6 +178,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     Key? key,
     bool Function()? onArrowRightOnLast,
     bool Function()? onArrowLeftOnFirst,
+    bool Function()? onArrowDownToNext,
+    bool Function()? onArrowUpToPrev,
   }) {
     switch (section.type) {
       case HomeSectionType.continueWatching:
@@ -215,6 +217,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onItemTap: (wideItem) => openTVDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
+              onArrowDownToNext: onArrowDownToNext,
+              onArrowUpToPrev: onArrowUpToPrev,
             ),
           );
         } else {
@@ -306,6 +310,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onItemTap: (wideItem) => openTVDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
+              onArrowDownToNext: onArrowDownToNext,
+              onArrowUpToPrev: onArrowUpToPrev,
             ),
           );
         } else {
@@ -328,7 +334,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     final bool isMovieish = m.type == MediaType.movie || m.card?.kind == 'movie_anime';
     final String? rawSub = m.subtitle;
     final bool isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
-    final String? effectiveSubtitle = isJustYear ? null : rawSub;
+    final bool isHomeInicio = ref.read(homeCategoryProvider) == 'inicio';
+    final String? effectiveSubtitle = (isJustYear || isHomeInicio) ? null : rawSub;
 
     return WideContentItem(
       id: m.id,
@@ -401,6 +408,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                         currentCategory: currentCategory,
                         // D-pad arriba desde el hero -> cÃ¡psula activa del topbar.
                         pillFocusNode: _pillFocusNodes[currentCategory] ?? _pillFocusNodes['inicio'],
+                        // D-pad abajo desde el hero -> primera tarjeta de la 1ª sección.
+                        onArrowDown: () {
+                          if (_sectionRowKeys.isEmpty) return false;
+                          final state = _sectionRowKeys.first.currentState;
+                          if (state != null) {
+                            try {
+                              return (state as dynamic).focusFirstCard() == true;
+                            } catch (_) {}
+                          }
+                          return false;
+                        },
                         onFocused: () {
                           // Senior Fix: Centrar hero suavemente al enfocarlo
                           _scrollController.animateTo(
@@ -478,6 +496,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                                       return false;
                                     }
                                   : null,
+                              onArrowDownToNext: index + 1 < sections.length
+                                  ? () {
+                                      final state = _sectionRowKeys[index + 1].currentState;
+                                      if (state != null) {
+                                        try {
+                                          return (state as dynamic).focusFirstCard() == true;
+                                        } catch (_) {}
+                                      }
+                                      return false;
+                                    }
+                                  : null,
+                              onArrowUpToPrev: index > 0
+                                  ? () {
+                                      final state = _sectionRowKeys[index - 1].currentState;
+                                      if (state != null) {
+                                        try {
+                                          return (state as dynamic).focusFirstCard() == true;
+                                        } catch (_) {}
+                                      }
+                                      return false;
+                                    }
+                                  : null,
                             ),
                           );
                         },
@@ -526,6 +566,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                                       if (state != null) {
                                         try {
                                           return (state as dynamic).focusLastCard() == true;
+                                        } catch (_) {}
+                                      }
+                                      return false;
+                                    }
+                                  : null,
+                              onArrowDownToNext: index + 1 < sections.length
+                                  ? () {
+                                      final state = _sectionRowKeys[index + 1].currentState;
+                                      if (state != null) {
+                                        try {
+                                          return (state as dynamic).focusFirstCard() == true;
+                                        } catch (_) {}
+                                      }
+                                      return false;
+                                    }
+                                  : null,
+                              onArrowUpToPrev: index > 0
+                                  ? () {
+                                      final state = _sectionRowKeys[index - 1].currentState;
+                                      if (state != null) {
+                                        try {
+                                          return (state as dynamic).focusFirstCard() == true;
                                         } catch (_) {}
                                       }
                                       return false;
@@ -1133,6 +1195,7 @@ class _RecentEpisodesSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncData = ref.watch(recentEpisodesProvider);
+    final bool isHomeInicio = ref.watch(homeCategoryProvider) == 'inicio';
     return asyncData.when(
       data: (items) => WideContentRow(
         title: title,
@@ -1144,7 +1207,7 @@ class _RecentEpisodesSection extends ConsumerWidget {
           return WideContentItem(
             id: m.id, title: m.title, imageUrl: m.bannerUrl ?? m.posterUrl,
             logoUrl: m.logoUrl,
-            subtitle: isJustYear ? null : rawSub, rating: formatRating(m.rating),
+            subtitle: (isJustYear || isHomeInicio) ? null : rawSub, rating: formatRating(m.rating),
             badgeOverlay: m.airingAt != null ? AiringCountdownBadge(airingAt: m.airingAt!, aired: m.aired) : null,
             originalItem: m,
           );
@@ -1188,6 +1251,8 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
   Timer? _debounce;
   String _currentQuery = '';
   bool _isFocused = false;
+  bool _suppressFocusRestore = false;
+  bool _pendingFocusFirstResult = false;
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
 
@@ -1208,7 +1273,8 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
       duration: const Duration(milliseconds: 220),
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    _initSpeech();
+    // El permiso de micrófono se pide SOLO al pulsar el icono del micro
+    // (en _startVoiceSearch -> _initSpeech), no al abrir el buscador.
     _focusNode.addListener(() {
       if (mounted) {
         setState(() => _isFocused = _focusNode.hasFocus);
@@ -1219,6 +1285,15 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
         if (!_focusNode.hasFocus) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
+            if (_suppressFocusRestore) {
+              _suppressFocusRestore = false;
+              if (_firstResultFocusNode.canRequestFocus) {
+                _firstResultFocusNode.requestFocus();
+              } else {
+                _pendingFocusFirstResult = true;
+              }
+              return;
+            }
             final focused = _overlayScopeNode.focusedChild;
             // If nothing in overlay has focus, return focus to search bar
             if (focused == null) {
@@ -1311,6 +1386,10 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
   }
 
   void _onSearchSubmitted(String value) {
+    _suppressFocusRestore = true;
+    Timer(const Duration(milliseconds: 600), () {
+      if (mounted) _suppressFocusRestore = false;
+    });
     _debounce?.cancel();
     final query = value.trim();
     if (query.isNotEmpty) {
@@ -1322,6 +1401,16 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
   void _clearSearch() {
     _searchController.clear();
     setState(() => _currentQuery = '');
+  }
+
+  void _focusFirstResultIfPending() {
+    if (!_pendingFocusFirstResult) return;
+    _pendingFocusFirstResult = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _firstResultFocusNode.canRequestFocus) {
+        _firstResultFocusNode.requestFocus();
+      }
+    });
   }
 
   void _performSearch(String query) {
@@ -1390,7 +1479,12 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
             children: [
               // Barra de búsqueda con botón de micrófono (idéntica a referencia)
               Padding(
-                padding: const EdgeInsets.fromLTRB(60, 16, 60, 16),
+                padding: EdgeInsets.fromLTRB(
+                  TVResponsiveUtils.horizontalPadding(context),
+                  16,
+                  TVResponsiveUtils.horizontalPadding(context),
+                  16,
+                ),
                 child: Row(
                   children: [
                     // Campo de búsqueda principal
@@ -1401,6 +1495,9 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
                             if (event.logicalKey == LogicalKeyboardKey.enter ||
                                 event.logicalKey == LogicalKeyboardKey.select ||
                                 event.logicalKey == LogicalKeyboardKey.space) {
+                              if (_suppressFocusRestore) {
+                                return KeyEventResult.ignored;
+                              }
                               _focusNode.requestFocus();
                               SystemChannels.textInput.invokeMethod('TextInput.show');
                               return KeyEventResult.handled;
@@ -1559,8 +1656,13 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
 
               // Título sección
               if (_currentQuery.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(60, 4, 60, 12),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    TVResponsiveUtils.horizontalPadding(context),
+                    4,
+                    TVResponsiveUtils.horizontalPadding(context),
+                    12,
+                  ),
                   child: Text(
                     'Lo más buscado',
                     style: TextStyle(
@@ -1576,7 +1678,9 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
               Expanded(
                 child: ClipRect(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 60),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: TVResponsiveUtils.horizontalPadding(context),
+                    ),
                     child: _buildResultsState(resultsAsync),
                   ),
                 ),
@@ -1600,20 +1704,27 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
         final results = _deduplicateSearch(response.results);
         if (results.isEmpty) return _buildNoResultsState();
 
+        _focusFirstResultIfPending();
+
         final notifier = ref.read(
           searchResultsProvider(
             SearchParams(category: _selectedCategory, query: _currentQuery),
           ).notifier,
         );
 
+        // Mismo ancho de tarjeta que las filas estándar de Home: el nº de
+        // columnas se calcula para que la celda mida ~posterWidth.
+        const double spacing = 14.0;
+        final int crossAxisCount = _overlayGridColumns(context, 0);
+
         return GridView.builder(
           key: const ValueKey('overlay_results_grid'),
-          clipBehavior: Clip.hardEdge,
-          padding: const EdgeInsets.fromLTRB(20, 20, 40, 40),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
+          clipBehavior: Clip.none,
+          padding: const EdgeInsets.fromLTRB(0, 20, 0, 40),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
             childAspectRatio: 0.55,
-            crossAxisSpacing: 18,
+            crossAxisSpacing: spacing,
             mainAxisSpacing: 20,
           ),
           itemCount: results.length + (response.hasMore ? 1 : 0),
@@ -1639,7 +1750,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
             return FocusablePosterCard(
               focusNode: index == 0 ? _firstResultFocusNode : null,
               onKeyEvent: (node, event) {
-                if (index < 5 && event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                if (index < 7 && event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
                   _focusNode.requestFocus();
                   return KeyEventResult.handled;
                 }
@@ -1663,7 +1774,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
               subtitle: meta.status,
               subtitleColor: meta.statusColor,
               activeBorderColor: Colors.white,
-              titleFontSize: 11,
+              titleFontSize: TVResponsiveUtils.sp(context, 13),
               showInfo: true,
               aspectRatio: 2 / 3,
               onTap: () => _onContentTap(result),
@@ -1679,26 +1790,37 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
     );
   }
 
+  int _overlayGridColumns(BuildContext context, double innerHorizontalPadding) {
+    final double pw = TVResponsiveUtils.posterWidth(context);
+    const double spacing = 14.0;
+    final double gridW = MediaQuery.sizeOf(context).width -
+        2 * TVResponsiveUtils.horizontalPadding(context) -
+        innerHorizontalPadding;
+    return ((gridW + spacing) / (pw + spacing)).round().clamp(1, 100);
+  }
+
   Widget _buildTrendingGrid(AsyncValue<List<SearchResult>> trendingAsync) {
     return trendingAsync.when(
-      data: (items) => GridView.builder(
-        key: const ValueKey('overlay_trending_grid'),
-        clipBehavior: Clip.hardEdge,
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 5,
-          childAspectRatio: 0.55,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 20,
-        ),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final result = items[index];
+      data: (items) {
+        _focusFirstResultIfPending();
+        return GridView.builder(
+          key: const ValueKey('overlay_trending_grid'),
+          clipBehavior: Clip.none,
+          padding: const EdgeInsets.fromLTRB(0, 20, 0, 40),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _overlayGridColumns(context, 0),
+            childAspectRatio: 0.55,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 20,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final result = items[index];
           final meta = result.resolveMetadata(_selectedCategory);
           return FocusablePosterCard(
             focusNode: index == 0 ? _firstResultFocusNode : null,
             onKeyEvent: (node, event) {
-              if (index < 5 && event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+              if (index < 7 && event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
                 _focusNode.requestFocus();
                 return KeyEventResult.handled;
               }
@@ -1713,13 +1835,14 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
             subtitle: meta.status,
             subtitleColor: meta.statusColor,
             activeBorderColor: Colors.white,
-            titleFontSize: 11,
+            titleFontSize: TVResponsiveUtils.sp(context, 13),
             showInfo: true,
             aspectRatio: 2 / 3,
             onTap: () => _onContentTap(result),
           );
-        },
-      ),
+          },
+        );
+      },
       loading: () =>
           const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
       error: (err, _) => const SizedBox.shrink(),

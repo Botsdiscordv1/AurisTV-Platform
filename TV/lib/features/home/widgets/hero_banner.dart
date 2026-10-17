@@ -31,6 +31,9 @@ class HeroBanner extends ConsumerStatefulWidget {
   /// Nodo de la cápsula activa del topbar: D-pad arriba desde el hero salta
   /// directo a ella (Inicio en Inicio, Anime en Anime, ...).
   final FocusNode? pillFocusNode;
+  /// D-pad abajo desde el hero: enfoca la PRIMERA tarjeta de la primera sección
+  /// (determinista vía las GlobalKey del home). Si es null, usa el salto genérico.
+  final bool Function()? onArrowDown;
 
   const HeroBanner({
     super.key,
@@ -42,6 +45,7 @@ class HeroBanner extends ConsumerStatefulWidget {
     this.currentCategory = 'inicio',
     this.onFocused,
     this.pillFocusNode,
+    this.onArrowDown,
     dynamic layout,
   });
 
@@ -489,7 +493,10 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                   return KeyEventResult.handled;
                 }
               } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                if (TvDirectionalFocus.focusFirstBelow()) {
+                if (widget.onArrowDown?.call() == true) {
+                  return KeyEventResult.handled;
+                }
+                if (TvDirectionalFocus.focusFirstBelow(preserveColumn: false)) {
                   return KeyEventResult.handled;
                 }
               } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {

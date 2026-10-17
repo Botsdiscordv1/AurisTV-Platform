@@ -457,46 +457,50 @@ class ContentDetailsPanel extends StatelessWidget {
       children: [
         // 1. Título original
         if (altTitles.isNotEmpty) ...[
-          _sectionTitle('Título original'),
-          const SizedBox(height: 6),
-          for (final t in altTitles)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(t, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.5, fontStyle: FontStyle.italic)),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionTitle('Título original'),
+                const SizedBox(height: 6),
+                for (final t in altTitles)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(t, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.5, fontStyle: FontStyle.italic)),
+                  ),
+              ],
             ),
-          const SizedBox(height: 20),
+          ),
         ],
 
         // 2. Advertencias de contenido (debajo del Título original)
         if (cert != null) ...[
-          const SizedBox(height: 4),
-          _sectionTitle('Advertencias de contenido'),
-          const SizedBox(height: 6),
-          Text(
-            getWarningText(cert),
-            style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.5),
-          ),
-          const SizedBox(height: 16),
+          _detailRow('Advertencias de contenido', getWarningText(cert)),
         ],
 
         // 3. Ficha técnica: duración / formato / estado
         if (facts.isNotEmpty) ...[
-          _sectionTitle('Ficha técnica'),
-          const SizedBox(height: 6),
-          Text(facts.join('  •  '), style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.5)),
-          const SizedBox(height: 20),
+          _detailRow('Ficha técnica', facts.join('  •  ')),
         ],
 
-        // 3. Disponible en (logos de plataformas)
+        // 4. Disponible en (logos de plataformas)
         if (platforms.isNotEmpty) ...[
-          _sectionTitle('Disponible en'),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: platforms.map((p) => _PlatformLogo(platform: p, size: 44)).toList(),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sectionTitle('Disponible en'),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: platforms.map((p) => _PlatformLogo(platform: p, size: 44)).toList(),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
         ],
 
         // 6. Dirección

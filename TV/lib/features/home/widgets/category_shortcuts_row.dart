@@ -52,6 +52,7 @@ class CategoryShortcutsRow extends StatelessWidget {
               onFocusChange: (focused) {
                 if (focused) {
                   TvScroll.anchorSectionBelowTopbar(context);
+                  TvScroll.anchorSectionBelowTopbarDeferred(context);
                 }
               },
               child: ListView.separated(

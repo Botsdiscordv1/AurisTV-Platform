@@ -99,4 +99,16 @@ class TvScroll {
     position.animateTo(target, duration: duration, curve: curve);
     return true;
   }
+
+  /// Repite el ancla de [anchorSectionBelowTopbar] al cierre del frame.
+  /// El traversal direccional de Flutter llama a `Scrollable.ensureVisible`
+  /// DESPUÉS del `onFocusChange` de la fila, así que en el salto con D-pad
+  /// ARRIBA el ensureVisible reescribe el scroll y la sección queda pegada al
+  /// borde (bajo el topbar). Reanclar un frame después deja el ancla como
+  /// última palabra, igual que al bajar.
+  static void anchorSectionBelowTopbarDeferred(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) anchorSectionBelowTopbar(context);
+    });
+  }
 }

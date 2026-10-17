@@ -38,8 +38,16 @@ class TvDirectionalFocus {
     }
   }
 
-  /// Enfoca el primer elemento de la fila de abajo. Devuelve true si saltó.
-  static bool focusFirstBelow() {
+  /// Enfoca la tarjeta de la fila de abajo conservando la columna.
+  ///
+  /// Con [preserveColumn] = true (por defecto) elige, dentro de la fila
+  /// inmediatamente inferior, la tarjeta con MAYOR solape horizontal con la
+  /// actual; a igualdad, la más a la izquierda. Así una wide/billboard (que
+  /// cubre varias columnas) baja a la PRIMERA de su columna y un póster baja al
+  /// de su misma columna. Solo si no hay solape alguno (fila destino desplazada)
+  /// cae en la de centro horizontal más cercano. Con false conserva el
+  /// comportamiento previo (primera tarjeta de la fila de abajo), que usa el hero.
+  static bool focusFirstBelow({bool preserveColumn = true}) {
     final current = FocusManager.instance.primaryFocus;
     if (current == null) return false;
     late final Rect curRect;
@@ -49,11 +57,10 @@ class TvDirectionalFocus {
       return false;
     }
 
-    FocusNode? best;
-    var bestTop = double.infinity;
-    var bestLeft = double.infinity;
     // Tops dentro de esta tolerancia se consideran la misma fila.
     const rowTolerance = 24.0;
+    final below = <MapEntry<FocusNode, Rect>>[];
+    var bandTop = double.infinity;
 
     for (final node in _eligible(current)) {
       late final Rect r;
@@ -65,12 +72,59 @@ class TvDirectionalFocus {
       if (r.width <= 0 || r.height <= 0) continue;
       // Estrictamente debajo (con tolerancia de solape).
       if (r.top < curRect.bottom - 8) continue;
+      below.add(MapEntry(node, r));
+      if (r.top < bandTop) bandTop = r.top;
+    }
+    if (below.isEmpty) return false;
 
-      if (r.top < bestTop - rowTolerance ||
-          ((r.top - bestTop).abs() <= rowTolerance && r.left < bestLeft)) {
-        best = node;
-        bestTop = r.top;
-        bestLeft = r.left;
+    FocusNode? best;
+    if (preserveColumn) {
+      // Máximo solape horizontal con la tarjeta actual; a igualdad, la más a la
+      // izquierda. Así una wide/billboard (que cubre varias columnas) baja a la
+      // PRIMERA de su columna, y un póster baja al de su misma columna.
+      final double curLeft = curRect.left;
+      final double curRight = curRect.right;
+      var bestOverlap = -1.0;
+      var bestLeft = double.infinity;
+      FocusNode? bestOverlapping;
+      for (final e in below) {
+        if ((e.value.top - bandTop).abs() > rowTolerance) continue;
+        final double ovLeft = e.value.left > curLeft ? e.value.left : curLeft;
+        final double ovRight = e.value.right < curRight ? e.value.right : curRight;
+        final double overlap = ovRight > ovLeft ? ovRight - ovLeft : 0.0;
+        if (overlap > bestOverlap + 0.5 ||
+            ((overlap - bestOverlap).abs() <= 0.5 && e.value.left < bestLeft)) {
+          bestOverlapping = e.key;
+          bestOverlap = overlap;
+          bestLeft = e.value.left;
+        }
+      }
+      if (bestOverlap > 0.5) {
+        best = bestOverlapping;
+      } else {
+        // Sin solape (fila destino desplazada): la de centro más cercano.
+        final double curCenterX = curRect.center.dx;
+        var bestDist = double.infinity;
+        var nearestLeft = double.infinity;
+        for (final e in below) {
+          if ((e.value.top - bandTop).abs() > rowTolerance) continue;
+          final double dist = (e.value.center.dx - curCenterX).abs();
+          if (dist < bestDist - 0.5 ||
+              ((dist - bestDist).abs() <= 0.5 && e.value.left < nearestLeft)) {
+            best = e.key;
+            bestDist = dist;
+            nearestLeft = e.value.left;
+          }
+        }
+      }
+    } else {
+      var bestLeft = double.infinity;
+      for (final e in below) {
+        if ((e.value.top - bandTop).abs() > rowTolerance) continue;
+        if (e.value.left < bestLeft) {
+          best = e.key;
+          bestLeft = e.value.left;
+        }
       }
     }
 

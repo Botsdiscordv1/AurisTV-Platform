@@ -195,6 +195,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                           onFocusChange: (focused) {
                             if (focused && mounted) {
                               TvScroll.anchorSectionBelowTopbar(this.context);
+                              TvScroll.anchorSectionBelowTopbarDeferred(this.context);
                             }
                           },
                           child: ListView.separated(
