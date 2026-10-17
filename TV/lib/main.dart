@@ -76,7 +76,13 @@ class AurisApp extends StatelessWidget {
           },
           child: NotificationInitializer(
             child: RemoteCommandListener(
-              child: child,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  child,
+                  const UpdateDownloadBanner(flavor: 'tv'),
+                ],
+              ),
             ),
           ),
         );

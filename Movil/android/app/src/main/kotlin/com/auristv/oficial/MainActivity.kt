@@ -16,6 +16,7 @@ class MainActivity: FlutterActivity() {
     private val VOLUME_CHANNEL = "auristv/volume"
     private val PIP_CHANNEL = "auristv/pip"
     private val ORIENTATION_CHANNEL = "auristv/orientation"
+    private val INSTALL_CHANNEL = "auristv/install"
     private var interceptVolume = false
     private var volumeMethodChannel: MethodChannel? = null
     private var isPipAllowed = false
@@ -143,6 +144,57 @@ class MainActivity: FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INSTALL_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "canInstall" -> result.success(canRequestInstall())
+                "openInstallSettings" -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val intent = android.content.Intent(
+                                android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                android.net.Uri.parse("package:$packageName"))
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        android.util.Log.d("AurisInstall", "openInstallSettings failed: ${e.message}")
+                        result.success(false)
+                    }
+                }
+                "installApk" -> {
+                    val path = call.argument<String>("path")
+                    if (path.isNullOrEmpty()) {
+                        result.error("INVALID_PATH", "Ruta de APK vacía", null)
+                    } else {
+                        try {
+                            val file = java.io.File(path)
+                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                this@MainActivity, "$packageName.fileprovider", file)
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+                            intent.setDataAndType(uri, "application/vnd.android.package-archive")
+                            intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            android.util.Log.d("AurisInstall", "installApk failed: ${e.message}")
+                            result.error("INSTALL_FAILED", e.message, null)
+                        }
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun canRequestInstall(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            packageManager.canRequestPackageInstalls()
+        } else {
+            true
         }
     }
 

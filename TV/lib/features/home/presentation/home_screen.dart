@@ -116,6 +116,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   };
 
   @override
+  void initState() {
+    super.initState();
+    _checkForUpdate();
+  }
+
+  void _checkForUpdate() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final updateInfo = await AppUpdateService.checkForUpdate();
+      if (updateInfo != null && mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: !updateInfo.forceUpdate,
+          builder: (context) =>
+              AppUpdateDialog(info: updateInfo, flavor: 'tv'),
+        );
+      }
+    });
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     routeObserver.subscribe(this, ModalRoute.of(context)!);

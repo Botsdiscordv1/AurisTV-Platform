@@ -94,6 +94,8 @@ class AurisApp extends StatelessWidget {
                         child,
                         // Senior: Floating MiniPlayer (Global y Persistente)
                         const GlobalMiniPlayerOverlay(),
+                        // Barra global de descarga de actualización (background)
+                        const UpdateDownloadBanner(flavor: 'mobile'),
                       ],
                     ),
                   ),
