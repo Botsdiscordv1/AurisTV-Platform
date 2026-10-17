@@ -12,8 +12,6 @@ import '../widgets/content_row.dart';
 import '../widgets/editorial_content_row.dart';
 import '../widgets/wide_content_row.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
-import '../../../services/update_service.dart';
-import '../../../shared/widgets/update_dialog.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -43,12 +41,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _checkForUpdate() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final updateInfo = await UpdateService.checkForUpdate();
+      final updateInfo = await AppUpdateService.checkForUpdate();
       if (updateInfo != null && mounted) {
         showDialog(
           context: context,
           barrierDismissible: !updateInfo.forceUpdate,
-          builder: (context) => UpdateDialog(updateInfo: updateInfo),
+          builder: (context) =>
+              AppUpdateDialog(info: updateInfo, flavor: 'mobile'),
         );
       }
     });

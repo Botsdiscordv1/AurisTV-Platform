@@ -110,5 +110,8 @@ export 'presentation/widgets/collage_grid_background.dart';
 export 'presentation/widgets/episode_list_card.dart';
 export 'presentation/widgets/adaptive_two_panel.dart';
 export 'presentation/widgets/option_list_card.dart';
+export 'presentation/widgets/app_update_dialog.dart';
+export 'presentation/widgets/update_download_banner.dart';
 
 export 'data/services/device_activation_service.dart';
+export 'data/services/app_update_service.dart';

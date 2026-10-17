@@ -23,6 +23,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     'Cuenta',
     'Reproducción',
     'Subtítulos',
+    'Sistema',
   ];
 
   @override
@@ -100,6 +101,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case 0: return _buildAccountCategory();
       case 1: return _buildPlaybackCategory(settings);
       case 2: return _buildSubtitlesCategory(settings);
+      case 3: return _buildSystemCategory();
       default: return const SizedBox.shrink();
     }
   }
@@ -325,13 +327,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _SettingsTVButton(
           label: 'Verificar actualizaciones',
           icon: Icons.update_rounded,
-          onTap: () {
+          onTap: () async {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('La aplicación está actualizada a la última versión')),
+              const SnackBar(content: Text('Buscando actualizaciones…')),
             );
+            final updateInfo = await AppUpdateService.checkForUpdate();
+            if (!mounted) return;
+            if (updateInfo != null) {
+              showDialog(
+                context: context,
+                barrierDismissible: !updateInfo.forceUpdate,
+                builder: (context) =>
+                    AppUpdateDialog(info: updateInfo, flavor: 'tv'),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('La aplicación está actualizada a la última versión'),
+                ),
+              );
+            }
           },
         ),
-        const Spacer(),
+        const SizedBox(height: 40),
         FutureBuilder<PackageInfo>(
           future: PackageInfo.fromPlatform(),
           builder: (context, snapshot) {
