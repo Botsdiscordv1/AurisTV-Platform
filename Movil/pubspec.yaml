@@ -1,7 +1,7 @@
 name: auristv_mobile
 description: "AurisTV Móvil — app multimedia personal optimizada para Android/iOS"
 publish_to: 'none'
-version: 1.0.1+1
+version: 1.0.2+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
