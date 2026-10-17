@@ -191,6 +191,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       items: section.items,
       badge: section.badge,
       verMas: verMas,
+      hideWideSubtitle: ref.read(homeCategoryProvider) == 'inicio',
       onItemTap: (item) => openHomeDetails(context, item, ref.read(homeCategoryProvider)),
     );
   }

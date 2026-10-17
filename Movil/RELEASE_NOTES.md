@@ -1,27 +1,27 @@
-# 🚀 AurisTV v1.0.1 - Actualización Mayor & Mejoras Multiplataforma
+# 🚀 AurisTV v1.0.3 - Actualización Mayor & Mejoras en UI Multiplataforma
 
-¡Nos complace anunciar una nueva iteración de **AurisTV v1.0.1** con importantes mejoras en el historial de reproducción (`playback_history`, `playback_history_provider`), reproductor (`player_provider`, `player_screen`), diseño de detalles adaptativos (`adaptive_detail_layout`) y optimizaciones en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
+¡Nos complace anunciar el lanzamiento de **AurisTV v1.0.3** con importantes optimizaciones de interfaz, pantalla de programación (`schedule_screen`), navegación adaptativa por control remoto (`tv_focus_wrapper`, `tv_scroll`, `tv_responsive_utils`) y mejoras en pantallas de inicio y contenido en todas las plataformas (**Móvil, Android TV y Web/Desktop**)!
 
 ---
 
 ## ✨ Novedades y Características Principales
 
-- **Mejoras en Historial y Proveedores de Reproducción (`playback_history`, `player_provider`):**
-  - Optimizaciones avanzadas en el seguimiento de reproducción, persistencia y control de reproductor activo en `auris_core`.
-- **Diseño Adaptativo de Detalles (`adaptive_detail_layout` & `hero_title`):**
-  - Refinamientos en la disposición de detalles de contenido y títulos de héroe adaptados para diferentes tamaños de pantalla.
-- **Optimizaciones en Pantallas de Contenido y Reproducción (`content_screen`, `player_screen`):**
-  - Ajustes de estabilidad, control multimedia y transiciones en Móvil, TV y Web/Desktop.
-- **Soporte Multiplataforma Unificado (`v1.0.1+1`):**
-  - Sincronización completa de la experiencia multimedia en Móvil, TV y Web/Desktop.
+- **Nueva Pantalla de Programación y Guía (`schedule_screen` en TV y Web/Desktop):**
+  - Acceso rápido a la programación de transmisiones optimizada para control remoto y pantallas grandes.
+- **Mejoras en Enfoque, Scroll y Navegación TV (`tv_focus_wrapper`, `tv_scroll`, `tv_responsive_utils`):**
+  - Control de foco robusto, desplazamiento fluido y utilidades de responsividad mejoradas en Android TV.
+- **Refinamientos en Pantallas de Inicio, Detalles y Búsqueda (`home_screen`, `content_details_screen`, `search_screen`):**
+  - Ajustes de diseño en tarjetas de póster (`focusable_poster_card`, `focusable_wide_card`), filas de contenido, atajos y banners principales.
+- **Soporte Multiplataforma Sincronizado (`v1.0.3+1`):**
+  - Versión unificada y optimizada en Móvil, Android TV y Web/Desktop.
 
 ---
 
 ## 🛠️ Correcciones de Errores y Mejoras de Rendimiento
 
-- **Estabilidad de Estado y Reproducción:** Correcciones en la reactividad de providers y manejo de eventos táctiles/control remoto.
+- **Estabilidad de Foco y Eventos:** Correcciones en la navegación con control remoto y transiciones fluidas.
 - **Empaquetado y Release:** Automatización limpia de compilación de APKs (Móvil y TV) e instalador ZIP de Windows.
 
 ---
 
-📥 *¡Actualiza a la versión v1.0.1 para disfrutar de la experiencia multimedia definitiva y sin interrupciones con AurisTV!*
+📥 *¡Actualiza a la versión v1.0.3 para disfrutar de la experiencia multimedia definitiva y sin interrupciones con AurisTV!*

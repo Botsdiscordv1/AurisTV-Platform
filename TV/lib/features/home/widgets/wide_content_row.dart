@@ -43,6 +43,13 @@ class WideContentRow extends StatefulWidget {
   final bool? hasSubtitle;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
+  /// D-pad abajo sobre cualquier wide card: enfoca la PRIMERA tarjeta de la
+  /// sección siguiente (mecanismo determinista vía las GlobalKey del home).
+  final bool Function()? onArrowDownToNext;
+  /// D-pad arriba sobre cualquier wide card: enfoca la PRIMERA tarjeta de la
+  /// sección anterior (la wide abarca varias columnas, así que cae al primero,
+  /// igual que al bajar).
+  final bool Function()? onArrowUpToPrev;
 
   const WideContentRow({
     super.key,
@@ -53,6 +60,8 @@ class WideContentRow extends StatefulWidget {
     this.hasSubtitle,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
+    this.onArrowDownToNext,
+    this.onArrowUpToPrev,
   });
 
   @override
@@ -174,7 +183,7 @@ class _WideContentRowState extends State<WideContentRow>
     final cardHeight = TVResponsiveUtils.bannerHeight(context);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 24), // Más aire y separación generosa entre filas wide
+      padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -248,6 +257,7 @@ class _WideContentRowState extends State<WideContentRow>
                           onFocusChange: (focused) {
                             if (focused && mounted) {
                               TvScroll.anchorSectionBelowTopbar(this.context);
+                              TvScroll.anchorSectionBelowTopbarDeferred(this.context);
                             }
                           },
                           child: ListView.separated(
@@ -258,7 +268,7 @@ class _WideContentRowState extends State<WideContentRow>
                             primary: false, 
                             padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0),
                             itemCount: widget.items.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 16),
+                            separatorBuilder: (_, __) => const SizedBox(width: 14),
                             itemBuilder: (context, index) {
                               final item = widget.items[index];
                               final bool isFocused = _focusedIndex == index;
@@ -270,7 +280,11 @@ class _WideContentRowState extends State<WideContentRow>
                                   focusNode: _itemFocusNodes[index],
                                   onKeyEvent: (node, event) {
                                     if (event is KeyDownEvent) {
-                                      if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
+                                      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                        if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
+                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                        if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
+                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
                                         if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
                                       } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
                                         if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
@@ -310,7 +324,7 @@ class _WideContentRowState extends State<WideContentRow>
                                         // Desliz desde la ranura previa a la
                                         // nueva (paso = ancho + separador).
                                         final double delta =
-                                            (prev - index) * (cardWidth + 16);
+                                            (prev - index) * (cardWidth + 14);
                                         _glideAnim = Tween<double>(
                                           begin: delta,
                                           end: 0.0,
@@ -377,7 +391,7 @@ class _WideContentRowState extends State<WideContentRow>
                       final index = _focusedIndex!;
                       final item = widget.items[index];
                       final double itemLeft = horizontalPadding +
-                          index * (cardWidth + 16) -
+                          index * (cardWidth + 14) -
                           _scrollController.offset +
                           (_glideAnim?.value ?? 0.0);
                       final Widget card = FocusableWideCard(

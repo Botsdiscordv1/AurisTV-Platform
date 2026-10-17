@@ -193,7 +193,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px
                 itemCount: widget.items.length,
-                separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 18),
+                separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 12 : 20),
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
                   return SizedBox(

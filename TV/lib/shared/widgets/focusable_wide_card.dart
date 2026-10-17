@@ -102,13 +102,6 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
             SafeTap.run(widget.onTap);
             return KeyEventResult.handled;
           }
-          // D-pad abajo desde una wide (ancha): ir al PRIMER elemento de la
-          // fila de abajo en vez de caer bajo el centro de la card.
-          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-            if (TvDirectionalFocus.focusFirstBelow()) {
-              return KeyEventResult.handled;
-            }
-          }
           // D-pad arriba con la fila de arriba vacía en esta columna: saltar
           // al primero de esa fila. Si hay algo alineado, no interviene.
           if (event.logicalKey == LogicalKeyboardKey.arrowUp) {

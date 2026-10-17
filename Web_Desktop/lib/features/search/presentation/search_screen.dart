@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:collection/collection.dart';
 
 import 'package:auris_core/auris_core.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:auristv_web/core/router/app_router.dart';
 import 'package:auristv_web/core/utils/responsive_utils.dart';
 import 'package:auristv_web/core/utils/url_utils.dart';
@@ -513,6 +514,14 @@ class _SearchResultsGrid extends ConsumerWidget {
         final isMobile = ResponsiveUtils.isMobile(context);
         final gridMetrics = webPosterGridMetrics(context);
 
+        final double cellWidth = webPosterGridCellWidth(context);
+        final double posterHeight = (cellWidth * 1.5).roundToDouble();
+        const double posterFocusZoom = 1.10;
+        final double posterZoneHeight = posterHeight * posterFocusZoom + 12.0;
+        final double titleGap = isMobile ? ResponsiveUtils.sp(context, 8) : 8.0;
+        final double titleHeight = isMobile ? ResponsiveUtils.sp(context, 22) : 28.0;
+        final double tileExtent = posterZoneHeight + titleGap + titleHeight + 4.0;
+
         final notifier = ref.read(notifierProvider.notifier);
 
         return RepaintBoundary(
@@ -521,7 +530,7 @@ class _SearchResultsGrid extends ConsumerWidget {
             padding: EdgeInsets.fromLTRB(gridMetrics.padding, 8, gridMetrics.padding, 40),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: gridMetrics.columns,
-              childAspectRatio: isMobile ? 0.54 : 0.54,
+              mainAxisExtent: tileExtent,
               crossAxisSpacing: gridMetrics.spacing,
               mainAxisSpacing: isMobile ? 12 : 16,
             ),
@@ -551,20 +560,51 @@ class _SearchResultsGrid extends ConsumerWidget {
               final result = results[index];
               final meta = result.resolveMetadata(category);
 
-              final card = FocusablePosterCard(
-                key: ValueKey('search_${result.url}_${result.source}'),
-                title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
-                posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
-                badge: meta.label,
-                badgeColor: meta.labelColor,
-                badgeOverlay: result.season != null && result.season! > 1
-                    ? SeasonBadge(season: result.season!)
-                    : null,
-                subtitle: meta.status,
-                subtitleColor: meta.statusColor,
-                showInfo: true,
-                progress: result.progress, // Senior Fix: Usamos el progreso inyectado
-                onTap: () => onContentTap(result),
+              final cardTitle = cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title);
+
+              final card = Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: posterZoneHeight,
+                    child: Center(
+                      child: FocusablePosterCard(
+                        key: ValueKey('search_${result.url}_${result.source}'),
+                        title: cardTitle,
+                        posterUrl: ApiEndpoints.proxyImage(result.thumbnail),
+                        badge: meta.label,
+                        badgeColor: meta.labelColor,
+                        badgeOverlay: result.season != null && result.season! > 1
+                            ? SeasonBadge(season: result.season!)
+                            : null,
+                        subtitle: meta.status,
+                        subtitleColor: meta.statusColor,
+                        showInfo: false,
+                        progress: result.progress, // Senior Fix: Usamos el progreso inyectado
+                        onTap: () => onContentTap(result),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: titleGap),
+                  SizedBox(
+                    height: titleHeight,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: MarqueeText(
+                        text: cardTitle,
+                        animate: isMobile,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white.withOpacity(0.95),
+                          fontSize: ResponsiveUtils.posterTitleFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               );
 
               // Senior Premium Fix: Animación escalonada persistente para evitar bloques negros al hacer scroll

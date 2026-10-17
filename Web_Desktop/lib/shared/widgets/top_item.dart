@@ -48,7 +48,7 @@ class TopItem extends StatelessWidget {
 
     return Container(
       width: numberVisiblePart + posterWidth,
-      margin: EdgeInsets.only(right: context.useMobileLayout ? 10 : 24), // Senior Fix: Separación adaptativa para tablets
+      margin: EdgeInsets.only(right: context.useMobileLayout ? 12 : 20), // Senior Fix: Separación adaptativa para tablets
       child: Stack(
         clipBehavior: Clip.none,
         children: [

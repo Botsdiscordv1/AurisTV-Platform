@@ -6,6 +6,7 @@ import 'package:auris_core/auris_core.dart' hide MarqueeText;
 import 'marquee_text.dart';
 import 'tv_focus_wrapper.dart';
 import 'tv_scroll.dart';
+import '../../core/utils/tv_responsive_utils.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 Color _colorFromString(String s) {
@@ -304,7 +305,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                 SizedBox(height: isMobile ? ResponsiveUtils.sp(context, 8) : 8),
                 // Senior Fix: Solo mostramos el título debajo. Altura fija para una sola línea.
                 SizedBox(
-                  height: isMobile ? ResponsiveUtils.sp(context, 22) : 28,
+                  height: isMobile ? ResponsiveUtils.sp(context, 22) : TVResponsiveUtils.sp(context, 28),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: MarqueeText(
@@ -312,7 +313,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                       animate: isMobile ? true : _isActive,
                       style: GoogleFonts.poppins(
                         color: _isActive ? Colors.white : Colors.white.withOpacity(0.95),
-                        fontSize: widget.titleFontSize ?? (isMobile ? ResponsiveUtils.sp(context, 13) : 16),
+                        fontSize: widget.titleFontSize ?? (isMobile ? ResponsiveUtils.sp(context, 13) : TVResponsiveUtils.sp(context, 13)),
                         fontWeight: FontWeight.w700,
                         height: 1.2,
                         letterSpacing: 0.2,

@@ -4454,7 +4454,12 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
     final isMobile = context.isMobile;
     
     final cardWidth = ResponsiveUtils.posterWidth(context);
-    final carouselHeight = ResponsiveUtils.rowHeight(context, hasInfo: true) + 4.0; // Senior Fix: +4px de seguridad para evitar overflow sub-pixel
+    final double posterHeight = (cardWidth * 1.5).roundToDouble();
+    const double posterFocusZoom = 1.10;
+    final double posterZoneHeight = posterHeight * posterFocusZoom + 12.0;
+    final double titleGap = isMobile ? ResponsiveUtils.sp(context, 8) : 8.0;
+    final double titleHeight = isMobile ? ResponsiveUtils.sp(context, 22) : 28.0;
+    final double carouselHeight = posterZoneHeight + titleGap + titleHeight + 4.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4502,18 +4507,47 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                     clipBehavior: Clip.none, 
                     padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
                     itemCount: widget.items.length,
-                    separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 10 : 24),
+                    separatorBuilder: (_, __) => SizedBox(width: context.useMobileLayout ? 12 : 20),
                     itemBuilder: (context, index) {
                       final item = widget.items[index];
                       return SizedBox(
                         width: cardWidth,
-                        child: FocusablePosterCard(
-                          key: ValueKey('related_${item.title}_${item.poster}'),
-                          title: item.title,
-                          posterUrl: item.poster,
-                          rating: item.rating,
-                          showInfo: true,
-                          onTap: item.onTap,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SizedBox(
+                              height: posterZoneHeight,
+                              child: Center(
+                                child: FocusablePosterCard(
+                                  key: ValueKey('related_${item.title}_${item.poster}'),
+                                  title: item.title,
+                                  posterUrl: item.poster,
+                                  rating: item.rating,
+                                  showInfo: false,
+                                  onTap: item.onTap,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: titleGap),
+                            SizedBox(
+                              height: titleHeight,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: MarqueeText(
+                                  text: item.title,
+                                  animate: isMobile,
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white.withOpacity(0.95),
+                                    fontSize: ResponsiveUtils.posterTitleFontSize(context),
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.2,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
@@ -4523,8 +4557,8 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
               if (!isMobile) ...[
                 Positioned(
                   left: 0, 
-                  top: 20, 
-                  bottom: 90, 
+                  top: 0, 
+                  height: posterZoneHeight, 
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),
@@ -4536,8 +4570,8 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                 ),
                 Positioned(
                   right: 0, 
-                  top: 20, 
-                  bottom: 90, 
+                  top: 0, 
+                  height: posterZoneHeight, 
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 300),
@@ -4551,6 +4585,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
             ],
           ),
         ),
+        SizedBox(height: isMobile ? 16 : 28),
       ],
     );
   }

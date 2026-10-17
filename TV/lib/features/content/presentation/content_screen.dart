@@ -432,7 +432,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   top: h * 0.06,
                   bottom: 20, 
                   child: SizedBox(
-                    width: 520 * (width / 1600.0).clamp(0.8, 1.2),
+                    width: width - 2 * ResponsiveUtils.horizontalPadding(context),
                     child: _buildNetflixContentColumn(context, d, width, heroTitle, logoReady),
                   ),
                 ),
@@ -459,52 +459,62 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final dynamic logo = d?.logo;
     final bool hasLogo = logo is String && logo.isNotEmpty;
     
+    final double textWidth = 720 * (width / 1600.0).clamp(0.8, 1.2);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start, 
       children: [
-        AnimatedOpacity(
-          duration: const Duration(milliseconds: 1200), 
-          curve: Curves.easeInOut, 
-          opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, 
+        SizedBox(
+          width: textWidth,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              HeroTitle(
-                title: heroTitle,
-                logo: d?.logo,
-                logoReady: logoReady,
-                maxWidth: width < 1050 ? width * 0.45 : 500.0,
-                maxHeight: titleSize * 2.2,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: titleSize * 1.5,
-                  fontWeight: FontWeight.w900,
-                  height: 1.0,
-                  letterSpacing: 1.5,
-                  shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
-                ),
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 1200), 
+                curve: Curves.easeInOut, 
+                opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, 
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    HeroTitle(
+                      title: heroTitle,
+                      logo: d?.logo,
+                      logoReady: logoReady,
+                      maxWidth: width * 0.4,
+                      maxHeight: 80,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: titleSize * 1.5,
+                        fontWeight: FontWeight.w900,
+                        height: 1.0,
+                        letterSpacing: 1.5,
+                        shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
+                      ),
+                    ),
+                    if (d is MovieDetail && !hasLogo && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        d.originalTitle!,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: titleSize * 0.65,
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                )
               ),
-              if (d is MovieDetail && !hasLogo && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  d.originalTitle!,
-                  style: GoogleFonts.poppins(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: titleSize * 0.65,
-                    fontWeight: FontWeight.w500,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
+              const SizedBox(height: 10),
+              _buildNetflixMetaRow(d),
+              const SizedBox(height: 6),
+              _buildSynopsis(d),
+              const SizedBox(height: 6),
+              _buildCastInfo(d),
             ],
-          )
+          ),
         ),
-        const SizedBox(height: 10),
-        _buildNetflixMetaRow(d),
-        const SizedBox(height: 6),
-        _buildSynopsis(d),
-        const SizedBox(height: 6),
-        _buildCastInfo(d),
         const SizedBox(height: 6),
         _buildCircularActions(context, d),
       ]
@@ -512,9 +522,9 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 
   Widget _buildCircularActions(BuildContext context, dynamic d) {
-    final size = ResponsiveUtils.sp(context, 42.0); 
+    final size = ResponsiveUtils.sp(context, 40.0); 
     final iconSize = ResponsiveUtils.sp(context, 20.0); 
-    final spacing = ResponsiveUtils.sp(context, 10.0);
+    final spacing = ResponsiveUtils.sp(context, 6.0);
     final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
     final bool isFav = ref.watch(favoritesProvider).any((f) => f.id == currentId);
     final latestHistory = ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title);
@@ -522,83 +532,106 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        mainAxisSize: MainAxisSize.min, 
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _DetailIconButton(
-            icon: AurisIcons.play,
-            filledIcon: AurisIcons.playFilled,
-            label: (latestHistory != null && !latestHistory.isFinished) ? 'Reanudar' : 'Reproducir',
-            autofocus: true,
-            focusNode: _actionsRowFirstNode,
-            onPressed: widget.onPlay,
-            size: size,
-            iconSize: iconSize,
-          ),
-          if (!widget.isMovieish) ...[
-            SizedBox(width: spacing),
-            _DetailIconButton(
-              icon: AurisIcons.episodes,
-              filledIcon: AurisIcons.episodesFilled,
-              label: 'Episodios y más',
-              onPressed: () => widget.onShowEpisodes?.call(),
-              size: size,
-              iconSize: iconSize,
+          // Cápsula contenedora SOLO para los botones de acción (íconos)
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A).withValues(alpha: 0.40),
+              borderRadius: BorderRadius.circular(100),
             ),
-          ],
-          SizedBox(width: spacing),
-          _DetailIconButton(
-            icon: isFav ? AurisIcons.bookmarkMinusFilled : AurisIcons.addCircleOutline,
-            filledIcon: isFav ? null : AurisIcons.addCircleFilled,
-            label: isFav ? 'En mi lista' : 'Añadir a mi lista',
-            onPressed: () {
-              final user = ref.read(authProvider);
-              final item = FavoriteItem(
-                id: currentId,
-                title: widget.title,
-                posterUrl: widget.poster ?? '',
-                bannerUrl: widget.banner ?? '',
-                category: widget.category,
-                source: widget.source,
-                url: widget.url,
-                addedAt: DateTime.now(),
-                profileId: user?.activeProfileId ?? 'guest_profile',
-                kind: widget.kind,
-                year: widget.year,
-                type: widget.type,
-                season: widget.season,
-                // Todas las fuentes del detalle (paridad con search/home).
-                sources: flattenSources(
-                    ref.read(activeContentSourcesProvider)),
-              );
-              ref.read(favoritesProvider.notifier).toggleFavorite(item);
-            },
-            size: size,
-            iconSize: iconSize,
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _DetailIconButton(
+                  icon: AurisIcons.play,
+                  label: (latestHistory != null && !latestHistory.isFinished) ? 'Reanudar' : 'Reproducir',
+                  autofocus: true,
+                  focusNode: _actionsRowFirstNode,
+                  onPressed: widget.onPlay,
+                  size: size,
+                  iconSize: iconSize,
+                ),
+                if (!widget.isMovieish) ...[
+                  SizedBox(width: spacing),
+                  _DetailIconButton(
+                    icon: AurisIcons.episodes,
+                    label: 'Episodios y más',
+                    onPressed: () => widget.onShowEpisodes?.call(),
+                    size: size,
+                    iconSize: iconSize,
+                  ),
+                ],
+                SizedBox(width: spacing),
+                _DetailIconButton(
+                  icon: isFav ? AurisIcons.bookmarkMinusFilled : AurisIcons.addCircleOutline,
+                  label: isFav ? 'En mi lista' : 'Añadir a mi lista',
+                  onPressed: () {
+                    final user = ref.read(authProvider);
+                    final item = FavoriteItem(
+                      id: currentId,
+                      title: widget.title,
+                      posterUrl: widget.poster ?? '',
+                      bannerUrl: widget.banner ?? '',
+                      category: widget.category,
+                      source: widget.source,
+                      url: widget.url,
+                      addedAt: DateTime.now(),
+                      profileId: user?.activeProfileId ?? 'guest_profile',
+                      kind: widget.kind,
+                      year: widget.year,
+                      type: widget.type,
+                      season: widget.season,
+                      // Todas las fuentes del detalle (paridad con search/home).
+                      sources: flattenSources(
+                          ref.read(activeContentSourcesProvider)),
+                    );
+                    ref.read(favoritesProvider.notifier).toggleFavorite(item);
+                  },
+                  size: size,
+                  iconSize: iconSize,
+                ),
+                SizedBox(width: spacing),
+                _DetailIconButton(
+                  icon: AurisIcons.docText,
+                  label: 'Detalles',
+                  onPressed: () => _openFullscreenDetails(d),
+                  size: size,
+                  iconSize: iconSize,
+                ), 
+                if (_lastTrailerKey != null) ...[
+                  SizedBox(width: spacing),
+                  _DetailIconButton(
+                    icon: AurisIcons.trailer,
+                    label: 'Ver tráiler',
+                    onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true),
+                    size: size,
+                    iconSize: iconSize,
+                  ),
+                ],
+                if (_trailerController != null && _showPlayer) ...[
+                  SizedBox(width: spacing),
+                  _DetailIconButton(
+                    icon: _isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp, 
+                    label: _isMuted ? 'Activar audio' : 'Silenciar', 
+                    onPressed: () { 
+                      setState(() { 
+                        _isMuted = !_isMuted; 
+                        if (_isMuted) _trailerController?.mute(); 
+                        else { _trailerController?.unmute(); _trailerController!.setVolume(100); } 
+                      }); 
+                    }, 
+                    size: size, 
+                    iconSize: iconSize,
+                  ),
+                ],
+              ],
+            ),
           ),
-          SizedBox(width: spacing),
-          _DetailIconButton(icon: AurisIcons.docText, filledIcon: AurisIcons.docTextFilled, label: 'Detalles', onPressed: () => _openFullscreenDetails(d), size: size, iconSize: iconSize), 
-          if (_lastTrailerKey != null) ...[
-            SizedBox(width: spacing),
-            _DetailIconButton(icon: AurisIcons.trailer, filledIcon: AurisIcons.trailerFilled, label: 'Ver tráiler', onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true), size: size, iconSize: iconSize),
-          ],
-          if (_trailerController != null && _showPlayer) ...[
-            SizedBox(width: spacing),
-            _DetailIconButton(
-              icon: _isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp, 
-              label: _isMuted ? 'Activar audio' : 'Silenciar', 
-              onPressed: () { 
-                setState(() { 
-                  _isMuted = !_isMuted; 
-                  if (_isMuted) _trailerController?.mute(); 
-                  else { _trailerController?.unmute(); _trailerController!.setVolume(100); } 
-                }); 
-              }, 
-              size: size, 
-              iconSize: iconSize
-            )
-          ],
+          // Opciones/fichas de fuentes (fuera de la cápsula)
           if (widget.currentSource != null) ...[
-            SizedBox(width: spacing * 1.5),
+            SizedBox(width: ResponsiveUtils.sp(context, 16.0)),
             SourceChipsBar(
               sources: widget.sources,
               currentSource: widget.currentSource,
@@ -747,7 +780,8 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
   bool _isFocused = false;
   @override Widget build(BuildContext context) {
     final bool isActive = _isHovered || _isFocused;
-    final Object displayIcon = (isActive && widget.filledIcon != null) ? widget.filledIcon! : widget.icon;
+    final Object displayIcon = widget.icon;
+    final Color iconColor = widget.color ?? (isActive ? Colors.black : Colors.white);
     return Focus(
       focusNode: widget.focusNode,
       autofocus: widget.autofocus,
@@ -764,18 +798,21 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
         child: _FocusTooltip(
           show: isActive,
           label: widget.label,
-          child: AnimatedScale(
-            scale: isActive ? 1.1 : 1.0,
+          child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: isActive ? Colors.white : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
             child: IconButton(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              padding: const EdgeInsets.all(6),
               constraints: const BoxConstraints(),
               icon: displayIcon is String
-                  ? AurisIcon(displayIcon as String, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24))
-                  : Icon(displayIcon as IconData?, color: widget.color ?? (isActive ? Colors.white : Colors.white.withOpacity(0.6)), size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)),
+                  ? AurisIcon(displayIcon as String, color: iconColor, size: widget.iconSize ?? ResponsiveUtils.sp(context, 24))
+                  : Icon(displayIcon as IconData?, color: iconColor, size: widget.iconSize ?? ResponsiveUtils.sp(context, 24)),
               onPressed: widget.onPressed,
-            )
-          )
+            ),
+          ),
         )
       ),
     );
@@ -1114,26 +1151,38 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
                   _updateScrollIndicators();
                   return false;
                 },
-                child: ListView.separated(
-                  controller: _scrollController,
-                  physics: const ClampingScrollPhysics(),
-                  cacheExtent: 1000,
-                  clipBehavior: Clip.none,
-                  scrollDirection: Axis.horizontal,
-                  primary: false,
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                  itemCount: widget.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 14),
-                  itemBuilder: (context, index) {
-                    final r = widget.items[index];
-                    return SizedBox(
-                      width: cardWidth,
-                      child: FocusablePosterCard(
-                        key: ValueKey(r.url),
-                        title: r.title,
-                        posterUrl: r.cover,
-                        showInfo: true,
-                        onTap: () => _openRelated(r),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      controller: _scrollController,
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      clipBehavior: Clip.none,
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth:
+                              (constraints.maxWidth - 2 * horizontalPadding)
+                                  .clamp(0.0, double.infinity),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            for (int index = 0; index < widget.items.length; index++) ...[
+                              if (index > 0) const SizedBox(width: 14),
+                              SizedBox(
+                                width: cardWidth,
+                                child: FocusablePosterCard(
+                                  key: ValueKey(widget.items[index].url),
+                                  title: widget.items[index].title,
+                                  posterUrl: widget.items[index].cover,
+                                  showInfo: true,
+                                  onTap: () => _openRelated(widget.items[index]),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     );
                   },

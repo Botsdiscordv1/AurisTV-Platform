@@ -38,8 +38,10 @@ class TVResponsiveUtils {
       tvScale = 0.85; // 720p
     } else if (width <= 1920) {
       tvScale = 1.0;  // 1080p estándar
-    } else {
+    } else if (width <= 3840) {
       tvScale = 1.15; // 4K / UHD (controlado)
+    } else {
+      tvScale = 1.3;  // 8K
     }
     return size * tvScale;
   }
@@ -85,7 +87,7 @@ class TVResponsiveUtils {
     final double extraSpace = hasSubtitle
         ? sp(context, 20) + (subtitleLines > 1 ? (4 + sp(context, 20)) : 0)
         : 0;
-    return bannerHeight(context) + extraSpace + 32.0; // Búfer amplio para dar aire y eliminar overflow por completo
+    return bannerHeight(context) + extraSpace + 12.0;
   }
 
   /// Títulos de secciones
