@@ -302,7 +302,16 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
         ? validPoster
         : existingHistory?.posterUrl;
 
-    final resolvedBanner = bannerUrl ?? existingHistory?.bannerUrl;
+    final resolvedBanner = (bannerUrl != null && bannerUrl.isNotEmpty)
+        ? bannerUrl
+        : existingHistory?.bannerUrl;
+
+    // No borrar un logo/banner ya guardado cuando el caller no aporta uno
+    // ('' o null): el player a veces inicia sin el logo cargado y lo pisaba,
+    // dejando la tarjeta de Continuar Viendo sin logo.
+    final resolvedLogo = (logoUrl != null && logoUrl.isNotEmpty)
+        ? logoUrl
+        : existingHistory?.logoUrl;
 
     final history = PlaybackHistory(
       contentId: contentId,
@@ -316,7 +325,7 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       title: title ?? existingHistory?.title,
       posterUrl: resolvedPoster,
       bannerUrl: resolvedBanner,
-      logoUrl: logoUrl ?? existingHistory?.logoUrl,
+      logoUrl: resolvedLogo,
       category: category ?? existingHistory?.category,
       source: source ?? existingHistory?.source,
       url: url ?? existingHistory?.url,
@@ -366,21 +375,25 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       final hContentId = h.contentId.toLowerCase().trim();
       final hUrl = (h.url ?? '').toLowerCase().trim();
 
-      if (hContentId == cleanContentId || 
-          hUrl == cleanContentId || 
-          (cleanTitle.isNotEmpty && (hTitle == cleanTitle || hTitle.contains(cleanTitle) || cleanTitle.contains(hTitle)))) {
-          
+      // Match ESTRICTO: id/url exacto o título normalizado IDÉNTICO.
+      // Antes se comparaba con `contains` bidireccional, lo que aplicaba el
+      // póster/logo de la obra abierta a OTRAS cuyo título lo contiene
+      // (p.ej. "One Piece" → "One Piece Film Red"), mezclando logos entre
+      // tarjetas de Continuar Viendo. Igual con id/url vacío.
+      final bool idMatch = cleanContentId.isNotEmpty &&
+          (hContentId == cleanContentId || hUrl == cleanContentId);
+      final bool titleMatch = cleanTitle.isNotEmpty && hTitle == cleanTitle;
+
+      if (idMatch || titleMatch) {
         if (h.posterUrl != posterUrl) {
-          // No pisar un banner ya guardado (suele ser el thumbnail del
-          // episodio en curso): este sync trae el backdrop genérico del
-          // detalle y revertía la tarjeta a backdrop en cada apertura.
-          // El banner se actualiza en reproducción (play/ticks/stop).
           final keepBanner =
               h.bannerUrl != null && h.bannerUrl!.isNotEmpty;
+          final String? newLogo =
+              (logoUrl != null && logoUrl.isNotEmpty) ? logoUrl : h.logoUrl;
           _memoryCache[i] = h.copyWith(
             posterUrl: posterUrl,
             bannerUrl: keepBanner ? h.bannerUrl : bannerUrl,
-            logoUrl: logoUrl ?? h.logoUrl,
+            logoUrl: newLogo,
           );
           updatedAny = true;
           _pendingSave = _memoryCache[i];

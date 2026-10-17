@@ -227,7 +227,16 @@ extension PlaybackHistoryToDetailParams on PlaybackHistory {
       normalizedCategory = 'series';
     } else if (normalizedCategory.contains('kdrama') || normalizedCategory == 'kdrama' || normalizedCategory.contains('dorama')) {
       normalizedCategory = 'kdrama';
-    } else if (normalizedCategory.contains('anim') || normalizedCategory == 'anime' || normalizedCategory == 'movie_anime') {
+    } else if (normalizedCategory == 'movie_anime' ||
+        normalizedCategory == 'anime_movie' ||
+        normalizedCategory == 'anime-movies' ||
+        kind?.toLowerCase() == 'movie_anime' ||
+        type?.toLowerCase() == 'movie_anime') {
+      // Película de anime: preservar como 'movie_anime' (antes se degradaba a
+      // 'anime' salvo kind=='movie'), así el content/player la tratan como
+      // película (sin episodios) y el enrutado sigue usando el server de anime.
+      normalizedCategory = 'movie_anime';
+    } else if (normalizedCategory.contains('anim') || normalizedCategory == 'anime') {
       normalizedCategory = (kind?.toLowerCase() == 'movie' || type?.toLowerCase() == 'movie') ? 'movie' : 'anime';
     } else {
       normalizedCategory = 'anime';
@@ -245,7 +254,9 @@ extension PlaybackHistoryToDetailParams on PlaybackHistory {
       title: resolvedTitle,
       metadataTitle: metadataTitle,
       category: normalizedCategory,
-      kind: kind ?? (normalizedCategory == 'movie' ? 'movie' : 'anime'),
+      kind: kind ?? (normalizedCategory == 'movie'
+          ? 'movie'
+          : (normalizedCategory == 'movie_anime' ? 'movie_anime' : 'anime')),
       type: type ?? normalizedCategory,
       year: year,
       url: url,

@@ -84,7 +84,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
 enum PlayerOverlay { none, language, server, quality, episodes }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBindingObserver {
-  bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime' || widget.episode == 'Trailer';
+  bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime' || widget.kind == 'movie_anime' || widget.episode == 'Trailer';
   Player? _player;
   VideoController? _controller;
   int _selectedTrackIndex = 0;

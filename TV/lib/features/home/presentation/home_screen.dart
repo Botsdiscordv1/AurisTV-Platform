@@ -39,7 +39,7 @@ void openTVDetails(BuildContext context, MediaItem item, String uiCategory) {
           },
     'animes' => isAnimeMovie ? 'movie_anime' : 'anime',
     'anime_movies' => 'movie_anime',
-    'pelÃ­culas' => isAnimeMovie ? 'movie_anime' : 'movie',
+    'películas' => isAnimeMovie ? 'movie_anime' : 'movie',
     'series' => 'series',
     'kdrama' => 'kdrama',
     _ => isAnimeMovie ? 'movie_anime' : 'all',
@@ -110,7 +110,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   final Map<String, FocusNode> _pillFocusNodes = {
     'inicio': FocusNode(),
     'animes': FocusNode(),
-    'pelÃ­culas': FocusNode(),
+    'películas': FocusNode(),
     'series': FocusNode(),
     'kdrama': FocusNode(),
   };

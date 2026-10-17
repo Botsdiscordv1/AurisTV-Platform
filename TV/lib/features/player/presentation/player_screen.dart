@@ -80,7 +80,49 @@ class PlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-enum PlayerOverlay { none, language, server, quality, config, speed, volume, episodes }
+enum PlayerOverlay { none, language, server, quality, config, speed, volume, episodes, aspect }
+
+/// Modos de "Relación de aspecto" (tamaño/encuadre) del reproductor.
+/// Cada modo define el [BoxFit] del video y, opcionalmente, un factor de
+/// ampliación (Zoom).
+enum AspectMode {
+  normal(
+    'Normal',
+    'Proporción original · barras negras si hace falta',
+    BoxFit.contain,
+    1.0,
+  ),
+  expandir(
+    'Expandir',
+    'Llena la pantalla recortando los bordes',
+    BoxFit.cover,
+    1.0,
+  ),
+  estirar(
+    'Estirar',
+    'Adapta el video a los bordes (puede deformar)',
+    BoxFit.fill,
+    1.0,
+  ),
+  zoom(
+    'Zoom',
+    'Acerca la imagen ampliando y recortando',
+    BoxFit.cover,
+    1.2,
+  );
+
+  const AspectMode(
+    this.label,
+    this.description,
+    this.fit,
+    this.scale,
+  );
+
+  final String label;
+  final String description;
+  final BoxFit fit;
+  final double scale;
+}
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBindingObserver {
   late final FocusNode _timelineFocusNode;
@@ -95,7 +137,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   late final FocusNode _sidePanelCloseNode = FocusNode(debugLabel: "sidepanel_close");
   FocusNode? _lastFocusedPillNode;
   DateTime _timelineFocusTime = DateTime.fromMillisecondsSinceEpoch(0);
-  bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime';
+  bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime' || widget.kind == 'movie_anime' || widget.episode == 'Trailer';
   Player? _player;
   VideoController? _controller;
   int _selectedTrackIndex = 0;
@@ -180,9 +222,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   /// En móvil/tablet el player ya ocupa toda la pantalla, así que el botón
   /// "fullscreen" no cambia la ventana sino el formato/ajuste del video:
-  /// contain (default) → fill (estira a los bordes) → cover (rellena sin
-  /// estirar) → contain.
-  BoxFit _videoFit = BoxFit.contain;
+  /// Normal → Estirar → Expandir → Normal.
+  /// En TV/desktop el mismo ajuste se elige desde Configuración → Relación de
+  /// aspecto (ver [AspectMode]).
+  AspectMode _aspectMode = AspectMode.normal;
 
   /// En Android/iOS (phone/tablet/foldable) y en web móvil el player ya cubre
   /// toda la pantalla, así que el botón debe ajustar el formato del video en
@@ -1272,6 +1315,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         isCurrent: _volume > 1.0,
         onTap: () => _openConfigSubPanel(PlayerOverlay.volume),
       ),
+      AurisOptionCard(
+        title: 'Relación de aspecto',
+        subtitle: _aspectMode.label,
+        icon: _aspectIcon(_aspectMode),
+        isCurrent: _aspectMode != AspectMode.normal,
+        onTap: () => _openConfigSubPanel(PlayerOverlay.aspect),
+      ),
     ];
     if (children.isEmpty) {
       return const Center(child: Padding(
@@ -1292,6 +1342,45 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _overlayParent = PlayerOverlay.config;
       _activeOverlay = overlay;
     });
+  }
+
+  /// Selector de "Relación de aspecto" (tamaño/encuadre del video).
+  Widget _buildAspectSelectorContent({bool isSidebar = false}) {
+    return ListView.builder(
+      shrinkWrap: !isSidebar,
+      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
+      itemCount: AspectMode.values.length,
+      itemBuilder: (context, index) {
+        final mode = AspectMode.values[index];
+        final bool isCurrent = _aspectMode == mode;
+        return AurisOptionCard(
+          title: mode.label,
+          subtitle: mode.description,
+          icon: _aspectIcon(mode),
+          isCurrent: isCurrent,
+          autofocus: index == 0,
+          onTap: () {
+            if (!isCurrent) setState(() => _aspectMode = mode);
+          },
+        );
+      },
+    );
+  }
+
+  String _aspectIcon(AspectMode mode) => switch (mode) {
+        AspectMode.normal => AurisIcons.aspectRatioSquare,
+        AspectMode.expandir => AurisIcons.expand,
+        AspectMode.estirar => AurisIcons.maximize,
+        AspectMode.zoom => AurisIcons.expand,
+      };
+
+  /// Aplica el [AspectMode] actual al widget de video: fija el [BoxFit] y,
+  /// si el modo lo pide (Zoom), amplía la imagen.
+  Widget _applyAspectMode(Widget video) {
+    if (_aspectMode.scale != 1.0) {
+      return Transform.scale(scale: _aspectMode.scale, child: video);
+    }
+    return video;
   }
 
   String _formatSpeed(double speed) =>
@@ -1549,14 +1638,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   /// Ciclo de formato del video en móvil/tablet (el player ya está a pantalla
-  /// completa): contain → fill (estirar a los bordes) → cover (rellenar sin
-  /// estirar la imagen) → contain.
+  /// completa): Normal → Estirar → Expandir → Normal.
   void _cycleVideoFit() {
     setState(() {
-      _videoFit = switch (_videoFit) {
-        BoxFit.contain => BoxFit.fill,
-        BoxFit.fill => BoxFit.cover,
-        _ => BoxFit.contain,
+      _aspectMode = switch (_aspectMode) {
+        AspectMode.normal => AspectMode.estirar,
+        AspectMode.estirar => AspectMode.expandir,
+        _ => AspectMode.normal,
       };
     });
   }
@@ -4060,20 +4148,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               opacity: (!_hasResetPosition && _resumePosition > 3000) ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeIn,
-              child: Video(
-                key: _videoKey,
-                controller: _controller!, 
-                controls: NoVideoControls, 
-                fit: _videoFit,
-                subtitleViewConfiguration: SubtitleViewConfiguration(
-                  style: TextStyle(
-                    height: 1.2,
-                    fontSize: 24 * settings.subtitleSize,
-                    color: Color(settings.subtitleColor),
-                    fontWeight: FontWeight.bold,
-                    backgroundColor: Colors.black38,
+              child: _applyAspectMode(
+                Video(
+                  key: _videoKey,
+                  controller: _controller!, 
+                  controls: NoVideoControls, 
+                  fit: _aspectMode.fit,
+                  subtitleViewConfiguration: SubtitleViewConfiguration(
+                    style: TextStyle(
+                      height: 1.2,
+                      fontSize: 24 * settings.subtitleSize,
+                      color: Color(settings.subtitleColor),
+                      fontWeight: FontWeight.bold,
+                      backgroundColor: Colors.black38,
+                    ),
+                    padding: EdgeInsets.only(bottom: _showControls ? 160 : 60),
                   ),
-                  padding: EdgeInsets.only(bottom: _showControls ? 160 : 60),
                 ),
               ),
             ),
@@ -4278,6 +4368,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 PlayerOverlay.quality => 'Calidad',
                 PlayerOverlay.speed => 'Velocidad',
                 PlayerOverlay.volume => 'Volumen',
+                PlayerOverlay.aspect => 'Relación de aspecto',
                 PlayerOverlay.episodes => 'Episodios',
                 _ => 'Configuración',
               },
@@ -4288,6 +4379,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 PlayerOverlay.config => _buildConfigMenuContent(isSidebar: true),
                 PlayerOverlay.speed => _buildSpeedSelectorContent(isSidebar: true),
                 PlayerOverlay.volume => _buildVolumeSelectorContent(isSidebar: true),
+                PlayerOverlay.aspect => _buildAspectSelectorContent(isSidebar: true),
                 PlayerOverlay.episodes => _buildEpisodesSelectorContent(isSidebar: true),
                 _ => const SizedBox.shrink(),
               },

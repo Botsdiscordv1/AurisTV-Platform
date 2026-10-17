@@ -1414,6 +1414,25 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     });
   }
 
+  /// Categoría/kind efectivos para el player. Si el detalle resolvió una
+  /// película de anime (movie_anime) aunque el card traiga kind/type 'anime',
+  /// se propaga para que el player oculte episodios y el historial reabra
+  /// como movie_anime (no como anime).
+  ({String category, String? kind}) _effectivePlayerMeta(bool isMovieish) {
+    if (!isMovieish) {
+      return (category: widget.category ?? 'anime', kind: widget.kind ?? widget.result?.kind);
+    }
+    final bool animeCtx = widget.category == 'anime' ||
+        widget.category == 'movie_anime' ||
+        widget.kind == 'movie_anime' ||
+        widget.result?.kind == 'movie_anime' ||
+        widget.result?.type == 'movie_anime' ||
+        widget.type == 'movie_anime' ||
+        widget.type == 'anime';
+    final String cat = animeCtx ? 'movie_anime' : 'movie';
+    return (category: cat, kind: cat);
+  }
+
   void _disposeController() { 
     _ytController?.close();
     _ytController = null;
@@ -1457,8 +1476,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum?.toString() ?? '1');
     final epThumb = currentSource.thumbnail ?? '';
     final posterParam = '&title=${Uri.encodeComponent(state.seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+    final meta = _effectivePlayerMeta(isMovieCategory);
     
-    context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource.source}&url=${Uri.encodeComponent(playUrl)}&episode=$episodeLabel&season=$currentSeason&serverName=${simplifySourceName(tapSource.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${state.episodes.valueOrNull?.response.total ?? 1}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
+    context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource.source}&url=${Uri.encodeComponent(playUrl)}&episode=$episodeLabel&season=$currentSeason&serverName=${simplifySourceName(tapSource.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${meta.category}&totalEpisodes=${state.episodes.valueOrNull?.response.total ?? 1}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${meta.kind != null && meta.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(meta.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
   }
 
   Widget _buildMetaRow(dynamic d, {required bool isMobile, double? sourceRating, String? kind}) {
@@ -2262,6 +2282,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         return [
           if (franchiseSource.isNotEmpty)
             _RelatedCarouselRow(
+              key: const ValueKey('related_franchise'),
               title: 'Franquicia y Secuelas',
               hPadding: hPadding,
               items: _unifyAndDeduplicate(
@@ -2271,6 +2292,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ),
           if (recommendedSource.isNotEmpty)
             _RelatedCarouselRow(
+              key: const ValueKey('related_recommended'),
               title: 'Te recomendamos',
               hPadding: hPadding,
               items: _unifyAndDeduplicate(
@@ -2281,6 +2303,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ),
           if (similarSource.isNotEmpty)
             _RelatedCarouselRow(
+              key: const ValueKey('related_similar'),
               title: 'Similares a ${cleanTitleForDisplay(stripSeasonSuffix(widget.title))}',
               hPadding: hPadding,
               items: _unifyAndDeduplicate(
@@ -2566,6 +2589,7 @@ class _RelatedCarouselRow extends StatefulWidget {
   final List<_RelatedCardData> items;
 
   const _RelatedCarouselRow({
+    super.key,
     required this.title,
     required this.hPadding,
     required this.items,
@@ -2585,6 +2609,16 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+  }
+
+  @override
+  void didUpdateWidget(covariant _RelatedCarouselRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Relations progresivas: la lista crece conforme llegan fuentes. Sin esto
+    // las flechas no aparecen hasta recrear el widget (salir y volver).
+    if (widget.items.length != oldWidget.items.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+    }
   }
 
   void _updateScrollIndicators() {

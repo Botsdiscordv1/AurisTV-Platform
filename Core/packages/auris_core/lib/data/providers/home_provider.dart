@@ -993,6 +993,10 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
   final s = result.source.toLowerCase();
   final t = result.title.toLowerCase();
   final sub = result.subtitle?.toLowerCase() ?? '';
+  // El backend entrega el tipo canónico en `kind`
+  // (movie / series / anime / movie_anime): es más fiable que las heurísticas
+  // por badge/subtítulo/source (un movie del server de películas no lo dice).
+  final kind = (result.kind ?? '').toLowerCase();
   
   final isAnime = result.badge.toLowerCase().contains('anime') || 
                   sub.contains('anime') || 
@@ -1004,9 +1008,10 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
                   sub.contains('película') ||
                   t.contains('película');
 
-  if (isAnime) type = MediaType.anime;
-  else if (isKdrama) type = MediaType.kdrama;
-  else if (isMovie) type = MediaType.movie;
+  if (isAnime || kind == 'anime' || kind == 'movie_anime') type = MediaType.anime;
+  else if (isKdrama || kind == 'kdrama' || kind == 'dorama') type = MediaType.kdrama;
+  else if (isMovie || kind == 'movie') type = MediaType.movie;
+  else if (kind == 'series' || kind == 'tv') type = MediaType.series;
 
   String? displaySubtitle = result.subtitle;
   if (type != MediaType.anime) {
