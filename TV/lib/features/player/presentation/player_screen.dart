@@ -2843,8 +2843,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     try {
       final platform = player.platform as dynamic;
       if (!kIsWeb) {
-        // Senior Balanced TV Buffer Tuning:
-        // Priorizamos estabilidad visual y sincronización perfecta en pantallas grandes.
+        // Perfil de rendimiento TV: el reloj de AUDIO manda. Si el SoC/GPU no
+        // alcanza, mpv suelta frames de video para no desincronizar la imagen.
         platform.setProperty('msg-level', 'all=error');
         platform.setProperty('cache', 'yes');
         platform.setProperty('cache-on-disk', 'no');
@@ -2852,9 +2852,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('demuxer-max-bytes', '67108864');
         platform.setProperty('demuxer-readahead-secs', '30');
         
-        platform.setProperty('video-sync', 'display-resample'); 
-        platform.setProperty('mc', '0.1'); 
-        platform.setProperty('autosync', '1'); 
+        platform.setProperty('video-sync', 'audio');
+        platform.setProperty('framedrop', 'decoder+vo');
         
         // Colchón de audio estable (5s)
         platform.setProperty('audio-buffer', '${pcfg.audioBufferSecFor(kIsWeb)}'); 
@@ -2864,12 +2863,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // Bloque de lectura equilibrado
         platform.setProperty('stream-buffer-size', pcfg.streamBufferSizeFor(kIsWeb)); 
         
-        platform.setProperty('vd-lavc-threads', '8'); 
+        platform.setProperty('vd-lavc-threads', '0'); 
         platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: HW con fallback seguro (estilo YouTube); si falla, mpv cae a SW
         platform.setProperty('tls-verify', 'no');
         
         // Suavizamos el parseo para evitar corrupción visual en el arranque
-        platform.setProperty('demuxer-lavf-o', 'probesize=10000000,analyzeduration=10000000,seek2any=1');
+        platform.setProperty('demuxer-lavf-o', 'probesize=5000000,analyzeduration=5000000,seek2any=1');
         platform.setProperty('user-agent', finalHeaders['User-Agent'] ?? 'Mozilla/5.0');
 
         if (finalHeaders.containsKey('Referer')) {
