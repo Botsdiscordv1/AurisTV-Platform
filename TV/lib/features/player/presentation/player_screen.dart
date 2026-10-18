@@ -4253,24 +4253,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         if (_webViewController != null)
           RepaintBoundary(child: WebViewWidget(controller: _webViewController!))
         else if (_useNativeTvSurface)
-          RepaintBoundary(
-            child: AnimatedOpacity(
-              opacity: (!_hasResetPosition && _resumePosition > 3000) ? 0.0 : 1.0,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeIn,
-              child: _applyAspectMode(
-                Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    TvVideoSurface(
-                      onSurface: (wid, width, height) =>
-                          unawaited(_applyTvSurface(wid, width, height)),
-                      onSurfaceDestroyed: _onTvSurfaceDestroyed,
-                    ),
-                    _tvSubtitleOverlay(settings),
-                  ],
+          // SurfaceView nativo (punch-out): sin opacity/transform/clip encima,
+          // ya que esas capas fuerzan el modo overlay de hybrid composition y
+          // provocan UI duplicada/translúcida. Fondo negro opaco para ocultar
+          // la capa Flutter inferior mientras la superficie aún no tiene frame.
+          ColoredBox(
+            color: Colors.black,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                TvVideoSurface(
+                  onSurface: (wid, width, height) =>
+                      unawaited(_applyTvSurface(wid, width, height)),
+                  onSurfaceDestroyed: _onTvSurfaceDestroyed,
                 ),
-              ),
+                _tvSubtitleOverlay(settings),
+              ],
             ),
           )
         else if (_controller != null)
@@ -4435,8 +4433,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   Positioned.fill(
                     child: IgnorePointer(
                       child: Container(
-                        // Senior UI: Negro opaco durante la reanudación para ocultar flickeos
-                        color: (_resumePosition > 3000 && !_hasResetPosition) ? Colors.black : Colors.black45,
+                        // Senior UI: opaco durante la reanudación; y SIEMPRE
+                        // opaco en la ruta SurfaceView para no dejar traslucir
+                        // la capa Flutter inferior (UI duplicada).
+                        color: _useNativeTvSurface
+                            ? Colors.black
+                            : ((_resumePosition > 3000 && !_hasResetPosition) ? Colors.black : Colors.black45),
                         child: const Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -4519,7 +4521,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               trapFocus: true,
               onBack: _dismissSidePanel,
               railWidth: 460,
-              borderRadius: 16,
+              // SurfaceView (punch-out) no soporta clip redondeado en hybrid
+              // composition; se usa recorte recto para no romper el video.
+              borderRadius: _useNativeTvSurface ? 0 : 16,
             ),
            
            if (_playbackError != null) 

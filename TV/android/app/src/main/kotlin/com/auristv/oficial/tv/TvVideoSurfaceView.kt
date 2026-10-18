@@ -64,6 +64,12 @@ class TvVideoSurfaceView(
         override fun surfaceDestroyed(holder: SurfaceHolder) {
             Log.i(TAG, "surfaceDestroyed")
             channel.invokeMethod("onSurfaceDestroyed", mapOf("viewId" to viewId))
+            // Liberar el global-ref: si la superficie se recrea, hay que obtener
+            // una nueva (reutilizar uno muerto deja el video en negro).
+            if (wid != 0L) {
+                deleteGlobalObjectRef(wid)
+                wid = 0L
+            }
         }
     }
 
