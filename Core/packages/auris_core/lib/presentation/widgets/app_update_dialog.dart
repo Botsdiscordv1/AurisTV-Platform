@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../data/services/app_update_service.dart';
+import 'tv_dialog_action.dart';
 
 /// Diálogo de actualización: muestra las novedades y gestiona la descarga del
 /// APK con progreso en vivo, opción de ocultar (sigue en segundo plano),
@@ -31,16 +34,38 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
   bool _needsPermission = false;
   bool _installFailed = false;
 
+  final FocusNode _primaryFocusNode =
+      FocusNode(debugLabel: 'appUpdatePrimary');
+  Timer? _focusRetry;
+
+  bool get _isTv => widget.flavor == 'tv';
+
   @override
   void initState() {
     super.initState();
     AppUpdateDownloader.instance.isDialogOpen = true;
     AppUpdateDownloader.instance.addListener(_onDownloaderChanged);
     _resolveAsset();
+    if (_isTv) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _primaryFocusNode.requestFocus();
+      });
+      // El hero de Home pide foco en su post-frame y puede pisar el del
+      // diálogo; reintento una vez para garantizar que el D-pad entre aquí.
+      _focusRetry = Timer(const Duration(milliseconds: 400), () {
+        if (mounted &&
+            !_primaryFocusNode.hasFocus &&
+            _primaryFocusNode.canRequestFocus) {
+          _primaryFocusNode.requestFocus();
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
+    _focusRetry?.cancel();
+    _primaryFocusNode.dispose();
     AppUpdateDownloader.instance.removeListener(_onDownloaderChanged);
     AppUpdateDownloader.instance.isDialogOpen = false;
     super.dispose();
@@ -261,71 +286,117 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
     }
   }
 
+  /// Botón de acción del diálogo. En TV usa un botón con foco visible
+  /// (borde blanco + resaltado) y navegable con D-pad; en el resto de
+  /// plataformas mantiene los botones Material de siempre.
+  Widget _action({
+    required String label,
+    IconData? icon,
+    required Color color,
+    Color? background,
+    required VoidCallback? onPressed,
+    bool primary = false,
+    bool first = false,
+  }) {
+    if (_isTv) {
+      return TvDialogAction(
+        label: label,
+        icon: icon,
+        color: color,
+        background: background,
+        onPressed: onPressed,
+        focusNode: first ? _primaryFocusNode : null,
+      );
+    }
+    if (primary) {
+      return ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: icon != null ? Icon(icon) : const SizedBox.shrink(),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: background ?? brandOrange,
+          foregroundColor: Colors.white,
+        ),
+      );
+    }
+    return TextButton(
+      onPressed: onPressed,
+      child: Text(label, style: TextStyle(color: color)),
+    );
+  }
+
   List<Widget> _buildActions(AppUpdateDownloader downloader) {
     switch (downloader.status) {
       case AppUpdateDownloadStatus.downloading:
         return [
-          TextButton(
+          _action(
+            label: 'Ocultar',
+            color: Colors.white70,
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Ocultar', style: TextStyle(color: Colors.white70)),
+            first: true,
           ),
-          TextButton(
+          _action(
+            label: 'Cancelar',
+            color: Colors.redAccent,
             onPressed: downloader.cancel,
-            child: const Text('Cancelar', style: TextStyle(color: Colors.redAccent)),
           ),
         ];
       case AppUpdateDownloadStatus.error:
         return [
-          TextButton(
+          _action(
+            label: 'Cerrar',
+            color: Colors.grey,
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cerrar', style: TextStyle(color: Colors.grey)),
+            first: true,
           ),
-          ElevatedButton.icon(
+          _action(
+            label: 'Reintentar',
+            icon: Icons.refresh,
+            color: Colors.white,
+            background: brandOrange,
+            primary: true,
             onPressed: _onUpdateNow,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reintentar'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: brandOrange,
-              foregroundColor: Colors.white,
-            ),
           ),
         ];
       case AppUpdateDownloadStatus.downloaded:
         return [
-          TextButton(
+          _action(
+            label: 'Cerrar',
+            color: Colors.grey,
             onPressed: () {
               downloader.reset();
               Navigator.of(context).pop();
             },
-            child: const Text('Cerrar', style: TextStyle(color: Colors.grey)),
+            first: true,
           ),
           if (!_installing)
-            ElevatedButton.icon(
+            _action(
+              label: 'Instalar',
+              icon: Icons.install_mobile,
+              color: Colors.white,
+              background: brandOrange,
+              primary: true,
               onPressed: _maybeInstall,
-              icon: const Icon(Icons.install_mobile),
-              label: const Text('Instalar'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: brandOrange,
-                foregroundColor: Colors.white,
-              ),
             ),
         ];
       case AppUpdateDownloadStatus.idle:
         return [
-          TextButton(
+          _action(
+            label: 'Más tarde',
+            color: Colors.grey,
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Más tarde', style: TextStyle(color: Colors.grey)),
+            first: true,
           ),
-          ElevatedButton.icon(
+          _action(
+            label: 'Actualizar ahora',
+            icon: Icons.download,
+            color: Colors.white,
+            background: brandOrange,
+            primary: true,
             onPressed: _resolving ? null : _onUpdateNow,
-            icon: const Icon(Icons.download),
-            label: const Text('Actualizar ahora'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: brandOrange,
-              foregroundColor: Colors.white,
-            ),
           ),
         ];
     }
   }
 }
+

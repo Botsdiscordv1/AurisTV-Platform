@@ -132,17 +132,17 @@ class _ExitConfirmationDialog extends StatelessWidget {
         style: TextStyle(color: Colors.white70),
       ),
       actions: [
-        TextButton(
+        TvDialogAction(
+          label: 'CANCELAR',
+          color: Colors.white70,
           autofocus: true,
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('CANCELAR', style: TextStyle(color: Colors.white70)),
         ),
-        TextButton(
+        TvDialogAction(
+          label: 'SALIR',
+          color: const Color(0xFFEF7A1E),
+          bold: true,
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text(
-            'SALIR',
-            style: TextStyle(color: Color(0xFFEF7A1E), fontWeight: FontWeight.bold),
-          ),
         ),
       ],
     );
