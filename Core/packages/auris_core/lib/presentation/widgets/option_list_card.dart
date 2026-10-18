@@ -45,86 +45,82 @@ class AurisOptionCard extends StatelessWidget {
       child: Builder(
         builder: (context) {
           final bool isFocused = Focus.of(context).hasFocus;
-          return AnimatedScale(
-            scale: isFocused ? 1.02 : 1.0,
-            duration: const Duration(milliseconds: 150),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
-              decoration: BoxDecoration(
-                color: isFocused ? Colors.white : const Color(0xFF272727),
+          return Container(
+            margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
+            decoration: BoxDecoration(
+              color: isFocused ? Colors.white : const Color(0xFF272727),
+              borderRadius: BorderRadius.circular(borderRadius),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: isAvailable ? onTap : null,
+                // Sin lavado del focusColor del tema: el foco se dibuja aquí.
+                focusColor: Colors.transparent,
                 borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: isAvailable ? onTap : null,
-                  // Sin lavado del focusColor del tema: el foco se dibuja aquí.
-                  focusColor: Colors.transparent,
-                  borderRadius: BorderRadius.circular(borderRadius),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    child: Row(
-                      children: [
-                        icon is String
-                            ? AurisIcon(
-                                icon as String,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Row(
+                    children: [
+                      icon is String
+                          ? AurisIcon(
+                              icon as String,
+                              color: isFocused
+                                  ? Colors.black
+                                  : (isAvailable ? Colors.white : Colors.white38),
+                              size: iconSize,
+                            )
+                          : Icon(
+                              icon as IconData?,
+                              color: isFocused
+                                  ? Colors.black
+                                  : (isAvailable ? Colors.white : Colors.white38),
+                              size: iconSize,
+                            ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: GoogleFonts.poppins(
                                 color: isFocused
                                     ? Colors.black
                                     : (isAvailable ? Colors.white : Colors.white38),
-                                size: iconSize,
-                              )
-                            : Icon(
-                                icon as IconData?,
-                                color: isFocused
-                                    ? Colors.black
-                                    : (isAvailable ? Colors.white : Colors.white38),
-                                size: iconSize,
+                                fontSize: titleSize,
+                                fontWeight: FontWeight.w700,
                               ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                            ),
+                            if (subtitle.isNotEmpty) ...[
+                              const SizedBox(height: 2),
                               Text(
-                                title,
+                                subtitle,
                                 style: GoogleFonts.poppins(
                                   color: isFocused
-                                      ? Colors.black
-                                      : (isAvailable ? Colors.white : Colors.white38),
-                                  fontSize: titleSize,
-                                  fontWeight: FontWeight.w700,
+                                      ? Colors.black54
+                                      : (isAvailable ? Colors.white60 : Colors.white24),
+                                  fontSize: subtitleSize,
+                                  fontWeight: FontWeight.w400,
                                 ),
                               ),
-                              if (subtitle.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  subtitle,
-                                  style: GoogleFonts.poppins(
-                                    color: isFocused
-                                        ? Colors.black54
-                                        : (isAvailable ? Colors.white60 : Colors.white24),
-                                    fontSize: subtitleSize,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ],
                             ],
-                          ),
+                          ],
                         ),
-                        if (isCurrent)
-                          Icon(
-                            Icons.check_rounded,
-                            color: isFocused ? Colors.black : Colors.white,
-                            size: 22,
-                          )
-                        else
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: isFocused ? Colors.black54 : Colors.white30,
-                            size: 20,
-                          ),
-                      ],
-                    ),
+                      ),
+                      if (isCurrent)
+                        Icon(
+                          Icons.check_rounded,
+                          color: isFocused ? Colors.black : Colors.white,
+                          size: 22,
+                        )
+                      else
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: isFocused ? Colors.black54 : Colors.white30,
+                          size: 20,
+                        ),
+                    ],
                   ),
                 ),
               ),

@@ -75,155 +75,151 @@ class AurisEpisodeListCard extends StatelessWidget {
           final Color titleColor = Colors.white;
           final Color subColor = Colors.white60;
           final Color overColor = isCurrent ? accentColor : Colors.white38;
-          return AnimatedScale(
-            scale: isFocused ? 1.02 : 1.0,
-            duration: const Duration(milliseconds: 150),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF272727),
+          return Container(
+            margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF272727),
+              borderRadius: BorderRadius.circular(borderRadius),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onTap,
+                focusColor: Colors.transparent,
                 borderRadius: BorderRadius.circular(borderRadius),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onTap,
-                  focusColor: Colors.transparent,
-                  borderRadius: BorderRadius.circular(borderRadius),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: thumbWidth,
-                          child: AspectRatio(
-                            aspectRatio: 16 / 9,
-                            child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: isCurrent
-                                      ? Border.all(color: accentColor, width: 2)
-                                      : null,
-                                ),
-                              // Foco estilo TizenTube: borde blanco de 2px
-                              // ceñido al thumb (foreground: no desplaza ni
-                              // re-mide el bitmap, así no se re-pide la imagen).
-                              // El item actual conserva su borde naranja: el
-                              // foco blanco solo aplica fuera de él.
-                              foregroundDecoration: (isFocused && !isCurrent)
-                                  ? BoxDecoration(
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                          color: Colors.white, width: 2),
-                                    )
-                                  : null,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: hasThumb
-                                    ? LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          final double base = constraints.maxWidth.isFinite
-                                              ? constraints.maxWidth
-                                              : 320.0;
-                                          final int w =
-                                              (base * MediaQuery.devicePixelRatioOf(context)).ceil();
-                                          final int h = (w * 9 / 16).ceil();
-                                          return CachedNetworkImage(
-                                            imageUrl: ApiEndpoints.proxyImage(
-                                              ep.thumbnail!,
-                                              width: w,
-                                              height: h,
-                                            ),
-                                            fit: BoxFit.cover,
-                                            memCacheWidth: w,
-                                            memCacheHeight: h,
-                                            placeholder: (context, url) => Container(
-                                              color: Colors.white.withValues(alpha: 0.05),
-                                            ),
-                                            errorWidget: (context, url, error) => Center(
-                                              child: Text(
-                                                '${ep.number}',
-                                                style: TextStyle(
-                                                  color: subColor,
-                                                  fontSize: 20,
-                                                  fontWeight: FontWeight.w900,
-                                                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: thumbWidth,
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(10),
+                                border: isCurrent
+                                    ? Border.all(color: accentColor, width: 2)
+                                    : null,
+                              ),
+                            // Foco estilo TizenTube: borde blanco de 2px
+                            // ceñido al thumb (foreground: no desplaza ni
+                            // re-mide el bitmap, así no se re-pide la imagen).
+                            // El item actual conserva su borde naranja: el
+                            // foco blanco solo aplica fuera de él.
+                            foregroundDecoration: (isFocused && !isCurrent)
+                                ? BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                        color: Colors.white, width: 2),
+                                  )
+                                : null,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: hasThumb
+                                  ? LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        final double base = constraints.maxWidth.isFinite
+                                            ? constraints.maxWidth
+                                            : 320.0;
+                                        final int w =
+                                            (base * MediaQuery.devicePixelRatioOf(context)).ceil();
+                                        final int h = (w * 9 / 16).ceil();
+                                        return CachedNetworkImage(
+                                          imageUrl: ApiEndpoints.proxyImage(
+                                            ep.thumbnail!,
+                                            width: w,
+                                            height: h,
+                                          ),
+                                          fit: BoxFit.cover,
+                                          memCacheWidth: w,
+                                          memCacheHeight: h,
+                                          placeholder: (context, url) => Container(
+                                            color: Colors.white.withValues(alpha: 0.05),
+                                          ),
+                                          errorWidget: (context, url, error) => Center(
+                                            child: Text(
+                                              '${ep.number}',
+                                              style: TextStyle(
+                                                color: subColor,
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w900,
                                               ),
                                             ),
-                                          );
-                                        },
-                                      )
-                                    : Center(
-                                        child: Text(
-                                          '${ep.number}',
-                                          style: TextStyle(
-                                            color: subColor,
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w900,
                                           ),
+                                        );
+                                      },
+                                    )
+                                  : Center(
+                                      child: Text(
+                                        '${ep.number}',
+                                        style: TextStyle(
+                                          color: subColor,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w900,
                                         ),
                                       ),
-                              ),
+                                    ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'EPISODIO ${ep.number}',
-                                style: TextStyle(
-                                  color: overColor,
-                                  fontSize: overlineSize,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1.2,
-                                ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'EPISODIO ${ep.number}',
+                              style: TextStyle(
+                                color: overColor,
+                                fontSize: overlineSize,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
                               ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              displayTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                color: titleColor,
+                                fontSize: titleSize,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (hasDesc) ...[
                               const SizedBox(height: 2),
                               Text(
-                                displayTitle,
+                                ep.description!,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.poppins(
-                                  color: titleColor,
-                                  fontSize: titleSize,
-                                  fontWeight: FontWeight.w700,
+                                  color: subColor,
+                                  fontSize: subtitleSize,
+                                  fontWeight: FontWeight.w400,
                                 ),
                               ),
-                              if (hasDesc) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  ep.description!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.poppins(
-                                    color: subColor,
-                                    fontSize: subtitleSize,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ],
                             ],
-                          ),
+                          ],
                         ),
-                        if (isCurrent)
-                          Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          )
-                        else
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: Colors.white30,
-                            size: 20,
-                          ),
-                      ],
-                    ),
+                      ),
+                      if (isCurrent)
+                        Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        )
+                      else
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: Colors.white30,
+                          size: 20,
+                        ),
+                    ],
                   ),
                 ),
               ),

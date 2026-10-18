@@ -149,6 +149,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   int? _tvWid;
   int _tvSurfaceW = 0;
   int _tvSurfaceH = 0;
+  /// `wid` de la superficie que ya recibió su init completo de mpv (`--vo`).
+  /// Un cambio sólo de tamaño (mismo `wid`) no debe reiniciar `--vo`.
+  int? _tvInitializedWid;
+  /// Resolución del video enviada al SurfaceView para fijar (`setFixedSize`) el
+  /// tamaño de la superficie; así el SurfaceView escala los modos de aspecto.
+  int _tvVideoW = 0;
+  int _tvVideoH = 0;
+  StreamSubscription<int?>? _videoWidthSub;
+  StreamSubscription<int?>? _videoHeightSub;
+  static const MethodChannel _tvSurfaceChannel =
+      MethodChannel('auris/tv_video_surface');
   int _selectedTrackIndex = 0;
 
   String get _currentTrackQuality {
@@ -248,6 +259,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   bool _isLoading = true;
   bool _isCompleted = false;
+  // La superficie nativa (SurfaceView) se monta SOLO cuando terminó la carga:
+  // mientras hay una animación en Dart (el spinner), Hybrid Composition congela
+  // la capa de UI superpuesta. El flag es "sticky" para no desmontar el video si
+  // vuelve el buffering durante la reproducción.
+  bool _tvSurfaceReady = false;
   StreamSubscription<bool>? _bufferingSubscription;
 
   List<VideoTrackOption> _extractTracks = [];
@@ -1420,22 +1436,132 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (player == null) return;
     try {
       final platform = player.platform as dynamic;
+      if (_tvInitializedWid == wid) {
+        // Misma superficie, sólo cambió el tamaño (abrir/cerrar el two-panel o
+        // su animación de padding). Con `vo=mediacodec_embed` el frame se
+        // renderiza sobre la Surface y la SurfaceView lo escala a sus límites,
+        // así que NO hay que reiniciar --vo ni hacer seek (eso causaba un parón
+        // de ~3s re-decodiendo desde el keyframe).
+        await platform.setProperty('android-surface-size', '${width}x$height');
+        return;
+      }
+      _tvInitializedWid = wid;
       await platform.setProperty('vo', 'null');
       await platform.setProperty('android-surface-size', '${width}x$height');
       await platform.setProperty('wid', wid.toString());
       await platform.setProperty('vo', 'mediacodec_embed');
       await platform.setProperty('vid', 'auto');
+      unawaited(_pushTvVideoSize());
     } catch (e) {
       debugPrint('[player] applyTvSurface error: $e');
     }
   }
 
+  /// Fija el tamaño de la superficie al de la resolución real del video
+  /// (`SurfaceHolder.setFixedSize`). Con la superficie al aspect del video, el
+  /// SurfaceView escala la superficie a su View y los modos de aspecto
+  /// (Contener/Cubrir/Estirar/Zoom) funcionan como un `BoxFit`.
+  Future<void> _pushTvVideoSize() async {
+    if (!_useNativeTvSurface) return;
+    final player = _player;
+    if (player == null) return;
+    final int w = player.state.width ?? 0;
+    final int h = player.state.height ?? 0;
+    if (w <= 0 || h <= 0) return;
+    if (w == _tvVideoW && h == _tvVideoH) return;
+    _tvVideoW = w;
+    _tvVideoH = h;
+    try {
+      await _tvSurfaceChannel.invokeMethod<void>(
+        'setVideoSize',
+        <String, int>{'width': w, 'height': h},
+      );
+    } catch (e) {
+      debugPrint('[player] setVideoSize error: $e');
+    }
+  }
+
   void _onTvSurfaceDestroyed() {
     _tvWid = null;
+    _tvInitializedWid = null;
+    _tvVideoW = 0;
+    _tvVideoH = 0;
     try {
       final platform = _player?.platform as dynamic;
       platform?.setProperty('vo', 'null');
     } catch (_) {}
+  }
+
+  /// Encaja la superficie nativa al aspecto real del video. media_kit lo hace
+  /// con un `FittedBox` en su widget `Video`; al usar un `SurfaceView` propio
+  /// hay que replicarlo o el códec estira el frame a pantalla completa.
+  Widget _buildTvSurfaceFitted(Widget surface) {
+    final player = _player;
+    if (player == null) return surface;
+    return StreamBuilder<int?>(
+      stream: player.stream.width,
+      initialData: player.state.width,
+      builder: (context, widthSnap) {
+        return StreamBuilder<int?>(
+          stream: player.stream.height,
+          initialData: player.state.height,
+          builder: (context, heightSnap) {
+            final int w = widthSnap.data ?? 0;
+            final int h = heightSnap.data ?? 0;
+            final double aspect = (w > 0 && h > 0) ? w / h : 16 / 9;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final double cw = constraints.maxWidth;
+                final double ch = constraints.maxHeight;
+                if (!cw.isFinite || !ch.isFinite || cw <= 0 || ch <= 0) {
+                  return surface;
+                }
+                final BoxFit fit = _aspectMode.fit;
+                final double scale = _aspectMode.scale;
+                double sw;
+                double sh;
+                if (fit == BoxFit.fill) {
+                  sw = cw;
+                  sh = ch;
+                } else if (fit == BoxFit.cover) {
+                  if (cw / ch > aspect) {
+                    sw = cw;
+                    sh = cw / aspect;
+                  } else {
+                    sh = ch;
+                    sw = ch * aspect;
+                  }
+                } else {
+                  if (cw / ch > aspect) {
+                    sh = ch;
+                    sw = ch * aspect;
+                  } else {
+                    sw = cw;
+                    sh = cw / aspect;
+                  }
+                }
+                if (scale != 1.0) {
+                  sw *= scale;
+                  sh *= scale;
+                }
+                // OverflowBox en vez de SizedBox: un SizedBox recorta su tamaño
+                // a las constraints del padre, así que Cubrir/Zoom (que deben
+                // desbordar para recortar) quedaban capados al contenedor y no
+                // se notaban. El Stack padre recorta el sobrante.
+                return OverflowBox(
+                  alignment: Alignment.center,
+                  minWidth: sw,
+                  maxWidth: sw,
+                  minHeight: sh,
+                  maxHeight: sh,
+                  child: surface,
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   /// Subtítulos renderizados en Flutter sobre la superficie nativa (media_kit los
@@ -2590,6 +2716,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     setState(() {
       _isLoading = true;
+      _tvSurfaceReady = false;
       _autoplayCountdown = -1;
       _isAutoplayResume = false;
       if (!isSwitching) {
@@ -2668,6 +2795,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _tracksSubscription = player.stream.tracks.listen((tracks) {
       if (mounted) _maybeAutoSelectSpanishAudio(player, tracks);
     });
+
+    // Resolución del video -> tamaño fijo de la superficie (modos de aspecto).
+    _videoWidthSub?.cancel();
+    _videoHeightSub?.cancel();
+    if (_useNativeTvSurface) {
+      _videoWidthSub = player.stream.width.listen((_) => unawaited(_pushTvVideoSize()));
+      _videoHeightSub = player.stream.height.listen((_) => unawaited(_pushTvVideoSize()));
+    }
 
     _errorSubscription = player.stream.error.listen((message) {
       if (!mounted) return;
@@ -2984,6 +3119,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       } catch (_) {}
       final int? wid = _tvWid;
       if (wid != null && wid > 0) {
+        // Nuevo medio en la misma superficie: forzar el init completo de mpv.
+        _tvInitializedWid = null;
         unawaited(_applyTvSurface(wid, _tvSurfaceW, _tvSurfaceH));
       }
     } else {
@@ -3319,6 +3456,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _logSubscription?.cancel();
     _playingSubscription?.cancel();
     _tracksSubscription?.cancel();
+    _videoWidthSub?.cancel();
+    _videoHeightSub?.cancel();
 
     final ms = _player?.state.position.inMilliseconds ?? 0;
     final duration = _player?.state.duration.inMilliseconds ?? 0;
@@ -4247,11 +4386,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final bool showAnyway = (_showControls || (_autoplayCountdown >= 0 && _isAutoplayResume) || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
     final bool isMenuOpen = _activeOverlay != PlayerOverlay.none;
 
+    // Anti-congelamiento (Hybrid Composition): mientras se anima el spinner de
+    // carga NO se monta el SurfaceView. HC compone la UI en el hilo de
+    // plataforma y las animaciones Dart quedan congeladas sobre el PlatformView.
+    if (_useNativeTvSurface && !_tvSurfaceReady && !_isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_tvSurfaceReady) setState(() => _tvSurfaceReady = true);
+      });
+    }
+
     final videoAndControls = Stack(
       fit: StackFit.expand,
       children: [
         if (_webViewController != null)
           RepaintBoundary(child: WebViewWidget(controller: _webViewController!))
+        else if (_useNativeTvSurface && !(_tvSurfaceReady || !_isLoading))
+          const ColoredBox(color: Colors.black)
         else if (_useNativeTvSurface)
           // SurfaceView nativo (punch-out): sin opacity/transform/clip encima,
           // ya que esas capas fuerzan el modo overlay de hybrid composition y
@@ -4262,10 +4412,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             child: Stack(
               fit: StackFit.expand,
               children: [
-                TvVideoSurface(
-                  onSurface: (wid, width, height) =>
-                      unawaited(_applyTvSurface(wid, width, height)),
-                  onSurfaceDestroyed: _onTvSurfaceDestroyed,
+                _buildTvSurfaceFitted(
+                  TvVideoSurface(
+                    onSurface: (wid, width, height) =>
+                        unawaited(_applyTvSurface(wid, width, height)),
+                    onSurfaceDestroyed: _onTvSurfaceDestroyed,
+                  ),
                 ),
                 _tvSubtitleOverlay(settings),
               ],
@@ -4521,6 +4673,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               trapFocus: true,
               onBack: _dismissSidePanel,
               railWidth: 460,
+              // En la ruta SurfaceView el árbol debe ser ESTABLE al abrir/cerrar
+              // el rail: si `AurisTwoPanel` cambia de `ClipRRect(video)` a
+              // `Center(ClipRRect(AspectRatio(video)))`, Flutter recrea el
+              // PlatformView (nuevo wid) y el video queda negro. Con
+              // `lockAspect: false` siempre usa `ClipRRect(video)` y el encaje
+              // 16:9 lo hace `_buildTvSurfaceFitted` dentro del área disponible.
+              lockAspect: !_useNativeTvSurface,
               // SurfaceView (punch-out) no soporta clip redondeado en hybrid
               // composition; se usa recorte recto para no romper el video.
               borderRadius: _useNativeTvSurface ? 0 : 16,
@@ -5435,11 +5594,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         stream: bufferStream,
                         initialData: initialBuffer,
                         builder: (context, bufSnapshot) {
+                          final Duration buffered = bufSnapshot.data ?? initialBuffer;
+                          final double bufferedMs =
+                              buffered.inMilliseconds.toDouble().clamp(0.0, maxMs);
+                          final double bufferFraction = maxMs > 0
+                              ? (bufferedMs / maxMs).clamp(0.0, 1.0)
+                              : 0.0;
                           return ExcludeFocus(
                             child: SliderTheme(
                               data: SliderTheme.of(context).copyWith(
                                 trackHeight: 4,
-                                trackShape: const _ZeroPaddingSliderTrackShape(),
+                                trackShape: _ZeroPaddingSliderTrackShape(
+                                    bufferFraction: bufferFraction),
                                 thumbShape: RoundSliderThumbShape(
                                     enabledThumbRadius: scrubbing ? 11 : 7),
                                 activeTrackColor: const Color(0xFFEF7A1E),
@@ -5632,7 +5798,11 @@ class _OdometerDigitState extends State<_OdometerDigit> {
 }
 
 class _ZeroPaddingSliderTrackShape extends RoundedRectSliderTrackShape {
-  const _ZeroPaddingSliderTrackShape();
+  /// Fracción (0..1) del tramo ya cargado en buffer. Se pinta como una "línea
+  /// de buffer" (estilo YouTube TV) entre la pista inactiva y la activa.
+  final double bufferFraction;
+
+  const _ZeroPaddingSliderTrackShape({this.bufferFraction = 0.0});
 
   @override
   Rect getPreferredRect({
@@ -5679,11 +5849,24 @@ class _ZeroPaddingSliderTrackShape extends RoundedRectSliderTrackShape {
       ..color = sliderTheme.activeTrackColor ?? const Color(0xFFEF7A1E);
     final Paint inactivePaint = Paint()
       ..color = sliderTheme.inactiveTrackColor ?? Colors.white.withOpacity(0.25);
+    final Paint bufferPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.45);
 
     final Radius radius = Radius.circular(trackRect.height / 2);
 
     // Inactive track (full width)
     context.canvas.drawRRect(RRect.fromRectAndRadius(trackRect, radius), inactivePaint);
+
+    // Buffered track (from left to the buffered position)
+    if (bufferFraction > 0) {
+      final double bufferRight =
+          trackRect.left + trackRect.width * bufferFraction.clamp(0.0, 1.0);
+      if (bufferRight > trackRect.left) {
+        final Rect bufferRect =
+            Rect.fromLTRB(trackRect.left, trackRect.top, bufferRight, trackRect.bottom);
+        context.canvas.drawRRect(RRect.fromRectAndRadius(bufferRect, radius), bufferPaint);
+      }
+    }
 
     // Active track (from left to thumb center)
     final double thumbRight = thumbCenter.dx.clamp(trackRect.left, trackRect.right);

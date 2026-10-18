@@ -906,7 +906,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       metadataTitle: widget.metadataTitle,
       category: widget.category,
       kind: widget.kind ?? widget.result?.kind,
-      year: widget.year,
+      year: widget.year ?? widget.result?.year,
       season: widget.season ?? widget.result?.season,
       source: widget.source,
       url: widget.url,
@@ -1117,14 +1117,20 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
       thumbnail: r.cover,
       slug: r.slug,
       metadataTitle: r.title,
+      kind: r.kind,
+      type: r.type,
       year: r.year,
       sources: [SourceItem(source: sName, url: r.url, quality: 'HD', slug: r.slug)],
     );
+    final openCategory = inferOpenCategory(result, widget.category);
     final uri = '/content/${Uri.encodeComponent(r.title)}'
         '?source=${Uri.encodeComponent(sName)}'
-        '&category=${Uri.encodeComponent(widget.category)}'
+        '&category=${Uri.encodeComponent(openCategory)}'
         '&url=${Uri.encodeComponent(r.url)}'
-        '&metadataTitle=${Uri.encodeComponent(r.title)}';
+        '&metadataTitle=${Uri.encodeComponent(r.title)}'
+        '${r.kind != null && r.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(r.kind!)}' : ''}'
+        '${r.type != null && r.type!.isNotEmpty ? '&type=${Uri.encodeComponent(r.type!)}' : ''}'
+        '${r.year != null ? '&year=${r.year}' : ''}';
     context.push(uri, extra: result);
   }
 
@@ -1133,7 +1139,6 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
     if (widget.items.isEmpty) return const SizedBox.shrink();
 
     final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
-    final double cardWidth = TVResponsiveUtils.posterWidth(context);
     final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: true);
 
     return Padding(
@@ -1153,6 +1158,16 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
                 },
                 child: LayoutBuilder(
                   builder: (context, constraints) {
+                    // 8 columnas en el ancho disponible: se reduce el ancho de la
+                    // tarjeta lo justo para que quepan las 8 (antes cabían 7).
+                    const int columns = 8;
+                    const double gap = 14;
+                    final double available =
+                        (constraints.maxWidth - 2 * horizontalPadding)
+                            .clamp(0.0, double.infinity);
+                    final double cardWidth =
+                        ((available - (columns - 1) * gap) / columns)
+                            .clamp(60.0, TVResponsiveUtils.posterWidth(context));
                     return SingleChildScrollView(
                       controller: _scrollController,
                       scrollDirection: Axis.horizontal,
@@ -1160,16 +1175,12 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
                       clipBehavior: Clip.none,
                       padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minWidth:
-                              (constraints.maxWidth - 2 * horizontalPadding)
-                                  .clamp(0.0, double.infinity),
-                        ),
+                        constraints: BoxConstraints(minWidth: available),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             for (int index = 0; index < widget.items.length; index++) ...[
-                              if (index > 0) const SizedBox(width: 14),
+                              if (index > 0) const SizedBox(width: gap),
                               SizedBox(
                                 width: cardWidth,
                                 child: FocusablePosterCard(

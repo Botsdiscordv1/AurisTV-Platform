@@ -289,7 +289,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/player/:contentId',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final contentId = state.pathParameters['contentId']!;
         final sourceUrl = state.uri.queryParameters['url'] ?? '';
         final source = state.uri.queryParameters['source'] ?? '';
@@ -316,7 +316,11 @@ final GoRouter appRouter = GoRouter(
         final video1080 = state.uri.queryParameters['video1080'];
         final skipResume = state.uri.queryParameters['skipResume'] == '1';
         
-        return PlayerScreen(
+        // El player abre con fondo negro puro, sin transición de fade/zoom que
+        // deje ver la pantalla anterior durante unos frames.
+        return NoTransitionPage<void>(
+          key: state.pageKey,
+          child: PlayerScreen(
           contentId: contentId,
           sourceUrl: sourceUrl,
           source: source,
@@ -337,6 +341,7 @@ final GoRouter appRouter = GoRouter(
           skipResume: skipResume,
           kind: kind,
           year: year,
+          ),
         );
       },
     ),

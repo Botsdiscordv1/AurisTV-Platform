@@ -61,6 +61,25 @@ class _TvVideoSurfaceState extends State<TvVideoSurface> {
 
   @override
   Widget build(BuildContext context) {
+    // Fix HC (flutter#74403): el sistema de vistas de Android redondea a int la
+    // posición de la plataforma y queda ~1px desalineada de la capa Flutter
+    // (UI "fantasma" duplicada y borde de 1px). Se agranda 2px y se centra para
+    // solapar 1px por lado; el sobrante se recorta con el Stack padre.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return OverflowBox(
+          minWidth: constraints.maxWidth + 2,
+          maxWidth: constraints.maxWidth + 2,
+          minHeight: constraints.maxHeight + 2,
+          maxHeight: constraints.maxHeight + 2,
+          alignment: Alignment.center,
+          child: _buildPlatformView(),
+        );
+      },
+    );
+  }
+
+  Widget _buildPlatformView() {
     return PlatformViewLink(
       viewType: 'auris/tv-video-surface',
       surfaceFactory: (context, controller) {
