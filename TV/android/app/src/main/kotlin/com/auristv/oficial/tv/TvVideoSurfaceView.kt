@@ -39,9 +39,18 @@ class TvVideoSurfaceView(
     private val surfaceView = SurfaceView(context)
     private var wid: Long = 0L
 
+    // Tamaño fijo de la superficie = resolución del video. Así el buffer del
+    // códec (que respeta el aspect) no se letterboxea dentro de la vista y es el
+    // SurfaceView el que escala la superficie a los límites de su View. Eso
+    // permite que los modos de aspecto (Contener/Cubrir/Estirar/Zoom) se
+    // apliquen deformando/recortando como un BoxFit.
+    private var fixedWidth = 0
+    private var fixedHeight = 0
+
     private val callback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
             Log.i(TAG, "surfaceCreated")
+            applyFixedSize()
         }
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -76,6 +85,30 @@ class TvVideoSurfaceView(
     init {
         surfaceView.holder.addCallback(callback)
         surfaceView.holder.setFormat(android.graphics.PixelFormat.OPAQUE)
+        channel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setVideoSize" -> {
+                    val w = call.argument<Int>("width") ?: 0
+                    val h = call.argument<Int>("height") ?: 0
+                    if (w > 0 && h > 0) {
+                        fixedWidth = w
+                        fixedHeight = h
+                        applyFixedSize()
+                    }
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun applyFixedSize() {
+        if (fixedWidth <= 0 || fixedHeight <= 0) return
+        try {
+            surfaceView.holder.setFixedSize(fixedWidth, fixedHeight)
+        } catch (t: Throwable) {
+            Log.e(TAG, "setFixedSize", t)
+        }
     }
 
     override fun getView(): View = surfaceView
