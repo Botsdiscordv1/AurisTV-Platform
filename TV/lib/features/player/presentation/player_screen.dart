@@ -1395,6 +1395,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Props base de mpv para render directo a un SurfaceView propio (Android TV).
   Future<void> _applyTvSurfaceBaseProps(dynamic platform) async {
     await platform.setProperty('vo', 'null');
+    await platform.setProperty('hwdec', 'mediacodec');
     await platform.setProperty('vid', 'auto');
     await platform.setProperty('opengl-es', 'yes');
     await platform.setProperty('force-window', 'yes');
@@ -1422,7 +1423,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       await platform.setProperty('vo', 'null');
       await platform.setProperty('android-surface-size', '${width}x$height');
       await platform.setProperty('wid', wid.toString());
-      await platform.setProperty('vo', 'gpu');
+      await platform.setProperty('vo', 'mediacodec_embed');
       await platform.setProperty('vid', 'auto');
     } catch (e) {
       debugPrint('[player] applyTvSurface error: $e');
