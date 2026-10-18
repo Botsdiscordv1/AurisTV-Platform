@@ -45,21 +45,17 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_UPDATE_ANDROID || secrets.KEY_ALIAS }}
 
-      - name: Build Mobile APK (Universal & Split)
+      - name: Build Mobile APK
         run: |
           cd Movil
           flutter pub get
-          flutter build apk --release
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-mobile-universal-release.apk
           flutter build apk --release --split-per-abi
 
       - name: Rename Mobile APKs
         run: |
           cd Movil/build/app/outputs/flutter-apk/
           for f in *release.apk; do
-            if [ "$f" != "app-release.apk" ] && [ "$f" != "app-mobile-universal-release.apk" ]; then
-              mv "$f" "app-mobile-${f}"
-            fi
+            mv "$f" "app-mobile-${f}"
           done
 
       - name: Upload Mobile Artifacts
@@ -107,21 +103,17 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_UPDATE_ANDROID || secrets.KEY_ALIAS }}
 
-      - name: Build TV APK (Universal & Split)
+      - name: Build TV APK
         run: |
           cd TV
           flutter pub get
-          flutter build apk --release
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-tv-universal-release.apk
           flutter build apk --release --split-per-abi
 
       - name: Rename TV APKs
         run: |
           cd TV/build/app/outputs/flutter-apk/
           for f in *release.apk; do
-            if [ "$f" != "app-release.apk" ] && [ "$f" != "app-tv-universal-release.apk" ]; then
-              mv "$f" "app-tv-${f}"
-            fi
+            mv "$f" "app-tv-${f}"
           done
 
       - name: Upload TV Artifacts
