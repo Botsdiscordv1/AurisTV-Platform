@@ -2864,7 +2864,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('stream-buffer-size', pcfg.streamBufferSizeFor(kIsWeb)); 
         
         platform.setProperty('vd-lavc-threads', '0'); 
-        platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: HW con fallback seguro (estilo YouTube); si falla, mpv cae a SW
+        // Decode por hardware directo (MediaCodec), igual que YouTube en la TV.
+        platform.setProperty('hwdec', Platform.isAndroid ? 'mediacodec' : 'auto-safe');
         platform.setProperty('tls-verify', 'no');
         
         // Suavizamos el parseo para evitar corrupción visual en el arranque
@@ -2877,7 +2878,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     } catch (_) {}
 
-    _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: false));
+    _controller ??= VideoController(
+      player,
+      configuration: VideoControllerConfiguration(
+        // Render directo a Surface (MediaCodec -> SurfaceView) en vez de vo=gpu:
+        // evita el coste por frame en OpenGL de los TV box y hace fluir 1080p/4K.
+        vo: (!kIsWeb && Platform.isAndroid) ? 'mediacodec_embed' : null,
+        hwdec: (!kIsWeb && Platform.isAndroid) ? 'mediacodec' : null,
+        androidAttachSurfaceAfterVideoParameters: false,
+      ),
+    );
 
     // Senior Web Fix: Auto-Fullscreen en Web Móvil al abrir el reproductor
     if (kIsWeb) {
