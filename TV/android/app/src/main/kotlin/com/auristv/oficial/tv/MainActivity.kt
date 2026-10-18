@@ -11,6 +11,11 @@ class MainActivity: FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            "auris/tv-video-surface",
+            TvVideoSurfaceFactory(flutterEngine.dartExecutor.binaryMessenger),
+        )
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INSTALL_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "canInstall" -> result.success(canRequestInstall())

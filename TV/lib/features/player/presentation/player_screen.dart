@@ -24,6 +24,7 @@ import 'package:material_symbols_icons/material_symbols_icons.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
 import '../../../core/utils/web_utils.dart';
+import 'tv_video_surface.dart';
 
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
 import '../../remote_control/data/models/remote_device.dart';
@@ -140,6 +141,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime' || widget.kind == 'movie_anime' || widget.episode == 'Trailer';
   Player? _player;
   VideoController? _controller;
+
+  // Render directo a Surface (Android TV): mpv pinta a un SurfaceView real en
+  // lugar de la textura de Flutter (punch-out, sin compositor). Ver
+  // tv_video_surface.dart.
+  bool get _useNativeTvSurface => !kIsWeb && Platform.isAndroid;
+  int? _tvWid;
+  int _tvSurfaceW = 0;
+  int _tvSurfaceH = 0;
   int _selectedTrackIndex = 0;
 
   String get _currentTrackQuality {
@@ -1381,6 +1390,95 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return Transform.scale(scale: _aspectMode.scale, child: video);
     }
     return video;
+  }
+
+  /// Props base de mpv para render directo a un SurfaceView propio (Android TV).
+  Future<void> _applyTvSurfaceBaseProps(dynamic platform) async {
+    await platform.setProperty('vo', 'null');
+    await platform.setProperty('vid', 'auto');
+    await platform.setProperty('opengl-es', 'yes');
+    await platform.setProperty('force-window', 'yes');
+    await platform.setProperty('gpu-context', 'android');
+    await platform.setProperty('sub-use-margins', 'no');
+    await platform.setProperty('sub-font-provider', 'none');
+    await platform.setProperty('sub-scale-with-window', 'yes');
+    await platform.setProperty(
+      'hwdec-codecs',
+      'h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1',
+    );
+  }
+
+  /// Conecta la superficie nativa a mpv. El orden es importante:
+  /// vo=null -> android-surface-size -> wid -> vo (igual que media_kit).
+  Future<void> _applyTvSurface(int wid, int width, int height) async {
+    if (wid <= 0 || width <= 0 || height <= 0) return;
+    _tvWid = wid;
+    _tvSurfaceW = width;
+    _tvSurfaceH = height;
+    final player = _player;
+    if (player == null) return;
+    try {
+      final platform = player.platform as dynamic;
+      await platform.setProperty('vo', 'null');
+      await platform.setProperty('android-surface-size', '${width}x$height');
+      await platform.setProperty('wid', wid.toString());
+      await platform.setProperty('vo', 'gpu');
+      await platform.setProperty('vid', 'auto');
+    } catch (e) {
+      debugPrint('[player] applyTvSurface error: $e');
+    }
+  }
+
+  void _onTvSurfaceDestroyed() {
+    _tvWid = null;
+    try {
+      final platform = _player?.platform as dynamic;
+      platform?.setProperty('vo', 'null');
+    } catch (_) {}
+  }
+
+  /// Subtítulos renderizados en Flutter sobre la superficie nativa (media_kit los
+  /// pinta con su propio widget sobre la textura, que aquí no usamos).
+  Widget _tvSubtitleOverlay(UserSettings settings) {
+    final player = _player;
+    if (player == null) return const SizedBox.shrink();
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: _showControls ? 160 : 60,
+      child: IgnorePointer(
+        child: StreamBuilder<List<String>>(
+          stream: player.stream.subtitle,
+          builder: (context, snapshot) {
+            final lines = snapshot.data ?? const <String>[];
+            if (lines.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final line in lines)
+                    Text(
+                      line,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        height: 1.2,
+                        fontSize: 24 * settings.subtitleSize,
+                        color: Color(settings.subtitleColor),
+                        fontWeight: FontWeight.bold,
+                        backgroundColor: Colors.black38,
+                        shadows: const [
+                          Shadow(blurRadius: 4, color: Colors.black),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   String _formatSpeed(double speed) =>
@@ -2864,7 +2962,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('stream-buffer-size', pcfg.streamBufferSizeFor(kIsWeb)); 
         
         platform.setProperty('vd-lavc-threads', '0'); 
-        platform.setProperty('hwdec', 'mediacodec-copy'); // HW en modo copia: evita el interop zero-copy (lento a 1080p en estos SoCs) y cae a SW si el códec no está soportado
+        platform.setProperty('hwdec', 'auto-safe');
         platform.setProperty('tls-verify', 'no');
         
         // Suavizamos el parseo para evitar corrupción visual en el arranque
@@ -2877,7 +2975,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     } catch (_) {}
 
-    _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: false));
+    if (_useNativeTvSurface) {
+      // Android TV: mpv pinta a nuestro SurfaceView (punch-out), sin
+      // VideoController ni textura de Flutter.
+      try {
+        await _applyTvSurfaceBaseProps(player.platform as dynamic);
+      } catch (_) {}
+      final int? wid = _tvWid;
+      if (wid != null && wid > 0) {
+        unawaited(_applyTvSurface(wid, _tvSurfaceW, _tvSurfaceH));
+      }
+    } else {
+      _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: false));
+    }
 
     // Senior Web Fix: Auto-Fullscreen en Web Móvil al abrir el reproductor
     if (kIsWeb) {
@@ -4141,6 +4251,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       children: [
         if (_webViewController != null)
           RepaintBoundary(child: WebViewWidget(controller: _webViewController!))
+        else if (_useNativeTvSurface)
+          RepaintBoundary(
+            child: AnimatedOpacity(
+              opacity: (!_hasResetPosition && _resumePosition > 3000) ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeIn,
+              child: _applyAspectMode(
+                Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    TvVideoSurface(
+                      onSurface: (wid, width, height) =>
+                          unawaited(_applyTvSurface(wid, width, height)),
+                      onSurfaceDestroyed: _onTvSurfaceDestroyed,
+                    ),
+                    _tvSubtitleOverlay(settings),
+                  ],
+                ),
+              ),
+            ),
+          )
         else if (_controller != null)
           RepaintBoundary(
             child: AnimatedOpacity(
