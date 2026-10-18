@@ -2864,7 +2864,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('stream-buffer-size', pcfg.streamBufferSizeFor(kIsWeb)); 
         
         platform.setProperty('vd-lavc-threads', '0'); 
-        platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: HW con fallback seguro (estilo YouTube); si falla, mpv cae a SW
+        platform.setProperty('hwdec', 'mediacodec-copy'); // HW en modo copia: evita el interop zero-copy (lento a 1080p en estos SoCs) y cae a SW si el códec no está soportado
         platform.setProperty('tls-verify', 'no');
         
         // Suavizamos el parseo para evitar corrupción visual en el arranque
