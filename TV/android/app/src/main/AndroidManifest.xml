@@ -38,6 +38,10 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
+
         <!-- Comparte el APK descargado con el instalador del sistema (actualizaciones in-app) -->
         <provider
             android:name="androidx.core.content.FileProvider"
