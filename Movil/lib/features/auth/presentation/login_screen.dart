@@ -25,6 +25,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   final TextEditingController _passwordController = TextEditingController();
   bool _showPassword = false;
 
+  // Evita mostrar el collage a medio cargar cuando Login es la pantalla de
+  // arranque: se pinta SOLO cuando sus imágenes están decodificadas.
+  bool _collageReady = false;
+
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fadeAnim;
 
@@ -36,6 +40,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       duration: const Duration(milliseconds: 350),
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+
+    // Garantiza el collage lleno desde el frame 1 aunque Login se abra como
+    // primera pantalla: precarga y solo entonces habilita el collage.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await CollageGridBackground.precache(context);
+      if (mounted) setState(() => _collageReady = true);
+    });
   }
 
   @override
@@ -91,7 +103,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     left: 0,
                     right: 0,
                     height: size.height * 0.70,
-                    child: const CollageGridBackground(),
+                    child: _collageReady
+                        ? const CollageGridBackground()
+                        : const SizedBox.shrink(),
                   ),
                   Positioned(
                     top: 0,

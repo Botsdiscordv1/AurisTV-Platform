@@ -29,7 +29,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFFEF7A1E);
-    const backgroundColor = Color(0xFF0B0B0D);
+    const backgroundColor = Color(0xFF000000);
 
     return Scaffold(
       backgroundColor: backgroundColor,

@@ -84,6 +84,7 @@ class AurisIcons {
   static String get compress => reiconSvg(Reicon.outline.compress);
   static String get maximize => reiconSvg(Reicon.outline.maximize);
   static String get minimize => reiconSvg(Reicon.outline.minimize);
+  static String get zoomIn => reiconSvg(Reicon.outline.searchZoomIn);
 
   // Navegación (Outline / Filled para Navbar)
   static String get homeOutline => reiconSvg(Reicon.outline.home6);

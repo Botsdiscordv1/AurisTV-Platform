@@ -19,7 +19,7 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider);
     const primaryColor = Color(0xFFEF7A1E);
-    const backgroundColor = Color(0xFF0B0B0D);
+    const backgroundColor = Color(0xFF000000);
 
     final bool initialEdit = GoRouterState.of(context).uri.queryParameters['edit'] == 'true';
     final bool _isEditMode = _isEditModeOverride ?? initialEdit;

@@ -32,13 +32,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settings = ref.watch(settingsProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       body: Row(
         children: [
           // BARRA LATERAL DE CATEGORÍAS
           Container(
             width: 260,
-            color: const Color(0xFF0B0B0D),
+            color: const Color(0xFF000000),
             padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

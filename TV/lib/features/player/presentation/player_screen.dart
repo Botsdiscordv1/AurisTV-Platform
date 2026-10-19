@@ -136,6 +136,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   late final FocusNode _opedPillFocusNode = FocusNode(debugLabel: "pill_oped");
   late final FocusNode _languagePillFocusNode = FocusNode(debugLabel: "pill_language");
   late final FocusNode _sidePanelCloseNode = FocusNode(debugLabel: "sidepanel_close");
+  // Nodos de entrada de los paneles de Configuración: al abrir un submenú
+  // (o volver a Configuración) el foco debe caer EXPLÍCITAMENTE en la opción
+  // actual dentro del panel. El `autofocus` se pierde al recrear el contenido
+  // (KeyedSubtree) y el foco terminaba en el nodo raíz del player, con lo que
+  // LEFT hacía seek en vez de que la trampa del two-panel enfocara el video.
+  final FocusNode _configEntryNode = FocusNode(debugLabel: "panel_config_entry");
+  final FocusNode _qualityEntryNode = FocusNode(debugLabel: "panel_quality_entry");
+  final FocusNode _speedEntryNode = FocusNode(debugLabel: "panel_speed_entry");
+  final FocusNode _volumeEntryNode = FocusNode(debugLabel: "panel_volume_entry");
+  final FocusNode _aspectEntryNode = FocusNode(debugLabel: "panel_aspect_entry");
   FocusNode? _lastFocusedPillNode;
   DateTime _timelineFocusTime = DateTime.fromMillisecondsSinceEpoch(0);
   bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime' || widget.kind == 'movie_anime' || widget.episode == 'Trailer';
@@ -215,6 +225,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Sub-panel padre para la navegación en dos niveles (Configuración →
   /// Calidad): salir desde el hijo vuelve al padre en vez de cerrar.
   PlayerOverlay? _overlayParent;
+  /// Fila de Configuración que abrió el submenú actual: al volver, el foco
+  /// regresa a ella (en vez de saltar al primer item).
+  PlayerOverlay? _configFocusTarget;
   bool _isVolumePillHovered = false;
   Timer? _volumeExitTimer;
   String _selectedQuality = 'auto';
@@ -264,6 +277,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   // la capa de UI superpuesta. El flag es "sticky" para no desmontar el video si
   // vuelve el buffering durante la reproducción.
   bool _tvSurfaceReady = false;
+  // Primer frame real ya pintado: hasta que la posición avance de verdad, el
+  // spinner de carga NO debe ocultarse (mpv reporta playing/buffering=false
+  // antes de tener imagen, y eso dejaba ver los controles sobre un video negro).
+  bool _firstFrameRendered = false;
   StreamSubscription<bool>? _bufferingSubscription;
 
   List<VideoTrackOption> _extractTracks = [];
@@ -958,6 +975,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ));
     }
 
+    final int currentIndex =
+        servers.indexWhere((s) => s == simplifySourceName(_currentSource));
+    final int autofocusIndex = currentIndex >= 0 ? currentIndex : 0;
+
     return ListView.builder(
       shrinkWrap: !isSidebar,
       padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
@@ -971,7 +992,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           subtitle: '${_groupedSources[sName]!.length} opciones disponibles',
           icon: AurisIcons.server,
           isCurrent: isCurrent,
-          autofocus: index == 0,
+          autofocus: index == autofocusIndex,
           onTap: () {
             if (!isSidebar) Navigator.pop(context);
             else setState(() => _activeOverlay = PlayerOverlay.none);
@@ -987,7 +1008,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   /// Cierra el panel lateral y devuelve el foco D-pad a la pill que lo abrió
   /// (estilo YouTube-TV: salir del panel = volver a los controles).
-  void _dismissSidePanel() {
+  ///
+  /// Con [fully] (OK/SELECT sobre el video enfocado) se cierra TODO el panel de
+  /// una vez —vuelve el video a pantalla completa— incluso desde un submenú, en
+  /// lugar de subir un nivel. Atrás sigue subiendo de nivel (back/dismiss sin
+  /// [fully]).
+  void _dismissSidePanel({bool fully = false}) {
     // Escudo anti-doble Back: el Back físico dispara la trampa (tecla) y
     // después el back del sistema (PopScope); sin esto el segundo encuentra
     // el panel ya cerrado y oculta los controles recién mostrados.
@@ -996,15 +1022,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _ignoreNextPop = false;
     });
     // Vuelta atrás de un nivel (Calidad → Configuración).
-    if (_overlayParent != null) {
+    if (!fully && _overlayParent != null) {
       final parent = _overlayParent!;
       setState(() {
         _activeOverlay = parent;
         _overlayParent = null;
       });
+      _focusPanelEntrySoon();
       return;
     }
-    setState(() => _activeOverlay = PlayerOverlay.none);
+    setState(() {
+      _activeOverlay = PlayerOverlay.none;
+      _overlayParent = null;
+    });
     _startHideTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -1060,6 +1090,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildQualitySelectorContent({bool isSidebar = false}) {
     final List<Map<String, dynamic>> options = _qualityMenuOptions;
+    final int currentIndex =
+        options.indexWhere((o) => o['key'] == _selectedQuality);
+    final int autofocusIndex = currentIndex >= 0 ? currentIndex : 0;
 
     return ListView.builder(
       shrinkWrap: !isSidebar,
@@ -1077,10 +1110,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         return AurisOptionCard(
           title: label,
           subtitle: isAvailable ? sub : 'No disponible para este tema',
-          icon: AurisIcons.hd,
           isCurrent: isCurrent,
           isAvailable: isAvailable,
-          autofocus: index == 0,
+          autofocus: index == autofocusIndex,
+          focusNode: index == autofocusIndex ? _qualityEntryNode : null,
           onTap: () {
             if (!isSidebar) Navigator.pop(context);
             else setState(() => _activeOverlay = PlayerOverlay.none);
@@ -1271,6 +1304,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ));
     }
 
+    final int currentIndex = sourceOptions.indexWhere(
+      (entry) => entry.isTrack
+          ? entry.trackIndex == _selectedTrackIndex
+          : entry.result.url == _currentSourceUrl,
+    );
+    final int autofocusIndex = currentIndex >= 0 ? currentIndex : 0;
+
     return ListView.builder(
       shrinkWrap: !isSidebar,
       padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
@@ -1292,7 +1332,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           subtitle: subtitleText,
           icon: AurisIcons.subtitles,
           isCurrent: isCurrent,
-          autofocus: index == 0,
+          autofocus: index == autofocusIndex,
           onTap: () {
             if (!isSidebar) Navigator.pop(context);
             else setState(() => _activeOverlay = PlayerOverlay.none);
@@ -1317,20 +1357,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ? 'Automático'
         : '${_selectedQuality.toUpperCase()}p';
     final bool showQuality = _hasQualityOptions;
+    // Al volver de un submenú el foco debe caer en la fila que lo abrió
+    // (_configFocusTarget). Si no hay destino válido (o Calidad está oculta),
+    // cae en el primer item visible.
+    final PlayerOverlay? target = _configFocusTarget;
+    final bool targetValid =
+        (target == PlayerOverlay.quality && showQuality) ||
+            target == PlayerOverlay.speed ||
+            target == PlayerOverlay.volume ||
+            target == PlayerOverlay.aspect;
+    final bool focusQuality =
+        targetValid ? target == PlayerOverlay.quality : showQuality;
+    final bool focusSpeed =
+        targetValid ? target == PlayerOverlay.speed : !showQuality;
     final children = <Widget>[
       if (showQuality)
         AurisOptionCard(
           title: 'Calidad',
           subtitle: qualitySub,
           icon: AurisIcons.hd,
-          autofocus: true,
+          autofocus: focusQuality,
+          focusNode: focusQuality ? _configEntryNode : null,
           onTap: () => _openConfigSubPanel(PlayerOverlay.quality),
         ),
       AurisOptionCard(
         title: 'Velocidad',
         subtitle: _formatSpeed(_playbackSpeed),
         icon: AurisIcons.speedometer,
-        autofocus: !showQuality,
+        autofocus: focusSpeed,
+        focusNode: focusSpeed ? _configEntryNode : null,
         onTap: () => _openConfigSubPanel(PlayerOverlay.speed),
       ),
       AurisOptionCard(
@@ -1338,6 +1393,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         subtitle: _volumeLabel,
         icon: AurisIcons.volumeUp,
         isCurrent: _volume > 1.0,
+        autofocus: targetValid && target == PlayerOverlay.volume,
+        focusNode:
+            (targetValid && target == PlayerOverlay.volume) ? _configEntryNode : null,
         onTap: () => _openConfigSubPanel(PlayerOverlay.volume),
       ),
       AurisOptionCard(
@@ -1345,6 +1403,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         subtitle: _aspectMode.label,
         icon: _aspectIcon(_aspectMode),
         isCurrent: _aspectMode != AspectMode.normal,
+        autofocus: targetValid && target == PlayerOverlay.aspect,
+        focusNode:
+            (targetValid && target == PlayerOverlay.aspect) ? _configEntryNode : null,
         onTap: () => _openConfigSubPanel(PlayerOverlay.aspect),
       ),
     ];
@@ -1365,12 +1426,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _openConfigSubPanel(PlayerOverlay overlay) {
     setState(() {
       _overlayParent = PlayerOverlay.config;
+      // Recordar la fila origen para devolverle el foco al volver.
+      _configFocusTarget = overlay;
       _activeOverlay = overlay;
+    });
+    _focusPanelEntrySoon();
+  }
+
+  /// Tras cambiar de nivel en el panel (Configuración ↔ submenú) el foco debe
+  /// quedar en la opción actual DENTRO del panel. Si se pierde, LEFT lo consume
+  /// el player (seek) en lugar de que la trampa del two-panel enfoque el video.
+  void _focusPanelEntrySoon() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _activeOverlay == PlayerOverlay.none) return;
+      final FocusNode? node = switch (_activeOverlay) {
+        PlayerOverlay.config => _configEntryNode,
+        PlayerOverlay.quality => _qualityEntryNode,
+        PlayerOverlay.speed => _speedEntryNode,
+        PlayerOverlay.volume => _volumeEntryNode,
+        PlayerOverlay.aspect => _aspectEntryNode,
+        _ => null,
+      };
+      if (node != null && node.canRequestFocus) node.requestFocus();
     });
   }
 
   /// Selector de "Relación de aspecto" (tamaño/encuadre del video).
   Widget _buildAspectSelectorContent({bool isSidebar = false}) {
+    final int currentIndex = AspectMode.values.indexOf(_aspectMode);
+    final int autofocusIndex = currentIndex >= 0 ? currentIndex : 0;
     return ListView.builder(
       shrinkWrap: !isSidebar,
       padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
@@ -1381,9 +1465,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         return AurisOptionCard(
           title: mode.label,
           subtitle: mode.description,
-          icon: _aspectIcon(mode),
           isCurrent: isCurrent,
-          autofocus: index == 0,
+          autofocus: index == autofocusIndex,
+          focusNode: index == autofocusIndex ? _aspectEntryNode : null,
           onTap: () {
             if (!isCurrent) setState(() => _aspectMode = mode);
           },
@@ -1396,7 +1480,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         AspectMode.normal => AurisIcons.aspectRatioSquare,
         AspectMode.expandir => AurisIcons.expand,
         AspectMode.estirar => AurisIcons.maximize,
-        AspectMode.zoom => AurisIcons.expand,
+        AspectMode.zoom => AurisIcons.zoomIn,
       };
 
   /// Aplica el [AspectMode] actual al widget de video: fija el [BoxFit] y,
@@ -1630,6 +1714,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   static const List<double> _speedOptions = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
   Widget _buildSpeedSelectorContent({bool isSidebar = false}) {
+    final int currentIndex = _speedOptions.indexOf(_playbackSpeed);
+    final int autofocusIndex = currentIndex >= 0 ? currentIndex : 0;
     return ListView.builder(
       shrinkWrap: !isSidebar,
       padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
@@ -1640,9 +1726,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         return AurisOptionCard(
           title: _formatSpeed(speed),
           subtitle: speed == 1.0 ? 'Normal' : '',
-          icon: AurisIcons.speedometer,
           isCurrent: isCurrent,
-          autofocus: index == 0,
+          autofocus: index == autofocusIndex,
+          focusNode: index == autofocusIndex ? _speedEntryNode : null,
           onTap: () {
             if (!isCurrent) _setPlaybackSpeed(speed);
           },
@@ -1654,6 +1740,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   static const List<double> _volumePresets = [1.0, 1.25, 1.5, 1.75, 2.0];
 
   Widget _buildVolumeSelectorContent({bool isSidebar = false}) {
+    final int currentIndex =
+        _volumePresets.indexWhere((v) => (_volume - v).abs() < 0.01);
+    final int autofocusIndex = currentIndex >= 0 ? currentIndex : 0;
     return ListView.builder(
       shrinkWrap: !isSidebar,
       padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
@@ -1665,9 +1754,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         return AurisOptionCard(
           title: value >= 2.0 ? '$percent% Máximo' : '$percent%',
           subtitle: value <= 1.0 ? 'Normal' : (value > 1.0 ? 'Boost' : ''),
-          icon: AurisIcons.volumeUp,
           isCurrent: isCurrent,
-          autofocus: index == 0,
+          autofocus: index == autofocusIndex,
+          focusNode: index == autofocusIndex ? _volumeEntryNode : null,
           onTap: () {
             if (!isCurrent) _setVolumePreset(value);
           },
@@ -1767,6 +1856,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           ));
         }
         final eps = _enrichedEpisodes(data.episodes);
+        final int currentIndex =
+            eps.indexWhere((e) => e.number.toString() == _activeEpisode);
+        final int autofocusIndex = currentIndex >= 0 ? currentIndex : 0;
         return ListView.builder(
           shrinkWrap: !isSidebar,
           padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
@@ -1777,7 +1869,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             return AurisEpisodeListCard(
               ep: ep,
               isCurrent: isCurrent,
-              autofocus: isCurrent,
+              autofocus: index == autofocusIndex,
               onTap: () => _selectEpisodeFromPanel(ep),
             );
           },
@@ -1814,6 +1906,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     setState(() {
       _overlayParent = null;
+      // Apertura fresca desde el engranaje: sin destino previo, foco al primer item.
+      _configFocusTarget = null;
       _activeOverlay = _activeOverlay == PlayerOverlay.config ? PlayerOverlay.none : PlayerOverlay.config;
       if (_activeOverlay != PlayerOverlay.none) {
         _showControls = true;
@@ -2716,6 +2810,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     setState(() {
       _isLoading = true;
+      _firstFrameRendered = false;
       _tvSurfaceReady = false;
       _autoplayCountdown = -1;
       _isAutoplayResume = false;
@@ -2782,7 +2877,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (mounted && playing) {
         setState(() {
           _playbackError = null;
-          _isLoading = false; 
+          // No ocultar el spinner hasta que haya un frame real: mpv reporta
+          // playing=true al arrancar el pipeline, antes de pintar imagen.
+          if (_firstFrameRendered || _isAutoplayResume) _isLoading = false;
           _webNeedsInteraction = false; // Si empieza a sonar, ya no necesitamos interaction
           _extractRefreshCount = 0;
         });
@@ -2904,6 +3001,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
       // Senior UI Fix: la carga termina cuando la posición avanza de verdad
       // (no al llamar a play()); así el spinner cubre el tiempo de buffering.
+      if (ms > 1000) _firstFrameRendered = true;
       if (ms > 1000 && mounted && _isLoading) {
         setState(() => _isLoading = false);
       }
@@ -3022,7 +3120,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         });
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _isLoading = false);
+          if (mounted && (_firstFrameRendered || _isAutoplayResume)) {
+            setState(() => _isLoading = false);
+          }
         });
       }
     });
@@ -3500,6 +3600,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _opedPillFocusNode.dispose();
     _languagePillFocusNode.dispose();
     _sidePanelCloseNode.dispose();
+    _configEntryNode.dispose();
+    _qualityEntryNode.dispose();
+    _speedEntryNode.dispose();
+    _volumeEntryNode.dispose();
+    _aspectEntryNode.dispose();
     super.dispose();
   }
 
@@ -3663,6 +3768,68 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
+  /// Pantalla ÚNICA de carga, compartida por la extracción de la fuente y el
+  /// arranque del reproductor: ambos usan el mismo spinner, texto y fondo para
+  /// que el usuario vea una sola carga continua y no crea que la app se quedó
+  /// congelada.
+  Widget _buildContentLoadingView({
+    bool showBack = false,
+    Color background = Colors.black,
+  }) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ColoredBox(color: background),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 56,
+                height: 56,
+                child: CircularProgressIndicator(
+                  strokeWidth: 4,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Cargando contenido...',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Preparando tu reproducción, un momento por favor.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: Colors.white54,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (showBack)
+          Positioned(
+            top: 16,
+            left: 16,
+            child: SafeArea(
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded,
+                    color: Colors.white, size: 30),
+                onPressed: _exitPlayer,
+                style: IconButton.styleFrom(backgroundColor: Colors.black45),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildMainContent(BuildContext context, UserSettings settings) {
     final remoteState = ref.watch(remoteControlProvider);
     final targetId = remoteState.activeTargetDeviceId;
@@ -3740,10 +3907,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           }
           return _playerView(tracks: tracks, settings: settings);
         },
-        loading: () => Stack(children: [
-            const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Conectando con la fuente...', style: TextStyle(color: Colors.white54))])),
-            Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28), onPressed: _exitPlayer))),
-          ]),
+        loading: () => _buildContentLoadingView(showBack: true),
         error: (err, _) => Stack(children: [
             Center(
               child: Padding(
@@ -4584,23 +4748,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 if (_isLoading)
                   Positioned.fill(
                     child: IgnorePointer(
-                      child: Container(
-                        // Senior UI: opaco durante la reanudación; y SIEMPRE
-                        // opaco en la ruta SurfaceView para no dejar traslucir
-                        // la capa Flutter inferior (UI duplicada).
-                        color: _useNativeTvSurface
+                      // Misma vista de carga que la extracción de la fuente →
+                      // una sola carga percibida por el usuario.
+                      // Opaco durante la reanudación y SIEMPRE opaco en la ruta
+                      // SurfaceView para no dejar traslucir la capa Flutter
+                      // inferior (UI duplicada).
+                      child: _buildContentLoadingView(
+                        background: _useNativeTvSurface
                             ? Colors.black
                             : ((_resumePosition > 3000 && !_hasResetPosition) ? Colors.black : Colors.black45),
-                        child: const Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(width: 48, height: 48, child: CircularProgressIndicator(strokeWidth: 4, color: Colors.white)),
-                              SizedBox(height: 16),
-                              Text('Cargando...', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ),
@@ -4657,32 +4813,45 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 PlayerOverlay.episodes => 'Episodios',
                 _ => 'Configuración',
               },
-              panelContent: switch (_activeOverlay) {
-                PlayerOverlay.language => _buildLanguageSelectorContent(isSidebar: true),
-                PlayerOverlay.server => _buildServerSelectorContent(isSidebar: true),
-                PlayerOverlay.quality => _buildQualitySelectorContent(isSidebar: true),
-                PlayerOverlay.config => _buildConfigMenuContent(isSidebar: true),
-                PlayerOverlay.speed => _buildSpeedSelectorContent(isSidebar: true),
-                PlayerOverlay.volume => _buildVolumeSelectorContent(isSidebar: true),
-                PlayerOverlay.aspect => _buildAspectSelectorContent(isSidebar: true),
-                PlayerOverlay.episodes => _buildEpisodesSelectorContent(isSidebar: true),
-                _ => const SizedBox.shrink(),
-              },
-              onDismiss: _dismissSidePanel,
+              // KeyedSubtree con la clave del overlay: al cambiar de menú/submenú,
+              // la ListView del panel NO debe reutilizar los elementos por índice
+              // (config item i -> item i del submenú), porque conservaría el
+              // FocusNode viejo y el `autofocus` de la opción actual no se
+              // aplicaría. Con la clave se recrea el contenido y el foco cae en
+              // la opción actual (ver autofocusIndex en cada selector).
+              panelContent: KeyedSubtree(
+                key: ValueKey(_activeOverlay),
+                child: switch (_activeOverlay) {
+                  PlayerOverlay.language => _buildLanguageSelectorContent(isSidebar: true),
+                  PlayerOverlay.server => _buildServerSelectorContent(isSidebar: true),
+                  PlayerOverlay.quality => _buildQualitySelectorContent(isSidebar: true),
+                  PlayerOverlay.config => _buildConfigMenuContent(isSidebar: true),
+                  PlayerOverlay.speed => _buildSpeedSelectorContent(isSidebar: true),
+                  PlayerOverlay.volume => _buildVolumeSelectorContent(isSidebar: true),
+                  PlayerOverlay.aspect => _buildAspectSelectorContent(isSidebar: true),
+                  PlayerOverlay.episodes => _buildEpisodesSelectorContent(isSidebar: true),
+                  _ => const SizedBox.shrink(),
+                },
+              ),
+              onDismiss: () => _dismissSidePanel(fully: true),
               closeFocusNode: _sidePanelCloseNode,
+              showCloseButton: false,
+              // LEFT desde el panel enfoca el video (borde blanco 3px); RIGHT vuelve.
+              enableVideoFocus: true,
               trapFocus: true,
               onBack: _dismissSidePanel,
               railWidth: 460,
-              // En la ruta SurfaceView el árbol debe ser ESTABLE al abrir/cerrar
-              // el rail: si `AurisTwoPanel` cambia de `ClipRRect(video)` a
-              // `Center(ClipRRect(AspectRatio(video)))`, Flutter recrea el
-              // PlatformView (nuevo wid) y el video queda negro. Con
-              // `lockAspect: false` siempre usa `ClipRRect(video)` y el encaje
-              // 16:9 lo hace `_buildTvSurfaceFitted` dentro del área disponible.
-              lockAspect: !_useNativeTvSurface,
-              // SurfaceView (punch-out) no soporta clip redondeado en hybrid
-              // composition; se usa recorte recto para no romper el video.
+              // Con `lockAspect` el área de video se ajusta a 16:9 mediante
+              // padding (sin cambiar la estructura del subárbol), de modo que el
+              // video la rellena y el redondeo del contenedor coincide con el
+              // video. El SurfaceView (punch-out) no soporta clip redondeado en
+              // Hybrid Composition: se redondean las esquinas con una máscara
+              // del color del fondo (16px), no con ClipRRect.
+              lockAspect: true,
               borderRadius: _useNativeTvSurface ? 0 : 16,
+              videoCornerRadius: _useNativeTvSurface ? 16 : null,
+              cornerMaskColor:
+                  _useNativeTvSurface ? const Color(0xFF0F0F0F) : null,
             ),
            
            if (_playbackError != null) 
@@ -4975,6 +5144,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     debugLabel: 'header_back',
                     focusNode: _headerFocusNode,
                     isTopButton: true,
+                    absorbLeft: true,
                   ),
                   const SizedBox(width: 16),
                   _buildCircularButton(
@@ -4994,6 +5164,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     debugLabel: 'header_replay',
                     focusNode: _headerFocusNode,
                     isTopButton: true,
+                    absorbLeft: true,
                   ),
                 ],
                 const SizedBox(width: 16),
@@ -5004,6 +5175,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   iconSize: 22,
                   debugLabel: 'header_options',
                   isTopButton: true,
+                  absorbRight: true,
                 ),
               ],
             ),
@@ -5101,6 +5273,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     bool isCapsule = false,
     FocusNode? focusNode,
     bool isTopButton = false,
+    bool absorbLeft = false,
+    bool absorbRight = false,
   }) {
     return Focus(
       focusNode: focusNode,
@@ -5111,6 +5285,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           if (debugLabel == 'header_back' || debugLabel == 'header_replay' || debugLabel == 'header_options') {
             if (!_showControls) {
               setState(() => _showControls = true);
+            }
+            // Extremos de la fila superior: contener la dirección para no
+            // perder el foco del botón (p. ej. DERECHA en Configuración).
+            if (key == LogicalKeyboardKey.arrowRight && absorbRight) {
+              return KeyEventResult.handled;
+            }
+            if (key == LogicalKeyboardKey.arrowLeft && absorbLeft) {
+              return KeyEventResult.handled;
             }
             if (key == LogicalKeyboardKey.arrowDown) {
               _timelineFocusNode.requestFocus();

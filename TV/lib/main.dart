@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:auris_core/auris_core.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/watch_next/watch_next_initializer.dart';
 import 'features/remote_control/presentation/providers/remote_control_provider.dart';
 import 'features/remote_control/data/models/remote_device.dart';
 
@@ -70,18 +71,20 @@ class AurisApp extends StatelessWidget {
       builder: (context, child) {
         if (child == null) return const SizedBox.shrink();
 
-        return Shortcuts(
-          shortcuts: const <ShortcutActivator, Intent>{
-            SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
-          },
-          child: NotificationInitializer(
-            child: RemoteCommandListener(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  child,
-                  const UpdateDownloadBanner(flavor: 'tv'),
-                ],
+        return WatchNextInitializer(
+          child: Shortcuts(
+            shortcuts: const <ShortcutActivator, Intent>{
+              SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
+            },
+            child: NotificationInitializer(
+              child: RemoteCommandListener(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    child,
+                    const UpdateDownloadBanner(flavor: 'tv'),
+                  ],
+                ),
               ),
             ),
           ),

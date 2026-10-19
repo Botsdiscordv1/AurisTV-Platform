@@ -52,6 +52,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   final FocusNode _submitBtnFocus     = FocusNode();
   bool _showPassword = false;
 
+  // Evita mostrar el collage a medio cargar cuando Login es la pantalla de
+  // arranque: se pinta SOLO cuando sus imágenes están decodificadas (lleno
+  // desde el primer frame). El Splash ya lo precarga, así que suele ser true
+  // casi de inmediato.
+  bool _collageReady = false;
+
   // Page-level animation
   late final AnimationController _fadeCtrl;
   late final Animation<double>    _fadeAnim;
@@ -69,6 +75,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loginBtnFocus.requestFocus();
+    });
+
+    // Garantiza el collage lleno desde el frame 1 aunque Login se abra como
+    // primera pantalla (sin pasar por el Splash): precarga y solo entonces
+    // habilita el collage.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await CollageGridBackground.precache(context);
+      if (mounted) setState(() => _collageReady = true);
     });
   }
 
@@ -190,8 +205,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     ? Stack(
                         fit: StackFit.expand,
                         children: [
-                          // Capa 1: Grid de posters en perspectiva
-                          const CollageGridBackground(),
+                          // Capa 1: Grid de posters en perspectiva (solo cuando
+                          // ya está precargado -> sin tarjetas vacías)
+                          if (_collageReady) const CollageGridBackground(),
 
                           // Capa 2: Gradiente izquierda -> derecha
                           Container(

@@ -24,7 +24,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
   @override
   Widget build(BuildContext context) {
     // Colores del tema AurisTV (basados en settings_screen.dart)
-    const backgroundColor = Color(0xFF0B0B0D);
+    const backgroundColor = Color(0xFF000000);
     const surfaceColor = Color(0xFF1A1D24);
     const primaryColor = Color(0xFFEF7A1E);
 

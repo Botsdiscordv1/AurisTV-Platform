@@ -364,13 +364,21 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   @override Widget build(BuildContext context) {
     final d = widget.detailAsync.valueOrNull?.main;
-    final logoReady = widget.detailAsync.hasValue;
-    final b = DetailBackdropResolver.resolve(
-      detail: d,
-      bannerParam: widget.banner,
-      poster: widget.poster,
-      season: widget.currentSeason,
-    );
+    // Mientras la respuesta de metadatos del servidor NO haya llegado, ocultamos
+    // tanto el título (texto) como la imagen de fondo: el nombre/póster/banner
+    // de la tarjeta solo valen como FALLBACK una vez resuelto el detalle. Antes
+    // de eso mostramos skeletons, para no "adelantar" datos que luego cambian.
+    final bool metaPending =
+        widget.detailAsync.isLoading && widget.detailAsync.valueOrNull == null;
+    final logoReady = !metaPending;
+    final b = metaPending
+        ? null
+        : DetailBackdropResolver.resolve(
+            detail: d,
+            bannerParam: widget.banner,
+            poster: widget.poster,
+            season: widget.currentSeason,
+          );
     final heroTitle = widget.title;
     final width = MediaQuery.sizeOf(context).width;
 
@@ -388,7 +396,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
               final ph = h; 
               final pw = ph * (16 / 9);
               return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
-                Container(color: const Color(0xFF0B0B0D)),
+                Container(color: const Color(0xFF000000)),
                 if (b != null) Positioned.fill(child: ShaderMask(
                   shaderCallback: (rect) => const LinearGradient(
                     begin: Alignment.topCenter,
@@ -417,10 +425,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                       colors: [
-                        const Color(0xFF0B0B0D).withOpacity(0.98),
-                        const Color(0xFF0B0B0D).withOpacity(0.90),
-                        const Color(0xFF0B0B0D).withOpacity(0.40),
-                        const Color(0xFF0B0B0D).withOpacity(0.10),
+                        const Color(0xFF000000).withOpacity(0.98),
+                        const Color(0xFF000000).withOpacity(0.90),
+                        const Color(0xFF000000).withOpacity(0.40),
+                        const Color(0xFF000000).withOpacity(0.10),
                         Colors.transparent,
                       ],
                       stops: const [0.0, 0.25, 0.45, 0.65, 1.0],
@@ -433,10 +441,10 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   bottom: 20, 
                   child: SizedBox(
                     width: width - 2 * ResponsiveUtils.horizontalPadding(context),
-                    child: _buildNetflixContentColumn(context, d, width, heroTitle, logoReady),
+                    child: _buildNetflixContentColumn(context, d, width, heroTitle, logoReady, metaPending),
                   ),
                 ),
-                DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.center, colors: [const Color(0xFF0B0B0D).withOpacity(0.5), Colors.transparent], stops: const [0.0, 0.4]))),
+                DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.center, colors: [const Color(0xFF000000).withOpacity(0.5), Colors.transparent], stops: const [0.0, 0.4]))),
               ]);
             }),
           ),
@@ -452,7 +460,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     );
   }
 
-  Widget _buildNetflixContentColumn(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady) {
+  Widget _buildNetflixContentColumn(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady, bool metaPending) {
     final titleSize = ResponsiveUtils.sp(context, width < 1050 ? 22.0 : 36.0);
     // Con logo presente la identidad ya la da el propio logo: el título
     // original bajo él sobra (HeroTitle solo pinta logo o texto, nunca ambos).
@@ -476,21 +484,28 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    HeroTitle(
-                      title: heroTitle,
-                      logo: d?.logo,
-                      logoReady: logoReady,
-                      maxWidth: width * 0.4,
-                      maxHeight: 80,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: titleSize * 1.5,
-                        fontWeight: FontWeight.w900,
-                        height: 1.0,
-                        letterSpacing: 1.5,
-                        shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
+                    if (metaPending)
+                      _SkeletonBox(
+                        width: width * 0.4,
+                        height: 80,
+                        borderRadius: 8,
+                      )
+                    else
+                      HeroTitle(
+                        title: heroTitle,
+                        logo: d?.logo,
+                        logoReady: logoReady,
+                        maxWidth: width * 0.4,
+                        maxHeight: 80,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: titleSize * 1.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          letterSpacing: 1.5,
+                          shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
+                        ),
                       ),
-                    ),
                     if (d is MovieDetail && !hasLogo && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Text(
@@ -960,7 +975,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       });
     }
 
-    if (!_showContent) return Scaffold(backgroundColor: const Color(0xFF0B0B0D), body: _buildPageSkeleton(context));
+    if (!_showContent) return Scaffold(backgroundColor: const Color(0xFF000000), body: _buildPageSkeleton(context));
 
     final detailData = detailState.detail.valueOrNull?.main;
     final currentSource = detailState.selectedSource;
@@ -1003,7 +1018,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final heroBanner = ApiEndpoints.proxyImage(DetailBackdropResolver.resolve(detail: detailData, bannerParam: widget.banner, sourceBanner: detailState.allSources.isNotEmpty ? detailState.allSources.first.banner : null, season: detailState.currentSeason), highQuality: true);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D), 
+      backgroundColor: const Color(0xFF000000), 
       body: _ContentHeader(
         title: widget.title, source: widget.source, url: widget.url, category: widget.category, poster: ApiEndpoints.proxyImage(currentSource?.thumbnail), banner: heroBanner, detailAsync: detailState.detail, currentSource: currentSource, sources: detailState.allSources, totalSeasons: detailState.totalSeasons, isMovieish: detailState.isMovieish, currentSeason: detailState.currentSeason, onSourceSelected: (index) => ref.setSource(detailParams, detailState.allSources[index]), 
         kind: widget.kind ?? widget.result?.kind, year: widget.year, type: widget.result?.type ?? widget.type, season: widget.season ?? widget.result?.season,
@@ -1041,7 +1056,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
   Widget _buildPageSkeleton(BuildContext context) {
     return Stack(clipBehavior: Clip.hardEdge, children: [
-      AspectRatio(aspectRatio: 3.2 / 1, child: Container(color: const Color(0xFF0B0B0D))),
+      AspectRatio(aspectRatio: 3.2 / 1, child: Container(color: const Color(0xFF000000))),
       Positioned(left: 40, right: 40, bottom: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [const _SkeletonBox(width: 400, height: 80), const SizedBox(height: 24), Row(mainAxisSize: MainAxisSize.min, children: [const _SkeletonBox(width: 64, height: 56, borderRadius: 28), const SizedBox(width: 16), const _SkeletonBox(width: 64, height: 56, borderRadius: 28)]), const SizedBox(height: 24), Container(width: 220, height: 56, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8)))]))
     ]);
   }

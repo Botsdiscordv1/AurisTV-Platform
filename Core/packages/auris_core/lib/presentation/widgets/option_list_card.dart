@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'auris_icon.dart';
 
@@ -12,11 +13,16 @@ import 'auris_icon.dart';
 class AurisOptionCard extends StatelessWidget {
   final String title;
   final String subtitle;
-  final Object icon;
+  final Object? icon;
   final VoidCallback onTap;
   final bool isCurrent;
   final bool isAvailable;
   final bool autofocus;
+
+  /// Nodo de foco externo opcional. Permite a la plataforma pedir el foco de
+  /// una tarjeta concreta (p. ej. la opción actual al abrir un submenú del
+  /// two-panel de TV), en vez de depender solo de [autofocus].
+  final FocusNode? focusNode;
 
   final double titleSize;
   final double subtitleSize;
@@ -27,11 +33,12 @@ class AurisOptionCard extends StatelessWidget {
     super.key,
     required this.title,
     required this.subtitle,
-    required this.icon,
+    this.icon,
     required this.onTap,
     this.isCurrent = false,
     this.isAvailable = true,
     this.autofocus = false,
+    this.focusNode,
     this.titleSize = 14,
     this.subtitleSize = 11,
     this.iconSize = 20,
@@ -41,7 +48,24 @@ class AurisOptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Focus(
+      focusNode: focusNode,
       autofocus: autofocus,
+      // El OK/select del mando de TV no tiene binding por defecto y el foco
+      // vive en este Focus (no en el InkWell interno), así que la activación
+      // por teclado se resuelve aquí, igual que en las pills de TV.
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.numpadEnter ||
+              key == LogicalKeyboardKey.space) {
+            if (isAvailable) onTap();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
       child: Builder(
         builder: (context) {
           final bool isFocused = Focus.of(context).hasFocus;
@@ -62,22 +86,24 @@ class AurisOptionCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   child: Row(
                     children: [
-                      icon is String
-                          ? AurisIcon(
-                              icon as String,
-                              color: isFocused
-                                  ? Colors.black
-                                  : (isAvailable ? Colors.white : Colors.white38),
-                              size: iconSize,
-                            )
-                          : Icon(
-                              icon as IconData?,
-                              color: isFocused
-                                  ? Colors.black
-                                  : (isAvailable ? Colors.white : Colors.white38),
-                              size: iconSize,
-                            ),
-                      const SizedBox(width: 16),
+                      if (icon != null) ...[
+                        icon is String
+                            ? AurisIcon(
+                                icon as String,
+                                color: isFocused
+                                    ? Colors.black
+                                    : (isAvailable ? Colors.white : Colors.white38),
+                                size: iconSize,
+                              )
+                            : Icon(
+                                icon as IconData?,
+                                color: isFocused
+                                    ? Colors.black
+                                    : (isAvailable ? Colors.white : Colors.white38),
+                                size: iconSize,
+                              ),
+                        const SizedBox(width: 16),
+                      ],
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

@@ -177,7 +177,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                       // 1. EL PÓSTER (Base)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        clipBehavior: Clip.antiAliasWithSaveLayer,
+                        clipBehavior: Clip.antiAlias,
                         child: Builder(
                           builder: (context) {
                             final dpr = MediaQuery.of(context).devicePixelRatio;
@@ -219,7 +219,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                       // 2. OVERLAYS (Clipeados individualmente o por el Stack)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        clipBehavior: Clip.antiAliasWithSaveLayer, // Senior Fix: Máxima calidad de recorte
+                        clipBehavior: Clip.antiAlias, // Senior Fix: Máxima calidad de recorte
                         child: Stack(
                           children: [
                             // TOP-LEFT: Airing

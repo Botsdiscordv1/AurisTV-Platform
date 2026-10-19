@@ -143,7 +143,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         });
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0B0B0D),
+        backgroundColor: const Color(0xFF000000),
         body: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(120, 48, 120, 60),
           child: Center(
