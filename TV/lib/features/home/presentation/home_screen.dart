@@ -98,7 +98,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   final GlobalKey<HeroBannerState> _heroKey = GlobalKey<HeroBannerState>();
   bool _isScrolled = false;
   bool _splashRemoved = false;
-  bool _isTopBarFocused = false;
   bool _isAppStartup = true;
   final List<GlobalKey> _sectionRowKeys = [];
   final FocusNode _searchIconFocusNode = FocusNode();
@@ -188,6 +187,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           horizontalPadding: horizontalPadding,
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
+          onArrowDownToNext: onArrowDownToNext,
+          onArrowUpToPrev: onArrowUpToPrev,
         );
 
       case HomeSectionType.editorial:
@@ -262,6 +263,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           horizontalPadding: horizontalPadding,
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
+          onArrowDownToNext: onArrowDownToNext,
+          onArrowUpToPrev: onArrowUpToPrev,
         );
 
       case HomeSectionType.trendingMovies:
@@ -273,6 +276,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           isWide: true,
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
+          onArrowDownToNext: onArrowDownToNext,
+          onArrowUpToPrev: onArrowUpToPrev,
         );
 
       case HomeSectionType.recentEpisodes:
@@ -282,6 +287,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           horizontalPadding: horizontalPadding,
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
+          onArrowDownToNext: onArrowDownToNext,
+          onArrowUpToPrev: onArrowUpToPrev,
         );
 
       case HomeSectionType.recommendation:
@@ -420,12 +427,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                           return false;
                         },
                         onFocused: () {
-                          // Senior Fix: Centrar hero suavemente al enfocarlo
-                          _scrollController.animateTo(
-                            0, 
-                            duration: const Duration(milliseconds: 500), 
-                            curve: Curves.easeOutQuart
-                          );
+                          // Centrar el hero al enfocarlo, con la misma cadencia que
+                          // las filas (300ms) para que la navegación sea uniforme.
+                          if (_scrollController.hasClients && _scrollController.offset > 1) {
+                            _scrollController.animateTo(
+                              0,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOutQuart,
+                            );
+                          }
                         },
                         onDetails: (item) => openTVDetails(context, item, currentCategory),
                         onTrailer: (item) {
@@ -654,37 +664,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             
             const Spacer(),
             
-            Focus(
-              onFocusChange: (focused) {
-                if (mounted && _isTopBarFocused != focused) {
-                  setState(() => _isTopBarFocused = focused);
-                }
+            _PillNavBar(
+              currentCategory: currentCategory,
+              isSearchActive: _showSearch,
+              onCategoryChanged: (cat) {
+                if (_showSearch) setState(() => _showSearch = false);
+                ref.read(homeCategoryProvider.notifier).state = cat;
               },
-              child: AnimatedScale(
-                scale: _isTopBarFocused ? 1.0 : 0.95,
-                alignment: Alignment.center,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-                child: _PillNavBar(
-                  currentCategory: currentCategory,
-                  isSearchActive: _showSearch,
-                  onCategoryChanged: (cat) {
-                    if (_showSearch) setState(() => _showSearch = false);
-                    ref.read(homeCategoryProvider.notifier).state = cat;
-                  },
-                  focusNodes: _pillFocusNodes,
-                  searchIconFocusNode: _searchIconFocusNode,
-                  onSearchPressed: () => setState(() => _showSearch = true),
-                  onSearchKeyEvent: (node, event) {
-                    if (_showSearch && event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                      _overlaySearchFocusNode.requestFocus();
-                      return KeyEventResult.handled;
-                    }
-                    return KeyEventResult.ignored;
-                  },
-                  onSchedulePressed: () => context.push('/schedule'),
-                ),
-              ),
+              focusNodes: _pillFocusNodes,
+              searchIconFocusNode: _searchIconFocusNode,
+              onSearchPressed: () => setState(() => _showSearch = true),
+              onSearchKeyEvent: (node, event) {
+                if (_showSearch && event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                  _overlaySearchFocusNode.requestFocus();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              onSchedulePressed: () => context.push('/schedule'),
             ),
             
             const Spacer(),
@@ -798,7 +795,7 @@ class _PillNavBar extends StatelessWidget {
           return Padding(
             padding: EdgeInsets.only(right: spacing),
             child: _PillNavItem(
-              key: ValueKey('pill_'),
+              key: ValueKey('pill_$id'),
               label: cat['label']!,
               isActive: isSelected,
               onTap: () => onCategoryChanged(id),
@@ -867,26 +864,33 @@ class _PillNavItemState extends State<_PillNavItem> {
       },
       child: GestureDetector(
         onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          height: 32.0, // Altura reducida a 32 px para mayor estilizaciÃ³n
+        child: AnimatedScale(
+          scale: _focused ? 1.08 : 1.0,
           alignment: Alignment.center,
-          padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16.0), // Radio de 16 px (mitad de 32px para pÃ­ldora perfecta)
-            // Senior Logic: Blanco si tiene el foco, Gris (#2D2D2D) si es la categorÃ­a activa sin foco
-            color: _focused 
-                ? Colors.white 
-                : (widget.isActive ? const Color(0xFF2D2D2D) : Colors.transparent),
-            border: _focused ? Border.all(color: Colors.white, width: 1.5) : null,
-          ),
-          child: Text(
-            widget.label,
-            style: GoogleFonts.poppins(
-              // Texto negro solo cuando la cÃ¡psula es blanca (estÃ¡ enfocada)
-              color: _focused ? Colors.black : Colors.white,
-              fontSize: TVResponsiveUtils.sp(context, 12.5), // Ajustado ligeramente para armonizar con 32px
-              fontWeight: FontWeight.w700,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
+            height: 32.0, // Altura reducida a 32 px para mayor estilizaciÃ³n
+            alignment: Alignment.center,
+            padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16.0), // Radio de 16 px (mitad de 32px para pÃ­ldora perfecta)
+              // Senior Logic: Blanco si tiene el foco, Gris (#2D2D2D) si es la categorÃ­a activa sin foco
+              color: _focused 
+                  ? Colors.white 
+                  : (widget.isActive ? const Color(0xFF2D2D2D) : Colors.transparent),
+              border: _focused ? Border.all(color: Colors.white, width: 1.5) : null,
+            ),
+            child: Text(
+              widget.label,
+              style: GoogleFonts.poppins(
+                // Texto negro solo cuando la cÃ¡psula es blanca (estÃ¡ enfocada)
+                color: _focused ? Colors.black : Colors.white,
+                fontSize: TVResponsiveUtils.sp(context, 12.5), // Ajustado ligeramente para armonizar con 32px
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -947,10 +951,11 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
         onTap: widget.onPressed,
         child: AnimatedScale(
           scale: (widget.scaleOnFocus && _focused) ? 1.10 : 1.0,
-          duration: const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 150),
           curve: Curves.easeOutCubic,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
             width: 32.0,
             height: 32.0,
             alignment: Alignment.center,
@@ -984,11 +989,15 @@ class _ContinueWatchingSection extends ConsumerWidget {
   final double horizontalPadding;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
+  final bool Function()? onArrowDownToNext;
+  final bool Function()? onArrowUpToPrev;
   const _ContinueWatchingSection({
     super.key,
     required this.horizontalPadding,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
+    this.onArrowDownToNext,
+    this.onArrowUpToPrev,
   });
 
   @override
@@ -1007,6 +1016,8 @@ class _ContinueWatchingSection extends ConsumerWidget {
           title: 'Continuar Viendo',
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
+          onArrowDownToNext: onArrowDownToNext,
+          onArrowUpToPrev: onArrowUpToPrev,
           items: filteredItems.take(10).map((h) {
             // LÃ³gica centralizada en Core (library_providers): solo diseÃ±o aquÃ­.
             final bool isMovieish = libraryIsMovieish(h);
@@ -1131,6 +1142,8 @@ class _TrendingSection extends ConsumerWidget {
   final bool isWide;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
+  final bool Function()? onArrowDownToNext;
+  final bool Function()? onArrowUpToPrev;
   const _TrendingSection({
     super.key,
     required this.category,
@@ -1139,6 +1152,8 @@ class _TrendingSection extends ConsumerWidget {
     this.isWide = false,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
+    this.onArrowDownToNext,
+    this.onArrowUpToPrev,
   });
 
   @override
@@ -1151,6 +1166,8 @@ class _TrendingSection extends ConsumerWidget {
             title: title,
             onArrowRightOnLast: onArrowRightOnLast,
             onArrowLeftOnFirst: onArrowLeftOnFirst,
+            onArrowDownToNext: onArrowDownToNext,
+            onArrowUpToPrev: onArrowUpToPrev,
             items: items.map((m) {
               final rawSub = m.subtitle;
               final isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
@@ -1183,12 +1200,16 @@ class _RecentEpisodesSection extends ConsumerWidget {
   final double horizontalPadding;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
+  final bool Function()? onArrowDownToNext;
+  final bool Function()? onArrowUpToPrev;
   const _RecentEpisodesSection({
     super.key,
     required this.title,
     required this.horizontalPadding,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
+    this.onArrowDownToNext,
+    this.onArrowUpToPrev,
   });
 
   @override
@@ -1200,9 +1221,11 @@ class _RecentEpisodesSection extends ConsumerWidget {
         title: title,
         onArrowRightOnLast: onArrowRightOnLast,
         onArrowLeftOnFirst: onArrowLeftOnFirst,
+        onArrowDownToNext: onArrowDownToNext,
+        onArrowUpToPrev: onArrowUpToPrev,
         items: items.map((m) {
           final rawSub = m.subtitle;
-          final isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
+          final bool isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
           return WideContentItem(
             id: m.id, title: m.title, imageUrl: m.bannerUrl ?? m.posterUrl,
             logoUrl: m.logoUrl,

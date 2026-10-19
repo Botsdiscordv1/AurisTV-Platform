@@ -459,14 +459,18 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
 
               // Si el contenedor capturó el foco primario, respetamos el botón manual si fue usado recientemente, sino vamos a reproducir
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted && _isFocused) {
-                  if (_lastNavButton == 'prev' && _prevButtonFocusNode.canRequestFocus) {
-                    _prevButtonFocusNode.requestFocus();
-                  } else if (_lastNavButton == 'next' && _nextButtonFocusNode.canRequestFocus) {
-                    _nextButtonFocusNode.requestFocus();
-                  } else if (!_playButtonFocusNode.hasFocus) {
-                    _playButtonFocusNode.requestFocus();
-                  }
+                if (!mounted || !_isFocused) return;
+                // Si el foco ya está dentro de un botón del hero, no lo robamos.
+                final item = _currentContentItem ?? (widget.items.isNotEmpty ? widget.items.first : null);
+                if (item != null && _getActiveActionFocusNodes(item).any((n) => n.hasFocus)) {
+                  return;
+                }
+                if (_lastNavButton == 'prev' && _prevButtonFocusNode.canRequestFocus) {
+                  _prevButtonFocusNode.requestFocus();
+                } else if (_lastNavButton == 'next' && _nextButtonFocusNode.canRequestFocus) {
+                  _nextButtonFocusNode.requestFocus();
+                } else if (!_playButtonFocusNode.hasFocus) {
+                  _playButtonFocusNode.requestFocus();
                 }
               });
             } else {
@@ -938,19 +942,15 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
         ),
 
         // BLOQUE DINÁMICO (Sinopsis y Botones)
-        // Senior Fix: Usamos AnimatedSwitcher con SizeTransition para el efecto de "empuje" hacia arriba
+        // Fade de opacidad (sin animación de layout) para que enfocar el hero sea fluido
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
-          switchInCurve: Curves.easeOutQuart,
-          switchOutCurve: Curves.easeInQuart,
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeIn,
           transitionBuilder: (child, animation) {
             return FadeTransition(
               opacity: animation,
-              child: SizeTransition(
-                sizeFactor: animation,
-                axisAlignment: -1.0, // Hace que crezca hacia arriba desde la base
-                child: child,
-              ),
+              child: child,
             );
           },
           child: _isFocused 

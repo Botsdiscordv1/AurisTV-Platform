@@ -4838,6 +4838,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               showCloseButton: false,
               // LEFT desde el panel enfoca el video (borde blanco 3px); RIGHT vuelve.
               enableVideoFocus: true,
+              // Transición compacto (two-panel) ↔ pantalla completa más rápida y
+              // con arranque ágil (easeOut) para que el video crezca fluido al
+              // pulsar OK sobre el video enfocado.
+              animationDuration: const Duration(milliseconds: 180),
+              animationCurve: Curves.easeOutCubic,
               trapFocus: true,
               onBack: _dismissSidePanel,
               railWidth: 460,
