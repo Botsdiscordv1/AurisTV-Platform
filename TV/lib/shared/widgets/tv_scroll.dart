@@ -25,8 +25,8 @@ class TvScroll {
   /// inicio del ELEMENTO, no el del póster: número y tarjeta siempre juntos.
   static bool ensureCardVisible(
     BuildContext context, {
-    Duration duration = const Duration(milliseconds: 320),
-    Curve curve = Curves.fastOutSlowIn,
+    Duration? duration,
+    Curve curve = Curves.easeOutCubic,
     double leadingInset = 0,
     double alignment = 0.0,
   }) {
@@ -43,8 +43,13 @@ class TvScroll {
       final double contentTop = viewport.getOffsetToReveal(object, 0.0).offset;
       final double target = (contentTop - 24.0)
           .clamp(position.minScrollExtent, position.maxScrollExtent);
-      if ((target - position.pixels).abs() < 1.0) return false;
-      position.animateTo(target, duration: duration, curve: curve);
+      final double travel = (target - position.pixels).abs();
+      if (travel < 1.0) return false;
+      position.animateTo(
+        target,
+        duration: duration ?? _distanceDuration(travel),
+        curve: curve,
+      );
       return true;
     }
 
@@ -52,8 +57,13 @@ class TvScroll {
     final double anchor = TVResponsiveUtils.horizontalPadding(context);
     final double target = (contentLeft - leadingInset - anchor)
         .clamp(position.minScrollExtent, position.maxScrollExtent);
-    if ((target - position.pixels).abs() < 1.0) return false;
-    position.animateTo(target, duration: duration, curve: curve);
+    final double travel = (target - position.pixels).abs();
+    if (travel < 1.0) return false;
+    position.animateTo(
+      target,
+      duration: duration ?? _distanceDuration(travel),
+      curve: curve,
+    );
     return true;
   }
 
@@ -67,8 +77,8 @@ class TvScroll {
   /// sección) cuando el foco entra en su subárbol.
   static bool anchorSectionBelowTopbar(
     BuildContext context, {
-    Duration duration = const Duration(milliseconds: 300),
-    Curve curve = Curves.easeOutQuart,
+    Duration? duration,
+    Curve curve = Curves.easeOutCubic,
   }) {
     final RenderObject? object = context.findRenderObject();
     if (object is! RenderBox || !object.attached || !object.hasSize) {
@@ -95,9 +105,30 @@ class TvScroll {
 
     final double target = (position.pixels + delta)
         .clamp(position.minScrollExtent, position.maxScrollExtent);
-    if ((target - position.pixels).abs() < 1.0) return false;
-    position.animateTo(target, duration: duration, curve: curve);
+    final double travel = (target - position.pixels).abs();
+    if (travel < 1.0) return false;
+    // Duración proporcional al recorrido (estilo Leanback/Netflix
+    // `setSelectedPositionSmooth`): saltos cortos, rápidos; largos, más suaves.
+    position.animateTo(
+      target,
+      duration: duration ?? _distanceDuration(travel),
+      curve: curve,
+    );
     return true;
+  }
+
+  /// Duración del scroll proporcional a la distancia recorrida, imitando el
+  /// `SmoothScroller` de Leanback que Netflix usa en el grid vertical
+  /// (`setSelectedPositionSmooth`): base fija + fracción por píxel, acotada.
+  static Duration _distanceDuration(
+    double distance, {
+    double base = 150,
+    double perPixel = 0.32,
+    int minMs = 200,
+    int maxMs = 450,
+  }) {
+    final int ms = (base + distance * perPixel).round();
+    return Duration(milliseconds: ms.clamp(minMs, maxMs));
   }
 
   /// Repite el ancla de [anchorSectionBelowTopbar] al cierre del frame.

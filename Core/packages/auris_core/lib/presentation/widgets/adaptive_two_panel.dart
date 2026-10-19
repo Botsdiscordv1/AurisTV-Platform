@@ -56,6 +56,13 @@ class AurisTwoPanel extends StatefulWidget {
   /// video (izquierda) y dibuje un borde blanco de 3px; RIGHT vuelve al panel.
   final bool enableVideoFocus;
 
+  /// Duración y curva de la transición compacto (panel abierto) ↔ pantalla
+  /// completa. Configurable por plataforma: el default (300 ms easeInOutCubic)
+  /// mantiene el comportamiento histórico de Móvil/Web; TV puede acortarla para
+  /// una expansión más rápida y fluida.
+  final Duration animationDuration;
+  final Curve animationCurve;
+
   /// Color que rellena las 4 esquinas del video cuando su superficie no puede
   /// recortarse (SurfaceView punch-out en TV): se pinta una máscara opaca sobre
   /// las esquinas para simular el redondeo. Si es null se confía en el recorte
@@ -88,6 +95,8 @@ class AurisTwoPanel extends StatefulWidget {
     this.lockAspect = true,
     this.maxRailFraction = 0.35,
     this.enableVideoFocus = false,
+    this.animationDuration = const Duration(milliseconds: 300),
+    this.animationCurve = Curves.easeInOutCubic,
     this.cornerMaskColor,
     this.videoCornerRadius,
   });
@@ -146,6 +155,13 @@ class _AurisTwoPanelState extends State<AurisTwoPanel> {
         final FocusNode? first = _firstItemNode();
         if (first != null && first.canRequestFocus) first.requestFocus();
       });
+    }
+    // Al CERRAR el panel (abierto→cerrado) apagamos de inmediato el borde de
+    // foco del video: si esperásemos a que el nodo pierda el foco, el borde de
+    // 3px alcanzaría a verse sobre el video ya a pantalla completa durante la
+    // animación de expansión (bug visual al pulsar OK sobre el video).
+    if (oldWidget.panelOpen && !widget.panelOpen) {
+      _videoFocusRequested = false;
     }
   }
 
@@ -241,8 +257,8 @@ class _AurisTwoPanelState extends State<AurisTwoPanel> {
           fit: StackFit.expand,
           children: [
             AnimatedPadding(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOutCubic,
+              duration: widget.animationDuration,
+              curve: widget.animationCurve,
               padding: showRail
                   ? EdgeInsets.fromLTRB(widget.margin, verticalPad,
                       effectiveRail + widget.panelGap, verticalPad)
@@ -295,6 +311,9 @@ class _AurisTwoPanelState extends State<AurisTwoPanel> {
       );
     }
     if (!widget.enableVideoFocus) return content;
+    // El borde solo existe con el panel abierto y el foco pedido en el video.
+    final bool showBorder =
+        widget.panelOpen && _videoFocusRequested && _videoFocusNode.hasFocus;
     return Focus(
       focusNode: _videoFocusNode,
       // Solo focusable con el panel abierto: al cerrarse el video suelta el
@@ -328,7 +347,12 @@ class _AurisTwoPanelState extends State<AurisTwoPanel> {
         return KeyEventResult.ignored;
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        // Al MOSTRAR el borde animamos brevemente; al QUITARLO (p. ej. al
+        // cerrar el panel) debe ser instantáneo, o el borde de 3px se alcanza
+        // a ver sobre el video ya a pantalla completa.
+        duration: showBorder
+            ? const Duration(milliseconds: 120)
+            : Duration.zero,
         curve: Curves.easeOut,
         // foregroundDecoration: el borde se pinta ENCIMA del video para que
         // no lo tape el ClipRRect interno. Solo con el panel abierto y cuando
@@ -336,11 +360,7 @@ class _AurisTwoPanelState extends State<AurisTwoPanel> {
         // animación de apertura por el foco transitorio del video.
         foregroundDecoration: BoxDecoration(
           borderRadius: BorderRadius.circular(radius),
-          border: (widget.panelOpen &&
-                  _videoFocusRequested &&
-                  _videoFocusNode.hasFocus)
-              ? Border.all(color: Colors.white, width: 3)
-              : null,
+          border: showBorder ? Border.all(color: Colors.white, width: 3) : null,
         ),
         child: content,
       ),
