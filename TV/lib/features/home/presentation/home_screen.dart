@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'dart:async';
 import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../search/presentation/providers/search_provider.dart';
@@ -376,7 +376,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     final navHeight = TVResponsiveUtils.topBarHeight(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       body: Stack(
         children: [
           CustomScrollView(
@@ -427,7 +427,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                             curve: Curves.easeOutQuart
                           );
                         },
-                        onPlay: (item) => openTVDetails(context, item, currentCategory),
                         onDetails: (item) => openTVDetails(context, item, currentCategory),
                         onTrailer: (item) {
                           if (item.trailerKey == null || item.trailerKey!.isEmpty) return;
@@ -643,7 +642,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
       duration: const Duration(milliseconds: 300),
       height: navHeight,
       decoration: const BoxDecoration(
-        color: Color(0xFF0B0B0D), // Fondo sÃ³lido sin blur
+        color: Color(0xFF000000), // Fondo sÃ³lido sin blur
       ),
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -1473,7 +1472,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
         child: FadeTransition(
         opacity: _fadeAnim,
         child: Container(
-          color: const Color(0xFF0B0B0D),
+          color: const Color(0xFF000000),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

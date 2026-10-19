@@ -22,7 +22,6 @@ enum HeroBannerLayout { mobile, cinematic }
 
 class HeroBanner extends ConsumerStatefulWidget {
   final List<MediaItem> items;
-  final void Function(MediaItem item) onPlay;
   final void Function(MediaItem item) onDetails;
   final dynamic Function(MediaItem item)? onTrailer;
   final bool autofocus;
@@ -38,7 +37,6 @@ class HeroBanner extends ConsumerStatefulWidget {
   const HeroBanner({
     super.key,
     required this.items,
-    required this.onPlay,
     required this.onDetails,
     this.onTrailer,
     this.autofocus = false,
@@ -68,7 +66,6 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
 
   final FocusNode _playButtonFocusNode = FocusNode(); 
   final FocusNode _favButtonFocusNode = FocusNode();
-  final FocusNode _detailsButtonFocusNode = FocusNode();
   final FocusNode _trailerButtonFocusNode = FocusNode();
   final FocusNode _muteButtonFocusNode = FocusNode();
   final FocusNode _prevButtonFocusNode = FocusNode();
@@ -147,7 +144,6 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
     WidgetsBinding.instance.removeObserver(this);
     _playButtonFocusNode.dispose();
     _favButtonFocusNode.dispose();
-    _detailsButtonFocusNode.dispose();
     _trailerButtonFocusNode.dispose();
     _muteButtonFocusNode.dispose();
     _prevButtonFocusNode.dispose();
@@ -164,7 +160,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   }
 
   List<FocusNode> _getActiveActionFocusNodes(MediaItem item) {
-    final nodes = <FocusNode>[_playButtonFocusNode, _favButtonFocusNode, _detailsButtonFocusNode];
+    final nodes = <FocusNode>[_playButtonFocusNode, _favButtonFocusNode];
     if (item.trailerKey != null && item.trailerKey!.isNotEmpty) {
       nodes.add(_trailerButtonFocusNode);
     }
@@ -543,7 +539,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
       padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 12), // Usamos el nuevo padding base alineado
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF0B0B0D),
+          color: const Color(0xFF000000),
           borderRadius: BorderRadius.circular(24),
           // Senior Fix: Borde estático original solo cuando tiene el foco
           border: _isFocused 
@@ -704,7 +700,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                const Color(0xFF0B0B0D).withOpacity(0.5),
+                const Color(0xFF000000).withOpacity(0.5),
                 Colors.transparent,
               ],
               stops: const [0.0, 0.25],
@@ -725,9 +721,9 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      const Color(0xFF0B0B0D).withOpacity(0.85), 
-                      const Color(0xFF0B0B0D).withOpacity(0.4),
-                      const Color(0xFF0B0B0D).withOpacity(0.1),
+                      const Color(0xFF000000).withOpacity(0.85), 
+                      const Color(0xFF000000).withOpacity(0.4),
+                      const Color(0xFF000000).withOpacity(0.1),
                       Colors.transparent,
                     ],
                     stops: const [0.0, 0.3, 0.5, 0.8],
@@ -740,8 +736,8 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      const Color(0xFF0B0B0D).withOpacity(0.8),
-                      const Color(0xFF0B0B0D).withOpacity(0.2),
+                      const Color(0xFF000000).withOpacity(0.8),
+                      const Color(0xFF000000).withOpacity(0.2),
                       Colors.transparent,
                     ],
                     stops: const [0.0, 0.15, 0.5],
@@ -764,9 +760,9 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      const Color(0xFF0B0B0D),
-                      const Color(0xFF0B0B0D),
-                      const Color(0xFF0B0B0D).withOpacity(0.9),
+                      const Color(0xFF000000),
+                      const Color(0xFF000000),
+                      const Color(0xFF000000).withOpacity(0.9),
                       Colors.transparent,
                     ],
                     stops: const [0.0, 0.38, 0.45, 1.0],
@@ -779,8 +775,8 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      const Color(0xFF0B0B0D),
-                      const Color(0xFF0B0B0D).withOpacity(0.3),
+                      const Color(0xFF000000),
+                      const Color(0xFF000000).withOpacity(0.3),
                       Colors.transparent,
                     ],
                     stops: const [0.0, 0.15, 0.4],
@@ -985,7 +981,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                     children: [
                       _BannerButton(
                         focusNode: _playButtonFocusNode, // Asignamos el nodo para la captura de foco
-                        onPressed: () => widget.onPlay(item), 
+                        onPressed: () => widget.onDetails(item), 
                         icon: AurisIcons.play,
                         label: 'Reproducir', 
                         isPrimary: true,
@@ -1013,13 +1009,6 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                           },
                         );
                       }),
-                      const SizedBox(width: 12),
-                      _BannerIconButton(
-                        focusNode: _detailsButtonFocusNode,
-                        icon: AurisIcons.info, 
-                        label: 'Detalles', 
-                        onPressed: () => widget.onDetails(item)
-                      ),
                       if (item.trailerKey != null) ...[
                         const SizedBox(width: 12),
                         _BannerIconButton(
@@ -1140,6 +1129,23 @@ class _BannerButtonState extends State<_BannerButton> {
     return Focus(
       focusNode: widget.focusNode,
       autofocus: widget.autofocus,
+      // El OK/select del mando de TV no activa `ElevatedButton` cuando el foco
+      // vive en este `Focus` externo: la acción del botón es un descendiente,
+      // no un ancestro del foco primario, así que `ActivateIntent` no la
+      // encuentra. Se resuelve aquí, igual que en las pills/AurisOptionCard.
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.numpadEnter ||
+              key == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
       child: ElevatedButton.icon(
         onPressed: widget.onPressed,
         icon: AurisIcon(widget.icon, size: 20, color: widget.isPrimary ? Colors.black : Colors.white),
@@ -1180,6 +1186,21 @@ class _BannerIconButtonState extends State<_BannerIconButton> {
     return Focus(
       focusNode: widget.focusNode,
       onFocusChange: (f) => setState(() => _focused = f),
+      // OK/select del mando: la acción del `IconButton` es descendiente del
+      // foco externo, así que se activa aquí (ver _BannerButton).
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && !widget.isLoading) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.numpadEnter ||
+              key == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
       child: AnimatedScale(
         scale: _focused ? 1.12 : 1.0,
         duration: const Duration(milliseconds: 200),

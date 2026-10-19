@@ -114,7 +114,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFFEF7A1E);
-    const backgroundColor = Color(0xFF0B0B0D);
+    const backgroundColor = Color(0xFF000000);
     const cardColor = Color(0xFF1A1D24);
 
     final user = ref.watch(authProvider);
@@ -483,7 +483,7 @@ class _TVMenuSelectorState extends State<_TVMenuSelector> {
                 color: Colors.transparent,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0B0B0D),
+                    color: const Color(0xFF000000),
                     borderRadius: BorderRadius.zero,
                     border: Border.all(color: Colors.white38, width: 1.5),
                   ),

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/web_utils.dart';
 import 'widgets/auris_splash_logo.dart';
 
@@ -16,7 +17,14 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    
+
+    // Precarga el collage del Login mientras se ve el Splash para que, al
+    // entrar (ahora o cuando Login sea la pantalla de arranque), aparezca
+    // LLENO desde el primer frame sin tarjetas vacías.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) CollageGridBackground.precache(context);
+    });
+
     // Senior Note: En Web, la intro del index.html ya se esta reproduciendo.
     // Una vez que Flutter carga, mostramos la version nativa (AurisSplashLogo)
     // para asegurar una transicion perfecta hacia el Home.

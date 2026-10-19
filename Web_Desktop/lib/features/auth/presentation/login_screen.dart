@@ -46,6 +46,10 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
   final TextEditingController _passwordController = TextEditingController();
   bool _showPassword = false;
 
+  // Evita mostrar el collage a medio cargar cuando Login es la pantalla de
+  // arranque: se pinta SOLO cuando sus imágenes están decodificadas.
+  bool _collageReady = false;
+
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fadeAnim;
 
@@ -57,6 +61,14 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
       duration: const Duration(milliseconds: 350),
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+
+    // Garantiza el collage lleno desde el frame 1 aunque Login se abra como
+    // primera pantalla: precarga y solo entonces habilita el collage.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await CollageGridBackground.precache(context);
+      if (mounted) setState(() => _collageReady = true);
+    });
   }
 
   @override
@@ -100,7 +112,9 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
             curve: Curves.easeInOut,
             child: Stack(
               children: [
-                const Positioned.fill(child: CollageGridBackground()),
+                _collageReady
+                    ? const Positioned.fill(child: CollageGridBackground())
+                    : const SizedBox.shrink(),
                 const Positioned(
                   top: 0,
                   left: 0,
@@ -558,6 +572,9 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
   bool _showPassword = false;
   bool _showPanel = false;
 
+  // Evita mostrar el collage a medio cargar cuando Login es la pantalla de
+  // arranque: se pinta SOLO cuando sus imágenes están decodificadas.
+  bool _collageReady = false;
 
   late final AnimationController _panelCtrl;
   late final Animation<double> _panelFade;
@@ -567,11 +584,18 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
   void initState() {
     super.initState();
 
-
     _panelCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
     _panelFade = CurvedAnimation(parent: _panelCtrl, curve: Curves.easeOut);
     _panelSlide = Tween<Offset>(begin: const Offset(1.0, 0), end: Offset.zero)
         .animate(CurvedAnimation(parent: _panelCtrl, curve: Curves.easeOutCubic));
+
+    // Garantiza el collage lleno desde el frame 1 aunque Login se abra como
+    // primera pantalla: precarga y solo entonces habilita el collage.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await CollageGridBackground.precache(context);
+      if (mounted) setState(() => _collageReady = true);
+    });
   }
 
   @override
@@ -601,8 +625,8 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Capa 1: Grid de posters en perspectiva
-          const CollageGridBackground(),
+          // Capa 1: Grid de posters en perspectiva (solo si ya está precargado)
+          _collageReady ? const CollageGridBackground() : const SizedBox.shrink(),
 
           // Capa 2: Gradiente izquierda -> derecha
           Container(

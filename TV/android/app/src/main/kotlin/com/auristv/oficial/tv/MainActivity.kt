@@ -1,5 +1,6 @@
 package com.auristv.oficial.tv
 
+import android.content.Intent
 import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -7,6 +8,10 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
     private val INSTALL_CHANNEL = "auristv/install"
+    private val WATCH_NEXT_CHANNEL = "auristv/watchnext"
+
+    private var watchNextChannel: MethodChannel? = null
+    private var pendingWatchNextRoute: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -15,6 +20,39 @@ class MainActivity: FlutterActivity() {
             "auris/tv-video-surface",
             TvVideoSurfaceFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
+
+        // Watch Next: publica "Continuar Viendo" en el launcher de Android/Google TV.
+        pendingWatchNextRoute = extractWatchNextRoute(intent)
+        watchNextChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            WATCH_NEXT_CHANNEL,
+        ).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getInitialRoute" -> {
+                        result.success(pendingWatchNextRoute)
+                        pendingWatchNextRoute = null
+                    }
+                    "sync" -> {
+                        try {
+                            WatchNextHelper.sync(this@MainActivity, toEntries(call.arguments))
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("WATCH_NEXT_SYNC", e.message, null)
+                        }
+                    }
+                    "clear" -> {
+                        try {
+                            WatchNextHelper.clear(this@MainActivity)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("WATCH_NEXT_CLEAR", e.message, null)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INSTALL_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -57,6 +95,42 @@ class MainActivity: FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val route = extractWatchNextRoute(intent) ?: return
+        val channel = watchNextChannel
+        if (channel != null) {
+            channel.invokeMethod("onDeepLink", route)
+        } else {
+            pendingWatchNextRoute = route
+        }
+    }
+
+    /**
+     * Extrae la ruta interna del deep link de Watch Next.
+     *
+     * Admite dos formas:
+     *  - `auristv://watchnext?route=...` (el launcher parsea la sintaxis `intent:`).
+     *  - `intent://watchnext?route=...#Intent;...;end` (el launcher NO parsea y
+     *    entrega el URI crudo; se toma la query antes del fragmento).
+     */
+    private fun extractWatchNextRoute(intent: Intent?): String? {
+        val data = intent?.data ?: return null
+        val scheme = data.scheme?.lowercase()
+        if (scheme != "auristv" && scheme != "intent") return null
+        if (!"watchnext".equals(data.host, ignoreCase = true)) return null
+        return data.getQueryParameter("route")?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun toEntries(arguments: Any?): List<Map<String, Any?>> {
+        val raw = arguments as? List<*> ?: return emptyList()
+        return raw.mapNotNull { item ->
+            val map = item as? Map<*, *> ?: return@mapNotNull null
+            map.entries.associate { (key, value) -> key.toString() to value }
         }
     }
 

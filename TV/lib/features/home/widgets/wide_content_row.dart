@@ -382,73 +382,12 @@ class _WideContentRowState extends State<WideContentRow>
                     );
                   }
                 ),
-                if (_focusedIndex != null && _focusedIndex! < widget.items.length) ...[
-                  AnimatedBuilder(
-                    // Scroll (posición exacta) + glide (desliz entre ranuras).
-                    animation: Listenable.merge(
-                        [_scrollController, _glideCtrl]),
-                    builder: (context, _) {
-                      final index = _focusedIndex!;
-                      final item = widget.items[index];
-                      final double itemLeft = horizontalPadding +
-                          index * (cardWidth + 14) -
-                          _scrollController.offset +
-                          (_glideAnim?.value ?? 0.0);
-                      final Widget card = FocusableWideCard(
-                        title: item.title,
-                        imageUrl: item.imageUrl,
-                        logoUrl: item.logoUrl,
-                        progress: item.progress,
-                        subtitle: item.subtitle,
-                        subtitle2: item.subtitle2,
-                        rating: item.rating,
-                        badgeOverlay: item.badgeOverlay,
-                        width: cardWidth,
-                        height: cardHeight,
-                        onTap: () => widget.onItemTap(item),
-                        forceInvisible: false,
-                        forceSelected: _overlaySelected,
-                      );
-
-                      return Positioned(
-                        left: itemLeft,
-                        top: 0,
-                        bottom: 0,
-                        width: cardWidth,
-                        // Pura capa visual: IgnorePointer (ratón) +
-                        // ExcludeFocus (D-pad) — el foco vive en la tarjeta
-                        // original de la lista.
-                        child: ExcludeFocus(
-                          child: IgnorePointer(
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              // Fundido del contenido al cambiar de ranura
-                              // (key por índice => un fundido por salto) que
-                              // enmascara el cambio de póster durante el
-                              // desliz. Sin glider (entrada a la fila) se
-                              // pinta directo, sin parpadeo.
-                              child: _glideAnim != null
-                                  ? TweenAnimationBuilder<double>(
-                                      key: ValueKey<int>(index),
-                                      tween: Tween<double>(
-                                          begin: 0.0, end: 1.0),
-                                      duration: const Duration(
-                                          milliseconds: 250),
-                                      curve: Curves.easeOut,
-                                      builder: (context, value, child) =>
-                                          Opacity(
-                                              opacity: value,
-                                              child: child!),
-                                      child: card,
-                                    )
-                                  : card,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                if (_focusedIndex != null && _focusedIndex! < widget.items.length)
+                  _buildFocusOverlay(
+                    horizontalPadding: horizontalPadding,
+                    cardWidth: cardWidth,
+                    cardHeight: cardHeight,
                   ),
-                ],
                 if (!isMobile) ...[
                   Positioned(
                     left: horizontalPadding - 25,
@@ -502,6 +441,78 @@ class _WideContentRowState extends State<WideContentRow>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFocusOverlay({
+    required double horizontalPadding,
+    required double cardWidth,
+    required double cardHeight,
+  }) {
+    final int index = _focusedIndex!;
+    final item = widget.items[index];
+
+    final Widget card = FocusableWideCard(
+      title: item.title,
+      imageUrl: item.imageUrl,
+      logoUrl: item.logoUrl,
+      progress: item.progress,
+      subtitle: item.subtitle,
+      subtitle2: item.subtitle2,
+      rating: item.rating,
+      badgeOverlay: item.badgeOverlay,
+      width: cardWidth,
+      height: cardHeight,
+      onTap: () => widget.onItemTap(item),
+      forceInvisible: false,
+      forceSelected: _overlaySelected,
+    );
+
+    // Se construye una sola vez y se reutiliza como `child` del
+    // AnimatedBuilder: durante el scroll/glide sólo se reposiciona el
+    // Positioned, sin reconstruir la tarjeta (imagen, logo, textos).
+    final Widget overlayChild = ExcludeFocus(
+      child: IgnorePointer(
+        child: Align(
+          alignment: Alignment.topCenter,
+          // Fundido del contenido al cambiar de ranura (key por índice =>
+          // un fundido por salto) que enmascara el cambio de póster durante
+          // el desliz. Sin glider (entrada a la fila) se pinta directo.
+          child: _glideAnim != null
+              ? TweenAnimationBuilder<double>(
+                  key: ValueKey<int>(index),
+                  tween: Tween<double>(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                  builder: (context, value, child) =>
+                      Opacity(opacity: value, child: child!),
+                  child: card,
+                )
+              : card,
+        ),
+      ),
+    );
+
+    return AnimatedBuilder(
+      // Scroll (posición exacta) + glide (desliz entre ranuras).
+      animation: Listenable.merge([_scrollController, _glideCtrl]),
+      // RepaintBoundary: al mover el overlay no se repinta su contenido.
+      child: RepaintBoundary(child: overlayChild),
+      builder: (context, child) {
+        final double itemLeft = horizontalPadding +
+            index * (cardWidth + 14) -
+            _scrollController.offset +
+            (_glideAnim?.value ?? 0.0);
+        return Positioned(
+          left: itemLeft,
+          top: 0,
+          bottom: 0,
+          width: cardWidth,
+          // Pura capa visual: IgnorePointer (ratón) + ExcludeFocus (D-pad)
+          // — el foco vive en la tarjeta original de la lista.
+          child: child!,
+        );
+      },
     );
   }
 }

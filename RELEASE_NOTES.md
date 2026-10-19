@@ -1,29 +1,35 @@
-## 🚀 AurisTV v1.0.4 - Actualización Multiplataforma & Mejoras del Core
+## 🚀 AurisTV v1.0.5 - Watch Next en Android/Google TV, rendimiento del Home y refinamientos
 
-¡Nos emociona anunciar el lanzamiento de **AurisTV v1.0.4**! Esta versión incluye importantes mejoras arquitectónicas en el paquete compartido `Core`, optimizaciones en la navegación multiplataforma (Móvil, TV y Web/Desktop) y refinamientos en las pantallas principales.
+¡Lanzamos **AurisTV v1.0.5**! Esta versión integra la fila **"Continuar Viendo"** en el launcher de Android/Google TV, mejora la fluidez del Home con el D-pad y refina el reproductor y las pantallas de detalle.
 
 ---
 
 ### ✨ Novedades y Mejoras Destacadas
 
-* ⚙️ **Optimización del Core Compartido (`auris_core`):**
-  * Actualización de endpoints en `api_endpoints.dart`.
-  * Refactorización en `playback_history.dart` y optimización de providers (`home_provider`, `active_player_provider`, `unified_content_notifier`) para una gestión de estado más fluida.
+* 📺 **Watch Next en Android/Google TV (TV):**
+  * La app publica "Continuar Viendo" en el launcher (canal `auristv/watchnext`).
+  * Al pulsar una tarjeta se abre el contenido directamente; el botón **Atrás** vuelve al Home de la app.
 
-* 🗺️ **Navegación y Enrutamiento Multiplataforma (`app_router.dart`):**
-  * Sincronización y actualización de rutas en Móvil, TV y Web/Desktop para una experiencia de usuario unificada y sin interrupciones.
+* ⚡ **Rendimiento del Home (TV):**
+  * D-pad más fluido: se eliminó el `Clip.antiAliasWithSaveLayer` de las tarjetas (menos capas GPU por frame).
+  * El overlay de foco de las filas "wide" se construye una sola vez y solo se reposiciona (no se reconstruye la tarjeta en cada frame).
 
-* 🏠 **Mejoras en Pantallas Principales (`Home`, `Library`, `Content`):**
-  * Refinamiento en la UI y rendimiento de las pantallas de inicio (`home_screen.dart`), biblioteca (`library_screen.dart`) y detalles multimedia (`content_screen.dart`) en todas las plataformas.
-  * Mejoras en utilidades de red y URLs (`url_utils.dart` en Web/Desktop).
+* 🎬 **Reproductor (TV):**
+  * Pantalla de carga unificada ("Cargando contenido…").
+  * El spinner del primer frame ya no desaparece antes de tiempo.
+
+* 🖼️ **Pantallas de detalle (TV):**
+  * Se evita mostrar el título/póster provisionales antes de cargar los metadatos (skeletons).
+
+* 🎨 **Arranque y collage (Móvil, TV, Web/Desktop):**
+  * El collage del Login se precarga durante el Splash y aparece lleno desde el primer frame.
 
 ---
 
 ### 📥 Descargas Directas (Assets)
 
-Puedes descargar el APK optimizado para tu dispositivo Android:
-* **`app-arm64-v8a-release.apk`**: 📱 Recomendado para el 95% de los smartphones y tablets Android modernos.
-* **`app-armeabi-v7a-release.apk`**: 📟 Para dispositivos Android antiguos de 32 bits.
-* **`app-x86_64-release.apk`**: 💻 Para emuladores de PC u otro hardware compatible.
+* **`app-tv-*.apk`**: 📺 APK para Android/Google TV (usa `armeabi-v7a` en boxes de 32 bits).
+* **`app-mobile-*.apk`**: 📱 APK para móviles Android.
+* **`auristv-windows-x64.zip`**: 💻 Build para Windows Desktop.
 
-> *¡Gracias por usar AurisTV! Disfruta de tu contenido multimedia favorito con la mejor calidad.* 🍿🎬
+> *¡Gracias por usar AurisTV!* 🍿🎬

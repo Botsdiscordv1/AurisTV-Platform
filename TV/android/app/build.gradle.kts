@@ -71,4 +71,6 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Watch Next: fila "Continuar Viendo" en el launcher de Android/Google TV.
+    implementation("androidx.tvprovider:tvprovider:1.1.0")
 }
