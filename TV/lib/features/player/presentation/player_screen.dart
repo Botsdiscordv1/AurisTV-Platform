@@ -609,6 +609,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       positionMs: positionMs,
       durationMs: durationMs,
       title: widget.title,
+      metadataTitle: widget.metadataTitle,
       posterUrl: widget.posterUrl,
       // Banner del episodio en curso (no el backdrop crudo): ver Movil.
       bannerUrl: episodeThumb ?? widget.bannerUrl,
@@ -638,6 +639,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         positionMs: positionMs,
         durationMs: durationMs,
         title: widget.title,
+        metadataTitle: widget.metadataTitle,
         posterUrl: widget.posterUrl,
         bannerUrl: _lastResolvedEpisodeBanner ?? widget.bannerUrl,
         episodeTitle: _lastResolvedEpisodeTitle,
@@ -2388,19 +2390,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           });
           _startHideTimer();
 
-          // Despertar direccional desde el ancla (timeline): arriba = header,
-          // abajo = pills, resto = timeline (+ su acción de seek/toggle).
-          final FocusNode wakeTarget;
-          if (key == LogicalKeyboardKey.arrowUp) {
-            wakeTarget = _headerFocusNode;
-          } else if (key == LogicalKeyboardKey.arrowDown) {
-            wakeTarget = _lastFocusedPillNode ?? _serverPillFocusNode;
-          } else {
-            wakeTarget = _timelineFocusNode;
-          }
+          // Al despertar los controles, el foco cae siempre en la timeline
+          // fusionada, también con D-PAD arriba/abajo. Desde ahí el usuario
+          // puede subir al header o bajar a las cápsulas.
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && wakeTarget.canRequestFocus) {
-              wakeTarget.requestFocus();
+            if (mounted && _timelineFocusNode.canRequestFocus) {
+              _timelineFocusNode.requestFocus();
             }
           });
 
@@ -2512,7 +2507,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Sin exenciones por foco: cualquier tecla en timeline/header/pills
     // vuelve a mostrar los controles, así que ocultar con foco aparcado
     // es seguro y evita que queden encendidos eternamente.
-    _hideTimer = Timer(const Duration(seconds: 4), () {
+    _hideTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() => _showControls = false);
         // Ancla neutral: con controles ocultos el foco vive en el timeline.
@@ -3155,6 +3150,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 positionMs: 0,
                 durationMs: 0,
                 title: widget.title,
+                metadataTitle: widget.metadataTitle,
                 posterUrl: widget.posterUrl,
                 bannerUrl: widget.bannerUrl,
                 category: widget.category,
@@ -5696,7 +5692,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             if (event is KeyDownEvent || event is KeyRepeatEvent) {
               // El timeline consume las teclas antes que la raíz: si los
               // controles están ocultos hay que mostrarlos aquí también.
-              if (!_showControls) {
+              final bool wasHidden = !_showControls;
+              if (wasHidden) {
                 setState(() => _showControls = true);
               }
               final key = event.logicalKey;
@@ -5709,11 +5706,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 _startHideTimer();
                 return KeyEventResult.handled;
               } else if (key == LogicalKeyboardKey.arrowUp) {
+                // Si los controles estaban ocultos, este D-PAD solo los
+                // revela: el foco se queda en la timeline fusionada.
+                if (wasHidden) {
+                  _startHideTimer();
+                  return KeyEventResult.handled;
+                }
                 _headerFocusNode.requestFocus();
                 _startHideTimer();
                 return KeyEventResult.handled;
               } else if (key == LogicalKeyboardKey.arrowDown) {
-                if (DateTime.now().difference(_timelineFocusTime).inMilliseconds < 250) {
+                // Igual que arriba: al despertar no saltamos a las cápsulas.
+                if (wasHidden ||
+                    DateTime.now().difference(_timelineFocusTime).inMilliseconds < 250) {
+                  _startHideTimer();
                   return KeyEventResult.handled;
                 }
                 (_lastFocusedPillNode ?? _serverPillFocusNode).requestFocus();

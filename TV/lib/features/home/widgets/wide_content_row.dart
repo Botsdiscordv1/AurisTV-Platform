@@ -43,12 +43,11 @@ class WideContentRow extends StatefulWidget {
   final bool? hasSubtitle;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
-  /// D-pad abajo sobre cualquier wide card: enfoca la PRIMERA tarjeta de la
-  /// sección siguiente (mecanismo determinista vía las GlobalKey del home).
+  /// D-pad abajo sobre cualquier wide card: enfoca la última tarjeta que tuvo
+  /// foco en la sección siguiente (memoria); si nunca tuvo, la primera.
   final bool Function()? onArrowDownToNext;
-  /// D-pad arriba sobre cualquier wide card: enfoca la PRIMERA tarjeta de la
-  /// sección anterior (la wide abarca varias columnas, así que cae al primero,
-  /// igual que al bajar).
+  /// D-pad arriba sobre cualquier wide card: igual que [onArrowDownToNext]
+  /// pero hacia la sección anterior.
   final bool Function()? onArrowUpToPrev;
 
   const WideContentRow({
@@ -77,6 +76,9 @@ class _WideContentRowState extends State<WideContentRow>
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
   int? _focusedIndex;
+  // Memoria independiente de `_focusedIndex` (que se limpia al salir de la
+  // fila): permite volver a la misma tarjeta al regresar a la sección.
+  int? _lastFocusedIndex;
   late List<FocusNode> _itemFocusNodes;
   // La copia de overlay arranca sin seleccionar (sin borde durante el vuelo)
   // y se selecciona al aterrizar: el realce florece con el glide, no antes.
@@ -111,7 +113,14 @@ class _WideContentRowState extends State<WideContentRow>
   }
 
   void _initFocusNodes() {
-    _itemFocusNodes = List.generate(widget.items.length, (_) => FocusNode());
+    _lastFocusedIndex = null;
+    _itemFocusNodes = List.generate(widget.items.length, (index) {
+      final node = FocusNode();
+      node.addListener(() {
+        if (node.hasFocus) _lastFocusedIndex = index;
+      });
+      return node;
+    });
   }
 
   @override
@@ -140,6 +149,20 @@ class _WideContentRowState extends State<WideContentRow>
       return true;
     }
     return false;
+  }
+
+  /// Restaura la última tarjeta enfocada de la sección; si nunca tuvo foco
+  /// (o la tarjeta ya no existe) cae a la primera.
+  bool focusRememberedCard() {
+    final int? index = _lastFocusedIndex;
+    if (index != null &&
+        index >= 0 &&
+        index < _itemFocusNodes.length &&
+        _itemFocusNodes[index].canRequestFocus) {
+      _itemFocusNodes[index].requestFocus();
+      return true;
+    }
+    return focusFirstCard();
   }
 
   @override

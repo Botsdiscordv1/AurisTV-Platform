@@ -17,6 +17,10 @@ class EditorialContentRow extends StatefulWidget {
   final void Function(MediaItem item) onItemTap;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
+  /// D-pad abajo: salta a la sección siguiente restaurando su última tarjeta.
+  final bool Function()? onArrowDownToNext;
+  /// D-pad arriba: salta a la sección anterior restaurando su última tarjeta.
+  final bool Function()? onArrowUpToPrev;
 
   const EditorialContentRow({
     super.key,
@@ -28,6 +32,8 @@ class EditorialContentRow extends StatefulWidget {
     this.forceTopDesign = false,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
+    this.onArrowDownToNext,
+    this.onArrowUpToPrev,
   });
 
   @override
@@ -42,6 +48,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
   late List<FocusNode> _itemFocusNodes;
+  // Última tarjeta enfocada: al volver a la sección con el D-pad se restaura.
+  int? _lastFocusedIndex;
 
   @override
   void initState() {
@@ -52,7 +60,14 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   void _initFocusNodes() {
-    _itemFocusNodes = List.generate(widget.items.length, (_) => FocusNode());
+    _lastFocusedIndex = null;
+    _itemFocusNodes = List.generate(widget.items.length, (index) {
+      final node = FocusNode();
+      node.addListener(() {
+        if (node.hasFocus) _lastFocusedIndex = index;
+      });
+      return node;
+    });
   }
 
   @override
@@ -81,6 +96,20 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       return true;
     }
     return false;
+  }
+
+  /// Restaura la última tarjeta enfocada de la sección; si nunca tuvo foco
+  /// (o la tarjeta ya no existe) cae a la primera.
+  bool focusRememberedCard() {
+    final int? index = _lastFocusedIndex;
+    if (index != null &&
+        index >= 0 &&
+        index < _itemFocusNodes.length &&
+        _itemFocusNodes[index].canRequestFocus) {
+      _itemFocusNodes[index].requestFocus();
+      return true;
+    }
+    return focusFirstCard();
   }
 
   void _updateScrollIndicators() {
@@ -221,7 +250,11 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                         focusNode: _itemFocusNodes[index],
                         onKeyEvent: (node, event) {
                           if (event is KeyDownEvent) {
-                            if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
+                            if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                              if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
+                            } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                              if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
+                            } else if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
                               if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
                             } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
                               if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
@@ -329,7 +362,11 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                             focusNode: _itemFocusNodes[index],
                             onKeyEvent: (node, event) {
                               if (event is KeyDownEvent) {
-                                if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == itemCount - 1) {
+                                if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                  if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
+                                } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                  if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
+                                } else if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == itemCount - 1) {
                                   if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
                                 } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
                                   if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;

@@ -203,6 +203,20 @@ String _normalizeTitle(String? raw) {
 class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
   Timer? _throttleTimer;
   PlaybackHistory? _pendingSave;
+
+  /// Película por metadata (NO por duración: un episodio de serie también
+  /// pasa de 30 min y perdería su still en Continuar Viendo).
+  static bool _isMovieEntry(PlaybackHistory h) {
+    final flags = <String?>[h.category, h.kind, h.type];
+    for (final flag in flags) {
+      final s = (flag ?? '').toLowerCase();
+      if (s.contains('movie') || s.contains('pelicula') || s.contains('película')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   
   final Map<String, int> _lastSavedPositionsMs = {};
   
@@ -247,6 +261,7 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     required int positionMs,
     required int durationMs,
     String? title,
+    String? metadataTitle,
     String? posterUrl,
     String? bannerUrl,
     String? logoUrl,
@@ -323,6 +338,7 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       progress: finalProgress,
       isCompleted: completed,
       title: title ?? existingHistory?.title,
+      metadataTitle: metadataTitle ?? existingHistory?.metadataTitle,
       posterUrl: resolvedPoster,
       bannerUrl: resolvedBanner,
       logoUrl: resolvedLogo,
@@ -385,14 +401,31 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       final bool titleMatch = cleanTitle.isNotEmpty && hTitle == cleanTitle;
 
       if (idMatch || titleMatch) {
-        if (h.posterUrl != posterUrl) {
-          final keepBanner =
-              h.bannerUrl != null && h.bannerUrl!.isNotEmpty;
-          final String? newLogo =
-              (logoUrl != null && logoUrl.isNotEmpty) ? logoUrl : h.logoUrl;
+        // El banner de un EPISODIO (still) manda para series. En películas
+        // no hay still: si se conserva un banner viejo equivocado (venía
+        // del thumbnail del scraper o del matching laxo anterior) la
+        // tarjeta de Continuar Viendo mostraba logo correcto + imagen de
+        // otra película, y nunca se corregía porque aquí se "protegía"
+        // cualquier banner existente.
+        final bool keepBanner = !_isMovieEntry(h) &&
+            h.bannerUrl != null &&
+            h.bannerUrl!.isNotEmpty;
+        final String? newLogo =
+            (logoUrl != null && logoUrl.isNotEmpty) ? logoUrl : h.logoUrl;
+        final String? newBanner = keepBanner
+            ? h.bannerUrl
+            : ((bannerUrl != null && bannerUrl.isNotEmpty)
+                ? bannerUrl
+                : h.bannerUrl);
+        // Antes todo dependía de que cambiara el póster: si el póster ya era
+        // el correcto, ni el banner ni el logo se corregían nunca.
+        final bool changed = h.posterUrl != posterUrl ||
+            h.bannerUrl != newBanner ||
+            h.logoUrl != newLogo;
+        if (changed) {
           _memoryCache[i] = h.copyWith(
             posterUrl: posterUrl,
-            bannerUrl: keepBanner ? h.bannerUrl : bannerUrl,
+            bannerUrl: newBanner,
             logoUrl: newLogo,
           );
           updatedAny = true;

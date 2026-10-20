@@ -183,7 +183,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     switch (section.type) {
       case HomeSectionType.continueWatching:
         return _ContinueWatchingSection(
-          key: key,
+          rowKey: key,
           horizontalPadding: horizontalPadding,
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
@@ -206,6 +206,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
+              onArrowDownToNext: onArrowDownToNext,
+              onArrowUpToPrev: onArrowUpToPrev,
             ),
           );
         } else if (row.format == SectionPresentation.wide) {
@@ -233,31 +235,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
+              onArrowDownToNext: onArrowDownToNext,
+              onArrowUpToPrev: onArrowUpToPrev,
             ),
           );
         }
 
       case HomeSectionType.top10Global:
         return _Top10Section(
-          key: key,
+          rowKey: key,
           title: section.title ?? 'Top 10 de hoy', 
           horizontalPadding: horizontalPadding,
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
+          onArrowDownToNext: onArrowDownToNext,
+          onArrowUpToPrev: onArrowUpToPrev,
         );
 
       case HomeSectionType.recentlyAdded:
         return _RecentlyAddedSection(
-          key: key,
+          rowKey: key,
           title: section.title ?? 'Recién añadido', 
           horizontalPadding: horizontalPadding,
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
+          onArrowDownToNext: onArrowDownToNext,
+          onArrowUpToPrev: onArrowUpToPrev,
         );
 
       case HomeSectionType.trendingAnime:
         return _TrendingSection(
-          key: key,
+          rowKey: key,
           category: 'animes', 
           title: section.title ?? 'Animes en tendencia', 
           horizontalPadding: horizontalPadding,
@@ -269,7 +277,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
       case HomeSectionType.trendingMovies:
         return _TrendingSection(
-          key: key,
+          rowKey: key,
           category: 'películas', 
           title: section.title ?? 'Películas destacadas', 
           horizontalPadding: horizontalPadding, 
@@ -282,7 +290,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
       case HomeSectionType.recentEpisodes:
         return _RecentEpisodesSection(
-          key: key,
+          rowKey: key,
           title: section.title ?? 'Estrenos (Hoy)', 
           horizontalPadding: horizontalPadding,
           onArrowRightOnLast: onArrowRightOnLast,
@@ -305,6 +313,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
+              onArrowDownToNext: onArrowDownToNext,
+              onArrowUpToPrev: onArrowUpToPrev,
             ),
           );
         } else if (row.format == SectionPresentation.wide) {
@@ -331,6 +341,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
+              onArrowDownToNext: onArrowDownToNext,
+              onArrowUpToPrev: onArrowUpToPrev,
             ),
           );
         }
@@ -510,7 +522,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                                       final state = _sectionRowKeys[index + 1].currentState;
                                       if (state != null) {
                                         try {
-                                          return (state as dynamic).focusFirstCard() == true;
+                                          return (state as dynamic).focusRememberedCard() == true;
                                         } catch (_) {}
                                       }
                                       return false;
@@ -521,7 +533,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                                       final state = _sectionRowKeys[index - 1].currentState;
                                       if (state != null) {
                                         try {
-                                          return (state as dynamic).focusFirstCard() == true;
+                                          return (state as dynamic).focusRememberedCard() == true;
                                         } catch (_) {}
                                       }
                                       return false;
@@ -585,7 +597,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                                       final state = _sectionRowKeys[index + 1].currentState;
                                       if (state != null) {
                                         try {
-                                          return (state as dynamic).focusFirstCard() == true;
+                                          return (state as dynamic).focusRememberedCard() == true;
                                         } catch (_) {}
                                       }
                                       return false;
@@ -596,7 +608,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                                       final state = _sectionRowKeys[index - 1].currentState;
                                       if (state != null) {
                                         try {
-                                          return (state as dynamic).focusFirstCard() == true;
+                                          return (state as dynamic).focusRememberedCard() == true;
                                         } catch (_) {}
                                       }
                                       return false;
@@ -986,13 +998,16 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
 }
 
 class _ContinueWatchingSection extends ConsumerWidget {
+  /// Key de la fila interna (la sección es stateless: la GlobalKey debe caer
+  /// en un State para que el Home pueda restaurar el foco).
+  final Key? rowKey;
   final double horizontalPadding;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
   final bool Function()? onArrowDownToNext;
   final bool Function()? onArrowUpToPrev;
   const _ContinueWatchingSection({
-    super.key,
+    this.rowKey,
     required this.horizontalPadding,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
@@ -1013,6 +1028,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
         if (filteredItems.isEmpty) return const SizedBox.shrink();
 
         return WideContentRow(
+          key: rowKey,
           title: 'Continuar Viendo',
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
@@ -1073,16 +1089,21 @@ class _ContinueWatchingSection extends ConsumerWidget {
 }
 
 class _Top10Section extends ConsumerWidget {
+  final Key? rowKey;
   final String title;
   final double horizontalPadding;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
+  final bool Function()? onArrowDownToNext;
+  final bool Function()? onArrowUpToPrev;
   const _Top10Section({
-    super.key,
+    this.rowKey,
     required this.title,
     required this.horizontalPadding,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
+    this.onArrowDownToNext,
+    this.onArrowUpToPrev,
   });
 
   @override
@@ -1090,6 +1111,7 @@ class _Top10Section extends ConsumerWidget {
     final asyncData = ref.watch(top10GlobalProvider);
     return asyncData.when(
       data: (items) => EditorialContentRow(
+        key: rowKey,
         title: title,
         items: items,
         badge: EditorialBadge.mythical,
@@ -1097,6 +1119,8 @@ class _Top10Section extends ConsumerWidget {
         onItemTap: (item) => openTVDetails(context, item, 'inicio'),
         onArrowRightOnLast: onArrowRightOnLast,
         onArrowLeftOnFirst: onArrowLeftOnFirst,
+        onArrowDownToNext: onArrowDownToNext,
+        onArrowUpToPrev: onArrowUpToPrev,
       ),
       loading: () => const RowSkeleton(),
       error: (_, __) => const SizedBox.shrink(),
@@ -1105,16 +1129,21 @@ class _Top10Section extends ConsumerWidget {
 }
 
 class _RecentlyAddedSection extends ConsumerWidget {
+  final Key? rowKey;
   final String title;
   final double horizontalPadding;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
+  final bool Function()? onArrowDownToNext;
+  final bool Function()? onArrowUpToPrev;
   const _RecentlyAddedSection({
-    super.key,
+    this.rowKey,
     required this.title,
     required this.horizontalPadding,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
+    this.onArrowDownToNext,
+    this.onArrowUpToPrev,
   });
 
   @override
@@ -1122,12 +1151,15 @@ class _RecentlyAddedSection extends ConsumerWidget {
     final asyncData = ref.watch(recentlyAddedProvider);
     return asyncData.when(
       data: (items) => ContentRow(
+        key: rowKey,
         title: title,
         items: items,
         horizontalPadding: horizontalPadding,
         onItemTap: (item) => openTVDetails(context, item, 'inicio'),
         onArrowRightOnLast: onArrowRightOnLast,
         onArrowLeftOnFirst: onArrowLeftOnFirst,
+        onArrowDownToNext: onArrowDownToNext,
+        onArrowUpToPrev: onArrowUpToPrev,
       ),
       loading: () => const RowSkeleton(),
       error: (_, __) => const SizedBox.shrink(),
@@ -1136,6 +1168,7 @@ class _RecentlyAddedSection extends ConsumerWidget {
 }
 
 class _TrendingSection extends ConsumerWidget {
+  final Key? rowKey;
   final String category;
   final String title;
   final double horizontalPadding;
@@ -1145,7 +1178,7 @@ class _TrendingSection extends ConsumerWidget {
   final bool Function()? onArrowDownToNext;
   final bool Function()? onArrowUpToPrev;
   const _TrendingSection({
-    super.key,
+    this.rowKey,
     required this.category,
     required this.title,
     required this.horizontalPadding,
@@ -1163,6 +1196,7 @@ class _TrendingSection extends ConsumerWidget {
       data: (items) {
         if (isWide) {
           return WideContentRow(
+            key: rowKey,
             title: title,
             onArrowRightOnLast: onArrowRightOnLast,
             onArrowLeftOnFirst: onArrowLeftOnFirst,
@@ -1181,12 +1215,15 @@ class _TrendingSection extends ConsumerWidget {
           );
         }
         return ContentRow(
+          key: rowKey,
           title: title,
           items: items,
           horizontalPadding: horizontalPadding,
           onItemTap: (item) => openTVDetails(context, item, category),
           onArrowRightOnLast: onArrowRightOnLast,
           onArrowLeftOnFirst: onArrowLeftOnFirst,
+          onArrowDownToNext: onArrowDownToNext,
+          onArrowUpToPrev: onArrowUpToPrev,
         );
       },
       loading: () => RowSkeleton(isWide: isWide),
@@ -1196,6 +1233,7 @@ class _TrendingSection extends ConsumerWidget {
 }
 
 class _RecentEpisodesSection extends ConsumerWidget {
+  final Key? rowKey;
   final String title;
   final double horizontalPadding;
   final bool Function()? onArrowRightOnLast;
@@ -1203,7 +1241,7 @@ class _RecentEpisodesSection extends ConsumerWidget {
   final bool Function()? onArrowDownToNext;
   final bool Function()? onArrowUpToPrev;
   const _RecentEpisodesSection({
-    super.key,
+    this.rowKey,
     required this.title,
     required this.horizontalPadding,
     this.onArrowRightOnLast,
@@ -1218,6 +1256,7 @@ class _RecentEpisodesSection extends ConsumerWidget {
     final bool isHomeInicio = ref.watch(homeCategoryProvider) == 'inicio';
     return asyncData.when(
       data: (items) => WideContentRow(
+        key: rowKey,
         title: title,
         onArrowRightOnLast: onArrowRightOnLast,
         onArrowLeftOnFirst: onArrowLeftOnFirst,

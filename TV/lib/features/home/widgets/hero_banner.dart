@@ -828,7 +828,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
           Builder(builder: (context) {
             final dpr = MediaQuery.of(context).devicePixelRatio;
-            final logoWidth = MediaQuery.of(context).size.width * 0.45;
+            final logoWidth = MediaQuery.of(context).size.width * 0.38;
             final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
             return SizedBox(
               height: TVResponsiveUtils.heroLogoHeight(context),

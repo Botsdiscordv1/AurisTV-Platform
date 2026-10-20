@@ -520,6 +520,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       positionMs: positionMs,
       durationMs: durationMs,
       title: widget.title,
+      metadataTitle: widget.metadataTitle,
       posterUrl: widget.posterUrl,
       // Banner del episodio en curso (no el backdrop crudo): ver Movil.
       bannerUrl: episodeThumb ?? widget.bannerUrl,
@@ -549,6 +550,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         positionMs: positionMs,
         durationMs: durationMs,
         title: widget.title,
+        metadataTitle: widget.metadataTitle,
         posterUrl: widget.posterUrl,
         bannerUrl: _lastResolvedEpisodeBanner ?? widget.bannerUrl,
         episodeTitle: _lastResolvedEpisodeTitle,
@@ -2502,6 +2504,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 positionMs: 0,
                 durationMs: 0,
                 title: widget.title,
+                metadataTitle: widget.metadataTitle,
                 posterUrl: widget.posterUrl,
                 bannerUrl: widget.bannerUrl,
                 category: widget.category,
