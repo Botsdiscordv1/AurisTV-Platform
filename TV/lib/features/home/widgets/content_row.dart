@@ -15,6 +15,10 @@ class ContentRow extends StatefulWidget {
   final void Function(MediaItem item) onItemTap;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
+  /// D-pad abajo: salta a la sección siguiente restaurando su última tarjeta.
+  final bool Function()? onArrowDownToNext;
+  /// D-pad arriba: salta a la sección anterior restaurando su última tarjeta.
+  final bool Function()? onArrowUpToPrev;
 
   const ContentRow({
     super.key,
@@ -25,6 +29,8 @@ class ContentRow extends StatefulWidget {
     this.horizontalPadding = 48.0,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
+    this.onArrowDownToNext,
+    this.onArrowUpToPrev,
   });
 
   @override
@@ -39,6 +45,9 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
   late List<FocusNode> _itemFocusNodes;
+  // Última tarjeta enfocada: al volver a la sección con el D-pad se restaura
+  // (memoria de navegación entre secciones del Home).
+  int? _lastFocusedIndex;
 
   @override
   void initState() {
@@ -49,7 +58,14 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
   }
 
   void _initFocusNodes() {
-    _itemFocusNodes = List.generate(widget.items.length, (_) => FocusNode());
+    _lastFocusedIndex = null;
+    _itemFocusNodes = List.generate(widget.items.length, (index) {
+      final node = FocusNode();
+      node.addListener(() {
+        if (node.hasFocus) _lastFocusedIndex = index;
+      });
+      return node;
+    });
   }
 
   @override
@@ -79,6 +95,20 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
       return true;
     }
     return false;
+  }
+
+  /// Restaura la última tarjeta enfocada de la sección; si nunca tuvo foco
+  /// (o la tarjeta ya no existe) cae a la primera.
+  bool focusRememberedCard() {
+    final int? index = _lastFocusedIndex;
+    if (index != null &&
+        index >= 0 &&
+        index < _itemFocusNodes.length &&
+        _itemFocusNodes[index].canRequestFocus) {
+      _itemFocusNodes[index].requestFocus();
+      return true;
+    }
+    return focusFirstCard();
   }
 
   void _updateScrollIndicators() {
@@ -217,7 +247,11 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                                   focusNode: _itemFocusNodes[index],
                                   onKeyEvent: (node, event) {
                                     if (event is KeyDownEvent) {
-                                      if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
+                                      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                        if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
+                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                        if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
+                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
                                         if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
                                       } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
                                         if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;

@@ -1,11 +1,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../../shared/widgets/tv_scroll.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -116,6 +118,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           final h = grouped[index];
                           return _HistoryCard(
                             item: h,
+                            horizontalPadding: hPadding,
                             displayTitle: libraryDisplayTitle(h),
                             imageUrl: ApiEndpoints.proxyImage(
                               libraryCardImage(h),
@@ -300,8 +303,9 @@ class _EmptyState extends StatelessWidget {
   );
 }
 
-class _HistoryCard extends StatelessWidget {
+class _HistoryCard extends StatefulWidget {
   final PlaybackHistory item;
+  final double horizontalPadding;
   final String displayTitle;
   final String imageUrl;
   final String? logoUrl;
@@ -310,6 +314,7 @@ class _HistoryCard extends StatelessWidget {
 
   const _HistoryCard({
     required this.item,
+    required this.horizontalPadding,
     required this.displayTitle,
     required this.imageUrl,
     this.logoUrl,
@@ -318,101 +323,146 @@ class _HistoryCard extends StatelessWidget {
   });
 
   @override
+  State<_HistoryCard> createState() => _HistoryCardState();
+}
+
+class _HistoryCardState extends State<_HistoryCard> {
+  bool _focused = false;
+
+  void _open() {
+    final detailParams = widget.item.toUnifiedDetailParams();
+    // FIX continuar-viendo: ver home (kind/year/type/metadataTitle + seed).
+    final uri = '/content/${Uri.encodeComponent(detailParams.title)}'
+        '?source=${Uri.encodeComponent(detailParams.source)}'
+        '&category=${Uri.encodeComponent(detailParams.category)}'
+        '&url=${Uri.encodeComponent(detailParams.url ?? widget.item.contentId)}'
+        '${detailParams.season != null ? '&season=${detailParams.season}' : ''}'
+        '${detailParams.sectionId != null ? '&sectionId=${Uri.encodeComponent(detailParams.sectionId!)}' : ''}'
+        '&year=${detailParams.year ?? ''}'
+        '${detailParams.kind != null && detailParams.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(detailParams.kind!)}' : ''}'
+        '${detailParams.type != null && detailParams.type!.isNotEmpty ? '&type=${Uri.encodeComponent(detailParams.type!)}' : ''}'
+        '${detailParams.metadataTitle != null && detailParams.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(detailParams.metadataTitle!)}' : ''}';
+    // Seed centralizado en Core (null si no hay URL http real).
+    final seed = historyToSeed(widget.item);
+    context.push(uri, extra: seed);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        final detailParams = item.toUnifiedDetailParams();
-        // FIX continuar-viendo: ver home (kind/year/type/metadataTitle + seed).
-        final uri = '/content/${Uri.encodeComponent(detailParams.title)}'
-            '?source=${Uri.encodeComponent(detailParams.source)}'
-            '&category=${Uri.encodeComponent(detailParams.category)}'
-            '&url=${Uri.encodeComponent(detailParams.url ?? item.contentId)}'
-            '${detailParams.season != null ? '&season=${detailParams.season}' : ''}'
-            '${detailParams.sectionId != null ? '&sectionId=${Uri.encodeComponent(detailParams.sectionId!)}' : ''}'
-            '&year=${detailParams.year ?? ''}'
-            '${detailParams.kind != null && detailParams.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(detailParams.kind!)}' : ''}'
-            '${detailParams.type != null && detailParams.type!.isNotEmpty ? '&type=${Uri.encodeComponent(detailParams.type!)}' : ''}'
-            '${detailParams.metadataTitle != null && detailParams.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(detailParams.metadataTitle!)}' : ''}';
-        // Seed centralizado en Core (null si no hay URL http real).
-        final seed = historyToSeed(item);
-        context.push(uri, extra: seed);
+    // Misma navegación que las tarjetas compartidas del Home: al recibir foco
+    // se ancla en la ranura del carrusel y Enter/SELECT abre el contenido.
+    return Focus(
+      onFocusChange: (focused) {
+        setState(() => _focused = focused);
+        if (focused) {
+          // La fila usa el margen del screen (no el estándar de TV): misma
+          // ranura exacta que la primera tarjeta.
+          TvScroll.ensureCardVisible(
+            context,
+            horizontalAnchor: widget.horizontalPadding,
+          );
+        }
       },
-      child: SizedBox(
-        width: 260,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl: ApiEndpoints.proxyImage(imageUrl),
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(color: Colors.white10),
-                      errorWidget: (_, __, ___) => Container(color: Colors.white10),
-                    ),
-                    if (logoUrl != null && logoUrl!.isNotEmpty)
-                      Positioned(
-                        bottom: 12,
-                        left: 8,
-                        right: 8,
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(
-                              maxWidth: 180,
-                              maxHeight: 60,
-                            ),
-                            child: LogoToneFilter(
-                              imageUrl: ApiEndpoints.proxyImage(logoUrl!),
-                              child: CachedNetworkImage(
-                                imageUrl: ApiEndpoints.proxyImage(logoUrl!),
-                                fit: BoxFit.contain,
-                                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select ||
+                event.logicalKey == LogicalKeyboardKey.space)) {
+          SafeTap.run(_open);
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: _open,
+        child: SizedBox(
+          width: 260,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CachedNetworkImage(
+                        imageUrl: ApiEndpoints.proxyImage(widget.imageUrl),
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(color: Colors.white10),
+                        errorWidget: (_, __, ___) => Container(color: Colors.white10),
+                      ),
+                      if (widget.logoUrl != null && widget.logoUrl!.isNotEmpty)
+                        Positioned(
+                          bottom: 12,
+                          left: 8,
+                          right: 8,
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: 180,
+                                maxHeight: 60,
+                              ),
+                              child: LogoToneFilter(
+                                imageUrl: ApiEndpoints.proxyImage(widget.logoUrl!),
+                                child: CachedNetworkImage(
+                                  imageUrl: ApiEndpoints.proxyImage(widget.logoUrl!),
+                                  fit: BoxFit.contain,
+                                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    Positioned(
-                      bottom: 0, left: 0, right: 0,
-                      child: Container(
-                        height: 4, color: Colors.white24,
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: item.progress.clamp(0.0, 1.0),
-                          child: Container(color: const Color(0xFFEF7A1E)),
-                        ),
-                      ),
-                    ),
-                    if (onDelete != null)
                       Positioned(
-                        top: 8, left: 8,
-                        child: GestureDetector(
-                          onTap: onDelete,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.4),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white.withOpacity(0.1)),
-                            ),
-                            child: AurisIcon(AurisIcons.close, color: Colors.white70, size: 16),
+                        bottom: 0, left: 0, right: 0,
+                        child: Container(
+                          height: 4, color: Colors.white24,
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: widget.item.progress.clamp(0.0, 1.0),
+                            child: Container(color: const Color(0xFFEF7A1E)),
                           ),
                         ),
                       ),
-                  ],
+                      if (widget.onDelete != null)
+                        Positioned(
+                          top: 8, left: 8,
+                          child: GestureDetector(
+                            onTap: widget.onDelete,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.4),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                              ),
+                              child: AurisIcon(AurisIcons.close, color: Colors.white70, size: 16),
+                            ),
+                          ),
+                        ),
+                      if (_focused)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis, 
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-            if (remainingText.isNotEmpty)
-              Text(remainingText, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          ],
+              const SizedBox(height: 10),
+              Text(widget.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis, 
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+              if (widget.remainingText.isNotEmpty)
+                Text(widget.remainingText, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            ],
+          ),
         ),
       ),
     );

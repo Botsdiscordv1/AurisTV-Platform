@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Scaffold;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
@@ -17,8 +18,10 @@ class TvScroll {
   /// de la primera tarjeta. Cerca del final de la fila el clamp del extent la
   /// deja lo más a la derecha posible (borde derecho simétrico).
   ///
-  /// En scrollables verticales (rejillas) el ancla no aplica: se mantiene el
-  /// centrado clásico para que la celda enfocada siga siendo visible.
+  /// En scrollables verticales (rejillas) se ancla la celda enfocada arriba,
+  /// teniendo en cuenta el AppBar fijo si el scroll vive detrás de él (así la
+  /// tarjeta no queda oculta). El resto de pantallas mantiene el margen
+  /// clásico de 24px.
   ///
   /// [leadingInset] = ancho de lo que precede a la tarjeta DENTRO de su
   /// elemento (p. ej. el número gigante del Top10). El ancla es entonces el
@@ -29,6 +32,7 @@ class TvScroll {
     Curve curve = Curves.easeOutCubic,
     double leadingInset = 0,
     double alignment = 0.0,
+    double? horizontalAnchor,
   }) {
     final RenderObject? object = context.findRenderObject();
     if (object is! RenderBox || !object.attached) return false;
@@ -41,7 +45,8 @@ class TvScroll {
 
     if (position.axis != Axis.horizontal) {
       final double contentTop = viewport.getOffsetToReveal(object, 0.0).offset;
-      final double target = (contentTop - 24.0)
+      final double desiredTop = _verticalAnchorInset(context, viewport);
+      final double target = (contentTop - desiredTop)
           .clamp(position.minScrollExtent, position.maxScrollExtent);
       final double travel = (target - position.pixels).abs();
       if (travel < 1.0) return false;
@@ -54,7 +59,11 @@ class TvScroll {
     }
 
     final double contentLeft = viewport.getOffsetToReveal(object, 0.0).offset;
-    final double anchor = TVResponsiveUtils.horizontalPadding(context);
+    // Por defecto, el margen estándar de TV. Las filas que usan otro padding
+    // (p. ej. el Historial de Biblioteca, con el margen de Core) lo pasan para
+    // que la tarjeta quede exactamente en la ranura de la primera.
+    final double anchor =
+        horizontalAnchor ?? TVResponsiveUtils.horizontalPadding(context);
     final double target = (contentLeft - leadingInset - anchor)
         .clamp(position.minScrollExtent, position.maxScrollExtent);
     final double travel = (target - position.pixels).abs();
@@ -115,6 +124,27 @@ class TvScroll {
       curve: curve,
     );
     return true;
+  }
+
+  /// Inset superior al que se ancla una celda de rejilla. Por defecto 24px;
+  /// si el scroll vive detrás de un AppBar fijo (`extendBodyBehindAppBar`,
+  /// p. ej. Biblioteca) se le suma la franja que la barra tapa, para que la
+  /// tarjeta enfocada no quede oculta bajo ella.
+  static double _verticalAnchorInset(
+    BuildContext context,
+    RenderObject viewport,
+  ) {
+    const double margin = 24.0;
+    final PreferredSizeWidget? appBar =
+        context.findAncestorWidgetOfExactType<Scaffold>()?.appBar;
+    if (appBar == null) return margin;
+    if (viewport is! RenderBox || !viewport.attached) return margin;
+    final double viewportTop = viewport.localToGlobal(Offset.zero).dy;
+    final double appBarBottom =
+        MediaQuery.of(context).padding.top + appBar.preferredSize.height;
+    final double covered = appBarBottom - viewportTop;
+    if (covered <= 0) return margin;
+    return covered + 8.0;
   }
 
   /// Duración del scroll proporcional a la distancia recorrida, imitando el

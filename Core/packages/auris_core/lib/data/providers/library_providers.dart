@@ -77,14 +77,34 @@ bool continueWatchingMatchesCategory(PlaybackHistory h, String uiCategory) {
   }
 }
 
+String _firstNonEmptyTitle(List<String?> values) {
+  for (final value in values) {
+    final text = (value ?? '').trim();
+    if (text.isNotEmpty) return text;
+  }
+  return '';
+}
+
 /// Título para tarjeta: limpia "Ep N •" en pelis. En series NO se antepone
 /// "Ep X" (ya va en el subtítulo "T1:E7 · Título" o "T2 E7 • ...").
+/// Si el historial no guardó `title` (p. ej. el player abrió sin él), cae a
+/// `metadataTitle`/`episodeTitle`/`contentId` antes que al genérico "Contenido".
 String libraryDisplayTitle(PlaybackHistory h) {
-  final displayTitle = h.title ?? 'Contenido';
+  final sourceTitle = h.alternativeSources
+      ?.map((s) => s.title)
+      .firstWhere((t) => t.trim().isNotEmpty, orElse: () => '');
+  final rawTitle = _firstNonEmptyTitle([h.title, h.metadataTitle, h.episodeTitle, sourceTitle]);
+  final idFallback = h.contentId.trim();
+  final displayTitle = rawTitle.isNotEmpty
+      ? rawTitle
+      : ((idFallback.isNotEmpty && idFallback != 'unknown' && !idFallback.startsWith('http'))
+          ? idFallback
+          : 'Contenido');
   if (libraryIsMovieish(h)) {
-    return displayTitle
+    final cleaned = displayTitle
         .replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[\.\-\•]\s*'), '')
         .trim();
+    return cleaned.isNotEmpty ? cleaned : displayTitle;
   }
   return displayTitle;
 }

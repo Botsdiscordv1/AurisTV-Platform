@@ -62,12 +62,16 @@ int? extractSeason(String? s) {
   if (m2 != null) return int.tryParse(m2.group(1)!);
 
   // 2. Detección por números romanos (Estándar en Anime)
-  final romanMap = {'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6, 'vii': 7, 'viii': 8, 'ix': 9, 'x': 10};
+  //    La "X" solo cuenta como temporada si viene marcada explícitamente
+  //    ("Season X", "Temporada X"): hay títulos legítimos que terminan en X
+  //    (Doctora X, Project X) y confundirlos con la temporada 10 rompía los
+  //    episodios.
+  final romanKeyword = RegExp(
+    r'(?:season|temporada|part|parte|cour)\s*[xX]\b',
+  ).firstMatch(s);
+  if (romanKeyword != null) return 10;
+  final romanMap = {'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6, 'vii': 7, 'viii': 8, 'ix': 9};
   for (final entry in romanMap.entries) {
-    if (entry.key == 'x') {
-      if (RegExp(r'[\s\-]X(?:$|[\s\-:,.)\]])').hasMatch(s)) return 10;
-      continue;
-    }
     if (RegExp(r'[\s\-]' + entry.key + r'(?:$|[\s\-:,.)\]])', caseSensitive: false).hasMatch(s)) return entry.value;
   }
 
@@ -94,7 +98,11 @@ int? seasonFromUrl(String? url) {
   final m = RegExp(r'[-/#](\d{1,2})(?:st|nd|rd|th)?-?(?:season|temporada)', caseSensitive: false).firstMatch(u) ??
       RegExp(r'[-/#](?:season|temporada)-(\d{1,2})', caseSensitive: false).firstMatch(u);
   if (m != null) return int.tryParse(m.group(1)!);
-  final rm = RegExp(r'[-/#]([ivx]{1,4})(?=$|[/?#_-])', caseSensitive: false).firstMatch(u);
+  // Romanos: solo si van marcados ("-season-ii") o son un segmento aislado
+  // ("/ii/"). Antes se aceptaba cualquier sufijo ("-x"), y títulos como
+  // "doctora-x" se interpretaban como temporada 10.
+  final rm = RegExp(r'[-/_](?:season|temporada|part|parte|cour)[-_]([ivx]{1,4})(?=$|[/?#_-])', caseSensitive: false).firstMatch(u) ??
+      RegExp(r'(?:^|/)([ivx]{1,4})(?=/|$)', caseSensitive: false).firstMatch(u);
   if (rm == null) return null;
   const roman = <String, int>{
     'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6, 'vii': 7, 'viii': 8, 'ix': 9, 'x': 10,

@@ -394,8 +394,30 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                               height: widget.height * 0.35,
                                               color: Colors.white.withOpacity(0.04),
                                             ),
-                                            errorWidget: (_, __, ___) =>
-                                                const SizedBox.shrink(),
+                                            // Sin logo (404/red): usar el título
+                                            // como fallback de texto en vez de
+                                            // dejar el hueco vacío.
+                                            errorWidget: (_, __, ___) => Align(
+                                              alignment: Alignment.bottomLeft,
+                                              child: Text(
+                                                widget.title,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: GoogleFonts.poppins(
+                                                  color: Colors.white,
+                                                  fontSize: ResponsiveUtils
+                                                      .bannerTitleFontSize(context),
+                                                  fontWeight: FontWeight.w700,
+                                                  shadows: [
+                                                    Shadow(
+                                                      color: Colors.black.withValues(alpha: 0.8),
+                                                      blurRadius: 10,
+                                                      offset: const Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
                                           ),
                                         );
                                       }),

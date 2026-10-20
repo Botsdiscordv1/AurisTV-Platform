@@ -347,7 +347,18 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                                         imageUrl: ApiEndpoints.proxyImage(logoUrl),
                                         fit: BoxFit.contain,
                                         filterQuality: FilterQuality.medium,
-                                        errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                                        // Sin logo (404/red): título como fallback
+                                        errorWidget: (context, __, ___) => Text(
+                                          titleText,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: textPrimary,
+                                            fontSize: ResponsiveUtils.bannerTitleFontSize(context),
+                                            fontWeight: FontWeight.w700,
+                                            shadows: const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 2))],
+                                          ),
+                                        ),
                                       ),
                                     ),
                                     ),
