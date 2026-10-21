@@ -145,10 +145,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: const Color(0xFF0B0B0D),
+        backgroundColor: const Color(0xFF000000),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         toolbarHeight: isMobile ? 116 : 132,

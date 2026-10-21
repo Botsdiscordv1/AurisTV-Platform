@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import '../models/playback_history.dart';
 import '../models/favorite_item.dart';
 import '../models/media_item.dart';
 import '../models/server/search_result.dart';
 import '../../core/utils/category_utils.dart';
+import '../../core/utils/content_logic.dart';
 import '../../core/utils/string_utils.dart';
 import '../../core/utils/source_utils.dart';
 import 'playback_history_provider.dart';
@@ -151,16 +153,25 @@ String libraryCardImage(PlaybackHistory h) =>
 /// discovery reconstruye las fuentes; sembrar un título rompería /episodes).
 SearchResult? historyToSeed(PlaybackHistory h) {
   final p = h.toUnifiedDetailParams();
-  final seedUrl = h.url ?? h.contentId;
-  if (!isHttpUrl(seedUrl)) return null;
+  final rawSeedUrl = p.url ?? h.url ?? h.contentId;
+  if (!isHttpUrl(rawSeedUrl)) return null;
+
+  String seedUrl = cleanSeriesUrl(rawSeedUrl);
+  if (isEpisodeUrl(seedUrl)) {
+    final altSeries = h.alternativeSources?.firstWhereOrNull((s) => !isEpisodeUrl(s.url) && isHttpUrl(s.url));
+    if (altSeries != null) {
+      seedUrl = altSeries.url;
+    }
+  }
+
   return SearchResult(
     title: h.title ?? p.title,
     url: seedUrl,
     quality: '',
     thumbnail: h.posterUrl ?? '',
     source: h.source ?? p.source,
-    kind: h.kind ?? p.kind,
-    type: h.type ?? p.type,
+    kind: p.kind,
+    type: p.type,
     year: h.year ?? p.year,
     metadataTitle: h.metadataTitle ?? p.metadataTitle,
     season: h.season ?? p.season,

@@ -998,7 +998,7 @@ class _CastCreditsModal extends ConsumerWidget {
     )));
 
     return Dialog(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.white10)),
       insetPadding: EdgeInsets.symmetric(
         horizontal: isMobile ? 12 : width * 0.08,
@@ -1799,7 +1799,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     }
 
     if (!_showContent) {
-      return Scaffold(backgroundColor: const Color(0xFF0B0B0D), body: _buildPageSkeleton(context, true));
+      return Scaffold(backgroundColor: const Color(0xFF000000), body: _buildPageSkeleton(context, true));
     }
 
     final hasEpisodesTab = !isMovieCategory;
@@ -1890,7 +1890,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       }
     }
 
-    final int displayTotalSeasons = [totalSeasons, widget.totalSeasons ?? 0].reduce((a, b) => a > b ? a : b);
+    final int displayTotalSeasons = totalSeasons > 0 ? totalSeasons : (widget.totalSeasons ?? 1);
     final bool bottomBarVisible = ref.watch(bottomNavVisibleProvider);
 
     return MouseRegion(
@@ -1952,8 +1952,22 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ),
           secondaryActions: _buildCircularActions(context, isMobile: isMobile, poster: currentSource?.thumbnail, banner: heroBanner),
           synopsis: _buildSynopsis(detailData),
-          selectors: (displayTotalSeasons > 0 || currentSource != null) ? Row(
+          selectors: (displayTotalSeasons > 1 || currentSource != null) ? Row(
             children: [
+              if (displayTotalSeasons > 1) ...[
+                SeasonSelector(
+                  data: SeasonSelectorData(
+                    currentSeason: currentSeason,
+                    totalSeasons: displayTotalSeasons,
+                    onSeasonSelected: (season) {
+                      ref.setSeason(detailParams, season);
+                    },
+                    compact: true,
+                    width: 150,
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
               if (currentSource != null)
                 Expanded(
                   child: SourceChipsBar(
@@ -2160,7 +2174,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     if (isMobile) {
       return Column(children: [
         Stack(clipBehavior: Clip.hardEdge, children: [
-          AspectRatio(aspectRatio: 16 / 12, child: Container(color: const Color(0xFF0B0B0D))),
+          AspectRatio(aspectRatio: 16 / 12, child: Container(color: const Color(0xFF000000))),
         ]),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const SizedBox(height: 8),
@@ -2178,7 +2192,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       ]);
     }
     return Stack(clipBehavior: Clip.hardEdge, children: [
-      AspectRatio(aspectRatio: 2.8 / 1, child: Container(color: const Color(0xFF0B0B0D))),
+      AspectRatio(aspectRatio: 2.8 / 1, child: Container(color: const Color(0xFF000000))),
       Positioned(
         left: 40, right: 40, bottom: 24,
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [

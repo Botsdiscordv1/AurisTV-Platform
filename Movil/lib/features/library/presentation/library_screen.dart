@@ -98,7 +98,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final filteredFavorites = filterLibraryFavorites(favorites, _activeFilter);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
@@ -115,7 +115,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               ),
               title: Text('Mi biblioteca', 
                 style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20)),
-              backgroundColor: _isScrolled ? const Color(0xFF0B0B0D).withValues(alpha: 0.6) : Colors.transparent,
+              backgroundColor: _isScrolled ? const Color(0xFF000000).withValues(alpha: 0.6) : Colors.transparent,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               centerTitle: false,

@@ -350,7 +350,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D), // Senior Recomienda: Rich Black para evitar OLED Smearing
+      backgroundColor: const Color(0xFF000000), // Senior Recomienda: Rich Black para evitar OLED Smearing
       body: Stack(
         children: [
           CustomScrollView(
@@ -506,8 +506,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             duration: const Duration(milliseconds: 300),
             decoration: BoxDecoration(
               color: _isScrolled 
-                  ? const Color(0xFF0B0B0D).withValues(alpha: 0.6) 
-                  : const Color(0xFF0B0B0D), 
+                  ? const Color(0xFF000000).withValues(alpha: 0.6) 
+                  : const Color(0xFF000000), 
               border: Border(
                 bottom: BorderSide(
                   color: _isScrolled ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
@@ -637,7 +637,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           margin: EdgeInsets.zero,
           decoration: BoxDecoration(
             color: _isScrolled 
-                ? const Color(0xFF0B0B0D).withValues(alpha: 0.4) 
+                ? const Color(0xFF000000).withValues(alpha: 0.4) 
                 : Colors.transparent,
             border: Border(
               bottom: BorderSide(

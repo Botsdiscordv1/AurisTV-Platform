@@ -1,25 +1,27 @@
-# 🚀 AurisTV v1.0.3 - Actualización Mayor & Firma Oficial de Producción
+# 🚀 AurisTV v1.0.8 - Actualización Mayor & Mejoras Multiplataforma
 
-¡Nos complace anunciar el lanzamiento oficial de **AurisTV v1.0.3**! Esta nueva versión llega firmada con el keystore oficial de producción configurado en el repositorio y trae importantes optimizaciones de interfaz, estabilidad y rendimiento en todas las plataformas (**Móvil, Android TV y Web/Desktop**).
+¡Nos complace anunciar el lanzamiento oficial de **AurisTV v1.0.8**! Esta versión incluye importantes mejoras en los temas de la aplicación (`app_theme`), enrutamiento (`app_router`), pantallas de inicio, perfil, exploración, reproductor y configuración en todas las plataformas (**Móvil, Android TV y Web/Desktop**).
 
 ---
 
 ## ✨ Novedades y Características Principales
 
-- **Firma de Producción Oficial (`upload-keystore.jks`):**
-  - APKs de Móvil y Android TV firmadas de forma segura y optimizadas para distribución oficial.
-- **Optimizaciones en Pantallas de Inicio, Contenido y Programación (`home_screen`, `content_screen`, `schedule_screen`):**
-  - Refinamientos en filas de contenido dinámicas, navegación con control remoto y transiciones fluidas.
-- **Soporte Multiplataforma Sincronizado (`v1.0.3+1`):**
-  - Experiencia unificada en Móvil, Android TV y Web/Desktop.
+- **Renovación de Temas y Estilos (`app_theme`):**
+  - Actualización de la paleta de colores y estilos visuales basados en Material Design 3.
+- **Mejoras en Perfiles y Configuración (`profile_screen`, `profile_edit_screen`, `settings_screen`, `storage_screen`):**
+  - Flujos mejorados de configuración de perfiles, almacenamiento y ajustes generales optimizados para Móvil y Android TV.
+- **Optimizaciones en Reproductor y Navegación (`player_screen`, `app_router`, `explore_screen`, `search_screen`):**
+  - Transiciones de rutas más fluidas y controles multimedia avanzados en todas las plataformas.
+- **Soporte Multiplataforma Sincronizado (`v1.0.8+8`):**
+  - Versión unificada con versionCode `8` en Móvil, Android TV y Web/Desktop.
 
 ---
 
 ## 🛠️ Correcciones de Errores y Mejoras de Rendimiento
 
-- **Estabilidad General:** Correcciones en la gestión de estado, control de enfoque y reproductor multimedia.
-- **Empaquetado y Release:** Automatización limpia y segura con firma digital en GitHub Actions.
+- **Estabilidad General:** Correcciones de estado y manejo de eventos de control remoto en pantallas de TV.
+- **Empaquetado y Release:** Automatización limpia con `--split-per-abi` y firma digital segura con el keystore oficial de producción.
 
 ---
 
-📥 *¡Actualiza a la versión v1.0.3 para disfrutar de la experiencia multimedia definitiva, segura y optimizada con AurisTV!*
+📥 *¡Actualiza a la versión v1.0.8 para disfrutar de la experiencia multimedia definitiva con AurisTV!*

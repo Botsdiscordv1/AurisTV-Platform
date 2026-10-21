@@ -85,11 +85,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         if (!didPop) _goBack();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0B0B0D),
+        backgroundColor: const Color(0xFF000000),
         body: Stack(
           children: [
             // 1. App Dark Base Background
-            const Positioned.fill(child: ColoredBox(color: Color(0xFF0B0B0D))),
+            const Positioned.fill(child: ColoredBox(color: Color(0xFF000000))),
 
             // 2. Native collage grid background (Welcome screen only)
             AnimatedOpacity(
@@ -124,7 +124,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             Color(0x40000000),
                             Color(0xBF000000),
                             Color(0xF5000000),
-                            Color(0xFF0B0B0D),
+                            Color(0xFF000000),
                           ],
                         ),
                       ),

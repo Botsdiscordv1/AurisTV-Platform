@@ -18,7 +18,7 @@ class AurisBottomBar extends ConsumerWidget {
     return Container(
       height: 54 + MediaQuery.of(context).padding.bottom,
       decoration: const BoxDecoration(
-        color: Color(0xFF0B0B0D),
+        color: Color(0xFF000000),
         border: Border(top: BorderSide(color: Colors.white10, width: 0.5)),
       ),
       child: Row(

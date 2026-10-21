@@ -68,7 +68,7 @@ class WideContentRow extends StatefulWidget {
 }
 
 class _WideContentRowState extends State<WideContentRow>
-    with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   final ScrollController _scrollController = ScrollController();
@@ -80,35 +80,11 @@ class _WideContentRowState extends State<WideContentRow>
   // fila): permite volver a la misma tarjeta al regresar a la sección.
   int? _lastFocusedIndex;
   late List<FocusNode> _itemFocusNodes;
-  // La copia de overlay arranca sin seleccionar (sin borde durante el vuelo)
-  // y se selecciona al aterrizar: el realce florece con el glide, no antes.
-  bool _overlaySelected = false;
-  // Transición horizontal: deslizamiento de la capa de foco entre tarjetas.
-  // El offset animado va de la posición previa a 0; el `left` real sigue el
-  // scroll al instante para que la capa nunca se despegue de su ranura.
-  late final AnimationController _glideCtrl;
-  Animation<double>? _glideAnim;
-  // Coreografía del realce: durante el vuelo la capa viaja sin borde; el
-  // bloom del borde se dispara AL ATERRIZAR (fin del glide), no al inicio.
-  int? _pendingBloomIndex;
 
   @override
   void initState() {
     super.initState();
     _initFocusNodes();
-    _glideCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-    _glideCtrl.addStatusListener((status) {
-      if (!mounted || status != AnimationStatus.completed) return;
-      final int? i = _pendingBloomIndex;
-      _pendingBloomIndex = null;
-      // Solo florecer si el foco sigue en esa tarjeta al aterrizar.
-      if (i != null && _focusedIndex == i) {
-        setState(() => _overlaySelected = true);
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
   }
 
@@ -170,7 +146,6 @@ class _WideContentRowState extends State<WideContentRow>
     for (final node in _itemFocusNodes) {
       node.dispose();
     }
-    _glideCtrl.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -192,7 +167,22 @@ class _WideContentRowState extends State<WideContentRow>
   void _scroll(double offset) {
     if (!_scrollController.hasClients) return;
     final target = (_scrollController.offset + offset).clamp(0.0, _scrollController.position.maxScrollExtent);
-    _scrollController.animateTo(target, duration: const Duration(milliseconds: 800), curve: Curves.easeOutQuart);
+    _scrollController.animateTo(target, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+  }
+
+  /// Desplaza la fila para anclar la tarjeta enfocada en el inicio (extremo izquierdo).
+  void _scrollToIndex(int index, double cardWidth) {
+    if (!_scrollController.hasClients) return;
+    const double spacing = 14.0;
+    final double targetOffset = index * (cardWidth + spacing);
+    final double maxScroll = _scrollController.position.maxScrollExtent;
+    final double clampedOffset = targetOffset.clamp(0.0, maxScroll);
+
+    _scrollController.animateTo(
+      clampedOffset,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -250,16 +240,11 @@ class _WideContentRowState extends State<WideContentRow>
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),
             child: Stack(
-              // Sin recorte: cualquier realce de la capa de foco que sobresalga
-              // de la ranura no se recorta.
               clipBehavior: Clip.none,
               children: [
-                  LayoutBuilder(
+                LayoutBuilder(
                   builder: (context, constraints) {
                     final bool hasSubtitle = widget.hasSubtitle ?? widget.items.any((i) => i.subtitle != null && i.subtitle!.isNotEmpty);
-                    // Reservar siempre el máximo (2 líneas) para que todas las
-                    // tarjetas compartan la misma altura de fila y las imágenes
-                    // queden alineadas sin importar cuántas líneas tenga cada una.
                     return SizedBox(
                       height: TVResponsiveUtils.bannerRowHeight(
                         context,
@@ -273,10 +258,6 @@ class _WideContentRowState extends State<WideContentRow>
                         },
                         child: Focus(
                           canRequestFocus: false,
-                          // Foco entra a la sección -> anclarla debajo del
-                          // topbar. this.context = la fila (borde superior
-                          // con título); el context del builder sería el
-                          // LayoutBuilder (solo el carrusel).
                           onFocusChange: (focused) {
                             if (focused && mounted) {
                               TvScroll.anchorSectionBelowTopbar(this.context);
@@ -294,7 +275,6 @@ class _WideContentRowState extends State<WideContentRow>
                             separatorBuilder: (_, __) => const SizedBox(width: 14),
                             itemBuilder: (context, index) {
                               final item = widget.items[index];
-                              final bool isFocused = _focusedIndex == index;
                               
                               return Align(
                                 alignment: Alignment.topCenter,
@@ -327,72 +307,15 @@ class _WideContentRowState extends State<WideContentRow>
                                   height: cardHeight,
                                   onTap: () => widget.onItemTap(item),
                                   onDelete: item.onDelete,
-                                  forceInvisible: isFocused,
                                   onFocusChanged: (focused) {
                                     if (!mounted) return;
                                     if (focused) {
-                                      // La pérdida de la tarjeta anterior se
-                                      // notifica ANTES que esta ganancia (y su
-                                      // limpieza está diferida al cierre de
-                                      // frame), así que _focusedIndex aún
-                                      // apunta a la tarjeta de partida.
-                                      final int? prev = _focusedIndex;
-                                      setState(() {
-                                        _focusedIndex = index;
-                                        _overlaySelected = false;
-                                      });
-                                      if (prev != null &&
-                                          prev != index &&
-                                          prev < widget.items.length) {
-                                        // Desliz desde la ranura previa a la
-                                        // nueva (paso = ancho + separador).
-                                        final double delta =
-                                            (prev - index) * (cardWidth + 14);
-                                        _glideAnim = Tween<double>(
-                                          begin: delta,
-                                          end: 0.0,
-                                        ).animate(CurvedAnimation(
-                                          parent: _glideCtrl,
-                                          curve: Curves.easeOutQuart,
-                                        ));
-                                        _glideCtrl.forward(from: 0);
-                                        // Bloom al aterrizar (status listener
-                                        // del glide), NO durante el vuelo.
-                                        _pendingBloomIndex = index;
-                                      } else {
-                                        // Entrada a la fila: capa directa,
-                                        // sin vuelo ni fundido. Bloom ya en el
-                                        // siguiente frame (feedback inmediato).
-                                        _glideAnim = null;
-                                        _pendingBloomIndex = null;
-                                        WidgetsBinding.instance
-                                            .addPostFrameCallback((_) {
-                                          if (!mounted ||
-                                              _focusedIndex != index) {
-                                            return;
-                                          }
-                                          setState(() =>
-                                              _overlaySelected = true);
-                                        });
-                                      }
+                                      setState(() => _focusedIndex = index);
+                                      _scrollToIndex(index, cardWidth);
                                     } else if (_focusedIndex == index) {
-                                      // No limpiar ya: si la pérdida y la
-                                      // ganancia de la vecina ocurren en el
-                                      // mismo tick, el gain debe poder leer
-                                      // _focusedIndex = este índice. Si al
-                                      // cierre de frame nadie lo ganó, sí se
-                                      // limpió (foco fuera de la fila).
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                        if (!mounted ||
-                                            _focusedIndex != index) {
-                                          return;
-                                        }
-                                        setState(() {
-                                          _focusedIndex = null;
-                                          _overlaySelected = false;
-                                          _pendingBloomIndex = null;
-                                        });
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        if (!mounted || _focusedIndex != index) return;
+                                        setState(() => _focusedIndex = null);
                                       });
                                     }
                                   },
@@ -405,19 +328,11 @@ class _WideContentRowState extends State<WideContentRow>
                     );
                   }
                 ),
-                if (_focusedIndex != null && _focusedIndex! < widget.items.length)
-                  _buildFocusOverlay(
-                    horizontalPadding: horizontalPadding,
-                    cardWidth: cardWidth,
-                    cardHeight: cardHeight,
-                  ),
                 if (!isMobile) ...[
                   Positioned(
                     left: horizontalPadding - 25,
                     top: 10,
                     bottom: 50,
-                    // Excluida del D-pad cuando está oculta: invisible +
-                    // enfocable = trampa de foco.
                     child: ExcludeFocus(
                       excluding: !(_isHovered && _canScrollLeft),
                       child: AnimatedOpacity(
@@ -464,78 +379,6 @@ class _WideContentRowState extends State<WideContentRow>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildFocusOverlay({
-    required double horizontalPadding,
-    required double cardWidth,
-    required double cardHeight,
-  }) {
-    final int index = _focusedIndex!;
-    final item = widget.items[index];
-
-    final Widget card = FocusableWideCard(
-      title: item.title,
-      imageUrl: item.imageUrl,
-      logoUrl: item.logoUrl,
-      progress: item.progress,
-      subtitle: item.subtitle,
-      subtitle2: item.subtitle2,
-      rating: item.rating,
-      badgeOverlay: item.badgeOverlay,
-      width: cardWidth,
-      height: cardHeight,
-      onTap: () => widget.onItemTap(item),
-      forceInvisible: false,
-      forceSelected: _overlaySelected,
-    );
-
-    // Se construye una sola vez y se reutiliza como `child` del
-    // AnimatedBuilder: durante el scroll/glide sólo se reposiciona el
-    // Positioned, sin reconstruir la tarjeta (imagen, logo, textos).
-    final Widget overlayChild = ExcludeFocus(
-      child: IgnorePointer(
-        child: Align(
-          alignment: Alignment.topCenter,
-          // Fundido del contenido al cambiar de ranura (key por índice =>
-          // un fundido por salto) que enmascara el cambio de póster durante
-          // el desliz. Sin glider (entrada a la fila) se pinta directo.
-          child: _glideAnim != null
-              ? TweenAnimationBuilder<double>(
-                  key: ValueKey<int>(index),
-                  tween: Tween<double>(begin: 0.0, end: 1.0),
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  builder: (context, value, child) =>
-                      Opacity(opacity: value, child: child!),
-                  child: card,
-                )
-              : card,
-        ),
-      ),
-    );
-
-    return AnimatedBuilder(
-      // Scroll (posición exacta) + glide (desliz entre ranuras).
-      animation: Listenable.merge([_scrollController, _glideCtrl]),
-      // RepaintBoundary: al mover el overlay no se repinta su contenido.
-      child: RepaintBoundary(child: overlayChild),
-      builder: (context, child) {
-        final double itemLeft = horizontalPadding +
-            index * (cardWidth + 14) -
-            _scrollController.offset +
-            (_glideAnim?.value ?? 0.0);
-        return Positioned(
-          left: itemLeft,
-          top: 0,
-          bottom: 0,
-          width: cardWidth,
-          // Pura capa visual: IgnorePointer (ratón) + ExcludeFocus (D-pad)
-          // — el foco vive en la tarjeta original de la lista.
-          child: child!,
-        );
-      },
     );
   }
 }

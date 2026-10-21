@@ -23,8 +23,11 @@ class EpisodesResponse {
   final String? releaseDate;
   final String? releaseTimestamp;
 
+  final int? totalSeasons;
+  final List<EpisodeSeasonSummary> seasons;
+
   /// Indica que la temporada pedida no existe en esta fuente (p.ej. AnimeD23
-  /// solo tiene S3 y se pidiÃ³ S1/S2). Lo usa el core para no listar la fuente
+  /// solo tiene S3 y se pidió S1/S2). Lo usa el core para no listar la fuente
   /// en temporadas que no tiene.
   final bool? seasonNotAvailable;
   final String? error;
@@ -45,6 +48,8 @@ class EpisodesResponse {
     this.releaseStatus,
     this.releaseDate,
     this.releaseTimestamp,
+    this.totalSeasons,
+    this.seasons = const [],
     this.seasonNotAvailable,
     this.error,
   });
@@ -81,8 +86,30 @@ class EpisodesResponse {
       releaseStatus: json['releaseStatus'] as String? ?? json['release_status'] as String?,
       releaseDate: json['releaseDate'] as String? ?? json['release_date'] as String?,
       releaseTimestamp: json['releaseTimestamp'] as String? ?? json['release_timestamp'] as String?,
+      totalSeasons: int.tryParse(json['totalSeasons']?.toString() ?? ''),
+      seasons: (json['seasons'] as List<dynamic>?)
+              ?.map((e) => EpisodeSeasonSummary.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
       seasonNotAvailable: json['seasonNotAvailable'] as bool?,
       error: json['error'] as String?,
+    );
+  }
+}
+
+class EpisodeSeasonSummary {
+  final int number;
+  final int? episodeCount;
+
+  const EpisodeSeasonSummary({
+    required this.number,
+    this.episodeCount,
+  });
+
+  factory EpisodeSeasonSummary.fromJson(Map<String, dynamic> json) {
+    return EpisodeSeasonSummary(
+      number: int.tryParse(json['number']?.toString() ?? json['seasonNumber']?.toString() ?? '') ?? 0,
+      episodeCount: int.tryParse(json['episodeCount']?.toString() ?? ''),
     );
   }
 }

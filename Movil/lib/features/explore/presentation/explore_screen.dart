@@ -106,7 +106,7 @@ class ExploreScreen extends ConsumerWidget {
     final scheduleAsync = ref.watch(scheduleProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D), // Color de fondo de la app
+      backgroundColor: const Color(0xFF000000), // Color de fondo de la app
       body: SafeArea(
         child: CustomScrollView(
           physics: const ClampingScrollPhysics(),

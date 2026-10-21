@@ -3179,7 +3179,7 @@ void _openPlayer(PlayerScreen player) {
       final isMovieCategory = detailState.isMovieish;
       final currentSeason = detailState.currentSeason;
       final totalSeasons = detailState.totalSeasons;
-      final int resolvedTotalSeasons = [totalSeasons, widget.totalSeasons ?? 0].reduce((a, b) => a > b ? a : b);
+      final int resolvedTotalSeasons = totalSeasons > 0 ? totalSeasons : (widget.totalSeasons ?? 1);
       final activeSources = detailState.allSources;
       final currentSource = detailState.selectedSource;
       final episodesAsync = detailState.episodes;
@@ -3378,8 +3378,22 @@ void _openPlayer(PlayerScreen player) {
         mainAction: _buildMainActionButton(context, isMobile: isMobile),
         secondaryActions: _buildCircularActions(context, isMobile: isMobile),
         synopsis: _buildSynopsis(detailData, isCompact: !isMobile && width < 1200),
-        selectors: (resolvedTotalSeasons > 0 || currentSource != null) ? Row(
+        selectors: (resolvedTotalSeasons > 1 || currentSource != null) ? Row(
           children: [
+            if (resolvedTotalSeasons > 1) ...[
+              SeasonSelector(
+                data: SeasonSelectorData(
+                  currentSeason: currentSeason,
+                  totalSeasons: resolvedTotalSeasons,
+                  onSeasonSelected: (season) {
+                    ref.setSeason(detailParams, season);
+                  },
+                  compact: true,
+                  width: 170,
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
             if (currentSource != null)
               _ServerSelector(
                 currentSource: currentSource,
@@ -3760,10 +3774,29 @@ void _openPlayer(PlayerScreen player) {
                                 ),
                                 SizedBox(height: gapActionsToSelectors),
                                 // Selectores
-                                if (totalSeasons > 0 || currentSource != null)
+                                if (totalSeasons > 1 || currentSource != null)
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      if (totalSeasons > 1) ...[
+                                        SizedBox(
+                                          width: selectorWidth + 30,
+                                          child: SeasonSelector(
+                                            data: SeasonSelectorData(
+                                              currentSeason: currentSeason,
+                                              totalSeasons: totalSeasons,
+                                              onSeasonSelected: (season) {
+                                                ref.setSeason(detailParams, season);
+                                              },
+                                              compact: isCompactHeader,
+                                              width: selectorWidth + 30,
+                                              height: selectorH,
+                                              fontSize: selectorFontSize,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                      ],
                                       if (currentSource != null)
                                         SizedBox(
                                           width: selectorWidth,

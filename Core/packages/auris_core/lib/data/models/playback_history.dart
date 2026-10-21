@@ -1,5 +1,8 @@
+import 'package:collection/collection.dart';
 import './server/search_result.dart';
 import './server/detail_params.dart';
+import '../../core/utils/content_logic.dart';
+import '../../core/utils/source_utils.dart';
 
 class PlaybackHistory {
   final String contentId;
@@ -221,12 +224,12 @@ class PlaybackHistory {
 extension PlaybackHistoryToDetailParams on PlaybackHistory {
   UnifiedDetailParams toUnifiedDetailParams({String? sectionId}) {
     String normalizedCategory = (category ?? 'anime').toLowerCase().trim();
-    if (normalizedCategory.contains('pelic') || normalizedCategory == 'movie') {
-      normalizedCategory = 'movie';
-    } else if (normalizedCategory.contains('serie') || normalizedCategory == 'series') {
-      normalizedCategory = 'series';
-    } else if (normalizedCategory.contains('kdrama') || normalizedCategory == 'kdrama' || normalizedCategory.contains('dorama')) {
-      normalizedCategory = 'kdrama';
+    if (normalizedCategory == 'movie_dorama' ||
+        normalizedCategory == 'dorama_movie' ||
+        normalizedCategory == 'movie_kdrama' ||
+        kind?.toLowerCase() == 'movie_dorama' ||
+        type?.toLowerCase() == 'movie_dorama') {
+      normalizedCategory = 'movie_dorama';
     } else if (normalizedCategory == 'movie_anime' ||
         normalizedCategory == 'anime_movie' ||
         normalizedCategory == 'anime-movies' ||
@@ -236,10 +239,31 @@ extension PlaybackHistoryToDetailParams on PlaybackHistory {
       // 'anime' salvo kind=='movie'), así el content/player la tratan como
       // película (sin episodios) y el enrutado sigue usando el server de anime.
       normalizedCategory = 'movie_anime';
+    } else if (normalizedCategory.contains('pelic') || normalizedCategory == 'movie') {
+      normalizedCategory = 'movie';
+    } else if (normalizedCategory.contains('serie') || normalizedCategory == 'series') {
+      normalizedCategory = 'series';
+    } else if (normalizedCategory.contains('kdrama') || normalizedCategory == 'kdrama' || normalizedCategory.contains('dorama')) {
+      normalizedCategory = 'kdrama';
     } else if (normalizedCategory.contains('anim') || normalizedCategory == 'anime') {
       normalizedCategory = (kind?.toLowerCase() == 'movie' || type?.toLowerCase() == 'movie') ? 'movie' : 'anime';
     } else {
       normalizedCategory = 'anime';
+    }
+
+    // Corregir kind si viene nulo o desalineado ('anime') con la categoría corregida
+    final String? rawKind = kind?.toLowerCase().trim();
+    String? resolvedKind = kind;
+    if (normalizedCategory == 'kdrama' && (rawKind == null || rawKind == 'anime')) {
+      resolvedKind = 'kdrama';
+    } else if (normalizedCategory == 'series' && (rawKind == null || rawKind == 'anime')) {
+      resolvedKind = 'series';
+    } else if (normalizedCategory == 'movie_dorama' && (rawKind == null || rawKind == 'anime')) {
+      resolvedKind = 'movie_dorama';
+    } else if (normalizedCategory == 'movie' && (rawKind == null || rawKind == 'anime')) {
+      resolvedKind = 'movie';
+    } else if (resolvedKind == null) {
+      resolvedKind = normalizedCategory;
     }
 
     // Título nunca vacío: sin él la ruta /content/:title no matchea
@@ -250,16 +274,26 @@ extension PlaybackHistoryToDetailParams on PlaybackHistory {
             ? metadataTitle!
             : contentId);
 
+    // Limpiar URL si es una URL directa de episodio y no de la serie principal
+    String? resolvedUrl = url;
+    if (resolvedUrl != null && resolvedUrl.isNotEmpty) {
+      resolvedUrl = cleanSeriesUrl(resolvedUrl);
+      if (isEpisodeUrl(resolvedUrl)) {
+        final altSeries = alternativeSources?.firstWhereOrNull((s) => !isEpisodeUrl(s.url) && isHttpUrl(s.url));
+        if (altSeries != null) {
+          resolvedUrl = altSeries.url;
+        }
+      }
+    }
+
     return UnifiedDetailParams(
       title: resolvedTitle,
       metadataTitle: metadataTitle,
       category: normalizedCategory,
-      kind: kind ?? (normalizedCategory == 'movie'
-          ? 'movie'
-          : (normalizedCategory == 'movie_anime' ? 'movie_anime' : 'anime')),
+      kind: resolvedKind,
       type: type ?? normalizedCategory,
       year: year,
-      url: url,
+      url: resolvedUrl,
       source: source ?? '',
       season: season,
       initialSources: alternativeSources,

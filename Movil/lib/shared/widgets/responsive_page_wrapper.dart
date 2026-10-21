@@ -24,7 +24,7 @@ class ResponsivePageWrapper extends StatelessWidget {
     }
 
     return Container(
-      color: backgroundColor ?? const Color(0xFF0B0B0D),
+      color: backgroundColor ?? const Color(0xFF000000),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(

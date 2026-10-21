@@ -48,7 +48,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final isDesktop = width > 1024;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF050505),
+      backgroundColor: const Color(0xFF000000),
       body: Stack(
         fit: StackFit.expand,
         children: [

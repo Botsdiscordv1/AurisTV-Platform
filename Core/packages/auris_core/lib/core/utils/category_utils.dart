@@ -22,22 +22,27 @@ String inferOpenCategory(SearchResult result, [String fallback = 'all']) {
 
   // 1. Prioridad: Metadatos explícitos del servidor (kind)
   if (kind == 'movie_anime' || kind == 'anime-movies' || kind == 'anime_movie') return 'movie_anime';
+  if (kind == 'movie_dorama' || kind == 'dorama_movie' || kind == 'movie_kdrama' || kind == 'kdrama_movie') return 'movie_dorama';
   if (kind == 'movie' || kind == 'pelicula') return 'movie';
+  if (kind == 'kdrama' || kind == 'dorama' || kind == 'drama') return 'kdrama';
   if (kind == 'series' || kind == 'serie' || kind == 'tv') return 'series';
   if (kind == 'anime') return 'anime';
 
   // 2. Prioridad: Calidad/Etiqueta visual (quality)
   if (q.contains('pelicula') || q.contains('película') || q.contains('movie')) return 'movie';
-  if (q.contains('serie') || q.contains('series') || q.contains('tv') || q.contains('dorama') || q.contains('drama')) return 'series';
+  if (q.contains('kdrama') || q.contains('dorama') || q.contains('drama')) return 'kdrama';
+  if (q.contains('serie') || q.contains('series') || q.contains('tv')) return 'series';
   if (q.contains('anime')) return 'anime';
 
   // 3. Prioridad: Estructura de la URL
   if (url.contains('/pelicula/') || url.contains('/movie/')) return 'movie';
-  if (url.contains('/serie/') || url.contains('/series/') || url.contains('/dorama/') || url.contains('/tv/')) return 'series';
+  if (url.contains('/kdrama/') || url.contains('/dorama/')) return 'kdrama';
+  if (url.contains('/serie/') || url.contains('/series/') || url.contains('/tv/')) return 'series';
   if (url.contains('/anime/')) return 'anime';
 
   // 4. Prioridad: Metadato 'type'
   if (type.contains('movie')) return 'movie';
+  if (type.contains('kdrama') || type.contains('dorama')) return 'kdrama';
   if (type.contains('tv') || type.contains('series')) return 'series';
   if (type.contains('anime')) return 'anime';
 
@@ -47,16 +52,25 @@ String inferOpenCategory(SearchResult result, [String fallback = 'all']) {
 /// Determina de forma robusta si un contenido es una película o formato largo
 /// para ajustar la UI (ocultar "Ep 1", formatear tiempo en horas, etc.)
 bool isMovieLike(String? category, [String? title, int? durationMs]) {
-  final String c = (category ?? '').toLowerCase();
-  final String t = (title ?? '').toLowerCase();
+  final String c = (category ?? '').toLowerCase().trim();
+  final String t = (title ?? '').toLowerCase().trim();
 
-  // 1. Check por categoría (Incluye variantes de servidores)
+  // 1. Check por categoría de película (incluye variantes de servidores)
   if (c == 'movie' || c == 'movie_anime' || c == 'anime-movies' || 
-      c == 'anime_movie' || c.contains('pelicula') || c.contains('película')) {
+      c == 'anime_movie' || c == 'movie_western' ||
+      c == 'movie_dorama' || c == 'dorama_movie' || c == 'movie_kdrama' || c == 'kdrama_movie' ||
+      c.contains('movie_dorama') || c.contains('dorama_movie') ||
+      c.contains('pelicula') || c.contains('película')) {
     return true;
   }
-  
-  // 2. Check por título (Palabras clave de largometraje)
+
+  // 2. Si la categoría es explícitamente una serie, TV, kdrama o anime de TV, NUNCA es película
+  if (c.contains('serie') || c.contains('tv') || c.contains('kdrama') || 
+      c.contains('dorama') || c == 'anime' || c == 'anime-seasonal' || c == 'tv_anime') {
+    return false;
+  }
+
+  // 3. Check por título (Palabras clave de largometraje)
   final bool hasMovieKeywords = t.contains('pelicula') || t.contains('película') || 
       t.contains('movie') || t.contains('especial') || t.contains('ova');
       
@@ -64,9 +78,13 @@ bool isMovieLike(String? category, [String? title, int? durationMs]) {
     return true;
   }
 
-  // 3. Check por duración (Senior Logic: > 30 min = Película/Especial largo)
+  // 4. Check por duración (Solo si la categoría es desconocida y NO tiene formato de episodio)
   if (durationMs != null && durationMs > 30 * 60 * 1000) {
-    return true;
+    // Si el título indica número o etiqueta de episodio, es una serie (ej: "Ep 1", "T1:E2", "Episodio 5")
+    final hasEpisodeTitle = RegExp(r'^[Ee]p\s*\d+|\b[Tt]\d+[:\s]*[Ee]\d+|\b[Cc]ap[ií]tulo\b|\b[Ee]pisodio\b').hasMatch(t);
+    if (!hasEpisodeTitle) {
+      return true;
+    }
   }
   
   return false;

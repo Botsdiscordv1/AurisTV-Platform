@@ -3430,7 +3430,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildRemoteModeView(RemoteDevice target) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final double h = constraints.maxHeight;

@@ -240,7 +240,7 @@ class ProfileWithNavScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bool bottomBarVisible = ref.watch(bottomNavVisibleProvider);
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       body: const ProfileScreen(),
       bottomNavigationBar: bottomBarVisible ? AurisBottomBar(
         currentIndex: 3,
