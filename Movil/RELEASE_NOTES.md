@@ -1,27 +1,23 @@
-# 🚀 AurisTV v1.0.8 - Actualización Mayor & Mejoras Multiplataforma
+# 🚀 AurisTV v1.0.9 - Corrección de Instalación en TV Box & Actualización Multiplataforma
 
-¡Nos complace anunciar el lanzamiento oficial de **AurisTV v1.0.8**! Esta versión incluye importantes mejoras en los temas de la aplicación (`app_theme`), enrutamiento (`app_router`), pantallas de inicio, perfil, exploración, reproductor y configuración en todas las plataformas (**Móvil, Android TV y Web/Desktop**).
+¡Nos complace anunciar el lanzamiento de **AurisTV v1.0.9**! Esta actualización soluciona el error *"No se puede instalar la aplicación"* al instalar la versión de TV en TV Boxes genéricas o personalizadas, cambiando el requisito de hardware Leanback a opcional.
 
 ---
 
 ## ✨ Novedades y Características Principales
 
-- **Renovación de Temas y Estilos (`app_theme`):**
-  - Actualización de la paleta de colores y estilos visuales basados en Material Design 3.
-- **Mejoras en Perfiles y Configuración (`profile_screen`, `profile_edit_screen`, `settings_screen`, `storage_screen`):**
-  - Flujos mejorados de configuración de perfiles, almacenamiento y ajustes generales optimizados para Móvil y Android TV.
-- **Optimizaciones en Reproductor y Navegación (`player_screen`, `app_router`, `explore_screen`, `search_screen`):**
-  - Transiciones de rutas más fluidas y controles multimedia avanzados en todas las plataformas.
-- **Soporte Multiplataforma Sincronizado (`v1.0.8+8`):**
-  - Versión unificada con versionCode `8` en Móvil, Android TV y Web/Desktop.
+- **Compatibilidad Ampliada con TV Boxes (`AndroidManifest.xml`):**
+  - Cambio de `android.software.leanback` de `required="true"` a `required="false"`. Esto permite que el APK de TV se instale exitosamente en cualquier TV Box (incluso aquellas con firmwares modificados o que no reportan formalmente la característica Leanback al sistema).
+- **Soporte Multiplataforma Sincronizado (`v1.0.9+9`):**
+  - Versión unificada con versionCode `9` en Móvil, Android TV y Web/Desktop.
 
 ---
 
 ## 🛠️ Correcciones de Errores y Mejoras de Rendimiento
 
-- **Estabilidad General:** Correcciones de estado y manejo de eventos de control remoto en pantallas de TV.
-- **Empaquetado y Release:** Automatización limpia con `--split-per-abi` y firma digital segura con el keystore oficial de producción.
+- **Instalación de TV APK:** Resuelto el bloqueo de paquetes al instalar en TV Boxes que no son dispositivos certificados de Google TV.
+- **Empaquetado y Release:** Automatización limpia con `--split-per-abi` y firma digital segura con el keystore oficial de producción (`upload-keystore.jks`).
 
 ---
 
-📥 *¡Actualiza a la versión v1.0.8 para disfrutar de la experiencia multimedia definitiva con AurisTV!*
+📥 *¡Actualiza a la versión v1.0.9 para instalar sin problemas en tu TV Box!*
