@@ -328,6 +328,20 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
         ? logoUrl
         : existingHistory?.logoUrl;
 
+    // Asegurar que la URL guardada en el historial sea la URL de la serie (no la del episodio en reproducción)
+    String? validSeriesUrl = url;
+    if (validSeriesUrl != null && validSeriesUrl.isNotEmpty) {
+      validSeriesUrl = cleanSeriesUrl(validSeriesUrl);
+      if (isEpisodeUrl(validSeriesUrl) && existingHistory?.url != null && !isEpisodeUrl(existingHistory!.url)) {
+        validSeriesUrl = existingHistory.url;
+      }
+    }
+    final resolvedUrl = (validSeriesUrl != null && !isEpisodeUrl(validSeriesUrl))
+        ? validSeriesUrl
+        : ((existingHistory?.url != null && !isEpisodeUrl(existingHistory!.url))
+            ? existingHistory!.url
+            : validSeriesUrl);
+
     final history = PlaybackHistory(
       contentId: contentId,
       season: season,
@@ -344,7 +358,7 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       logoUrl: resolvedLogo,
       category: category ?? existingHistory?.category,
       source: source ?? existingHistory?.source,
-      url: url ?? existingHistory?.url,
+      url: resolvedUrl ?? existingHistory?.url,
       alternativeSources: alternativeSources ?? existingHistory?.alternativeSources,
       kind: kind ?? existingHistory?.kind,
       type: type ?? existingHistory?.type,

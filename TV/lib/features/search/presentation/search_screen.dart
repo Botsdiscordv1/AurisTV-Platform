@@ -384,7 +384,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
             final result = results[index];
             final meta = result.resolveMetadata(_selectedCategory);
-            final card = FocusablePosterCard(
+            return FocusablePosterCard(
+              focusNode: index == 0 ? _firstResultFocusNode : null,
+              onKeyEvent: (node, event) {
+                if (index < 5 && event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                  _blurFocusNode.requestFocus();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
               title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
               posterUrl: ApiEndpoints.proxyImage(result.thumbnail, fallbackUrl: result.tmdbThumbnail),
               badge: meta.label,
@@ -406,13 +414,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               aspectRatio: 2/3,
               onTap: () => _onContentTap(result),
             );
-            if (index == 0) {
-              return Focus(
-                focusNode: _firstResultFocusNode,
-                child: card,
-              );
-            }
-            return card;
           },
         );
       },
@@ -445,7 +446,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           itemBuilder: (context, index) {
             final result = items[index];
             final meta = result.resolveMetadata(_selectedCategory);
-            final card = FocusablePosterCard(
+            return FocusablePosterCard(
+              focusNode: index == 0 ? _firstResultFocusNode : null,
+              onKeyEvent: (node, event) {
+                if (index < 5 && event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                  _blurFocusNode.requestFocus();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
               title: cleanTitleForDisplay(result.scrapedTitle ?? result.metadataTitle ?? result.title),
               posterUrl: ApiEndpoints.proxyImage(result.thumbnail, fallbackUrl: result.tmdbThumbnail),
               badge: meta.label,
@@ -467,13 +476,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               aspectRatio: 2/3,
               onTap: () => _onContentTap(result),
             );
-            if (index == 0) {
-              return Focus(
-                focusNode: _firstResultFocusNode,
-                child: card,
-              );
-            }
-            return card;
           },
         );
       },

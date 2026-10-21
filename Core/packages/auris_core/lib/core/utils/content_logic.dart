@@ -4,6 +4,33 @@ import '../../core/api/image_policy.dart';
 import '../../data/models/server/search_result.dart';
 import 'source_utils.dart';
 
+/// Verifica si una URL corresponde a un episodio individual en lugar de la serie/ficha principal
+bool isEpisodeUrl(String? url) {
+  if (url == null || url.isEmpty) return false;
+  final l = url.toLowerCase();
+  return RegExp(r'/episodios?/|/ver/|-\d+x\d+|\b-s\d+e\d+\b|/capitulo/|/episode/').hasMatch(l);
+}
+
+/// Convierte una URL de episodio a la URL canónica de la serie principal si es posible
+String cleanSeriesUrl(String url) {
+  if (url.isEmpty) return url;
+
+  // 1. OnlyPelis / GnulaHD / PelisPedia / RePelisHD:
+  // /episodios/title-1x1/ o /episodio/title-1x1/ -> /serie/title/
+  final movieSeriesEp = RegExp(r'/episodios?/([^/]+)-\d+x\d+/?', caseSensitive: false);
+  if (movieSeriesEp.hasMatch(url)) {
+    return url.replaceAllMapped(movieSeriesEp, (m) => '/serie/${m.group(1)}/');
+  }
+
+  // 2. JKAnime: /anime-name/1/ -> /anime-name/
+  final jkEp = RegExp(r'(https?://jkanime\.net/([^/]+))/\d+/?', caseSensitive: false);
+  if (jkEp.hasMatch(url)) {
+    return url.replaceAllMapped(jkEp, (m) => '${m.group(1)}/');
+  }
+
+  return url;
+}
+
 MediaItem mapSearchResultToMediaItem(SearchResult result, String category) {
   MediaType type = MediaType.series;
   final c = category.toLowerCase();

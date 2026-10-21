@@ -37,7 +37,7 @@ class BrowserMockupWrapper extends StatelessWidget {
               width: 800,
               height: MediaQuery.of(context).size.height * 0.9,
               decoration: BoxDecoration(
-                color: const Color(0xFF0B0B0D),
+                color: const Color(0xFF000000),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(

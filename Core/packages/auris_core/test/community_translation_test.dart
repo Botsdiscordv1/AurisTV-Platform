@@ -46,6 +46,47 @@ void main() {
               title: 'Episode 10', overview: 'Yani heads out.'),
           true);
     });
+    test('false for scraper promo overview (not a synopsis)', () {
+      expect(
+          CommunityTranslationManager.shouldAttempt(
+              title: 'Episodio 1',
+              overview: 'Disfruta del capitulo 1 de La chispa del amor con '
+                  'subtítulos y con doblaje al Español Latino. Elige uno de '
+                  'los servidores que están disponibles.'),
+          false);
+    });
+  });
+
+  group('scraper promo', () {
+    const promo = 'Disfruta del capitulo 1 de La chispa del amor con '
+        'subtítulos y con doblaje al Español Latino. Elige uno de los '
+        'servidores que están disponibles y navega fácilmente entre los '
+        'episodios';
+    test('detects promo texts', () {
+      expect(CommunityTranslationManager.isScraperPromo(promo), true);
+      expect(
+          CommunityTranslationManager.isScraperPromo(
+              'Disfruta del capítulo 7 de otra serie'),
+          true);
+      expect(
+          CommunityTranslationManager.isScraperPromo(
+              'Elige uno de los servidores disponibles'),
+          true);
+    });
+    test('does not flag real synopses', () {
+      expect(
+          CommunityTranslationManager.isScraperPromo(
+              'Na Bo-bae is a struggling writer — and human electrical '
+              'conductor. She meets a man who changes her life.'),
+          false);
+      expect(
+          CommunityTranslationManager.isScraperPromo(
+              'Una escritora con problemas conoce a un hombre que cambiará '
+              'su vida para siempre.'),
+          false);
+      expect(CommunityTranslationManager.isScraperPromo(null), false);
+      expect(CommunityTranslationManager.isScraperPromo('  '), false);
+    });
   });
 
   group('helpers', () {
@@ -63,6 +104,27 @@ void main() {
       expect(
           CommunityTranslationManager.detectSourceLanguage('ニャーも'), 'ja');
       expect(CommunityTranslationManager.detectSourceLanguage('Hello'), 'en');
+    });
+    test('detectSourceLanguage detects Spanish (never sends es as en)', () {
+      expect(
+          CommunityTranslationManager.detectSourceLanguage(
+              'Disfruta del capitulo de la serie y elige uno de los servidores'),
+          'es');
+      expect(
+          CommunityTranslationManager.detectSourceLanguage(
+              'Una escritora con problemas conoce a un hombre'),
+          'es');
+      // Inglés real no debe clasificarse como español.
+      expect(
+          CommunityTranslationManager.detectSourceLanguage(
+              'Na Bo-bae is a struggling writer and human electrical conductor'),
+          'en');
+      expect(
+          CommunityTranslationManager.detectSourceLanguage(
+              'La La Land is a 2016 American musical romantic comedy film '
+              'directed by Damien Chazelle. The con artist lives in Los '
+              'Angeles and wants a fresh start.'),
+          'en');
     });
   });
 

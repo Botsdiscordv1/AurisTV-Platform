@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
@@ -372,14 +373,56 @@ final unifiedContentProvider = Provider.autoDispose
   }
 
   final detailData = detailAsync.valueOrNull;
+  int resolvedTotalSeasons = 1;
+
+  // 1. Autoridad primaria: respuesta de /api/episodes de la fuente activa
+  final epData = episodesAsync.valueOrNull?.response;
+  if (epData != null && ((epData.totalSeasons != null && epData.totalSeasons! > 0) || epData.seasons.isNotEmpty)) {
+    final epSeasonsCount = epData.seasons.isNotEmpty
+        ? epData.seasons.map((s) => s.number).fold(epData.seasons.length, max)
+        : (epData.totalSeasons ?? 1);
+    resolvedTotalSeasons = max(epData.totalSeasons ?? 1, epSeasonsCount);
+  } else {
+    // 2. Fallback mientras carga /api/episodes o si la fuente no envía totalSeasons
+    if (detailData != null) {
+      resolvedTotalSeasons = [
+        resolvedTotalSeasons,
+        detailData.anime?.totalSeasons ?? 1,
+        detailData.movie?.totalSeasons ?? 1,
+        detailData.movie?.seasons.length ?? 1,
+      ].reduce(max);
+    }
+    for (final s in allSources) {
+      if (s.totalSeasons != null && s.totalSeasons! > resolvedTotalSeasons) {
+        resolvedTotalSeasons = s.totalSeasons!;
+      }
+      if (s.season != null && s.season! > resolvedTotalSeasons) {
+        resolvedTotalSeasons = s.season!;
+      }
+    }
+  }
+
+  if (epData == null && params.season != null && params.season! > resolvedTotalSeasons) {
+    resolvedTotalSeasons = params.season!;
+  }
+
+  // Ajustar input.season si excede las temporadas reales reportadas por la fuente activa
+  int effectiveCurrentSeason = input.season;
+  if (input.season > resolvedTotalSeasons) {
+    if (epData != null) {
+      effectiveCurrentSeason = resolvedTotalSeasons;
+      Future.microtask(() => inputNotifier.setSeason(resolvedTotalSeasons, null));
+    } else {
+      resolvedTotalSeasons = input.season;
+    }
+  }
+
   return UnifiedContentState(
     detail: detailAsync,
     allSources: allSources,
     selectedSource: selected,
-    currentSeason: input.season,
-    totalSeasons: detailData != null 
-        ? (detailData.anime?.totalSeasons ?? detailData.movie?.totalSeasons ?? detailData.movie?.seasons.length ?? 1)
-        : 1,
+    currentSeason: effectiveCurrentSeason,
+    totalSeasons: resolvedTotalSeasons,
     episodes: episodesAsync,
     cast: castAsync,
     relations: relationsAsync,
@@ -551,7 +594,14 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
           : (!_isGenericTitle(cachedTitle) ? cachedTitle : epTitle);
 
       final thumbnail = _hasValue(ep.thumbnail) ? ep.thumbnail : cached.thumbnail;
-      final description = _hasValue(ep.description) ? ep.description : cached.description;
+      // La promo del scraper nunca pisa una sinopsis real ya cacheada.
+      final epDescIsUseful =
+          _hasValue(ep.description) && !CommunityTranslationManager.isScraperPromo(ep.description);
+      final cachedDescIsUseful = _hasValue(cached.description) &&
+          !CommunityTranslationManager.isScraperPromo(cached.description);
+      final description = epDescIsUseful
+          ? ep.description
+          : (cachedDescIsUseful ? cached.description : ep.description);
       final airDate = ep.airDate ?? cached.airDate;
       final duration = ep.duration ?? cached.duration;
       final runtime = ep.runtime ?? cached.runtime;
@@ -588,6 +638,14 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
         final epTitle = ep.title;
         final existingTitle = existing.title;
         final title = (!_isGenericTitle(epTitle)) ? epTitle : existingTitle;
+        // No degradar una sinopsis real a la promo del scraper.
+        final incomingDescIsPromo =
+            CommunityTranslationManager.isScraperPromo(ep.description);
+        final existingDescIsUseful = _hasValue(existing.description) &&
+            !CommunityTranslationManager.isScraperPromo(existing.description);
+        final description = incomingDescIsPromo && existingDescIsUseful
+            ? existing.description
+            : (_hasValue(ep.description) ? ep.description : existing.description);
 
         map[ep.number] = EpisodeInfo(
           number: ep.number,
@@ -595,7 +653,7 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
           url: _hasValue(ep.url) ? ep.url : existing.url,
           title: title,
           thumbnail: _hasValue(ep.thumbnail) ? ep.thumbnail : existing.thumbnail,
-          description: _hasValue(ep.description) ? ep.description : existing.description,
+          description: description,
           airDate: ep.airDate ?? existing.airDate,
           duration: ep.duration ?? existing.duration,
           runtime: ep.runtime ?? existing.runtime,
@@ -829,7 +887,9 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
           year: _params.year,
           tmdbId: effectiveTmdbId,
           fast: false,
-        ).timeout(const Duration(seconds: 10));
+          // El repo ya reintenta a los 15s: el timeout exterior no debe
+          // cortarlo antes (dejaba el paso fast fijo en pantalla).
+        ).timeout(const Duration(seconds: 35));
 
         if (!mounted) return;
         final currentBundle = state.episodes.valueOrNull;
@@ -878,11 +938,19 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
               mergedTitle = fastTitle;
             }
 
+            // La promo del scraper ("Disfruta del capítulo…") no es una
+            // sinopsis: aunque fast venga marcado como ES, full manda.
+            final fastDescIsPromo =
+                CommunityTranslationManager.isScraperPromo(fastDesc);
+            final fastDescAuthoritative =
+                fastHasDesc && fastIsEs && !fastDescIsPromo;
+            final usedFullDesc = !fastDescAuthoritative && fullHasDesc;
+
             String? mergedDesc;
-            if (fastHasDesc && fastIsEs) {
+            if (fastDescAuthoritative) {
               mergedDesc = fastDesc;
             } else if (fullHasDesc) {
-              mergedDesc = (!fastHasDesc || !fastIsEs) ? fullDesc : fastDesc;
+              mergedDesc = fullDesc;
             } else {
               mergedDesc = fastDesc;
             }
@@ -904,7 +972,7 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
               quality: fullEp.quality ?? fastEp.quality,
               episodeType: fullEp.episodeType ?? fastEp.episodeType,
               tmdbSpecialNumber: fullEp.tmdbSpecialNumber ?? fastEp.tmdbSpecialNumber,
-              needsTranslation: fastIsEs
+              needsTranslation: (fastIsEs && !usedFullDesc)
                   ? false
                   : fullEp.needsTranslation,
             );
@@ -1006,15 +1074,23 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
         }
         final t = c['title'] as String?;
         final o = c['overview'] as String?;
-        if (t == null && o == null) {
+        // Un caché envenenado con la promo del scraper no debe repintarse
+        // encima de la sinopsis real (ni marcar el episodio como traducido).
+        final cachedTitleIsReal = t != null &&
+            t.trim().isNotEmpty &&
+            !CommunityTranslationManager.isGenericTitle(t);
+        final cachedOverviewIsReal = o != null &&
+            o.trim().isNotEmpty &&
+            !CommunityTranslationManager.isScraperPromo(o);
+        if (!cachedTitleIsReal && !cachedOverviewIsReal) {
           out.add(e);
           continue;
         }
         // Título siempre con mayúscula inicial (cache viejo puede traer "solá").
-        final nt = (t != null && t.trim().isNotEmpty)
+        final nt = cachedTitleIsReal
             ? CommunityTranslationManager.capitalizeTitle(t)
             : e.title;
-        final no = (o != null && o.trim().isNotEmpty) ? o : e.description;
+        final no = cachedOverviewIsReal ? o : e.description;
         if (nt == e.title && no == e.description) {
           out.add(e);
           continue;
@@ -1033,7 +1109,9 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
           quality: e.quality,
           episodeType: e.episodeType,
           tmdbSpecialNumber: e.tmdbSpecialNumber,
-          needsTranslation: false,
+          // Solo una sinopsis traducida real completa la traducción. Si solo
+          // se rellenó el título, full todavía debe poder mandar la sinopsis.
+          needsTranslation: cachedOverviewIsReal ? false : e.needsTranslation,
         ));
       }
       return changed ? out : episodes;

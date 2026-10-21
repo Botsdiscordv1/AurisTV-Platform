@@ -28,10 +28,57 @@ class CommunityTranslationManager {
     return RegExp(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7A3]').hasMatch(text);
   }
 
+  /// Sinopsis promocional que generan los scrapers (no es una sinopsis real):
+  /// "Disfruta del capítulo 1… Elige uno de los servidores…". Nunca debe
+  /// guardarse como traducción ni pisar la sinopsis real de TMDB.
+  static final RegExp _scraperPromoRe = RegExp(
+    r'disfruta\s+del\s+cap[ií]tulo|'
+    r'elige\s+uno\s+de\s+los\s+servidores|'
+    r'navega\s+f[aá]cilmente\s+entre\s+los\s+episodios',
+    caseSensitive: false,
+  );
+
+  static bool isScraperPromo(String? text) {
+    if (text == null || text.trim().isEmpty) return false;
+    return _scraperPromoRe.hasMatch(text);
+  }
+
+  static final RegExp _spanishAccentsRe =
+      RegExp(r'[áéíóúüñ¿¡]', caseSensitive: false);
+  static final RegExp _wordRe = RegExp(r'[a-záéíóúüñ]+');
+  // Sin "la/los/las" (aparecen en títulos y nombres en inglés: "La La Land",
+  // "Los Angeles"), sin palabras con colisión clara (es/son/era/se/su/ya/al)
+  // y exigiendo 3 coincidencias para evitar falsos positivos.
+  static const Set<String> _spanishStopwords = {
+    'el', 'un', 'una', 'unos', 'unas', 'del', 'que', 'en', 'por', 'para',
+    'con', 'como', 'pero', 'sus', 'este', 'esta', 'estos', 'estas', 'fue',
+    'tiene', 'puede', 'cuando', 'donde', 'porque', 'muy', 'sin', 'sobre',
+    'entre', 'hasta', 'desde', 'otra', 'otro', 'también', 'tambien',
+  };
+
+  /// Heurística conservadora: tildes/¿¡ o varias stopwords españolas.
+  /// Evita mandar texto español a Google con sl=en (lo dejaba igual o lo
+  /// "traducía" a sí mismo y se guardaba como si fuera una traducción).
+  static bool looksSpanish(String text) {
+    if (text.trim().isEmpty) return false;
+    if (_spanishAccentsRe.hasMatch(text)) return true;
+    if (isScraperPromo(text)) return true;
+    final lower = text.toLowerCase();
+    var hits = 0;
+    for (final m in _wordRe.allMatches(lower)) {
+      if (_spanishStopwords.contains(m.group(0))) {
+        hits++;
+        if (hits >= 3) return true;
+      }
+    }
+    return false;
+  }
+
   static String detectSourceLanguage(String text) {
     if (RegExp(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]').hasMatch(text)) {
       return 'ja';
     }
+    if (looksSpanish(text)) return 'es';
     return 'en';
   }
 
@@ -156,6 +203,7 @@ class CommunityTranslationManager {
     final hasTitle = title != null && title.trim().isNotEmpty;
     final hasOverview = overview != null && overview.trim().isNotEmpty;
     if (!hasTitle && !hasOverview) return false;
+    if (isScraperPromo(overview)) return false;
     if (isGenericTitle(title) && !hasOverview) return false;
     return true;
   }
@@ -174,10 +222,11 @@ class CommunityTranslationManager {
     final srcTitle = episode.title;
     final srcOverview = episode.description;
 
-    // 1. Validar que exista texto fuente real
+    // 1. Validar que exista texto fuente real (nunca la promo del scraper)
     if (!shouldAttempt(title: srcTitle, overview: srcOverview)) {
       return null;
     }
+    if (isScraperPromo(srcOverview)) return null;
 
     try {
       // 2. Dedup local: si ya hay textos ES en cache, devolverlos para pintar

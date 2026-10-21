@@ -92,7 +92,7 @@ class _ScheduleBody extends StatelessWidget {
         : '${schedule.season} ${schedule.year}';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       body: CustomScrollView(
         physics: const ClampingScrollPhysics(),
         slivers: [

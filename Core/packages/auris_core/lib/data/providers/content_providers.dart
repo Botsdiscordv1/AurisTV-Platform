@@ -646,15 +646,16 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
   final String? effectiveServer = params.server ??
       (params.source.isNotEmpty
           ? (ApiEndpoints.baseUrlForSourceOrNull(params.source) ??
-              (params.kind == 'anime'
-                  ? ApiEndpoints.animeBaseUrl
-                  : ApiEndpoints.moviesSeriesBaseUrl))
-          : (params.kind == 'anime'
-              ? ApiEndpoints.animeBaseUrl
-              : ApiEndpoints.moviesSeriesBaseUrl));
-  String requestCategory = params.category.toLowerCase();
-  if (effectiveServer == ApiEndpoints.moviesSeriesBaseUrl) requestCategory = params.kind == 'anime' ? 'movie_anime' : (requestCategory.contains('movie') ? 'movie' : 'series');
-  else requestCategory = 'anime';
+              ApiEndpoints.baseUrlForCategory(params.category))
+          : ApiEndpoints.baseUrlForCategory(params.category));
+  String requestCategory = params.category.toLowerCase().trim();
+  if (effectiveServer == ApiEndpoints.moviesSeriesBaseUrl) {
+    requestCategory = params.kind == 'anime' ? 'movie_anime' : (requestCategory.contains('movie') ? 'movie' : 'series');
+  } else if (effectiveServer == ApiEndpoints.kdramasBaseUrl) {
+    requestCategory = (params.kind == 'movie_dorama' || requestCategory.contains('movie')) ? 'movie_dorama' : 'kdrama';
+  } else if (effectiveServer == ApiEndpoints.animeBaseUrl) {
+    requestCategory = (params.kind == 'movie_anime' || requestCategory.contains('movie')) ? 'movie_anime' : 'anime';
+  }
 
   final queryTitle = cleanTitleForDisplay(stripSeasonSuffix(params.metadataTitle ?? params.title));
   final searchAsync = ref.watch(contentSearchProvider(ContentSearchParams(query: queryTitle, category: requestCategory, year: params.year, server: effectiveServer)));

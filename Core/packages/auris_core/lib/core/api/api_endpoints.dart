@@ -126,7 +126,8 @@ class ApiEndpoints {
 
   static String baseUrlForCategory(String category) {
     final c = category.toLowerCase().trim();
-    if (c == 'kdrama' || c == 'kdramas' || c == 'dorama' || c == 'doramas') return kdramasBaseUrl;
+    if (c == 'kdrama' || c == 'kdramas' || c == 'dorama' || c == 'doramas' ||
+        c == 'movie_dorama' || c == 'dorama_movie' || c == 'movie_kdrama' || c == 'kdrama_movie') return kdramasBaseUrl;
     if (c == 'anime' || c == 'animes' || c == 'animé' ||
         c == 'anime-seasonal' || c == 'anime-movies' ||
         c == 'movie_anime') return animeBaseUrl;
@@ -136,9 +137,12 @@ class ApiEndpoints {
   }
 
   static String baseUrlForSource(String source, [String? category]) {
-    // Comportamiento histórico intacto (desconocido → movies); quien necesite
-    // distinguir "sin hint" usa baseUrlForSourceOrNull.
-    return baseUrlForSourceOrNull(source) ?? moviesSeriesBaseUrl;
+    final hint = baseUrlForSourceOrNull(source);
+    if (hint != null) return hint;
+    if (category != null && category.isNotEmpty) {
+      return baseUrlForCategory(category);
+    }
+    return moviesSeriesBaseUrl;
   }
 
   static String fixUrl(String? url) {

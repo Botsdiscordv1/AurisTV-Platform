@@ -64,7 +64,7 @@ final unifiedContentDetailProvider =
   // 'anime' viviendo en movies); el source guardado es el dato fiel.
   final bool isExplicitAnimeKind = rawKind == 'anime' || rawKind == 'movie_anime' || rawKind == 'tv_anime';
   final bool isExplicitMovieSeriesKind = rawKind == 'movie' || rawKind == 'series' || rawKind == 'pelicula';
-  final bool isExplicitKdramaKind = rawKind == 'kdrama' || rawKind == 'dorama';
+  final bool isExplicitKdramaKind = rawKind == 'kdrama' || rawKind == 'dorama' || rawKind == 'movie_dorama' || rawKind == 'dorama_movie' || rawKind == 'movie_kdrama';
 
   // 1. Determinar el servidor objetivo. Orden: hint explícito > nombre de
   // fuente (canónico) > kind. El kind solo no basta: OnlyPelis/Gnula sirven
@@ -87,7 +87,7 @@ final unifiedContentDetailProvider =
     technicalCategory = (rawKind == 'movie' || rawKind == 'pelicula' || rawType == 'movie') ? 'movie' : 'series';
   } else if (isExplicitKdramaKind) {
     effectiveBaseUrl = ApiEndpoints.kdramasBaseUrl;
-    technicalCategory = 'kdrama';
+    technicalCategory = (rawKind == 'movie_dorama' || rawKind == 'dorama_movie' || rawKind == 'movie_kdrama') ? 'movie_dorama' : 'kdrama';
   } else {
     // Fallback a source o categoría
     effectiveBaseUrl = sourceServer ?? ApiEndpoints.baseUrlForCategory(params.category);
@@ -102,12 +102,16 @@ final unifiedContentDetailProvider =
   final bool isMovieFormat = rawKind == 'movie' || 
                              rawKind == 'pelicula' || 
                              rawKind == 'movie_anime' ||
+                             rawKind == 'movie_dorama' ||
+                             rawKind == 'dorama_movie' ||
+                             rawKind == 'movie_kdrama' ||
                              rawType == 'movie_anime' ||
+                             rawType == 'movie_dorama' ||
                              rawType == 'movie' ||
-                             // La propia categoría 'movie_anime' basta para forzar
-                             // getMovieDetail aunque el card traiga kind/type 'anime'
-                             // (datos del server): si no, se pedía /detail/anime.
-                             params.category.toLowerCase().trim() == 'movie_anime';
+                             // La propia categoría 'movie_anime' o 'movie_dorama' basta para forzar
+                             // getMovieDetail aunque el card traiga kind/type genérico
+                             params.category.toLowerCase().trim() == 'movie_anime' ||
+                             params.category.toLowerCase().trim() == 'movie_dorama';
 
   // Senior Fix: Extraer año explícito desde los parámetros o inferirlo del título ("Movie (2009)") o URL si es nulo
   int? effectiveYear = params.year;

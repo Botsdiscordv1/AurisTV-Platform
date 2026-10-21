@@ -107,7 +107,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFFEF7A1E);
-    const backgroundColor = Color(0xFF0B0B0D);
+    const backgroundColor = Color(0xFF000000);
     const cardColor = Color(0xFF1A1D24);
 
     final user = ref.watch(authProvider);

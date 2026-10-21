@@ -1498,16 +1498,17 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
         '&totalSeasons=${result.totalSeasons ?? ''}'
         '${contentType != null ? '&type=${Uri.encodeComponent(contentType)}' : ''}';
 
-    // Navigate first WITHOUT closing the overlay, then restore it on back.
-    // This keeps the overlay in the widget tree so that pressing BACK
-    // on the content screen returns the user to the search overlay.
+    // Navegar sin cerrar el overlay para que al pulsar ATRÁS en ContentScreen
+    // el usuario regrese al search overlay.
     if (context.mounted) {
       context.push(uri, extra: result).then((_) {
-        // When the user comes back, ensure the search field regains focus.
+        // Al regresar del contenido al search overlay, conservamos el foco en
+        // la tarjeta que el usuario tenía seleccionada antes de abrir el contenido.
+        // Solo si ningún elemento del overlay mantiene el foco, restauramos a la barra.
         if (mounted) {
-          Future.delayed(const Duration(milliseconds: 50), () {
-            if (mounted) _focusNode.requestFocus();
-          });
+          if (_overlayScopeNode.focusedChild == null) {
+            _focusNode.requestFocus();
+          }
         }
       });
     }

@@ -218,10 +218,23 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
   static const int _menuExtras = 1;
 
   List<Map<String, dynamic>> _menuItems() {
-    return [
-      {'id': _menuEpisodes, 'label': 'Episodios', 'icon': Icons.layers_outlined},
-      if (_showExtrasMenu) {'id': _menuExtras, 'label': 'Opening/Ending', 'icon': Icons.movie_outlined},
-    ];
+    final items = <Map<String, dynamic>>[];
+    if (widget.totalSeasons > 1) {
+      for (int i = 1; i <= widget.totalSeasons; i++) {
+        items.add({
+          'id': 100 + i,
+          'season': i,
+          'label': 'Temporada $i',
+          'icon': Icons.layers_outlined,
+        });
+      }
+    } else {
+      items.add({'id': _menuEpisodes, 'label': 'Episodios', 'icon': Icons.layers_outlined});
+    }
+    if (_showExtrasMenu) {
+      items.add({'id': _menuExtras, 'label': 'Opening/Ending', 'icon': Icons.movie_outlined});
+    }
+    return items;
   }
 
   Widget _buildSideMenu() {
@@ -244,7 +257,14 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
             // DPAD derecha: primer ítem del panel derecho.
             _rightFirstItemNode.requestFocus();
           },
-          onPressed: () => setState(() => _selectedMenuId = menuItems[index]['id'] as int),
+          onPressed: () {
+            final item = menuItems[index];
+            if (item['season'] != null) {
+              final seasonNum = item['season'] as int;
+              ref.setSeason(widget.detailParams, seasonNum);
+            }
+            setState(() => _selectedMenuId = item['id'] as int);
+          },
         );
       },
     );
@@ -254,11 +274,11 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
     final menuItems = _menuItems();
     final int selectedIndex = menuItems.indexWhere((m) => m['id'] == _selectedMenuId);
     final int safeIndex = (selectedIndex == -1 ? 0 : selectedIndex).clamp(0, menuItems.length - 1);
-    switch (menuItems[safeIndex]['id']) {
-      case _menuEpisodes: return _buildEpisodesView();
-      case _menuExtras: return _buildExtrasView();
-      default: return _buildEpisodesView();
+    final selectedItem = menuItems[safeIndex];
+    if (selectedItem['id'] == _menuExtras) {
+      return _buildExtrasView();
     }
+    return _buildEpisodesView();
   }
 
   Widget _buildEpisodesView() {
