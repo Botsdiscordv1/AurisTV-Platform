@@ -53,6 +53,11 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? video1080;
   final bool skipResume;
 
+  /// Cabeceras HTTP (Referer/UA) del stream resuelto, recibidas por el canal
+  /// de cast (open_media con `direct=1`). Al tenerlas, el player abre el stream
+  /// DIRECTO con estas headers (sin re-extraer, latencia 0 y fuente idéntica).
+  final Map<String, String>? initialHeaders;
+
   const PlayerScreen({
     super.key,
     required this.contentId,
@@ -75,6 +80,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.video720,
     this.video1080,
     this.skipResume = false,
+    this.initialHeaders,
   });
 
   @override
@@ -790,9 +796,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     }
 
-    if (widget.sourceUrl.isNotEmpty && widget.source.isEmpty) {
+    // Cast AurisTV (open_media con stream resuelto + headers): reproducción
+    // directa sin re-extraer. También cubre la vía clásica (source vacío).
+    if (widget.sourceUrl.isNotEmpty &&
+        (widget.source.isEmpty || widget.initialHeaders != null)) {
       _hasInitialized = true;
-      _initPlayer(widget.sourceUrl);
+      if (widget.initialHeaders != null) {
+        _initPlayer(widget.sourceUrl, widget.initialHeaders!);
+      } else {
+        _initPlayer(widget.sourceUrl);
+      }
       _findAlternatives();
     } else if (widget.source == 'YouTube' && widget.sourceUrl.isNotEmpty) {
       // OP/ED de /api/themes con solo ID de YouTube (igual que Movil): van
@@ -3841,7 +3854,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Direct Flow: Fuentes que ya entregan el stream directo o proxied
     final bool isDirectSource = _currentSource == 'Themes' || _currentSource == 'YouTube';
 
-    if (isDirectSource || widget.source.isEmpty && widget.sourceUrl.isNotEmpty) {
+    if (isDirectSource ||
+        (widget.source.isEmpty && widget.sourceUrl.isNotEmpty) ||
+        widget.initialHeaders != null) {
       return Material(color: bg, child: _playerView(settings: settings));
     }
 

@@ -46,6 +46,11 @@ class CastState {
   /// El dispositivo soporta Cast nativo (Android + Google Cast SDK listo).
   final bool available;
 
+  /// El SDK nativo está inicializado aunque rediscovery siga en curso.
+  /// (La "availability" de Google solo es true cuando ya descubrió devices;
+  /// sin este flag la sección Chromecast parpadearía/vaniría tras abrir el app.)
+  final bool sdkSupported;
+
   final CastPhase phase;
 
   /// Dispositivo Chromecast / Google TV conectado.
@@ -63,6 +68,7 @@ class CastState {
 
   const CastState({
     this.available = false,
+    this.sdkSupported = false,
     this.phase = CastPhase.idle,
     this.device,
     this.media = const CastMediaStatus(),
@@ -75,6 +81,7 @@ class CastState {
 
   CastState copyWith({
     bool? available,
+    bool? sdkSupported,
     CastPhase? phase,
     CastDeviceInfo? device,
     CastMediaStatus? media,
@@ -84,6 +91,7 @@ class CastState {
   }) {
     return CastState(
       available: available ?? this.available,
+      sdkSupported: sdkSupported ?? this.sdkSupported,
       phase: phase ?? this.phase,
       device: device ?? this.device,
       media: media ?? this.media,

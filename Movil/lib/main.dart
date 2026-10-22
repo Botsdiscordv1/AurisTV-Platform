@@ -365,6 +365,14 @@ class _DeepLinkHandlerState extends ConsumerState<DeepLinkHandler> {
 
   void _handleUri(Uri uri) {
     debugPrint('Deep link received: $uri');
+    // Callback de Google OAuth (Supabase PKCE): el navegador vuelve con
+    // `io.supabase.flutter://callback?code=...`. Hay que intercambiar el code
+    // por la sesión; navegar esa URI por el router sería un no-op.
+    if (uri.scheme == 'io.supabase.flutter' &&
+        (uri.host == 'callback' || uri.path == 'callback' || uri.path == '/callback')) {
+      _completeOauthSignIn(uri);
+      return;
+    }
     if (uri.path.contains('activate') || uri.host == 'activate') {
       final code = uri.queryParameters['code'] ?? '';
       if (code.isNotEmpty) {
@@ -380,6 +388,19 @@ class _DeepLinkHandlerState extends ConsumerState<DeepLinkHandler> {
       if (path.isNotEmpty && path != '/') {
         appRouter.go('$path$query');
       }
+    }
+  }
+
+  /// Intercambia el `?code` del callback OAuth por la sesión de Supabase
+  /// (PKCE: el verificador quedó guardado cuando signInWithOAuth lanzó el
+  /// navegador). Al terminar, la app retoma en la ruta raíz ya logeada.
+  Future<void> _completeOauthSignIn(Uri uri) async {
+    try {
+      await Supabase.instance.client.auth.getSessionFromUrl(uri);
+      debugPrint('[AurisAuth] OAuth callback: sesión establecida');
+      if (mounted) appRouter.go('/');
+    } catch (e) {
+      debugPrint('[AurisAuth] OAuth callback falló: $e');
     }
   }
 

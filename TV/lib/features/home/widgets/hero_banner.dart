@@ -1124,11 +1124,19 @@ class _BannerButton extends StatefulWidget {
 }
 
 class _BannerButtonState extends State<_BannerButton> {
+  bool _isFocused = false;
+
   @override
   Widget build(BuildContext context) {
+    final String effectiveIcon = (_isFocused && (widget.icon == AurisIcons.play || widget.icon == AurisIcons.playFilled))
+        ? AurisIcons.playFilled
+        : widget.icon;
+    final Color iconColor = _isFocused ? Colors.black : (widget.isPrimary ? Colors.black : Colors.white);
+
     return Focus(
       focusNode: widget.focusNode,
       autofocus: widget.autofocus,
+      onFocusChange: (f) => setState(() => _isFocused = f),
       // El OK/select del mando de TV no activa `ElevatedButton` cuando el foco
       // vive en este `Focus` externo: la acción del botón es un descendiente,
       // no un ancestro del foco primario, así que `ActivateIntent` no la
@@ -1148,7 +1156,7 @@ class _BannerButtonState extends State<_BannerButton> {
       },
       child: ElevatedButton.icon(
         onPressed: widget.onPressed,
-        icon: AurisIcon(widget.icon, size: 20, color: widget.isPrimary ? Colors.black : Colors.white),
+        icon: AurisIcon(effectiveIcon, size: 20, color: iconColor),
         label: Text(widget.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
         style: ElevatedButton.styleFrom(
           backgroundColor: widget.isPrimary ? Colors.white : Colors.white10,

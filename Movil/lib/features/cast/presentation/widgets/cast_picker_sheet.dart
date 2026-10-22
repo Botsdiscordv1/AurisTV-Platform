@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart';
+import 'package:auristv_mobile/features/remote_control/data/models/remote_device.dart';
 import 'package:auristv_mobile/features/remote_control/presentation/providers/remote_control_provider.dart';
 import 'package:auristv_mobile/features/remote_control/presentation/widgets/device_selector_dialog.dart';
 
@@ -14,7 +15,11 @@ import '../providers/cast_provider.dart';
 /// Se abre desde el botÃ³n de cast del reproductor. Cuando hay sesiÃ³n
 /// Chromecast activa muestra el dispositivo conectado y el botÃ³n para detener.
 class CastPickerSheet extends ConsumerWidget {
-  const CastPickerSheet({super.key});
+  /// Callback cuando el usuario elige un dispositivo AurisTV (cast propio vía
+  /// Supabase con stream resuelto + headers). Lo maneja el PlayerScreen.
+  final void Function(RemoteDevice device)? onConnectAurisDevice;
+
+  const CastPickerSheet({super.key, this.onConnectAurisDevice});
 
   void _close(BuildContext context) {
     Navigator.of(context).pop();
@@ -24,11 +29,19 @@ class CastPickerSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final castState = ref.watch(chromecastProvider);
     final remoteState = ref.watch(remoteControlProvider);
-    final hasRemoteDevices = remoteState.availableDevices.any((d) =>
-        d.id != remoteState.currentDevice?.id &&
-        d.isOnline &&
-        d.lastSeen
-            .isAfter(DateTime.now().subtract(const Duration(minutes: 15))));
+    final onConnectAurisDevice = this.onConnectAurisDevice;
+
+    // Dispositivos AurisTV online (mismo criterio que DeviceSelectorDialog):
+    // online y con actividad reciente; ordenados por última actividad.
+    final cutoff = DateTime.now().subtract(const Duration(minutes: 15));
+    final aurisDevices = remoteState.availableDevices
+        .where((d) =>
+            d.id != remoteState.currentDevice?.id &&
+            d.isOnline &&
+            d.lastSeen.isAfter(cutoff))
+        .toList()
+      ..sort((a, b) => b.lastSeen.compareTo(a.lastSeen));
+    final hasRemoteDevices = aurisDevices.isNotEmpty;
 
     return Container(
       decoration: const BoxDecoration(
@@ -74,7 +87,7 @@ class CastPickerSheet extends ConsumerWidget {
           // ------------------------------------------------------------
           // SecciÃ³n Chromecast nativo (Google Cast SDK)
           // ------------------------------------------------------------
-          if (castState.available || castState.isCasting) ...[
+          if (castState.sdkSupported || castState.available || castState.isCasting) ...[
             const _SectionLabel('Chromecast'),
             const SizedBox(height: 8),
             if (castState.isCasting && castState.device != null) ...[
@@ -121,37 +134,68 @@ class CastPickerSheet extends ConsumerWidget {
           ],
 
           // ------------------------------------------------------------
-          // SecciÃ³n remota AurisTV (Supabase realtime) â€” oculta si ya hay
-          // una sesiÃ³n Chromecast para no mezclar canales de playback.
+          // Sección remota AurisTV (Supabase realtime) — oculta si ya hay
+          // una sesión Chromecast para no mezclar canales de playback.
+          // Con `onConnectAurisDevice` lista los dispositivos online (cast
+          // propio: stream resuelto + headers reproducidos por la TV);
+          // sin callback mantiene el diálogo clásico (compatibilidad).
           // ------------------------------------------------------------
           if (!castState.isCasting) ...[
-            if (castState.available || hasRemoteDevices)
+            if (castState.available || hasRemoteDevices || aurisDevices.isNotEmpty)
               const _SectionLabel('Dispositivos AurisTV'),
             const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: Center(
-                child: TextButton.icon(
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFFEF7A1E),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      side: BorderSide(
-                          color: const Color(0xFFEF7A1E).withValues(alpha: 0.35)),
+            if (onConnectAurisDevice != null)
+              if (aurisDevices.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Center(
+                    child: Text(
+                      'No hay dispositivos AurisTV online',
+                      style: TextStyle(color: Colors.white38, fontSize: 13),
                     ),
                   ),
-                  onPressed: () {
-                    _close(context);
-                    _openRemoteSelector(context);
-                  },
-                  icon: const Icon(Icons.devices_rounded, size: 20),
-                  label: const Text('Conectar a un dispositivo AurisTV',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                )
+              else
+                ...aurisDevices.map((device) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _CastDeviceTile(
+                        icon: _deviceIcon(device.type),
+                        title: device.name,
+                        subtitle: device.mediaTitle?.isNotEmpty == true
+                            ? device.mediaTitle!
+                            : 'En espera',
+                        highlight: false,
+                        onTap: () {
+                          _close(context);
+                          onConnectAurisDevice(device);
+                        },
+                      ),
+                    ))
+            else
+              SizedBox(
+                width: double.infinity,
+                child: Center(
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFFEF7A1E),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        side: BorderSide(
+                            color: const Color(0xFFEF7A1E).withValues(alpha: 0.35)),
+                      ),
+                    ),
+                    onPressed: () {
+                      _close(context);
+                      _openRemoteSelector(context);
+                    },
+                    icon: const Icon(Icons.devices_rounded, size: 20),
+                    label: const Text('Conectar a un dispositivo AurisTV',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
                 ),
               ),
-            ),
           ],
           const SizedBox(height: 4),
           const SafeArea(top: false, child: SizedBox(height: 8)),
@@ -162,6 +206,19 @@ class CastPickerSheet extends ConsumerWidget {
 
   Future<void> _openRemoteSelector(BuildContext context) async {
     await showDialog(context: context, builder: (_) => const DeviceSelectorDialog());
+  }
+}
+
+String _deviceIcon(RemoteDeviceType type) {
+  switch (type) {
+    case RemoteDeviceType.web:
+    case RemoteDeviceType.windows:
+      return AurisIcons.desktop;
+    case RemoteDeviceType.android:
+    case RemoteDeviceType.ios:
+      return AurisIcons.mobile;
+    default:
+      return AurisIcons.cast;
   }
 }
 
