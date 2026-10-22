@@ -27,8 +27,8 @@ import '../../../core/utils/pip_service.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/screen_brightness.dart';
 import '../../../core/utils/web_utils.dart';
-import 'package:auris_core/auris_core.dart';
 
+import 'mobile_video_surface.dart';
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
 import '../../remote_control/data/models/remote_device.dart';
 import '../../cast/data/models/cast_state.dart';
@@ -109,6 +109,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isLandscapeOnly = true;
   bool _hasResetPosition = false;
   int _resumePosition = 0;
+
+  /// EXPERIMENTO A/B (temporal): replica los props de mpv del player TV y
+  /// desactiva el gate/re-seek de arranque para ver si el offset inicial
+  /// 0:05-0:20 desaparece sin ayuda del guard. Se puede volver al
+  /// comportamiento anterior compilando con
+  /// `--dart-define=TV_MPV_PARITY=false`.
+  static const bool _tvMpvParityTest =
+      bool.fromEnvironment('TV_MPV_PARITY', defaultValue: true);
+
+  /// Prototipo aislado de render nativo (SurfaceView + vo=mediacodec_embed).
+  /// Por defecto queda apagado para no romper mini player/PiP/subtítulos.
+  static const bool _nativeSurfaceEnabled =
+      bool.fromEnvironment('NATIVE_VIDEO_SURFACE', defaultValue: false);
+  bool get _useNativeMobileSurface =>
+      !kIsWeb && Platform.isAndroid && _nativeSurfaceEnabled;
+
+  final GlobalKey _mobileSurfaceKey = GlobalKey();
+  static const MethodChannel _mobileSurfaceChannel =
+      MethodChannel('auris/mobile_video_surface');
+  int? _mobileWid;
+  int? _mobileInitializedWid;
+  int _mobileSurfaceW = 0;
+  int _mobileSurfaceH = 0;
+  int _mobileVideoW = 0;
+  int _mobileVideoH = 0;
+  bool _mobileSurfaceMounted = false;
   /// Generación del seek de resume: cada _initPlayer la incrementa para que
   /// los loops de reintento del episodio/fuente anterior se aborten y no
   /// apliquen su seek tardío sobre el nuevo stream (episodios abriendo
@@ -537,8 +563,137 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => const CastPickerSheet(),
+      builder: (_) => CastPickerSheet(
+        onConnectAurisDevice: (device) => _beginAurisCast(device),
+      ),
     );
+  }
+
+  // ==================================================================
+  // Cast a dispositivo AurisTV (receptor propio vía Supabase)
+  // ==================================================================
+
+  /// Conecta el stream RESUELTO actual al dispositivo destino: envía
+  /// `open_media` con url + headers + posición para que su player (media_kit/mpv)
+  /// reproduzca la MISMA fuente con las mismas cabeceras HTTP (Referer/UA).
+  /// Luego pausa el player local y entra en modo remoto (overlay existente).
+  Future<void> _beginAurisCast(RemoteDevice device) async {
+    if (!mounted || _isDisposed) return;
+
+    final url = _currentSourceUrl;
+    final canCast = url.isNotEmpty &&
+        _player != null &&
+        !_isCurrentTrackEmbed(_allTracks) &&
+        _currentSource != 'YouTube';
+
+    if (!canCast) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFEF7A1E),
+          content: Text(
+              'La fuente actual no se puede transmitir. Abre una fuente directa.',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      );
+      return;
+    }
+
+    final posMs = _player!.state.position.inMilliseconds;
+    final wasPlaying = _player!.state.playing;
+
+    ref.read(remoteControlProvider.notifier).setActiveTarget(device.id);
+    _sendRemoteAction(device, RemoteAction.openMedia, {
+      'params': {
+        'contentId': widget.contentId,
+        // Stream ya resuelto: el receptor NO re-extrae; reproduce exactamente
+        // la misma pista con las mismas cabeceras (direct=1 en el receptor).
+        'url': url,
+        'headers': jsonEncode(_currentStreamHeaders),
+        'direct': '1',
+        'source': _currentSource,
+        if (_currentEpisode != null) 'episode': _currentEpisode!,
+        if (widget.season != null) 'season': widget.season.toString(),
+        'metadataTitle': widget.metadataTitle ?? '',
+        'banner': widget.bannerUrl ?? '',
+        'category': widget.category ?? '',
+        'title': widget.title ?? '',
+        'posterUrl': widget.posterUrl ?? '',
+        'startPosition': posMs.toString(),
+      },
+    });
+
+    setState(() {
+      _aurisCastTargetId = device.id;
+      _aurisWasPlaying = wasPlaying;
+      _userHasPaused = true;
+    });
+    await _player!.pause();
+  }
+
+  /// Handback: el cast a la TV terminó (desvinculación/stop del receptor) →
+  /// retomar la reproducción local desde la última posición reportada por el
+  /// receptor. El stream local sigue cargado (solo lo pausamos), así que basta
+  /// seek + play sin re-inicializar nada.
+  void _endAurisCastSession() {
+    final targetId = _aurisCastTargetId;
+    _aurisCastTargetId = null;
+    if (!mounted || _isDisposed) return;
+
+    final devices = ref.read(remoteControlProvider).availableDevices;
+    RemoteDevice? target;
+    try {
+      target = devices.firstWhere((d) => d.id == targetId);
+    } catch (_) {
+      target = null;
+    }
+
+    final resume = (target != null && target.positionMs > 3000)
+        ? target.positionMs
+        : _resumePosition;
+    final duration = (target != null && target.durationMs > 0)
+        ? target.durationMs
+        : _player?.state.duration.inMilliseconds ?? 0;
+
+    if (resume > 3000) {
+      _updateHistory(positionMs: resume, durationMs: duration, force: true);
+    }
+
+    final player = _player;
+    if (player != null) {
+      setState(() => _userHasPaused = !_aurisWasPlaying);
+      final resumeFuture =
+          resume > 3000 ? player.seek(Duration(milliseconds: resume)) : Future.value();
+      resumeFuture.then((_) {
+        if (_aurisWasPlaying && mounted && !_isDisposed) {
+          player.play();
+        }
+      });
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFFEF7A1E),
+        content: Text('Transmisión terminada. Retomando reproducción local...',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  /// Observa la desvinculación del target del cast propio para hacer handback.
+  void _initAurisCastHandback() {
+    Future.delayed(Duration.zero, () {
+      if (!mounted || _isDisposed) return;
+      ref.listenManual(
+        remoteControlProvider.select((s) => s.activeTargetDeviceId),
+        (previousTargetId, nextTargetId) {
+          if (!mounted || _isDisposed || _aurisCastTargetId == null) return;
+          if (previousTargetId == _aurisCastTargetId &&
+              nextTargetId != _aurisCastTargetId) {
+            _endAurisCastSession();
+          }
+        },
+      );
+    });
   }
 
   void _applyVolume() {
@@ -708,6 +863,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   // remota; si estaba en pausa, la local queda en pausa.
   bool _castWasPlaying = false;
   int _lastCastDurationMs = 0;
+
+  // Cast propio a dispositivo AurisTV (receptor vía Supabase). Si el usuario
+  // estaba reproduciendo localmente, al desvincular el target se retoma con
+  // autoplay desde la última posición reportada por el receptor.
+  String? _aurisCastTargetId;
+  bool _aurisWasPlaying = false;
   Timer? _bufferingDebounceTimer;
   // Senior Continuity Shield: Usar la llave global del provider para evitar reconstrucciones del hardware
   late final GlobalKey _videoKey;
@@ -890,6 +1051,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     _initRemoteControl();
     _initCast();
+    _initAurisCastHandback();
 
     // Senior Bridge Listener: Escuchar señales de botones físicos desde Android
     _volumeControlChannel.setMethodCallHandler((call) async {
@@ -2259,6 +2421,184 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     player.setAudioTrack(es);
   }
 
+  /// Props base de mpv para render directo a SurfaceView (prototipo Móvil).
+  Future<void> _applyMobileSurfaceBaseProps(dynamic platform) async {
+    await platform.setProperty('vo', 'null');
+    await platform.setProperty('hwdec', 'mediacodec');
+    await platform.setProperty('vid', 'auto');
+    await platform.setProperty('opengl-es', 'yes');
+    await platform.setProperty('force-window', 'yes');
+    await platform.setProperty('gpu-context', 'android');
+    await platform.setProperty('sub-use-margins', 'no');
+    await platform.setProperty('sub-font-provider', 'none');
+    await platform.setProperty('sub-scale-with-window', 'yes');
+    await platform.setProperty(
+      'hwdec-codecs',
+      'h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1',
+    );
+  }
+
+  /// Conecta la SurfaceView nativa a mpv. Orden: vo=null -> size -> wid -> vo.
+  Future<void> _applyMobileSurface(int wid, int width, int height) async {
+    if (wid <= 0 || width <= 0 || height <= 0) return;
+    _mobileWid = wid;
+    _mobileSurfaceW = width;
+    _mobileSurfaceH = height;
+    final player = _player;
+    if (player == null) return;
+    try {
+      final platform = player.platform as dynamic;
+      if (_mobileInitializedWid == wid) {
+        await platform.setProperty('android-surface-size', '${width}x$height');
+        return;
+      }
+      _mobileInitializedWid = wid;
+      await platform.setProperty('vo', 'null');
+      await platform.setProperty('android-surface-size', '${width}x$height');
+      await platform.setProperty('wid', wid.toString());
+      await platform.setProperty('vo', 'mediacodec_embed');
+      await platform.setProperty('vid', 'auto');
+      unawaited(_pushMobileVideoSize());
+    } catch (e) {
+      debugPrint('[player] applyMobileSurface error: $e');
+    }
+  }
+
+  Future<void> _pushMobileVideoSize() async {
+    if (!_useNativeMobileSurface) return;
+    final player = _player;
+    if (player == null) return;
+    final int w = player.state.width ?? 0;
+    final int h = player.state.height ?? 0;
+    if (w <= 0 || h <= 0) return;
+    if (w == _mobileVideoW && h == _mobileVideoH) return;
+    _mobileVideoW = w;
+    _mobileVideoH = h;
+    try {
+      await _mobileSurfaceChannel.invokeMethod<void>(
+        'setVideoSize',
+        <String, int>{'width': w, 'height': h},
+      );
+    } catch (e) {
+      debugPrint('[player] mobile setVideoSize error: $e');
+    }
+  }
+
+  void _onMobileSurfaceDestroyed() {
+    _mobileWid = null;
+    _mobileInitializedWid = null;
+    _mobileVideoW = 0;
+    _mobileVideoH = 0;
+    try {
+      final platform = _player?.platform as dynamic;
+      platform?.setProperty('vo', 'null');
+    } catch (_) {}
+  }
+
+  /// Subtítulos en Flutter sobre la SurfaceView nativa. Con
+  /// vo=mediacodec_embed mpv no compone su OSD sobre la superficie, así que
+  /// usamos el stream de subtítulos de media_kit.
+  Widget _mobileSubtitleOverlay(UserSettings settings) {
+    final player = _player;
+    if (player == null) return const SizedBox.shrink();
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: _showControls ? 160 : 60,
+      child: IgnorePointer(
+        child: StreamBuilder<List<String>>(
+          stream: player.stream.subtitle,
+          builder: (context, snapshot) {
+            final lines = snapshot.data ?? const <String>[];
+            if (lines.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final line in lines)
+                    Text(
+                      line,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        height: 1.2,
+                        fontSize: 24 * settings.subtitleSize,
+                        color: Color(settings.subtitleColor),
+                        fontWeight: FontWeight.bold,
+                        backgroundColor: Colors.black38,
+                        shadows: const [
+                          Shadow(blurRadius: 4, color: Colors.black),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileSurfaceFitted(Widget surface) {
+    final player = _player;
+    if (player == null) return surface;
+    return StreamBuilder<int?>(
+      stream: player.stream.width,
+      initialData: player.state.width,
+      builder: (context, widthSnap) {
+        return StreamBuilder<int?>(
+          stream: player.stream.height,
+          initialData: player.state.height,
+          builder: (context, heightSnap) {
+            final int w = widthSnap.data ?? 0;
+            final int h = heightSnap.data ?? 0;
+            final double aspect = (w > 0 && h > 0) ? w / h : 16 / 9;
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final double cw = constraints.maxWidth;
+                final double ch = constraints.maxHeight;
+                if (!cw.isFinite || !ch.isFinite || cw <= 0 || ch <= 0) {
+                  return surface;
+                }
+                double sw;
+                double sh;
+                if (_videoFit == BoxFit.fill) {
+                  sw = cw;
+                  sh = ch;
+                } else if (_videoFit == BoxFit.cover) {
+                  if (cw / ch > aspect) {
+                    sw = cw;
+                    sh = cw / aspect;
+                  } else {
+                    sh = ch;
+                    sw = ch * aspect;
+                  }
+                } else {
+                  if (cw / ch > aspect) {
+                    sh = ch;
+                    sw = ch * aspect;
+                  } else {
+                    sw = cw;
+                    sh = cw / aspect;
+                  }
+                }
+                return OverflowBox(
+                  alignment: Alignment.center,
+                  minWidth: sw,
+                  maxWidth: sw,
+                  minHeight: sh,
+                  maxHeight: sh,
+                  child: surface,
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _initPlayer(String videoUrl, [Map<String, String> headers = const {}]) async {
     // Senior Youtube Fix: Detectar URLs de YouTube para usar el player especializado
     // y evitar errores del motor nativo (MPV) sin yt-dlp.
@@ -2693,14 +3033,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (!kIsWeb) {
         // Senior Ultra-Smooth Buffer Tuning:
         // Optimizamos para un desplazamiento (Seeking) fluido y un colchón de red ininterrumpido.
+        // En el perfil tv-parity usamos los mismos valores que el player TV
+        // para aislar el salto inicial del demuxer en Android.
+        debugPrint('[player] mpv profile=${_tvMpvParityTest ? 'tv-parity' : 'mobile'}');
         platform.setProperty('msg-level', 'all=error');
         platform.setProperty('cache', 'yes');
         platform.setProperty('cache-on-disk', 'no');
         
-        platform.setProperty('demuxer-max-bytes', '134217728');
-        platform.setProperty('demuxer-max-back-bytes', '33554432');
+        platform.setProperty('demuxer-max-bytes', _tvMpvParityTest ? '67108864' : '134217728');
+        if (!_tvMpvParityTest) {
+          platform.setProperty('demuxer-max-back-bytes', '33554432');
+        }
         platform.setProperty('demuxer-readahead-secs', '30');
         
+        // PRUEBA: no sincronizar el video contra el reloj de audio. Con la
+        // textura de media_kit, el vo se reinicia al conocer los parámetros
+        // del stream; si el video se sincroniza contra audio, tras ese reinit
+        // salta a la posición que ya lleva el audio (~12s). Con
+        // display-resample el reinit debe conservar la posición de video.
         platform.setProperty('video-sync', 'display-resample');
         platform.setProperty('mc', '0.1');
         platform.setProperty('autosync', '1');
@@ -2709,18 +3059,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('audio-buffer', '${pcfg.audioBufferSecFor(kIsWeb)}');
         platform.setProperty('volume-max', '200');
         platform.setProperty('cache-pause', 'yes'); 
-        platform.setProperty('cache-pause-initial', 'yes');
-        platform.setProperty('cache-pause-wait', '3'); // Esperar 3s tras seek para fluidez
+        if (!_tvMpvParityTest) {
+          platform.setProperty('cache-pause-initial', 'yes');
+          platform.setProperty('cache-pause-wait', '3'); // Esperar 3s tras seek para fluidez
+        }
 
         // Bloque de lectura de red optimizado para 5G/Wi-Fi
         platform.setProperty('stream-buffer-size', pcfg.streamBufferSizeFor(kIsWeb));
         
-        platform.setProperty('vd-lavc-threads', '4');
+        platform.setProperty('vd-lavc-threads', _tvMpvParityTest ? '0' : '4');
         platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: HW con fallback seguro (estilo YouTube); si falla, mpv cae a SW
         platform.setProperty('tls-verify', 'no');
         
         // Eliminamos agresividad en fflags que causaba frames rotos
-        platform.setProperty('demuxer-lavf-o', 'probesize=10000000,analyzeduration=10000000,seek2any=1');
+        platform.setProperty('demuxer-lavf-o', _tvMpvParityTest
+            ? 'probesize=5000000,analyzeduration=5000000,seek2any=1'
+            : 'probesize=10000000,analyzeduration=10000000,seek2any=1');
         platform.setProperty('user-agent', finalHeaders['User-Agent'] ?? 'Mozilla/5.0');
 
         if (finalHeaders.containsKey('Referer')) {
@@ -2729,7 +3083,59 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     } catch (_) {}
 
-    _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: false));
+    if (_useNativeMobileSurface) {
+      // Prototipo nativo: nada de textura media_kit. mpv pinta directo sobre
+      // la SurfaceView con vo=mediacodec_embed (mismo camino que TV), así que
+      // no existe el reinit de vo=gpu que provocaba el salto inicial.
+      _controller = null;
+      try {
+        await _applyMobileSurfaceBaseProps(player.platform as dynamic);
+      } catch (e) {
+        debugPrint('[player] native base props error: $e');
+      }
+      if (mounted) {
+        setState(() => _mobileSurfaceMounted = true);
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      // No esperamos a que la SurfaceView exista: si aparece después del
+      // open, _applyMobileSurface la engancha sin reiniciar el decoder.
+      final wid = _mobileWid;
+      if (wid != null && _mobileSurfaceW > 0 && _mobileSurfaceH > 0) {
+        await _applyMobileSurface(wid, _mobileSurfaceW, _mobileSurfaceH);
+      }
+      debugPrint('[player] native surface mounting (wid=$wid)');
+    } else {
+      final bool hadController = _controller != null;
+      _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: true));
+      if (!hadController && mounted) {
+        setState(() {});
+        await WidgetsBinding.instance.endOfFrame;
+      }
+
+      // PRUEBA: esperar a que la salida de video (textura) esté creada antes de
+      // abrir el stream. Antes, VideoOutputManager.Create terminaba después de
+      // player.open(); la superficie se enganchaba tarde y el vo se reiniciaba
+      // cuando el decoder ya había arrancado en 0, provocando el salto.
+      final controllerForWarmup = _controller;
+      if (!kIsWeb && controllerForWarmup != null && controllerForWarmup.id.value == null) {
+        debugPrint('[player] waiting for video output id before open...');
+        final completer = Completer<void>();
+        void onIdChanged() {
+          if (controllerForWarmup.id.value != null && !completer.isCompleted) {
+            completer.complete();
+          }
+        }
+        controllerForWarmup.id.addListener(onIdChanged);
+        try {
+          await completer.future.timeout(const Duration(seconds: 3));
+        } catch (_) {
+          debugPrint('[player] video output id timeout (continuing)');
+        } finally {
+          controllerForWarmup.id.removeListener(onIdChanged);
+        }
+        debugPrint('[player] video output id=${controllerForWarmup.id.value}');
+      }
+    }
 
     _checkAutoFullscreen();
 
@@ -2776,7 +3182,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // la reproducción en el cambio de episodio.
         _watchZeroStart(player, _resumeSeekGen);
         // Ocultar video hasta verificar primer frame sano (ver campo).
-        if (mounted) {
+        if (!_tvMpvParityTest && mounted) {
           _holdingGen = _resumeSeekGen;
           setState(() => _holdingFirstFrame = true);
         }
@@ -2789,7 +3195,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         debugPrint('[player] 5. PLAY');
         await player.play();
         // Gate de primer frame solo para videos nuevos (ver campo).
-        if (_resumePosition <= 3000 && !_isAutoplayResume) {
+        if (!_tvMpvParityTest && _resumePosition <= 3000 && !_isAutoplayResume) {
           _gateFirstFrame(player, _resumeSeekGen);
         }
         // Senior Autoplay Fix: Garantizar que el stream arranca aunque el motor
@@ -2905,6 +3311,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       final elapsed = DateTime.now().difference(t0).inMilliseconds;
       final pos = player.state.position.inMilliseconds;
       final dur = player.state.duration.inMilliseconds;
+      if (_tvMpvParityTest) {
+        // A/B: solo diagnosticar. No corregimos para ver el comportamiento
+        // real de los props de TV sin que el guard oculte el resultado.
+        debugPrint('[player][tv-parity] pos=$pos elapsed=$elapsed dur=$dur'
+            '${dur > 0 && pos > elapsed + 3000 ? ' SALTO_SIN_CORREGIR' : ''}');
+        return;
+      }
       if (dur > 0 && pos > elapsed + 3000) {
         debugPrint('[player] Salto inicial detectado (pos $pos vs $elapsed ms): re-seek(0)');
         await player.seek(Duration.zero);
@@ -3421,6 +3834,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final remoteState = ref.watch(remoteControlProvider);
     final targetId = remoteState.activeTargetDeviceId;
 
+    // Cast a dispositivo AurisTV (receptor propio): overlay de control del
+    // receptor mientras la sesión esté vinculada (ver _beginAurisCast).
+    if (_aurisCastTargetId != null) {
+      RemoteDevice? aurisTarget;
+      for (final d in remoteState.availableDevices) {
+        if (d.id == _aurisCastTargetId) aurisTarget = d;
+      }
+      if (aurisTarget != null) return _buildRemoteModeView(aurisTarget);
+    }
+
     // ------------------------------------------------------------
     // Senior Chromecast NATIVO: mientras castea a un Chromecast (Google
     // Cast SDK), el video corre en el receptor y la pantalla muestra el
@@ -3625,7 +4048,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         onPressed: () {
                           // Senior Handback Logic: Recuperar posición y volver a local
                           final int resumeMs = target.positionMs;
-                          
+
+                          if (_aurisCastTargetId != null) {
+                            // Cast propio (stream+headers): el stream local sigue
+                            // cargado; setActiveTarget(null) dispara el handback
+                            // unificado (_endAurisCastSession: seek + play).
+                            _sendRemoteAction(target, RemoteAction.stop);
+                            ref.read(remoteControlProvider.notifier).setActiveTarget(null);
+                            return;
+                          }
+
                           // 1. Detener al receptor remotamente
                           _sendRemoteAction(target, RemoteAction.stop);
                           
@@ -4374,6 +4806,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               children: [
           if (_webViewController != null)
             RepaintBoundary(child: WebViewWidget(controller: _webViewController!))
+          else if (_useNativeMobileSurface && _mobileSurfaceMounted)
+            // SurfaceView nativo (punch-out). Sin opacity/transform/clip sobre
+            // la superficie para no forzar el modo overlay de hybrid composition.
+            ColoredBox(
+              color: Colors.black,
+              child: _buildMobileSurfaceFitted(
+                MobileVideoSurface(
+                  key: _mobileSurfaceKey,
+                  onSurface: (wid, width, height) =>
+                      unawaited(_applyMobileSurface(wid, width, height)),
+                  onSurfaceDestroyed: _onMobileSurfaceDestroyed,
+                ),
+              ),
+            )
+          else if (_useNativeMobileSurface)
+            const ColoredBox(color: Colors.black)
           else if (_controller != null)
             RepaintBoundary(
               child: AnimatedOpacity(
@@ -4402,6 +4850,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             )
             else
               const SizedBox.shrink(),
+
+            if (_useNativeMobileSurface) _mobileSubtitleOverlay(settings),
 
             // Gate de primer frame: spinner mientras el video está oculto
             // verificando posición (si no, pantalla negra muerta).

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -132,17 +134,23 @@ class RemoteCommandListener extends ConsumerWidget {
     ref.listen(remoteControlProvider.select((s) => s.lastReceivedCommand), (prev, next) {
       if (next != null && next != prev) {
         if (next['action'] == RemoteAction.openMedia) {
-          final p = next['params'] as Map<String, dynamic>?;
+          final p = next['params'] as Map<String, dynamic>? ??
+              next['data'] as Map<String, dynamic>?;
           if (p != null) {
             final contentId = p['contentId'];
-            final query = Map<String, String>.from(p);
-            query.remove('contentId');
-            
+            final query = <String, String>{};
+            p.forEach((k, v) {
+              if (k == 'contentId') return;
+              // Los mapas anidados (ej. `headers` de HTTP) viajan como JSON
+              // string; el router del player los decodifica.
+              query[k] = v is Map ? jsonEncode(v) : v?.toString() ?? '';
+            });
+
             final uri = Uri(
               path: '/player/${Uri.encodeComponent(contentId)}',
               queryParameters: query,
             );
-            
+
             appRouter.push(uri.toString());
           }
         }

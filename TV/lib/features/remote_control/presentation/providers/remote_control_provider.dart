@@ -226,11 +226,15 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
     if (currentDevice == null) return;
 
     try {
+      // Shape unificado con Movil/Web: los receptores leen lastCommand['action']
+      // y lastCommand['params']. Se escriben DUAL ('params' + 'data') para que
+      // también sigan funcionando receptores antiguos que leen 'data'.
       await _supabase.from('remote_sessions').update({
         'last_command': {
           'action': action,
+          'params': data ?? {},
           'data': data ?? {},
-          'timestamp': DateTime.now().toIso8601String(),
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
           'sender_id': currentDevice.id,
         },
       }).match({

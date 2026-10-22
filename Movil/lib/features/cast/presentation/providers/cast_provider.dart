@@ -33,6 +33,8 @@ class CastNotifier extends StateNotifier<CastState> {
       state = state.copyWith(available: false);
       return;
     }
+    // El SDK quedó listo (aunque el discovery aún no encuentre devices).
+    state = state.copyWith(sdkSupported: true);
     // Restaurar estado si ya había una sesión activa (p. ej. reabrir el player).
     final status = await _service.getMediaStatus();
     if (status != null && status['loaded'] == true && mounted) {

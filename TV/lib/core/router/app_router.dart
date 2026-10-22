@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -315,6 +317,19 @@ final GoRouter appRouter = GoRouter(
         final video720 = state.uri.queryParameters['video720'];
         final video1080 = state.uri.queryParameters['video1080'];
         final skipResume = state.uri.queryParameters['skipResume'] == '1';
+
+        // Cabeceras HTTP del stream (Referer/UA) serializadas como JSON string
+        // por el canal de cast (open_media con stream ya resuelto).
+        Map<String, String>? initialHeaders;
+        final headersRaw = state.uri.queryParameters['headers'];
+        if (headersRaw != null && headersRaw.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(headersRaw);
+            if (decoded is Map) {
+              initialHeaders = decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+            }
+          } catch (_) {}
+        }
         
         // El player abre con fondo negro puro, sin transición de fade/zoom que
         // deje ver la pantalla anterior durante unos frames.
@@ -341,6 +356,7 @@ final GoRouter appRouter = GoRouter(
           skipResume: skipResume,
           kind: kind,
           year: year,
+          initialHeaders: initialHeaders,
           ),
         );
       },

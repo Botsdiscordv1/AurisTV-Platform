@@ -47,6 +47,15 @@
                 <data android:host="auristv.dpdns.org"/>
                 <data android:pathPrefix="/activate"/>
             </intent-filter>
+            <!-- Deep Link de Google OAuth (Supabase signInWithOAuth): el
+                 redirectTo `io.supabase.flutter://callback` regresa aquí y
+                 el DeepLinkHandler (app_links) completa la sesión. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="io.supabase.flutter"/>
+            </intent-filter>
         </activity>
         <!-- Google Cast nativo (Chromecast): proveedor de opciones del SDK -->
         <meta-data
