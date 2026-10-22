@@ -125,7 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             backgroundColor: Color(0xFFEF7A1E),
           ),
         );
-        context.go('/home');
+        context.go('/');
       }
     });
   }
@@ -686,7 +686,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             backgroundColor: Color(0xFFEF7A1E),
           ),
         );
-        context.go('/home');
+        context.go('/');
       }
     } catch (e) {
       if (mounted) {

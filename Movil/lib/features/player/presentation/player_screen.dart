@@ -2600,6 +2600,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Future<void> _initPlayer(String videoUrl, [Map<String, String> headers = const {}]) async {
+    debugPrint('[player] native flag=$_useNativeMobileSurface');
     // Senior Youtube Fix: Detectar URLs de YouTube para usar el player especializado
     // y evitar errores del motor nativo (MPV) sin yt-dlp.
     if (videoUrl.contains('youtube.com') || videoUrl.contains('youtu.be') || _currentSource == 'YouTube' || widget.source == 'YouTube') {

@@ -57,6 +57,24 @@
                 <data android:scheme="io.supabase.flutter"/>
             </intent-filter>
         </activity>
+        <!-- Override de flutter_appauth: el plugin registra su
+             RedirectUriReceiverActivity con ${appAuthRedirectScheme}. El
+             placeholder apuntaba a `io.supabase.flutter` y duplicaba el
+             claim del scheme con MainActivity (popup "Abrir con"): AppAuth
+             solo serve AniList/Simkl, cuyo redirect es `auristv://auth`. -->
+        <activity
+            android:name="net.openid.appauth.RedirectUriReceiverActivity"
+            tools:node="replace"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="auristv"/>
+                <data android:host="auth"/>
+            </intent-filter>
+        </activity>
         <!-- Google Cast nativo (Chromecast): proveedor de opciones del SDK -->
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
