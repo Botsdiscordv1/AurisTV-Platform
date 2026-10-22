@@ -180,7 +180,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/player/:contentId',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final contentId = state.pathParameters['contentId']!;
         final sourceUrl = state.uri.queryParameters['url'] ?? '';
         final source = state.uri.queryParameters['source'] ?? '';
@@ -206,32 +206,92 @@ final GoRouter appRouter = GoRouter(
         final video1080 = state.uri.queryParameters['video1080'];
         final skipResume = state.uri.queryParameters['skipResume'] == '1';
         
-        return PlayerScreen(
-          contentId: contentId,
-          sourceUrl: sourceUrl,
-          source: source,
-          episode: episode,
-          season: season,
-          serverName: serverName,
-          startPosition: startPosition,
-          category: category,
-          totalEpisodes: totalEpisodes,
-          title: title,
-          metadataTitle: metadataTitle,
-          episodeTitle: episodeTitle,
-          posterUrl: posterUrl,
-          bannerUrl: bannerUrl,
-          logoUrl: logoUrl,
-          video720: video720,
-          video1080: video1080,
-          skipResume: skipResume,
-          kind: kind,
-          year: year,
+        return CustomTransitionPage<void>(
+          key: state.pageKey,
+          transitionDuration: const Duration(milliseconds: 150),
+          reverseTransitionDuration: const Duration(milliseconds: 150),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // Fondo negro opaco desde el primer frame de la transición: la
+            // pantalla anterior no queda visible ni "congelada" mientras el
+            // player monta la SurfaceView nativa.
+            return ColoredBox(
+              color: Colors.black,
+              child: FadeTransition(opacity: animation, child: child),
+            );
+          },
+          child: _PlayerRouteShell(
+            child: PlayerScreen(
+              contentId: contentId,
+              sourceUrl: sourceUrl,
+              source: source,
+              episode: episode,
+              season: season,
+              serverName: serverName,
+              startPosition: startPosition,
+              category: category,
+              totalEpisodes: totalEpisodes,
+              title: title,
+              metadataTitle: metadataTitle,
+              episodeTitle: episodeTitle,
+              posterUrl: posterUrl,
+              bannerUrl: bannerUrl,
+              logoUrl: logoUrl,
+              video720: video720,
+              video1080: video1080,
+              skipResume: skipResume,
+              kind: kind,
+              year: year,
+            ),
+          ),
         );
       },
     ),
   ],
 );
+
+/// Shell mínima de la ruta del player.
+///
+/// Su primer frame es un fondo negro con spinner: cubre la pantalla anterior
+/// de inmediato y evita que quede congelada mientras `PlayerScreen` construye
+/// el player nativo. El player real se monta en el siguiente frame.
+class _PlayerRouteShell extends StatefulWidget {
+  const _PlayerRouteShell({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_PlayerRouteShell> createState() => _PlayerRouteShellState();
+}
+
+class _PlayerRouteShellState extends State<_PlayerRouteShell> {
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _ready = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return widget.child;
+    return const ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: CircularProgressIndicator(
+            strokeWidth: 4,
+            color: Color(0xFFEF7A1E),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class ProfileWithNavScreen extends ConsumerWidget {
   const ProfileWithNavScreen({super.key});

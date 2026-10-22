@@ -11,6 +11,7 @@ import 'package:auris_core/auris_core.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/watch_next/watch_next_initializer.dart';
+import 'features/local_cast/local_cast_server.dart';
 import 'features/remote_control/presentation/providers/remote_control_provider.dart';
 import 'features/remote_control/data/models/remote_device.dart';
 
@@ -36,6 +37,7 @@ Future<void> main() async {
   await Hive.openBox('user_data');
   await Hive.openBox('favorites');
   await Hive.openBox('home_cache');
+  await Hive.openBox('local_pairings');
 
   // Inicializa Supabase
   await Supabase.initialize(
@@ -74,18 +76,22 @@ class AurisApp extends StatelessWidget {
         if (child == null) return const SizedBox.shrink();
 
         return WatchNextInitializer(
-          child: Shortcuts(
-            shortcuts: const <ShortcutActivator, Intent>{
-              SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
-            },
-            child: NotificationInitializer(
-              child: RemoteCommandListener(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    child,
-                    const UpdateDownloadBanner(flavor: 'tv'),
-                  ],
+          child: LocalCastInitializer(
+            child: Shortcuts(
+              shortcuts: const <ShortcutActivator, Intent>{
+                SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
+              },
+              child: NotificationInitializer(
+                child: RemoteCommandListener(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      child,
+                      const UpdateDownloadBanner(flavor: 'tv'),
+                      // PIN de vinculación local / confirmación de par
+                      const LocalCastOverlay(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -151,7 +157,14 @@ class RemoteCommandListener extends ConsumerWidget {
               queryParameters: query,
             );
 
-            appRouter.push(uri.toString());
+            final route = uri.toString();
+
+            // Llama al wakeUp nativo solo para traer la app al primer plano sin recrear/pisar la ruta
+            const MethodChannel('auristv/system')
+                .invokeMethod('wakeUp', {})
+                .catchError((_) {});
+
+            appRouter.push(route);
           }
         }
       }

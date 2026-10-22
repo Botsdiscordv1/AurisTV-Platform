@@ -86,7 +86,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
                           color: primaryColor,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.edit, size: 20, color: Colors.black),
+                        child: AurisIcon(AurisIcons.penFilled, size: 20, color: Colors.black),
                       ),
                     ],
                   ),

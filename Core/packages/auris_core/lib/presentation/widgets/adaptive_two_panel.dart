@@ -31,6 +31,7 @@ class AurisTwoPanel extends StatefulWidget {
   final Widget panelContent;
   final bool panelOpen;
   final VoidCallback onDismiss;
+  final bool dismissOnBackgroundTap;
 
   final FocusNode? closeFocusNode;
   final bool trapFocus;
@@ -82,6 +83,7 @@ class AurisTwoPanel extends StatefulWidget {
     required this.panelContent,
     required this.panelOpen,
     required this.onDismiss,
+    this.dismissOnBackgroundTap = true,
     this.videoOverlays = const [],
     this.closeFocusNode,
     this.trapFocus = false,
@@ -270,11 +272,12 @@ class _AurisTwoPanelState extends State<AurisTwoPanel> {
               Positioned.fill(
                 child: Stack(
                   children: [
-                    GestureDetector(
-                      onTap: widget.onDismiss,
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(color: Colors.transparent),
-                    ),
+                    if (widget.dismissOnBackgroundTap)
+                      GestureDetector(
+                        onTap: widget.onDismiss,
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(color: Colors.transparent),
+                      ),
                     trapped,
                   ],
                 ),

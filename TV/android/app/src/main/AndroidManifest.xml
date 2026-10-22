@@ -2,6 +2,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Cast Local: permite traer la app al frente desde segundo plano y mantener encendido el TV -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- Watch Next: publicar "Continuar Viendo" en el launcher de Android/Google TV -->
     <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
     <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA" />
@@ -42,14 +47,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="auristv" android:host="watchnext" />
-            </intent-filter>
-
-            <!-- Fallback por si el launcher NO parsea la sintaxis `intent:` y
-                 entrega el URI crudo `intent://watchnext?route=...#Intent;...` -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="intent" android:host="watchnext" />
             </intent-filter>
         </activity>
@@ -61,6 +58,13 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
+
+        <!-- Servicio en primer plano para mantener activo el servidor local de Cast -->
+        <service
+            android:name=".LocalCastForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- Comparte el APK descargado con el instalador del sistema (actualizaciones in-app) -->
         <provider

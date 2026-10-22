@@ -310,7 +310,7 @@ class _AvatarItem extends StatelessWidget {
                           )
                         ],
                       ),
-                      child: const Icon(Icons.sync_alt,
+                      child: AurisIcon(AurisIcons.transferH,
                           size: 14, color: Colors.black),
                     ),
                   ),

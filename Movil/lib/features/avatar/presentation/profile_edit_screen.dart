@@ -188,7 +188,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.edit, size: 16, color: Colors.black),
+                              child: AurisIcon(AurisIcons.penFilled, size: 16, color: Colors.black),
                             ),
                           ),
                         ],

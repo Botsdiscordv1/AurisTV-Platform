@@ -261,11 +261,12 @@ class _ProfileItemState extends State<_ProfileItem> {
                         Container(
                           width: 120,
                           height: 120,
+                          alignment: Alignment.center,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
                             color: Colors.black.withValues(alpha: 0.5),
                           ),
-                          child: const Icon(Icons.edit, color: Colors.white, size: 40),
+                          child: AurisIcon(AurisIcons.penFilled, color: Colors.white, size: 28),
                         ),
                     ],
                   ),

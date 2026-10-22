@@ -120,6 +120,14 @@ class AuthNotifier extends StateNotifier<UserAccount?> {
     }
   }
 
+  /// Inicia sesión o establece el estado de la cuenta de usuario
+  /// (usado en la vinculación por QR / Código de dispositivo).
+  void loginWithUserAccount(UserAccount user) {
+    state = user;
+    _saveLocally(user);
+    _syncToCloud(user);
+  }
+
   void updateConnections(Map<ConnectionType, ExternalConnection> connections) {
     if (state == null) return;
     final active = state!.activeProfile;

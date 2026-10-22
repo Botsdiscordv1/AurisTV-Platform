@@ -8,11 +8,29 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 
+/// Builder de la superficie nativa del mini player.
+///
+/// Core no conoce el `PlatformView` de Móvil; el entrypoint de Móvil inyecta
+/// el widget y Core solo le pasa los callbacks de enganche/desenganche.
+typedef MiniPlayerNativeSurfaceBuilder = Widget Function(
+  BuildContext context,
+  Player player,
+  void Function(int viewId, int wid, int width, int height) onSurface,
+  void Function(int viewId, int? wid) onSurfaceDestroyed,
+);
+
 class MiniPlayerBar extends ConsumerStatefulWidget {
   final VoidCallback onExpand;
   /// Entrada manual a PiP nativo (solo Movil Android; null = sin botón).
   final VoidCallback? onEnterPip;
-  const MiniPlayerBar({super.key, required this.onExpand, this.onEnterPip});
+  /// Solo Móvil con render nativo; null = textura/póster de siempre.
+  final MiniPlayerNativeSurfaceBuilder? nativeSurfaceBuilder;
+  const MiniPlayerBar({
+    super.key,
+    required this.onExpand,
+    this.onEnterPip,
+    this.nativeSurfaceBuilder,
+  });
 
   @override
   ConsumerState<MiniPlayerBar> createState() => _MiniPlayerBarState();
@@ -23,11 +41,19 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
   /// La posición inicial se calcula en post-frame: hasta entonces no se
   /// pinta nada (evita 1 frame en (0,0) arriba-izquierda al volver de PiP).
   bool _positionReady = false;
+  /// Evita encolar varios post-frames mientras llegan las métricas reales.
+  bool _positionInitScheduled = false;
   /// Suscripciones propias del mini (fin de video + umbral de preload).
   /// El motor es compartido con el fullscreen: solo actúan en modo mini.
   StreamSubscription<Duration>? _miniPosSub;
   StreamSubscription<bool>? _miniCompletedSub;
   Player? _listenedPlayer;
+  /// Estado de la superficie nativa del mini (solo Móvil con modo nativo).
+  Player? _nativePlayer;
+  int? _nativeViewId;
+  int? _nativeWid;
+  int _nativeSurfaceW = 0;
+  int _nativeSurfaceH = 0;
   String? _preloadedForKey;
   bool _showReplay = false;
   String? _lastMiniEpisode;
@@ -117,27 +143,48 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
     
     // Posición inicial: la previa al desmontaje (vuelta de PiP) o abajo a
     // la derecha por defecto. Se acota a las métricas actuales.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final size = MediaQuery.of(context).size;
-      if (size.width > 100 && size.height > 100) {
-        if (_savedUserWidth != null) {
-          _userWidth = _savedUserWidth!.clamp(_minPlayerWidth, _maxPlayerWidth);
-        }
-        final Offset initial = _savedPosition ?? Offset(
-          size.width - _playerWidth - _edgeMargin,
-          size.height - _totalHeight - _bottomOffset,
-        );
-        setState(() {
-          _position = _clampPosition(initial, _playerWidth);
-          _positionReady = true;
-        });
-      }
-    });
+    _schedulePositionInit();
     // Auto-ocultar controles a los 3s (tap en video los revela).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _restartControlsTimer();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // En el primer frame de algunos arranques MediaQuery aún no tiene el
+    // tamaño real. Reintentar aquí evita que el mini quede invisible hasta
+    // que PiP reconstruya todo el árbol.
+    if (!_positionReady) _schedulePositionInit();
+  }
+
+  void _schedulePositionInit() {
+    if (_positionReady || _positionInitScheduled) return;
+    _positionInitScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _positionInitScheduled = false;
+      if (!mounted || _positionReady) return;
+      final size = MediaQuery.of(context).size;
+      if (size.width <= 100 || size.height <= 100) {
+        debugPrint('[MiniPlayer] métricas no listas: ${size.width}x${size.height}');
+        return;
+      }
+      if (_savedUserWidth != null) {
+        _userWidth = _savedUserWidth!.clamp(_minPlayerWidth, _maxPlayerWidth);
+      }
+      final Offset initial = _savedPosition ?? Offset(
+        size.width - _playerWidth - _edgeMargin,
+        size.height - _totalHeight - _bottomOffset,
+      );
+      setState(() {
+        _position = _clampPosition(initial, _playerWidth);
+        _positionReady = true;
+      });
+      debugPrint('[MiniPlayer] posición lista: ${_position.dx.toStringAsFixed(0)},'
+          '${_position.dy.toStringAsFixed(0)} ${size.width.toStringAsFixed(0)}x'
+          '${size.height.toStringAsFixed(0)}');
     });
   }
 
@@ -148,8 +195,9 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
     // soltar un arrastre). Re-anclar aquí movía el mini a una esquina al
     // volver de PiP.
     if (!mounted || _isDragging) return;
+    if (!_positionReady) _schedulePositionInit();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || !_positionReady) return;
       if (_userWidth != null) {
         _userWidth = _userWidth!.clamp(_minPlayerWidth, _maxPlayerWidth);
       }
@@ -163,6 +211,16 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
   void dispose() {
     _miniPosSub?.cancel();
     _miniCompletedSub?.cancel();
+    // Desconectar antes de que el PlatformView destruya la Surface. El binder
+    // ignora el wid viejo si el fullscreen ya enganchó su propia superficie.
+    final Player? nativePlayer = _nativePlayer;
+    if (nativePlayer != null) {
+      unawaited(NativeVideoSurfaceBinder.detach(
+        nativePlayer,
+        viewId: _nativeViewId,
+        wid: _nativeWid,
+      ));
+    }
     // Guardar el punto visual real (si hay glide en curso, el valor animado).
     _savedPosition =
         _snapController.isAnimating ? _snapAnimation.value : _position;
@@ -291,6 +349,89 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
     });
   }
 
+  /// Si el motor compartido se recreó, la SurfaceView sigue viva pero mpv ya
+  /// no la conoce: reengancharla al nuevo `Player`.
+  void _syncNativeSurface(Player player) {
+    if (_nativePlayer == player) return;
+    _nativePlayer = player;
+    final int? viewId = _nativeViewId;
+    final int? wid = _nativeWid;
+    final int w = _nativeSurfaceW;
+    final int h = _nativeSurfaceH;
+    if (viewId == null || wid == null || w <= 0 || h <= 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(NativeVideoSurfaceBinder.attach(
+        player: player,
+        viewId: viewId,
+        wid: wid,
+        width: w,
+        height: h,
+      ));
+    });
+  }
+
+  Widget _buildMiniVideoLayer(BuildContext context, ActivePlayerState state) {
+    final Player? player = state.player;
+    final MiniPlayerNativeSurfaceBuilder? builder = widget.nativeSurfaceBuilder;
+
+    if (builder != null && player != null && state.controller == null) {
+      _syncNativeSurface(player);
+      return ColoredBox(
+        color: Colors.black,
+        child: builder(
+          context,
+          player,
+          (viewId, wid, width, height) {
+            _nativePlayer = player;
+            _nativeViewId = viewId;
+            _nativeWid = wid;
+            _nativeSurfaceW = width;
+            _nativeSurfaceH = height;
+            unawaited(NativeVideoSurfaceBinder.attach(
+              player: player,
+              viewId: viewId,
+              wid: wid,
+              width: width,
+              height: height,
+            ));
+          },
+          (viewId, wid) {
+            if (_nativeViewId == viewId) {
+              _nativeViewId = null;
+              _nativeWid = null;
+              _nativeSurfaceW = 0;
+              _nativeSurfaceH = 0;
+            }
+            unawaited(NativeVideoSurfaceBinder.detach(
+              player,
+              viewId: viewId,
+              wid: wid,
+            ));
+          },
+        ),
+      );
+    }
+
+    if (state.controller != null) {
+      return Video(
+        key: state.videoKey,
+        controller: state.controller!,
+        fill: Colors.black,
+        controls: NoVideoControls,
+      );
+    }
+
+    return Image.network(
+      state.currentItem!.posterUrl,
+      fit: BoxFit.cover,
+      cacheWidth: (MediaQuery.of(context).size.width *
+                  MediaQuery.of(context).devicePixelRatio)
+              .round()
+              .clamp(320, 1280),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(activePlayerProvider);
@@ -299,7 +440,10 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
     }
     // Posición aún no calculada (primer frame tras montar, p. ej. vuelta de
     // PiP): no pintar a (0,0), esperar al post-frame con la posición real.
-    if (!_positionReady) return const SizedBox.shrink();
+    if (!_positionReady) {
+      _schedulePositionInit();
+      return const SizedBox.shrink();
+    }
 
     _listenMiniPlayer(state.player);
     // Cambio de episodio: resetear replay/preload (sincrono en build, sin
@@ -390,24 +534,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                         children: [
                           // CAPA 0: VIDEO / POSTER
                           Positioned.fill(
-                            child: state.controller != null
-                                ? Video(
-                                    key: state.videoKey, 
-                                    controller: state.controller!,
-                                    fill: Colors.black,
-                                    controls: NoVideoControls,
-                                  )
-                                : Image.network(
-                                    item.posterUrl,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: (MediaQuery.of(context)
-                                                .size
-                                                .width *
-                                            MediaQuery.of(context)
-                                                .devicePixelRatio)
-                                        .round()
-                                        .clamp(320, 1280),
-                                  ),
+                            child: _buildMiniVideoLayer(context, state),
                           ),
 
                           // CAPA TAP-TOGGLE (solo controles móviles): en desktop el

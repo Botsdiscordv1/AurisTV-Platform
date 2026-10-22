@@ -22,12 +22,14 @@ class MainActivity: FlutterFragmentActivity() {
     private val PIP_CHANNEL = "auristv/pip"
     private val ORIENTATION_CHANNEL = "auristv/orientation"
     private val INSTALL_CHANNEL = "auristv/install"
+    private val NETWORK_CHANNEL = "auristv/network"
     private var interceptVolume = false
     private var volumeMethodChannel: MethodChannel? = null
     private var isPipAllowed = false
     private var currentAspectRatioWidth = 16
     private var currentAspectRatioHeight = 9
     private var isInPlayer = false
+    private var multicastLock: android.net.wifi.WifiManager.MulticastLock? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -150,6 +152,10 @@ class MainActivity: FlutterFragmentActivity() {
                     this@MainActivity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     result.success(null)
                 }
+                "setOrientationPortrait" -> {
+                    this@MainActivity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                    result.success(null)
+                }
                 "resetOrientation" -> {
                     this@MainActivity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     result.success(null)
@@ -159,6 +165,39 @@ class MainActivity: FlutterFragmentActivity() {
         }
 
         installCastChannel(flutterEngine)
+
+        // Cast Local (LAN, sin login): muchos drivers de Wi-Fi filtran los
+        // paquetes broadcast/multicast; el MulticastLock lo habilita.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NETWORK_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "acquireMulticastLock" -> {
+                    try {
+                        if (multicastLock == null) {
+                            val wifi = applicationContext
+                                .getSystemService(WIFI_SERVICE) as android.net.wifi.WifiManager
+                            multicastLock = wifi.createMulticastLock("auristv_local_cast").apply {
+                                setReferenceCounted(false)
+                                acquire()
+                            }
+                        }
+                        result.success(multicastLock?.isHeld == true)
+                    } catch (e: Exception) {
+                        android.util.Log.d("AurisNetwork", "multicast lock falló: ${e.message}")
+                        result.success(false)
+                    }
+                }
+                "releaseMulticastLock" -> {
+                    try {
+                        multicastLock?.release()
+                        multicastLock = null
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INSTALL_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {

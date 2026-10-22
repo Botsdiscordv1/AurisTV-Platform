@@ -9,12 +9,6 @@ import '../../auris_core.dart';
 import 'playback_config_provider.dart';
 import 'playback_history_provider.dart';
 
-/// Prototipo de render nativo en Móvil (SurfaceView + vo=mediacodec_embed).
-/// Apagado por defecto: TV/Web y las builds normales siguen usando la textura
-/// de media_kit. Se activa con --dart-define=NATIVE_VIDEO_SURFACE=true.
-const bool _nativeVideoSurface =
-    bool.fromEnvironment('NATIVE_VIDEO_SURFACE', defaultValue: false);
-
 enum PlayerUIState { none, mini, full, pip }
 
 /// Etiqueta de episodio `T1:E1 Título` (o `T1:E1` sin título / tal cual si
@@ -145,8 +139,12 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
       }
     } catch (_) {}
 
-    final controller =
-        _nativeVideoSurface ? null : VideoController(player);
+    // Móvil puede usar SurfaceView nativo; TV/Web conservan la textura de
+    // media_kit. La decisión la toma el entrypoint de cada plataforma.
+    final bool nativeAndroidSurface = !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        VideoSurfaceConfig.nativeAndroidSurface;
+    final controller = nativeAndroidSurface ? null : VideoController(player);
     
     // Senior Strategy: Actualizamos el estado síncronamente para evitar que llamadas rápidas
     // sucesivas a initPlayerIfNeeded creen múltiples instancias de hardware (Audio Doble).

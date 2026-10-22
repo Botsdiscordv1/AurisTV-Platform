@@ -5,16 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:auris_core/auris_core.dart';
 
 import '../providers/cast_provider.dart';
+import '../../../remote_control/presentation/widgets/dpad_remote_sheet.dart';
 
 /// Modo "transmitiendo a Chromecast": overlay completo estilo Netflix que
 /// sustituye al reproductor local mientras el video corre en el receptor.
 ///
-/// El PlayerScreen decide mostrarlo cuando `chromecastProvider` estÃ¡ en fase
-/// casting; aquÃ­ solo se controla el receptor nativo (play/pause/seek/stop).
+/// El PlayerScreen decide mostrarlo cuando `chromecastProvider` está en fase
+/// casting; aquí solo se controla el receptor nativo (play/pause/seek/stop).
 ///
-/// Handback: "DETENER TRANSMISIÃ“N" corta la sesiÃ³n nativa; el evento
-/// `sessionEnded` (con la Ãºltima posiciÃ³n) la recibe el PlayerScreen y
-/// retoma la reproducciÃ³n local desde ahÃ­.
+/// Handback: "DETENER TRANSMISIÓN" corta la sesión nativa; el evento
+/// `sessionEnded` (con la última posición) la recibe el PlayerScreen y
+/// retoma la reproducción local desde ahí.
 class ChromecastModeView extends ConsumerWidget {
   final String title;
   final String episodeLabel;
@@ -54,8 +55,11 @@ class ChromecastModeView extends ConsumerWidget {
         ? ApiEndpoints.proxyImage(bannerUrl ?? posterUrl)
         : null;
 
+    // La duración puede llegar 0 o -1 (DURATION_UNKNOWN del SDK de Cast) en el
+    // arranque del stream; clamp(0, durationMs) lanza ArgumentError si < 0.
     final double maxMs = media.durationMs > 0 ? media.durationMs.toDouble() : 1.0;
-    final double posMs = media.positionMs.clamp(0, media.durationMs).toDouble();
+    final double posMs =
+        media.positionMs.clamp(0, maxMs.toInt()).toDouble();
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
@@ -90,6 +94,12 @@ class ChromecastModeView extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       child: Row(
                         children: [
+                          IconButton(
+                            icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 28),
+                            onPressed: () {
+                              if (Navigator.canPop(context)) Navigator.pop(context);
+                            },
+                          ),
                           const Spacer(),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -263,6 +273,26 @@ class ChromecastModeView extends ConsumerWidget {
                               ),
                             ),
                           ],
+                          if (device != null) ...[
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: () => showDpadRemoteSheet(context, device),
+                              icon: AurisIcon(AurisIcons.gamepadButtons, size: 18, color: accent),
+                              label: const Text('MANDO D-PAD',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: accent.withValues(alpha: 0.4)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 6),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -310,16 +340,35 @@ class ChromecastModeView extends ConsumerWidget {
                             ],
                           ),
                           const SizedBox(height: 14),
-                          // Footer: handback (retomar reproducciÃ³n local)
+                          // Footer: handback (retomar reproducción local)
                           TextButton.icon(
                             onPressed: () => notifier.stopCasting(),
                             icon: AurisIcon(AurisIcons.cast, color: Colors.redAccent, size: 16),
-                            label: const Text('DETENER TRANSMISIÃ“N',
+                            label: const Text('DETENER TRANSMISIÓN',
                                 style: TextStyle(
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 1.2)),
                             style: TextButton.styleFrom(
                                 foregroundColor: Colors.redAccent),
+                          ),
+                          const SizedBox(height: 4),
+                          TextButton.icon(
+                            onPressed: () => notifier.stopCasting(),
+                            icon: const Icon(Icons.link_off_rounded, color: Colors.white54, size: 16),
+                            label: Text(
+                              'Desvincular ${(device?.name.isEmpty ?? true) ? 'Chromecast' : device!.name}',
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white54,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                           ),
                           const SizedBox(height: 10),
                         ],

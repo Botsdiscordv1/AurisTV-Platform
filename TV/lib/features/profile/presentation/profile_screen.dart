@@ -325,7 +325,7 @@ class _ProfileHeroState extends State<_ProfileHero> {
                           color: primaryColor,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.edit_rounded,
+                        child: AurisIcon(AurisIcons.penFilled,
                             color: Colors.black, size: 16),
                       ),
                     ),
