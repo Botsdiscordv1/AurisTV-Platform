@@ -28,6 +28,7 @@ import 'tv_video_surface.dart';
 
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
 import '../../remote_control/data/models/remote_device.dart';
+import '../../local_cast/local_cast_server.dart';
 // import '../../remote_control/presentation/widgets/device_selector_dialog.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -220,6 +221,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Timer? _hideTimer;
   double _playbackSpeed = 1.0;
   StreamSubscription? _posSubscription;
+  StreamSubscription? _durationSubscription;
   StreamSubscription? _completedSubscription;
   bool _isStabilizing = false;
   Timer? _stabilizationTimer;
@@ -456,14 +458,72 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _switchTrack(index);
         }
         break;
+      case RemoteAction.dpadUp:
+      case RemoteAction.volumeUp:
+        setState(() {
+          _volume = (_volume + 0.1).clamp(0.0, 1.0);
+          _applyVolume();
+        });
+        break;
+      case RemoteAction.dpadDown:
+      case RemoteAction.volumeDown:
+        setState(() {
+          _volume = (_volume - 0.1).clamp(0.0, 1.0);
+          _applyVolume();
+        });
+        break;
+      case RemoteAction.dpadLeft:
+        _skipBackward();
+        break;
+      case RemoteAction.dpadRight:
+        _skipForward();
+        break;
+      case RemoteAction.dpadCenter:
+        if (_player != null) {
+          if (_player!.state.playing) _player!.pause(); else _player!.play();
+        }
+        break;
+      case RemoteAction.back:
+        if (context.canPop()) context.pop();
+        break;
+      case RemoteAction.mute:
+        setState(() {
+          _volume = _volume > 0.01 ? 0.0 : 1.0;
+          _applyVolume();
+        });
+        break;
     }
+    _reportStatusToRemote(force: true);
   }
 
-  void _reportStatusToRemote() {
+  void _reportStatusToRemote({bool force = false}) {
     if (_player == null || !mounted) return;
-    
+
+    // Cast Local: publica al bridge del server para el /cast/status del
+    // móvil (poll). Throttle propio a 1 s para un timeline más fluido que
+    // el de Supabase (3 s), sin tocar su lógica.
+    final nowBridge = DateTime.now().millisecondsSinceEpoch;
+    if (force || nowBridge - _lastBridgeReportMs >= 1000) {
+      _lastBridgeReportMs = nowBridge;
+      ref.read(localCastBridgeProvider.notifier).publish(
+            loaded: true,
+            positionMs: _player!.state.position.inMilliseconds,
+            durationMs: _player!.state.duration.inMilliseconds,
+            isPlaying: _player!.state.playing,
+            mediaTitle: widget.title ?? widget.metadataTitle,
+            tracks: _allTracks
+                .map((t) => {
+                      'label': t.label,
+                      'url': t.url,
+                      'quality': t.quality,
+                    })
+                .toList(),
+            selectedTrackIndex: _selectedTrackIndex,
+          );
+    }
+
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastRemoteUpdateMs < 3000) return;
+    if (!force && now - _lastRemoteUpdateMs < 3000) return;
     _lastRemoteUpdateMs = now;
 
     ref.read(remoteControlProvider.notifier).updateStatus(
@@ -679,6 +739,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   int _lastStablePositionMs = 0;
   int _lastUiPersistenceMs = 0;
   int _lastRemoteUpdateMs = 0;
+  int _lastBridgeReportMs = 0;
   Timer? _bufferingDebounceTimer;
   final GlobalKey _videoKey = GlobalKey();
   
@@ -697,6 +758,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   String? _playbackError;
   String _lastVideoUrl = '';
   Map<String, String> _lastVideoHeaders = const {};
+
+  /// Auto-reintento silencioso (sin popup): ante un error genérico se
+  /// re-abre el MISMO stream con sus headers un par de veces con backoff;
+  /// el popup solo aparece cuando se agotan los intentos.
+  int _autoRetryCount = 0;
+  static const int _kMaxAutoRetry = 3;
+  Timer? _autoRetryTimer;
   // Contador de refreshes de extract por URLs firmadas expiradas (vimeos rota
   // host+tokens por extract). Máx 2 re-extracciones con backoff; después, UI error.
   int _extractRefreshCount = 0;
@@ -2809,6 +2877,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Invalidar loops de resume-retry de inits anteriores (ver campo).
     _resumeSeekGen++;
 
+    // Nuevo stream elegido por el usuario (server/episodio/calidad distinta)
+    // → se reinicia el contador de auto-reintentos. Un retry del MISMO stream
+    // llega con la misma URL, así que no interfiere con el ciclo silencioso.
+    if (videoUrl != _lastVideoUrl) _autoRetryCount = 0;
     _lastVideoUrl = videoUrl;
     _lastVideoHeaders = headers;
     _playbackError = null;
@@ -2871,6 +2943,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final player = _player!;
 
     _posSubscription?.cancel();
+    _durationSubscription?.cancel();
     _bufferingSubscription?.cancel();
     _completedSubscription?.cancel();
     _errorSubscription?.cancel();
@@ -2879,19 +2952,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _tracksSubscription?.cancel();
     _audioAutoSelectedForUrl = null;
 
+    _durationSubscription = player.stream.duration.listen((dur) {
+      if (mounted) {
+        _reportStatusToRemote(force: true);
+      }
+    });
+
     // Si el video arranca a reproducirse (p.ej. tras un error de codec no
     // fatal en una pista de audio), retiramos cualquier cartel de error.
     _playingSubscription = player.stream.playing.listen((playing) {
-      if (mounted && playing) {
-        setState(() {
-          _playbackError = null;
-          // No ocultar el spinner hasta que haya un frame real: mpv reporta
-          // playing=true al arrancar el pipeline, antes de pintar imagen.
-          if (_firstFrameRendered || _isAutoplayResume) _isLoading = false;
-          _webNeedsInteraction = false; // Si empieza a sonar, ya no necesitamos interaction
-          _extractRefreshCount = 0;
-        });
-        _applyVolume();
+      if (mounted) {
+        _reportStatusToRemote(force: true);
+        if (playing) {
+          setState(() {
+            _playbackError = null;
+            // No ocultar el spinner hasta que haya un frame real: mpv reporta
+            // playing=true al arrancar el pipeline, antes de pintar imagen.
+            if (_firstFrameRendered || _isAutoplayResume) _isLoading = false;
+            _webNeedsInteraction = false; // Si empieza a sonar, ya no necesitamos interaction
+            _extractRefreshCount = 0;
+          });
+          _applyVolume();
+        }
       }
     });
 
@@ -2929,7 +3011,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // con backoff en vez de reintentar la misma URL en loop (eso generaba
         // la tormenta de 403s en el server). Trailers/YouTube no expiran:
         // esos sí reintentan la misma URL como antes.
-        if (!_isTrailer && _extractRefreshCount < _kMaxExtractRefresh) {
+        //
+        // En streams DIRECTOS (cast: initialHeaders != null) la URL ya viene
+        // resuelta desde el emisor: no hay extract que refrescar, así que
+        // ese caso cae al auto-retry silencioso genérico.
+        if (!_isTrailer &&
+            widget.initialHeaders == null &&
+            _extractRefreshCount < _kMaxExtractRefresh) {
           _extractRefreshCount++;
           PlaybackTelemetry.instance.markError('AURI1002');
           final wait = Duration(seconds: _extractRefreshCount == 1 ? 2 : 5);
@@ -2971,6 +3059,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       debugPrint('[player] error: $message');
       final errInfo = describePlaybackError(message);
       PlaybackTelemetry.instance.markError(errInfo.code);
+
+      // Auto-reintento SILENCIOSO del mismo stream+headers (con backoff):
+      // muchos fallos son transitorios (red, mpv arrancando, servidor
+      // congestionado). El popup "Reintentar" solo si se agotan los
+      // intentos — sin pedir intervención del usuario para transitorios.
+      if (_autoRetryCount < _kMaxAutoRetry) {
+        _autoRetryCount++;
+        final wait = Duration(seconds: 2 * _autoRetryCount);
+        debugPrint(
+            '[player recovery] auto-retry #$_autoRetryCount/$_kMaxAutoRetry en ${wait.inSeconds}s (sin popup)');
+        _autoRetryTimer?.cancel();
+        _autoRetryTimer = Timer(wait, () {
+          if (!mounted || _isDisposed) return;
+          if (_playbackError != null) return;
+          setState(() => _isLoading = true);
+          _retryPlayback();
+        });
+        return;
+      }
+
       Future.delayed(const Duration(milliseconds: 1200), () {
         if (!mounted) return;
         if (player.state.playing) return;
@@ -3005,6 +3113,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _reportStatusToRemote(); // Reportar a Auris Remote
       final ms = pos.inMilliseconds;
       if (ms > 0) PlaybackTelemetry.instance.markFirstFrame();
+      // Progreso real: el stream vive → el ciclo de auto-reintentos queda
+      // limpio para el próximo error transitorio.
+      if (ms > 1000) _autoRetryCount = 0;
       final duration = player.state.duration.inMilliseconds;
 
       // Senior UI Fix: la carga termina cuando la posición avanza de verdad
@@ -3275,6 +3386,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       while (player.state.duration == Duration.zero && timeout < 60) {
         await Future.delayed(const Duration(milliseconds: 100));
         timeout++;
+        // Los re-inits de retry/switch pueden destruir este player mientras
+        // esta continuación sigue viva: abortar silenciosamente en ese caso.
+        if (_isDisposed || !mounted) return;
       }
       
       if (needsResumeSeek) {
@@ -3297,6 +3411,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         await player.pause();
       } else {
         debugPrint('[player] 5. PLAY');
+        // Guard: los re-inits (retry/switch) pueden haber disposed este player
+        // mientras la continuación de _initPlayer seguía viva. Llamar play()
+        // sobre un player disposed lanza "Assertion failed: [Player] has been
+        // disposed" como excepción no manejada.
+        if (_isDisposed || !mounted) return;
         await player.play();
         // Senior Autoplay Fix: Garantizar que el stream arranca aunque el motor
         // reporte pausa justo después del open (común en HLS nativo).
@@ -3541,6 +3660,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   @override
   void dispose() {
+    // Cast Local: el server deja de reportar media activa (el móvil hará
+    // handback al ver loaded=false en /cast/status).
+    try {
+      ref.read(localCastBridgeProvider.notifier).clear();
+    } catch (_) {}
     // Primero la bandera: a partir de aquí el ref está muerto (igual que Movil).
     _isDisposed = true;
     // Senior Fix: Cancelar TODOS los timers para evitar fugas de memoria y llamadas a setState
@@ -3548,6 +3672,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _hideTimer?.cancel();
     _autoplayTimer?.cancel();
     _stabilizationTimer?.cancel();
+    _autoRetryTimer?.cancel();
     _historySaveTimer?.cancel();
     _holdTimer?.cancel();
     _bufferingDebounceTimer?.cancel();
@@ -3559,6 +3684,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _setVolumeIntercept(false);
     }
     _posSubscription?.cancel();
+    _durationSubscription?.cancel();
     _bufferingSubscription?.cancel();
     _completedSubscription?.cancel();
     _errorSubscription?.cancel();
@@ -4890,9 +5016,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                            Row(
                              mainAxisSize: MainAxisSize.min, 
                              children: [
-                               OutlinedButton(onPressed: _exitPlayer, child: const Text('Volver')),
+                               OutlinedButton(
+                                 autofocus: true,
+                                 onPressed: _exitPlayer,
+                                 child: const Text('Volver'),
+                               ),
                                const SizedBox(width: 12),
-                               ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF7A1E)), onPressed: _retryPlayback, child: const Text('Reintentar')),
+                               ElevatedButton(
+                                 style: ElevatedButton.styleFrom(
+                                     backgroundColor:
+                                         const Color(0xFFEF7A1E)),
+                                 onPressed: _retryPlayback,
+                                 child: const Text('Reintentar'),
+                               ),
                              ],
                            ),
                          ],

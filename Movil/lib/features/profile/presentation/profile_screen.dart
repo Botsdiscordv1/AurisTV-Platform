@@ -80,7 +80,7 @@ class ProfileScreen extends ConsumerWidget {
                             color: primaryColor,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.edit, size: 12, color: Colors.black),
+                          child: AurisIcon(AurisIcons.penFilled, size: 12, color: Colors.black),
                         ),
                       ],
                     ),

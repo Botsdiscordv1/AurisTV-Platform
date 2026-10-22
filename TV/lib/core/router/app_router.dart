@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -68,10 +69,18 @@ Future<bool> handleAppBack(GoRouter router) async {
   //    navigator de la pestaña para que el overlay se cierre primero.
   if (await _popInShellRoutes(router)) return true;
 
-  // 3) En una pestaña que no es Inicio -> volver a Inicio.
+  // 3) En una ruta intermedia (no Inicio ni Login) -> volver a Inicio o Login según sesión.
   final String top = delegate.currentConfiguration.uri.path;
-  if (top != '/') {
-    router.go('/');
+  if (top != '/' && top != '/login') {
+    final ctx = rootNavigatorKey.currentContext;
+    bool hasSession = false;
+    if (ctx != null && ctx.mounted) {
+      try {
+        final user = ProviderScope.containerOf(ctx).read(authProvider);
+        hasSession = user != null && user.id != 'guest_user';
+      } catch (_) {}
+    }
+    router.go(hasSession ? '/' : '/login');
     return true;
   }
 

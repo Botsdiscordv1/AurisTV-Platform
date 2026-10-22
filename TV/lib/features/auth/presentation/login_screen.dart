@@ -119,6 +119,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       if (userAccount != null && mounted) {
         timer.cancel();
         _pollTimer = null;
+        ref.read(authProvider.notifier).loginWithUserAccount(userAccount);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('¡Dispositivo activado con éxito! Iniciando sesión...'),

@@ -217,6 +217,11 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
     state = state.copyWith(lastReceivedCommand: command);
   }
 
+  /// Inyección de comandos desde canales EXTERNOS a este archivo: el
+  /// LocalCastServer (cast LAN sin Supabase) también usa el bus de comandos
+  /// del player reutilizando exactamente el mismo formato.
+  void receiveCommand(Map<String, dynamic> command) => _processCommand(command);
+
   void setActiveTarget(String? deviceId) {
     state = state.copyWith(activeTargetDeviceId: deviceId);
   }

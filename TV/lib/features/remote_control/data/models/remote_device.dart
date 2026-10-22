@@ -174,4 +174,15 @@ class RemoteAction {
   static const String stop = 'stop';
   static const String skipOpEd = 'skip_oped';
   static const String switchTrack = 'switch_track';
+
+  // D-Pad y Navegación TV
+  static const String dpadUp = 'dpad_up';
+  static const String dpadDown = 'dpad_down';
+  static const String dpadLeft = 'dpad_left';
+  static const String dpadRight = 'dpad_right';
+  static const String dpadCenter = 'dpad_center';
+  static const String back = 'back';
+  static const String volumeUp = 'volume_up';
+  static const String volumeDown = 'volume_down';
+  static const String mute = 'mute';
 }

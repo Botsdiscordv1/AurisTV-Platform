@@ -97,7 +97,9 @@ class CastChannelImpl(
     /** Actualizaciones cada ~1s del receptor (timeline remoto). */
     private val progressListener = RemoteMediaClient.ProgressListener { positionMs, durationMs ->
         lastRemotePositionMs = positionMs
-        lastRemoteDurationMs = durationMs
+        // El SDK reporta DURATION_UNKNOWN (-1) hasta que el receptor conoce la
+        // longitud real (HLS al iniciar). No propagar el -1: rompe clamp del UI.
+        if (durationMs > 0) lastRemoteDurationMs = durationMs
         emitMediaStatus()
     }
 
@@ -363,8 +365,11 @@ class CastChannelImpl(
 
     override fun onSessionEnded(session: Session, error: Int) {
         val castSession = session as? CastSession
-        val pos = castSession?.remoteMediaClient?.getApproximateStreamPosition() ?: lastRemotePositionMs
-        val dur = castSession?.remoteMediaClient?.getStreamDuration() ?: lastRemoteDurationMs
+        val rawPos = castSession?.remoteMediaClient?.getApproximateStreamPosition()
+        val rawDur = castSession?.remoteMediaClient?.getStreamDuration()
+        val pos = (rawPos ?: lastRemotePositionMs).coerceAtLeast(0)
+        // DURATION_UNKNOWN (-1) del SDK: conservar la última duración conocida.
+        val dur = if ((rawDur ?: -1L) > 0) rawDur else lastRemoteDurationMs
         detachClient()
         // La app local debe retomar la reproducción en esta posición.
         emit("sessionEnded", mapOf("positionMs" to pos, "durationMs" to dur))
@@ -398,8 +403,12 @@ class CastChannelImpl(
         val status = client.mediaStatus
         val data = HashMap<String, Any?>()
         val state = status?.playerState
-        lastRemotePositionMs = client.getApproximateStreamPosition()
-        lastRemoteDurationMs = client.getStreamDuration()
+        val approxPos = client.getApproximateStreamPosition()
+        lastRemotePositionMs = if (approxPos > 0) approxPos else lastRemotePositionMs
+        val streamDur = client.getStreamDuration()
+        // Duración desconocida (-1) durante el arranque del stream: se conserva
+        // la última válida para que el timeline no reciba valores inválidos.
+        if (streamDur > 0) lastRemoteDurationMs = streamDur
         data["loaded"] = status != null
         data["positionMs"] = lastRemotePositionMs
         data["durationMs"] = lastRemoteDurationMs

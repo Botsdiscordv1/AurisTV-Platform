@@ -219,11 +219,12 @@ class _ProfileItemState extends State<_ProfileItem> {
                       Container(
                         width: 130,
                         height: 130,
+                        alignment: Alignment.center,
                         decoration: const BoxDecoration(
                           color: Colors.black54,
                           shape: BoxShape.circle,
                         ),
-                        child: AurisIcon(AurisIcons.settings, color: Colors.white, size: 42),
+                        child: AurisIcon(AurisIcons.penFilled, color: Colors.white, size: 30),
                       ),
                     if (widget.isEditMode && !widget.isMain)
                       Positioned(

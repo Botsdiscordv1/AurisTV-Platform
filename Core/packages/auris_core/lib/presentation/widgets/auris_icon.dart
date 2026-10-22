@@ -15,13 +15,20 @@ class AurisIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SvgPicture.string(
-      svgContent,
+    return SizedBox(
       width: size,
       height: size,
-      colorFilter: color != null
-          ? ColorFilter.mode(color!, BlendMode.srcIn)
-          : null,
+      child: Center(
+        child: SvgPicture.string(
+          svgContent,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          colorFilter: color != null
+              ? ColorFilter.mode(color!, BlendMode.srcIn)
+              : null,
+        ),
+      ),
     );
   }
 }

@@ -350,7 +350,7 @@ class _AvatarItem extends StatelessWidget {
                           )
                         ],
                       ),
-                      child: AurisIcon(AurisIcons.settings,
+                      child: AurisIcon(AurisIcons.transferH,
                           size: 14, color: Colors.black),
                     ),
                   ),

@@ -43,6 +43,9 @@ class MobileVideoSurfaceView(
     private var fixedWidth = 0
     private var fixedHeight = 0
 
+    private var lastWidth = 0
+    private var lastHeight = 0
+
     private val callback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
             Log.i(TAG, "surfaceCreated")
@@ -54,21 +57,17 @@ class MobileVideoSurfaceView(
             if (wid == 0L) {
                 wid = newGlobalObjectRef(surface)
             }
-            Log.i(TAG, "surfaceChanged wid=$wid size=${width}x$height")
-            channel.invokeMethod(
-                "onSurface",
-                mapOf(
-                    "viewId" to viewId,
-                    "wid" to wid,
-                    "width" to width,
-                    "height" to height,
-                ),
-            )
+            Log.i(TAG, "surfaceChanged view=$viewId wid=$wid size=${width}x$height")
+            notifySurface(width, height)
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder) {
-            Log.i(TAG, "surfaceDestroyed")
-            channel.invokeMethod("onSurfaceDestroyed", mapOf("viewId" to viewId))
+            val currentWid = wid
+            Log.i(TAG, "surfaceDestroyed wid=$currentWid")
+            channel.invokeMethod(
+                "onSurfaceDestroyed",
+                mapOf("viewId" to viewId, "wid" to currentWid),
+            )
             if (wid != 0L) {
                 deleteGlobalObjectRef(wid)
                 wid = 0L
@@ -81,10 +80,22 @@ class MobileVideoSurfaceView(
         surfaceView.holder.setFormat(android.graphics.PixelFormat.OPAQUE)
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "requestSurface" -> {
+                    val target = call.argument<Int>("viewId")
+                    if ((target == null || target == viewId) && wid != 0L) {
+                        val w = if (lastWidth > 0) lastWidth else surfaceView.width
+                        val h = if (lastHeight > 0) lastHeight else surfaceView.height
+                        if (w > 0 && h > 0) notifySurface(w, h)
+                    }
+                    result.success(null)
+                }
                 "setVideoSize" -> {
+                    // Varias superficies comparten el canal; solo la que
+                    // coincide con viewId aplica el tamaño.
+                    val target = call.argument<Int>("viewId")
                     val w = call.argument<Int>("width") ?: 0
                     val h = call.argument<Int>("height") ?: 0
-                    if (w > 0 && h > 0) {
+                    if ((target == null || target == viewId) && w > 0 && h > 0) {
                         fixedWidth = w
                         fixedHeight = h
                         applyFixedSize()
@@ -94,6 +105,21 @@ class MobileVideoSurfaceView(
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun notifySurface(width: Int, height: Int) {
+        if (wid == 0L) return
+        lastWidth = width
+        lastHeight = height
+        channel.invokeMethod(
+            "onSurface",
+            mapOf(
+                "viewId" to viewId,
+                "wid" to wid,
+                "width" to width,
+                "height" to height,
+            ),
+        )
     }
 
     private fun applyFixedSize() {
@@ -114,6 +140,15 @@ class MobileVideoSurfaceView(
             Log.e(TAG, "dispose", t)
         }
         if (wid != 0L) {
+            // Avisar a Dart para que mpv suelte el wid antes de liberar la ref.
+            try {
+                channel.invokeMethod(
+                    "onSurfaceDestroyed",
+                    mapOf("viewId" to viewId, "wid" to wid),
+                )
+            } catch (t: Throwable) {
+                Log.e(TAG, "dispose notify", t)
+            }
             deleteGlobalObjectRef(wid)
             wid = 0L
         }

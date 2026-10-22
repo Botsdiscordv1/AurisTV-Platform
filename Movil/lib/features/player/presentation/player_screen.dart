@@ -31,7 +31,9 @@ import '../../../core/utils/web_utils.dart';
 import 'mobile_video_surface.dart';
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
 import '../../remote_control/data/models/remote_device.dart';
+import '../../remote_control/presentation/widgets/dpad_remote_sheet.dart';
 import '../../cast/data/models/cast_state.dart';
+import '../../cast/data/providers/local_cast_provider.dart';
 import '../../cast/presentation/providers/cast_provider.dart';
 import '../../cast/presentation/widgets/cast_picker_sheet.dart';
 import '../../cast/presentation/widgets/cast_mode_view.dart';
@@ -87,7 +89,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-enum PlayerOverlay { none, language, server, quality, episodes }
+enum PlayerOverlay { none, language, server, quality, episodes, cast }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBindingObserver {
   bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime' || widget.kind == 'movie_anime' || widget.episode == 'Trailer';
@@ -118,23 +120,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   static const bool _tvMpvParityTest =
       bool.fromEnvironment('TV_MPV_PARITY', defaultValue: true);
 
-  /// Prototipo aislado de render nativo (SurfaceView + vo=mediacodec_embed).
-  /// Por defecto queda apagado para no romper mini player/PiP/subtítulos.
-  static const bool _nativeSurfaceEnabled =
-      bool.fromEnvironment('NATIVE_VIDEO_SURFACE', defaultValue: false);
+  /// Render nativo (SurfaceView + vo=mediacodec_embed). La bandera la activa
+  /// solo el entrypoint de Móvil; TV/Web conservan la textura.
   bool get _useNativeMobileSurface =>
-      !kIsWeb && Platform.isAndroid && _nativeSurfaceEnabled;
+      !kIsWeb && Platform.isAndroid && VideoSurfaceConfig.nativeAndroidSurface;
 
   final GlobalKey _mobileSurfaceKey = GlobalKey();
-  static const MethodChannel _mobileSurfaceChannel =
-      MethodChannel('auris/mobile_video_surface');
+  int? _mobileViewId;
   int? _mobileWid;
-  int? _mobileInitializedWid;
   int _mobileSurfaceW = 0;
   int _mobileSurfaceH = 0;
-  int _mobileVideoW = 0;
-  int _mobileVideoH = 0;
   bool _mobileSurfaceMounted = false;
+  /// `true` cuando la SurfaceView del player grande ya entregó un `wid` válido
+  /// y tuvo margen para presentar contenido. Mientras sea `false`, el overlay
+  /// nativo cubre el arranque aunque `_isLoading` se haya reutilizado de una
+  /// sesión activa (mini player / mismo episodio).
+  bool _nativeSurfaceReady = false;
+  bool? _lastShowNativeLoading;
+  Timer? _nativeSurfaceReadyTimer;
+  StreamSubscription<int?>? _mobileWidthSub;
+  StreamSubscription<int?>? _mobileHeightSub;
   /// Generación del seek de resume: cada _initPlayer la incrementa para que
   /// los loops de reintento del episodio/fuente anterior se aborten y no
   /// apliquen su seek tardío sobre el nuevo stream (episodios abriendo
@@ -387,6 +392,57 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _switchTrack(index);
         }
         break;
+      case RemoteAction.dpadUp:
+        setState(() {
+          _volume = (_volume + 0.1).clamp(0.0, 1.0);
+          _applyVolume();
+        });
+        break;
+      case RemoteAction.dpadDown:
+        setState(() {
+          _volume = (_volume - 0.1).clamp(0.0, 1.0);
+          _applyVolume();
+        });
+        break;
+      case RemoteAction.dpadLeft:
+        _skipBackward();
+        break;
+      case RemoteAction.dpadRight:
+        _skipForward();
+        break;
+      case RemoteAction.dpadCenter:
+        if (_player != null) {
+          if (_player!.state.playing) _player!.pause(); else _player!.play();
+        }
+        break;
+      case RemoteAction.back:
+        if (context.canPop()) context.pop();
+        break;
+      case RemoteAction.home:
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/');
+        }
+        break;
+      case RemoteAction.volumeUp:
+        setState(() {
+          _volume = (_volume + 0.1).clamp(0.0, 1.0);
+          _applyVolume();
+        });
+        break;
+      case RemoteAction.volumeDown:
+        setState(() {
+          _volume = (_volume - 0.1).clamp(0.0, 1.0);
+          _applyVolume();
+        });
+        break;
+      case RemoteAction.mute:
+        setState(() {
+          _volume = _volume > 0.01 ? 0.0 : 1.0;
+          _applyVolume();
+        });
+        break;
     }
   }
 
@@ -462,8 +518,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final bool isCasting = next.phase == CastPhase.casting;
 
     if (isCasting && !wasCasting) {
+      _enforcePortraitOrientation();
       _beginChromecastSession(next.device);
     } else if (wasCasting && !isCasting) {
+      _enforceLandscapeOrientation();
       // La sesión nativa terminó (disconnect/stop desde Google o el app).
       _endChromecastSession(next.finalPositionMs, next.finalDurationMs);
     } else if (isCasting) {
@@ -525,10 +583,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   /// Handback: el Chromecast terminó/desconectó → retomar local desde la
+  /// Handback: el Chromecast terminó/desconectó → retomar local desde la
   /// última posición remota (si estaba reproduciendo, con autoplay).
   void _endChromecastSession(int positionMs, int durationMs) {
     if (!mounted || _isDisposed) return;
     debugPrint('[AurisCast] Session ended at $positionMs');
+
+    _enforceLandscapeOrientation();
 
     final resume = positionMs > 3000 ? positionMs : _resumePosition;
     final duration = durationMs > 0 ? durationMs : _lastCastDurationMs;
@@ -536,14 +597,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _updateHistory(positionMs: resume, durationMs: duration, force: true);
     }
 
-    if (_player == null) return;
-
-    setState(() {
-      _resumePosition = resume;
-      _hasInitialized = false;
-      _isLoading = true;
-      _userHasPaused = !_castWasPlaying;
-    });
+    final player = _player;
+    if (player != null) {
+      setState(() {
+        _resumePosition = resume;
+        _userHasPaused = !_castWasPlaying;
+      });
+      if (resume > 3000) {
+        player.seek(Duration(milliseconds: resume)).then((_) {
+          if (_castWasPlaying && mounted && !_isDisposed) {
+            player.play();
+          }
+        });
+      } else if (_castWasPlaying) {
+        player.play();
+      }
+    } else {
+      setState(() {
+        _resumePosition = resume;
+        _hasInitialized = false;
+        _isLoading = true;
+        _userHasPaused = !_castWasPlaying;
+      });
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -554,8 +630,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  /// Sheet unificada: Chromecast nativo (diálogo de Google) + dispositivos AurisTV.
+  /// Sheet / TwoPanel unificado: Chromecast nativo + dispositivos AurisTV.
   void _showCastPicker() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isLandscape || _isMobileDevice) {
+      setState(() {
+        _activeOverlay = _activeOverlay == PlayerOverlay.cast
+            ? PlayerOverlay.none
+            : PlayerOverlay.cast;
+        _showControls = true;
+        _startHideTimer();
+      });
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -566,6 +654,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       builder: (_) => CastPickerSheet(
         onConnectAurisDevice: (device) => _beginAurisCast(device),
       ),
+    );
+  }
+
+  Widget _buildCastSelectorContent({bool isSidebar = true}) {
+    return CastPickerContent(
+      isSidebar: isSidebar,
+      onConnectAurisDevice: (device) {
+        setState(() => _activeOverlay = PlayerOverlay.none);
+        _beginAurisCast(device);
+      },
+      onClose: () {
+        setState(() => _activeOverlay = PlayerOverlay.none);
+        _startHideTimer();
+      },
     );
   }
 
@@ -580,7 +682,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Future<void> _beginAurisCast(RemoteDevice device) async {
     if (!mounted || _isDisposed) return;
 
-    final url = _currentSourceUrl;
+    // FIX AURI1000: `_currentSourceUrl` puede ser la PÁGINA fuente (p.ej.
+    // https://ww3.gnulahd.nu/ver/sonrie-2022/), que mpv recibe como HTML →
+    // "Failed to recognize file format". El stream directo que mpv realmente
+    // reproduce es `_currentStreamUrl` (con `_currentStreamHeaders`); solo
+    // caemos a la fuente si el stream resuelto quedó vacío.
+    final url = _currentStreamUrl.isNotEmpty ? _currentStreamUrl : _currentSourceUrl;
     final canCast = url.isNotEmpty &&
         _player != null &&
         !_isCurrentTrackEmbed(_allTracks) &&
@@ -622,6 +729,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       },
     });
 
+    _enforcePortraitOrientation();
     setState(() {
       _aurisCastTargetId = device.id;
       _aurisWasPlaying = wasPlaying;
@@ -635,6 +743,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// receptor. El stream local sigue cargado (solo lo pausamos), así que basta
   /// seek + play sin re-inicializar nada.
   void _endAurisCastSession() {
+    _enforceLandscapeOrientation();
     final targetId = _aurisCastTargetId;
     _aurisCastTargetId = null;
     if (!mounted || _isDisposed) return;
@@ -850,6 +959,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   late DateTime _screenInitTime;
   int _autoplayCountdown = -1;
   bool _isAutoplayResume = false;
+  /// Hay un historial pendiente de reanudar, pero el countdown no se muestra
+  /// hasta que `open()`/seek terminan. Si se muestra antes, el usuario pulsa
+  /// "Reanudar" sobre un player que aún no está listo y la UI queda congelada.
+  bool _resumeCountdownPending = false;
   Timer? _autoplayTimer;
   int _lastFrameMs = 0;
   DateTime? _lastManualSeekTime;
@@ -896,7 +1009,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   static const _volumeControlChannel = MethodChannel('auristv/volume');
   static const _orientationChannel = MethodChannel('auristv/orientation');
 
+  bool get _isCastOrRemoteActive {
+    final castState = ref.read(chromecastProvider);
+    final bool isCasting = castState.phase == CastPhase.casting && castState.device != null;
+    final bool isAurisRemote = _aurisCastTargetId != null;
+    return isCasting || isAurisRemote;
+  }
+
+  void _enforcePortraitOrientation() {
+    if (!_isMobileDevice) return;
+    try {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+      if (Platform.isAndroid) {
+        _orientationChannel.invokeMethod('setOrientationPortrait');
+      }
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    } catch (_) {}
+  }
+
   void _enforceLandscapeOrientation() {
+    if (!_isMobileDevice) return;
     try {
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
@@ -908,6 +1043,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } catch (_) {}
   }
+
+  void _syncOrientationForCurrentMode() {
+    if (!_isMobileDevice) return;
+    if (_isCastOrRemoteActive) {
+      _enforcePortraitOrientation();
+    } else {
+      _enforceLandscapeOrientation();
+    }
+  }
   
   @override
   void initState() {
@@ -917,10 +1061,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _uiStateSub = ref.listenManual(
         activePlayerProvider.select((s) => s.uiState), (previous, next) {
       if (next == PlayerUIState.full && mounted) {
-        _enforceLandscapeOrientation();
+        _syncOrientationForCurrentMode();
       }
     });
-    _enforceLandscapeOrientation();
+    _syncOrientationForCurrentMode();
     // PiP lo gobierna SOLO el overlay (pipReady: mini/full + item + url).
     // Forzar true aquí abría PiP sin stream (player recién abierto / sin url).
     PipService.setPlayerActive(true);
@@ -982,7 +1126,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
 
-    _enforceLandscapeOrientation();
+    _syncOrientationForCurrentMode();
     
     // Senior Immersive Fix: Usar immersiveSticky para máxima compatibilidad con notch
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -1067,6 +1211,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _isLoading = false;
       _player = activePlayer.player;
       _controller = activePlayer.controller;
+      if (_useNativeMobileSurface) {
+        // Al volver de mini/PiP la superficie anterior se destruyó; la nueva
+        // debe montarse ya para que su callback reenganche el wid.
+        _controller = null;
+        _mobileSurfaceMounted = true;
+      }
       _allTracks = activePlayer.availableTracks;
       _selectedTrackIndex = activePlayer.selectedTrackIndex;
       _extractTracks = _allTracks.where((t) => !t.isEmbed).toList();
@@ -1178,7 +1328,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       VolumeController().showSystemUI = false;
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true});
       ScreenBrightnessController.setBrightness(_brightness);
-      _enforceLandscapeOrientation();
+      _syncOrientationForCurrentMode();
     }
   }
 
@@ -1337,16 +1487,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _showServerSelector() {
-    _hideTimer?.cancel();
-
     setState(() {
       _activeOverlay = _activeOverlay == PlayerOverlay.server ? PlayerOverlay.none : PlayerOverlay.server;
-      if (_activeOverlay != PlayerOverlay.none) {
-        _showControls = true;
-        _hideTimer?.cancel();
-      } else {
-        _startHideTimer();
-      }
+      _showControls = true;
+      _startHideTimer();
     });
   }
 
@@ -1381,16 +1525,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _showQualitySelector() {
-    _hideTimer?.cancel();
-
     setState(() {
       _activeOverlay = _activeOverlay == PlayerOverlay.quality ? PlayerOverlay.none : PlayerOverlay.quality;
-      if (_activeOverlay != PlayerOverlay.none) {
-        _showControls = true;
-        _hideTimer?.cancel();
-      } else {
-        _startHideTimer();
-      }
+      _showControls = true;
+      _startHideTimer();
     });
   }
 
@@ -1542,15 +1680,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _showEpisodesPanel() {
-    _hideTimer?.cancel();
     setState(() {
       _activeOverlay = _activeOverlay == PlayerOverlay.episodes ? PlayerOverlay.none : PlayerOverlay.episodes;
-      if (_activeOverlay != PlayerOverlay.none) {
-        _showControls = true;
-        _hideTimer?.cancel();
-      } else {
-        _startHideTimer();
-      }
+      _showControls = true;
+      _startHideTimer();
     });
   }
 
@@ -1766,16 +1899,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _showLanguageSelector() {
-    _hideTimer?.cancel();
-
     setState(() {
       _activeOverlay = _activeOverlay == PlayerOverlay.language ? PlayerOverlay.none : PlayerOverlay.language;
-      if (_activeOverlay != PlayerOverlay.none) {
-        _showControls = true;
-        _hideTimer?.cancel();
-      } else {
-        _startHideTimer();
-      }
+      _showControls = true;
+      _startHideTimer();
     });
   }
 
@@ -2040,6 +2167,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _startAutoplayCountdown({bool isResume = false}) {
     if (_isTrailer) return; // [Trailer Fix] No hay reproducción automática para tráilers
 
+    // Nativo: el post-frame inicial marca la intención, pero el countdown
+    // real se lanza cuando open()/seek terminan (ver flujo secuencial).
+    if (isResume && _resumeCountdownPending) return;
+
     // Senior Fix: Respetar la preferencia de Autoplay del usuario
     final settings = ref.read(settingsProvider);
     if (!isResume && (!settings.autoPlayNextEpisode || !_policy.autoPlayNext)) return;
@@ -2077,6 +2208,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _handleResumeAction() {
     _autoplayTimer?.cancel();
+    final player = _player;
+    final int startPos = player?.state.position.inMilliseconds ?? 0;
     setState(() {
       _autoplayCountdown = -1;
       _isAutoplayResume = false;
@@ -2085,36 +2218,98 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _isStabilizing = true;
       _lastManualSeekTime = DateTime.now();
       _lastStablePositionMs = _resumePosition;
+      // Nativo: cubrir el play/buffering posterior a "Reanudar" para que no
+      // quede la UI congelada sobre el último frame.
+      if (_useNativeMobileSurface) {
+        _holdingGen = _resumeSeekGen;
+        _holdingFirstFrame = true;
+      }
     });
 
-    if (kIsWeb || (_player?.state.position.inMilliseconds ?? 0) < 3000) {
-      _player?.seek(Duration(milliseconds: _resumePosition));
+    if (player == null) return;
+    if (kIsWeb || player.state.position.inMilliseconds < 3000) {
+      player.seek(Duration(milliseconds: _resumePosition));
     }
     _userHasPaused = false;
-    _player?.play();
+    player.play();
+
+    if (_useNativeMobileSurface) {
+      unawaited(_gateResumePlayback(player, _resumeSeekGen, startPos));
+    }
 
     _startHideTimer();
     _startStabilizationTimer();
 
     _updateHistory(
       positionMs: _resumePosition,
-      durationMs: (_player?.state.duration.inMilliseconds ?? 0),
+      durationMs: (player.state.duration.inMilliseconds),
       force: true,
     );
   }
 
   void _handleRestartAction() {
     _autoplayTimer?.cancel();
+    final player = _player;
+    // Invalidar gates/seeks pendientes del resume anterior. Si no, el guard de
+    // reanudación ve la posición en 0 y vuelve a saltar a la posición guardada.
+    final int gen = ++_resumeSeekGen;
     setState(() {
       _autoplayCountdown = -1;
       _isAutoplayResume = false;
       _isCompleted = false;
       _hasResetPosition = true;
+      _resumePosition = 0;
+      _resumeCountdownPending = false;
+      _resumeGuardUntil = null;
+      _resumeGuardRetries = 0;
+      _lastManualSeekTime = DateTime.now();
+      _lastStablePositionMs = 0;
+      _lastFrameMs = 0;
+      _isStabilizing = true;
+      if (_useNativeMobileSurface) {
+        _holdingGen = gen;
+        _holdingFirstFrame = true;
+      }
     });
     if (!_isOpEd) _historyNotifier?.deleteProgress(widget.contentId, widget.season, _activeEpisode);
-    _player?.seek(Duration.zero);
+
+    if (player == null) return;
     _userHasPaused = false;
-    _player?.play();
+    unawaited(_restartFromZero(player, gen));
+    _startHideTimer();
+  }
+
+  /// Reinicia en 0 y verifica que mpv realmente aplicó el seek. En nativo el
+  /// primer seek puede perderse mientras el vo termina de inicializar; el
+  /// reintento evita que el video siga desde la posición de reanudación.
+  Future<void> _restartFromZero(Player player, int gen) async {
+    try {
+      await player.seek(Duration.zero);
+      if (!mounted || gen != _resumeSeekGen) return;
+      _userHasPaused = false;
+      await player.play();
+      if (!mounted || gen != _resumeSeekGen) return;
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted || gen != _resumeSeekGen) return;
+      final int pos = player.state.position.inMilliseconds;
+      if (pos > 1500) {
+        debugPrint('[player] restart: seek(0) no aplicó (pos=$pos), reintentando');
+        await player.seek(Duration.zero);
+        if (!mounted || gen != _resumeSeekGen) return;
+        await player.play();
+      }
+    } catch (e) {
+      debugPrint('[player] restart error: $e');
+    }
+
+    if (!mounted || gen != _resumeSeekGen) return;
+    if (_useNativeMobileSurface) {
+      unawaited(_gateFirstFrame(player, gen));
+    } else if (_holdingFirstFrame) {
+      setState(() => _holdingFirstFrame = false);
+    }
+    _startStabilizationTimer();
     _startHideTimer();
   }
 
@@ -2438,29 +2633,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  /// Conecta la SurfaceView nativa a mpv. Orden: vo=null -> size -> wid -> vo.
-  Future<void> _applyMobileSurface(int wid, int width, int height) async {
-    if (wid <= 0 || width <= 0 || height <= 0) return;
+  /// Conecta la SurfaceView nativa a mpv. El orden y el estado compartido con
+  /// mini player/PiP viven en [NativeVideoSurfaceBinder].
+  Future<void> _applyMobileSurface(
+    int viewId,
+    int wid,
+    int width,
+    int height,
+  ) async {
+    // El primer PlatformView de Flutter tiene id 0: es válido. Solo un id
+    // negativo indica que la vista aún no está registrada.
+    if (viewId < 0 || wid <= 0 || width <= 0 || height <= 0) return;
+    _mobileViewId = viewId;
     _mobileWid = wid;
     _mobileSurfaceW = width;
     _mobileSurfaceH = height;
     final player = _player;
     if (player == null) return;
-    try {
-      final platform = player.platform as dynamic;
-      if (_mobileInitializedWid == wid) {
-        await platform.setProperty('android-surface-size', '${width}x$height');
-        return;
-      }
-      _mobileInitializedWid = wid;
-      await platform.setProperty('vo', 'null');
-      await platform.setProperty('android-surface-size', '${width}x$height');
-      await platform.setProperty('wid', wid.toString());
-      await platform.setProperty('vo', 'mediacodec_embed');
-      await platform.setProperty('vid', 'auto');
-      unawaited(_pushMobileVideoSize());
-    } catch (e) {
-      debugPrint('[player] applyMobileSurface error: $e');
+    await NativeVideoSurfaceBinder.attach(
+      player: player,
+      viewId: viewId,
+      wid: wid,
+      width: width,
+      height: height,
+    );
+    // El wid ya está enganchado, pero la Surface puede tardar uno o dos frames
+    // en presentar el primer frame. Mantener el overlay negro un momento evita
+    // que se vea el último frame de la sesión anterior (mini player).
+    if (!_nativeSurfaceReady && mounted) {
+      _nativeSurfaceReadyTimer?.cancel();
+      _nativeSurfaceReadyTimer =
+          Timer(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          debugPrint('[player] native surface ready');
+          setState(() => _nativeSurfaceReady = true);
+        }
+      });
     }
   }
 
@@ -2468,31 +2676,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (!_useNativeMobileSurface) return;
     final player = _player;
     if (player == null) return;
-    final int w = player.state.width ?? 0;
-    final int h = player.state.height ?? 0;
-    if (w <= 0 || h <= 0) return;
-    if (w == _mobileVideoW && h == _mobileVideoH) return;
-    _mobileVideoW = w;
-    _mobileVideoH = h;
-    try {
-      await _mobileSurfaceChannel.invokeMethod<void>(
-        'setVideoSize',
-        <String, int>{'width': w, 'height': h},
-      );
-    } catch (e) {
-      debugPrint('[player] mobile setVideoSize error: $e');
-    }
+    await NativeVideoSurfaceBinder.updateVideoSize(player);
   }
 
-  void _onMobileSurfaceDestroyed() {
-    _mobileWid = null;
-    _mobileInitializedWid = null;
-    _mobileVideoW = 0;
-    _mobileVideoH = 0;
-    try {
-      final platform = _player?.platform as dynamic;
-      platform?.setProperty('vo', 'null');
-    } catch (_) {}
+  void _onMobileSurfaceDestroyed(int viewId, int? wid) {
+    if (_mobileViewId == viewId) {
+      _mobileViewId = null;
+      _mobileWid = null;
+      _mobileSurfaceW = 0;
+      _mobileSurfaceH = 0;
+      _nativeSurfaceReadyTimer?.cancel();
+      if (mounted && _nativeSurfaceReady) {
+        setState(() => _nativeSurfaceReady = false);
+      }
+    }
+    unawaited(NativeVideoSurfaceBinder.detach(
+      _player,
+      viewId: viewId,
+      wid: wid,
+    ));
   }
 
   /// Subtítulos en Flutter sobre la SurfaceView nativa. Con
@@ -2651,6 +2853,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _isLoading = true;
       _autoplayCountdown = -1;
       _isAutoplayResume = false;
+      _resumeCountdownPending = false;
+      // Modo nativo: cubrir el arranque desde el primer frame. En HLS el
+      // `open()` puede tardar varios segundos y un evento `playing` prematuro
+      // apaga `_isLoading`; sin este gate la UI del player queda visible antes
+      // de que exista el primer frame. `_gateFirstFrame` lo retira al validar
+      // posición o a los 6s.
+      _holdingFirstFrame = false;
+      _holdingGen = -1;
       if (!isSwitching) {
         if (!skipResume && widget.startPosition != null && widget.startPosition! > 3000) {
            _resumePosition = widget.startPosition!;
@@ -2658,6 +2868,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         } else if (!skipResume && historyPos > 0) {
            _resumePosition = historyPos;
            _hasResetPosition = false;
+           // Nativo: el countdown se lanza al terminar open()/seek, no ahora.
+           if (!kIsWeb) _resumeCountdownPending = true;
            // En lugar de mostrar el diálogo estático, disparamos el contador blanco de reanudación
            WidgetsBinding.instance.addPostFrameCallback((_) {
              if (mounted) _startAutoplayCountdown(isResume: true);
@@ -2671,6 +2883,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _isStabilizing = true; 
       _lastFrameMs = _resumePosition; 
       _lastStablePositionMs = _resumePosition;
+      if (_useNativeMobileSurface && _resumePosition <= 3000) {
+        _holdingGen = _resumeSeekGen;
+        _holdingFirstFrame = true;
+      }
     });
 
     debugPrint('[player] init resume=${_resumePosition} resumeCountdown=$_isAutoplayResume url=$videoUrl (HLS=$isHls)');
@@ -3100,11 +3316,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
       // No esperamos a que la SurfaceView exista: si aparece después del
       // open, _applyMobileSurface la engancha sin reiniciar el decoder.
+      final viewId = _mobileViewId;
       final wid = _mobileWid;
-      if (wid != null && _mobileSurfaceW > 0 && _mobileSurfaceH > 0) {
-        await _applyMobileSurface(wid, _mobileSurfaceW, _mobileSurfaceH);
+      if (viewId != null &&
+          wid != null &&
+          _mobileSurfaceW > 0 &&
+          _mobileSurfaceH > 0) {
+        await _applyMobileSurface(
+          viewId,
+          wid,
+          _mobileSurfaceW,
+          _mobileSurfaceH,
+        );
       }
-      debugPrint('[player] native surface mounting (wid=$wid)');
+      debugPrint(
+          '[player] native surface mounting (view=$viewId wid=$wid)');
+
+      // El tamaño real puede llegar después de enganchar la superficie.
+      unawaited(_mobileWidthSub?.cancel());
+      unawaited(_mobileHeightSub?.cancel());
+      _mobileWidthSub = player.stream.width.listen((_) {
+        unawaited(_pushMobileVideoSize());
+      });
+      _mobileHeightSub = player.stream.height.listen((_) {
+        unawaited(_pushMobileVideoSize());
+      });
     } else {
       final bool hadController = _controller != null;
       _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: true));
@@ -3183,12 +3419,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // la reproducción en el cambio de episodio.
         _watchZeroStart(player, _resumeSeekGen);
         // Ocultar video hasta verificar primer frame sano (ver campo).
-        if (!_tvMpvParityTest && mounted) {
+        if ((!_tvMpvParityTest || _useNativeMobileSurface) && mounted) {
           _holdingGen = _resumeSeekGen;
           setState(() => _holdingFirstFrame = true);
         }
       }
       
+      // Nativo: open()/seek ya terminaron. Ahora sí mostrar el countdown de
+      // reanudación; el player queda pausado en la posición guardada y
+      // "Reanudar" reproduce sin el congelamiento de UI.
+      if (_resumeCountdownPending && mounted) {
+        debugPrint('[player] 4b. RESUME READY -> countdown');
+        _resumeCountdownPending = false;
+        _startAutoplayCountdown(isResume: true);
+      }
+
       if (_isAutoplayResume) {
         debugPrint('[player] 5. PAUSE for Resume Countdown');
         await player.pause();
@@ -3196,7 +3441,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         debugPrint('[player] 5. PLAY');
         await player.play();
         // Gate de primer frame solo para videos nuevos (ver campo).
-        if (!_tvMpvParityTest && _resumePosition <= 3000 && !_isAutoplayResume) {
+        if ((!_tvMpvParityTest || _useNativeMobileSurface) &&
+            _resumePosition <= 3000 &&
+            !_isAutoplayResume) {
           _gateFirstFrame(player, _resumeSeekGen);
         }
         // Senior Autoplay Fix: Garantizar que el stream arranca aunque el motor
@@ -3290,8 +3537,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       final elapsed = DateTime.now().difference(t0).inMilliseconds;
       final pos = player.state.position.inMilliseconds;
       final dur = player.state.duration.inMilliseconds;
-      if (dur > 0 && pos >= 0 && pos <= elapsed + 2500) break;
+      // `pos >= 0` era siempre cierto: el gate se retiraba en el primer poll
+      // (250 ms) aunque la Surface aún mostrara el frame anterior. Esperamos a
+      // que la posición avance de verdad y damos un margen para presentar el
+      // primer frame antes de quitar el overlay.
+      if (dur > 0 && pos > 0 && pos <= elapsed + 2500) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        break;
+      }
       if (elapsed > 6000) break;
+    }
+    if (mounted && _holdingGen == gen) {
+      setState(() => _holdingFirstFrame = false);
+    }
+  }
+
+  /// Gate del "Reanudar": mantiene el overlay nativo hasta que el player
+  /// realmente avanza desde la posición de reanudación (o 3s de seguridad).
+  /// Evita ver la UI/último frame congelados durante el play/buffering.
+  Future<void> _gateResumePlayback(
+    Player player,
+    int gen,
+    int startPos,
+  ) async {
+    final t0 = DateTime.now();
+    while (mounted && gen == _resumeSeekGen) {
+      await Future.delayed(const Duration(milliseconds: 150));
+      if (gen != _resumeSeekGen) break;
+      final elapsed = DateTime.now().difference(t0).inMilliseconds;
+      final pos = player.state.position.inMilliseconds;
+      final bool advanced = startPos > 0 ? pos > startPos : pos > 1000;
+      if (player.state.playing && !player.state.buffering && advanced) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        break;
+      }
+      if (elapsed > 3000) break;
     }
     if (mounted && _holdingGen == gen) {
       setState(() => _holdingFirstFrame = false);
@@ -3564,6 +3844,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
       ScreenBrightnessController.resetBrightness();
     }
+    _mobileWidthSub?.cancel();
+    _mobileHeightSub?.cancel();
+    _nativeSurfaceReadyTimer?.cancel();
     _posSubscription?.cancel();
     _bufferingSubscription?.cancel();
     _completedSubscription?.cancel();
@@ -3592,6 +3875,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _historyNotifier?.flush();
 
     WidgetsBinding.instance.removeObserver(this);
+
+    if (_useNativeMobileSurface) {
+      // Soltar el wid antes de que el PlatformView libere la Surface. Si PiP
+      // ya enganchó otra superficie, el binder ignora este wid viejo.
+      unawaited(NativeVideoSurfaceBinder.detach(
+        _player,
+        viewId: _mobileViewId,
+        wid: _mobileWid,
+      ));
+    }
 
     if (_player != null) {
       // Senior Fix: Ya no matamos al player aquí, lo gestiona el Global Provider
@@ -3646,6 +3939,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final sessionNotifier = ref.read(activePlayerProvider.notifier);
     final String? exitUrl = sessionNotifier.state.url;
     final String? exitEpisode = sessionNotifier.state.episode;
+    final String? exitItemId = sessionNotifier.state.currentItem?.id;
 
     if (_allTracks.isNotEmpty) {
       sessionNotifier.updateSession(
@@ -3711,18 +4005,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     }
 
-    Future.delayed(Duration(milliseconds: isLandscape ? 350 : 0), () {
+    void syncMiniState() {
       // Sin chequeo de mounted: la ruta ya hizo pop; el notifier global sigue
       // vivo. Si el usuario reabrió otro contenido, no degradar a mini.
       try {
         final s = sessionNotifier.state;
-        if (s.uiState == PlayerUIState.full &&
-            s.url == exitUrl &&
-            s.episode == exitEpisode) {
+        final bool sameItem = exitItemId != null && s.currentItem?.id == exitItemId;
+        debugPrint('[player] minimize sync ui=${s.uiState} sameItem=$sameItem '
+            'urlMatch=${s.url == exitUrl} epMatch=${s.episode == exitEpisode}');
+        if (s.uiState == PlayerUIState.full && sameItem) {
           sessionNotifier.setUiState(PlayerUIState.mini);
         }
       } catch (_) {}
-    });
+    }
+    Future.delayed(Duration(milliseconds: isLandscape ? 350 : 0), syncMiniState);
+    // El estado del provider puede tardar en asentarse tras el pop. Un segundo
+    // intento evita que el mini quede en `full` (audio sin tarjeta visible).
+    Future.delayed(const Duration(milliseconds: 900), syncMiniState);
   }
 
   void _exitPlayer({bool minimizing = false}) async {
@@ -3833,32 +4132,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildMainContent(BuildContext context, UserSettings settings) {
     final remoteState = ref.watch(remoteControlProvider);
-    final targetId = remoteState.activeTargetDeviceId;
-
-    // Cast a dispositivo AurisTV (receptor propio): overlay de control del
-    // receptor mientras la sesión esté vinculada (ver _beginAurisCast).
-    if (_aurisCastTargetId != null) {
-      RemoteDevice? aurisTarget;
-      for (final d in remoteState.availableDevices) {
-        if (d.id == _aurisCastTargetId) aurisTarget = d;
-      }
-      if (aurisTarget != null) return _buildRemoteModeView(aurisTarget);
-    }
-
-    // ------------------------------------------------------------
-    // Senior Chromecast NATIVO: mientras castea a un Chromecast (Google
-    // Cast SDK), el video corre en el receptor y la pantalla muestra el
-    // overlay de control (poster + timeline + play/pause/stop).
-    // ------------------------------------------------------------
     final castState = ref.watch(chromecastProvider);
-    if (castState.phase == CastPhase.casting && castState.device != null) {
-      return ChromecastModeView(
-        title: _displayTitle,
-        episodeLabel: _episodeLabel(),
-        posterUrl: widget.posterUrl,
-        bannerUrl: widget.bannerUrl,
-        logoUrl: widget.logoUrl,
-      );
+    final bool isCasting = (castState.phase == CastPhase.casting && castState.device != null);
+    final bool isAurisRemote = (_aurisCastTargetId != null);
+
+    if (isCasting || isAurisRemote) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _enforcePortraitOrientation();
+      });
+
+      if (isAurisRemote) {
+        RemoteDevice? aurisTarget;
+        for (final d in remoteState.availableDevices) {
+          if (d.id == _aurisCastTargetId) aurisTarget = d;
+        }
+        if (aurisTarget != null) return _buildRemoteModeView(aurisTarget);
+      }
+
+      if (isCasting) {
+        return ChromecastModeView(
+          title: _displayTitle,
+          episodeLabel: _episodeLabel(),
+          posterUrl: widget.posterUrl,
+          bannerUrl: widget.bannerUrl,
+          logoUrl: widget.logoUrl,
+        );
+      }
     }
     
     final activeState = ref.watch(activePlayerProvider);
@@ -3949,7 +4248,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           return _playerView(tracks: tracks, settings: settings);
         },
         loading: () => Stack(children: [
-            const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Conectando con la fuente...', style: TextStyle(color: Colors.white54))])),
+            const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(color: Color(0xFFEF7A1E)), SizedBox(height: 16), Text('Conectando con la fuente...', style: TextStyle(color: Colors.white54))])),
             Positioned(top: 16, left: 16, child: SafeArea(child: IconButton(icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 28), onPressed: _exitPlayer))),
           ]),
         error: (err, _) => Stack(children: [
@@ -3998,7 +4297,56 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
+  void _stopRemoteSession(RemoteDevice target) {
+    final int resumeMs = target.positionMs;
+    _enforceLandscapeOrientation();
+
+    // 1. Detener al receptor remotamente
+    _sendRemoteAction(target, RemoteAction.stop);
+
+    // 2. Limpiar el vínculo remoto
+    ref.read(remoteControlProvider.notifier).setActiveTarget(null);
+
+    // 3. Si era Cast propio desde player local
+    if (_aurisCastTargetId != null) {
+      _endAurisCastSession();
+      return;
+    }
+
+    // 4. Si el reproductor local sigue cargado en memoria, reanudar
+    final player = _player;
+    if (player != null) {
+      setState(() => _userHasPaused = false);
+      if (resumeMs > 3000) {
+        player.seek(Duration(milliseconds: resumeMs)).then((_) {
+          if (mounted && !_isDisposed) player.play();
+        });
+      } else {
+        player.play();
+      }
+    } else {
+      // Si no hay reproductor local cargado, re-inicializar
+      setState(() {
+        _resumePosition = resumeMs;
+        _hasInitialized = false;
+        _isLoading = true;
+      });
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFFEF7A1E),
+        content: Text('Transmisión terminada. Recuperando reproducción local...',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
   Widget _buildRemoteModeView(RemoteDevice target) {
+    final String? bgUrl = (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
+        ? widget.bannerUrl
+        : widget.posterUrl;
+
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       body: LayoutBuilder(
@@ -4008,16 +4356,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
           return Stack(
             children: [
-              if (widget.bannerUrl != null)
+              if (bgUrl != null && bgUrl.isNotEmpty) ...[
                 Positioned.fill(
-                  child: Opacity(
-                    opacity: 0.2,
-                    child: CachedNetworkImage(
-                      imageUrl: ApiEndpoints.proxyImage(widget.bannerUrl),
-                      fit: BoxFit.cover,
+                  child: CachedNetworkImage(
+                    imageUrl: ApiEndpoints.proxyImage(bgUrl),
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0xD90A0A0E),
+                          Color(0xF20A0A0E),
+                          Color(0xFF000000),
+                        ],
+                      ),
                     ),
                   ),
                 ),
+              ],
               
               SafeArea(
                 child: Column(
@@ -4028,8 +4390,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     Expanded(
                       child: SingleChildScrollView(
                         padding: EdgeInsets.symmetric(
-                          horizontal: isLandscape ? 32 : 40,
-                          vertical: isLandscape ? 8 : 20,
+                          horizontal: isLandscape ? 32 : 24,
+                          vertical: isLandscape ? 8 : 12,
                         ),
                         child: Column(
                           children: [
@@ -4042,45 +4404,57 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       ),
                     ),
                     
-                    // Footer (Botón Desconectar siempre visible o al final del scroll)
+                    // Footer (Botón Desconectar siempre visible)
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: TextButton.icon(
-                        onPressed: () {
-                          // Senior Handback Logic: Recuperar posición y volver a local
-                          final int resumeMs = target.positionMs;
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => _stopRemoteSession(target),
+                            icon: AurisIcon(AurisIcons.cast, color: Colors.redAccent, size: 18),
+                            label: const Text('DETENER TRANSMISIÓN', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+                          ),
+                          const SizedBox(height: 2),
+                          TextButton.icon(
+                            onPressed: () {
+                              final String targetId = target.id;
+                              _sendRemoteAction(target, RemoteAction.stop);
+                              ref.read(remoteControlProvider.notifier).setActiveTarget(null);
+                              if (targetId.startsWith('local:') || target.transport == 'local') {
+                                ref.read(localCastProvider.notifier).forgetDevice(targetId);
+                              }
+                              if (_aurisCastTargetId != null) {
+                                _endAurisCastSession();
+                              } else {
+                                _enforceLandscapeOrientation();
+                              }
 
-                          if (_aurisCastTargetId != null) {
-                            // Cast propio (stream+headers): el stream local sigue
-                            // cargado; setActiveTarget(null) dispara el handback
-                            // unificado (_endAurisCastSession: seek + play).
-                            _sendRemoteAction(target, RemoteAction.stop);
-                            ref.read(remoteControlProvider.notifier).setActiveTarget(null);
-                            return;
-                          }
-
-                          // 1. Detener al receptor remotamente
-                          _sendRemoteAction(target, RemoteAction.stop);
-                          
-                          // 2. Limpiar el vínculo y restaurar estado local
-                          ref.read(remoteControlProvider.notifier).setActiveTarget(null);
-                          
-                          setState(() {
-                            _resumePosition = resumeMs;
-                            _hasInitialized = false; // Forzar re-inicialización del reproductor local
-                            _isLoading = true;
-                          });
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              backgroundColor: Color(0xFFEF7A1E),
-                              content: Text('Recuperando reproducción local...', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: const Color(0xFFEF7A1E),
+                                  content: Text('Desvinculado de ${target.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.link_off_rounded, color: Colors.white54, size: 16),
+                            label: Text(
+                              'Desvincular ${target.name}',
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          );
-                        },
-                        icon: AurisIcon(AurisIcons.cast, color: Colors.redAccent, size: 16),
-                        label: const Text('DETENER TRANSMISIÓN', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-                        style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white54,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -4113,7 +4487,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AurisIcon(AurisIcons.cast, color: Color(0xFFEF7A1E), size: 18),
+                AurisIcon(AurisIcons.cast, color: const Color(0xFFEF7A1E), size: 18),
                 const SizedBox(width: 10),
                 Text(
                   target.name.toUpperCase(),
@@ -4128,6 +4502,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
           ),
           const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.gamepad_rounded, color: Color(0xFFEF7A1E), size: 24),
+            tooltip: 'Mando D-PAD',
+            onPressed: () => showDpadRemoteSheet(context, target),
+          ),
+          const SizedBox(width: 4),
           _buildCastIcon(28),
         ],
       ),
@@ -4135,20 +4515,84 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildPortraitRemoteLayout(RemoteDevice target) {
+    final poster = (widget.posterUrl != null && widget.posterUrl!.isNotEmpty)
+        ? widget.posterUrl
+        : widget.bannerUrl;
+    final posterImage = (poster != null && poster.isNotEmpty)
+        ? ApiEndpoints.proxyImage(poster)
+        : null;
+
     return Column(
       children: [
-        const SizedBox(height: 60),
-        Text(
-          _displayTitle,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
-        ),
-        if (_activeEpisode != null && !_isMovie)
-          Text(
-            _episodeLabel(),
-            style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 18, fontWeight: FontWeight.bold),
+        const SizedBox(height: 8),
+        if (posterImage != null) ...[
+          Container(
+            height: 200,
+            width: 135,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.6),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: const Color(0xFFEF7A1E).withOpacity(0.2),
+                  blurRadius: 25,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: CachedNetworkImage(
+                imageUrl: posterImage,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => Container(
+                  color: Colors.white10,
+                  child: const Center(
+                    child: Icon(Icons.movie_rounded, color: Colors.white38, size: 48),
+                  ),
+                ),
+              ),
+            ),
           ),
-        const SizedBox(height: 60),
+          const SizedBox(height: 20),
+        ] else ...[
+          const SizedBox(height: 16),
+        ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            _displayTitle,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              height: 1.2,
+            ),
+          ),
+        ),
+        if (_activeEpisode != null && !_isMovie) ...[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              _episodeLabel(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.65),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 24),
         _buildRemoteControls(target),
       ],
     );
@@ -4187,39 +4631,46 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 icon: AurisIcon(AurisIcons.skipPrev, color: Colors.white70, size: 32),
                 onPressed: () => _handleRemoteNavigation(false, target),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
             ],
             IconButton(
-              iconSize: 24,
-              icon: AurisIcon(AurisIcons.backward10, color: Colors.white, size: 24),
+              iconSize: 28,
+              icon: AurisIcon(AurisIcons.backward10, color: Colors.white, size: 28),
               onPressed: () => _sendRemoteSeek(target, -10000),
             ),
-            const SizedBox(width: 32),
+            const SizedBox(width: 24),
             Container(
-              width: 70, height: 70,
+              width: 72,
+              height: 72,
               decoration: BoxDecoration(
                 color: Colors.white, 
                 shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: const Color(0xFFEF7A1E).withOpacity(0.3), blurRadius: 15)]
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFEF7A1E).withOpacity(0.4),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
               child: IconButton(
-                iconSize: 44,
+                iconSize: 40,
                 icon: AurisIcon(
                   target.isPlaying ? AurisIcons.pause : AurisIcons.play,
                   color: Colors.black,
-                  size: 44,
+                  size: 40,
                 ),
                 onPressed: () => _sendRemoteAction(target, target.isPlaying ? RemoteAction.pause : RemoteAction.play),
               ),
             ),
-            const SizedBox(width: 32),
+            const SizedBox(width: 24),
             IconButton(
-              iconSize: 24,
-              icon: AurisIcon(AurisIcons.forward10, color: Colors.white, size: 24),
+              iconSize: 28,
+              icon: AurisIcon(AurisIcons.forward10, color: Colors.white, size: 28),
               onPressed: () => _sendRemoteSeek(target, 10000),
             ),
             if (!_isTrailer) ...[
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               IconButton(
                 iconSize: 32,
                 icon: AurisIcon(AurisIcons.skipNext, color: Colors.white70, size: 32),
@@ -4229,7 +4680,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           ],
         ),
         if (!_isMobileDevice) ...[
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
           Row(
             children: [
               AurisIcon(AurisIcons.volumeDown, color: Colors.white54, size: 20),
@@ -4246,34 +4697,37 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           ),
         ],
         
-        const SizedBox(height: 32),
+        const SizedBox(height: 28),
         
-        // Acciones Especiales (OP/ED e Idioma)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        // Acciones Especiales (Mando D-PAD, OP/ED, Idioma, Episodios)
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 12,
+          runSpacing: 12,
           children: [
+            _RemoteMandoActionButton(
+              icon: Icons.gamepad_rounded,
+              label: 'MANDO D-PAD',
+              onTap: () => showDpadRemoteSheet(context, target),
+            ),
             if (!_isOpEd)
               _RemoteMandoActionButton(
                 icon: AurisIcons.fastForward,
                 label: 'SALTAR OP/ED',
                 onTap: () => _sendRemoteAction(target, RemoteAction.skipOpEd),
               ),
-            if (!_isOpEd && target.availableTracks.length > 1) ...[
-              const SizedBox(width: 16),
+            if (!_isOpEd && target.availableTracks.length > 1)
               _RemoteMandoActionButton(
                 icon: AurisIcons.subtitles,
                 label: 'IDIOMA',
                 onTap: () => _showRemoteLanguageSelector(target),
               ),
-            ],
-            if (!_isOpEd && !_isMovie) ...[
-              const SizedBox(width: 16),
+            if (!_isOpEd && !_isMovie)
               _RemoteMandoActionButton(
                 icon: AurisIcons.videoLib,
                 label: 'EPISODIOS',
                 onTap: () => _showRemoteEpisodesSelector(target),
               ),
-            ],
           ],
         ),
       ],
@@ -4434,21 +4888,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildRemoteTimeline(RemoteDevice target) {
-    final double progress = target.durationMs > 0 ? (target.positionMs / target.durationMs).clamp(0.0, 1.0) : 0.0;
-    
+    final double maxMs = target.durationMs > 0 ? target.durationMs.toDouble() : 1.0;
+    final double posMs = target.positionMs.clamp(0, maxMs.toInt()).toDouble();
+
     return Column(
       children: [
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            trackHeight: 4,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            trackHeight: 5,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
             activeTrackColor: const Color(0xFFEF7A1E),
             inactiveTrackColor: Colors.white10,
+            thumbColor: const Color(0xFFEF7A1E),
           ),
           child: Slider(
-            value: target.positionMs.toDouble(),
-            max: target.durationMs.toDouble().clamp(0.1, double.infinity),
-            onChanged: (v) => _sendRemoteAction(target, RemoteAction.seek, {'position_ms': v.toInt()}),
+            value: posMs,
+            min: 0.0,
+            max: maxMs,
+            onChanged: (v) => _sendRemoteAction(
+              target,
+              RemoteAction.seek,
+              {'position_ms': v.toInt()},
+            ),
           ),
         ),
         Padding(
@@ -4476,7 +4938,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _sendRemoteSeek(RemoteDevice target, int deltaMs) {
-    final int targetPos = (target.positionMs + deltaMs).clamp(0, target.durationMs);
+    final int desired = target.positionMs + deltaMs;
+    // durationMs puede ser 0/desconocida: sin tope superior fiable solo se
+    // evita el negativo (clamp contra duración inválida lanza ArgumentError).
+    final int targetPos = target.durationMs > 0
+        ? desired.clamp(0, target.durationMs)
+        : desired.clamp(0, 1 << 31);
     _sendRemoteAction(target, RemoteAction.seek, {'position_ms': targetPos});
   }
 
@@ -4794,6 +5261,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Widget _buildMobilePlayer(List<VideoTrackOption> playableTracks, UserSettings settings) {
     final bool isAnyGestureActive = _isBrightnessGesture != null || _showSeekIndicator || _isLongPressSpeedActive;
     final bool showAnyway = (_showControls || (_autoplayCountdown >= 0 && _isAutoplayResume) || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
+    // Modo nativo: un único overlay opaco cubre TODO el arranque (open,
+    // buffering y primer frame). Sin esto la textura muestra el último frame
+    // de la superficie anterior entre el spinner de "Cargando..." y el gate.
+    final bool showNativeLoading = _useNativeMobileSurface &&
+        _webViewController == null &&
+        !_isAutoplayResume &&
+        (_resumeCountdownPending ||
+            !_nativeSurfaceReady ||
+            _isLoading ||
+            _holdingFirstFrame ||
+            (!_hasResetPosition && _resumePosition > 3000));
+
+    if (_lastShowNativeLoading != showNativeLoading) {
+      _lastShowNativeLoading = showNativeLoading;
+      debugPrint(
+          '[player] nativeLoading=$showNativeLoading surfaceReady=$_nativeSurfaceReady '
+          'isLoading=$_isLoading holding=$_holdingFirstFrame '
+          'resume=$_resumePosition hasReset=$_hasResetPosition');
+    }
 
     return Focus(
       autofocus: true, 
@@ -4815,8 +5301,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               child: _buildMobileSurfaceFitted(
                 MobileVideoSurface(
                   key: _mobileSurfaceKey,
-                  onSurface: (wid, width, height) =>
-                      unawaited(_applyMobileSurface(wid, width, height)),
+                  onSurface: (viewId, wid, width, height) => unawaited(
+                      _applyMobileSurface(viewId, wid, width, height)),
                   onSurfaceDestroyed: _onMobileSurfaceDestroyed,
                 ),
               ),
@@ -4855,8 +5341,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             if (_useNativeMobileSurface) _mobileSubtitleOverlay(settings),
 
             // Gate de primer frame: spinner mientras el video está oculto
-            // verificando posición (si no, pantalla negra muerta).
-            if (_holdingFirstFrame)
+            // verificando posición (si no, pantalla negra muerta). En modo
+            // nativo lo cubre el overlay único `showNativeLoading`.
+            if (_holdingFirstFrame && !_useNativeMobileSurface)
               const Positioned.fill(
                 child: ColoredBox(
                   color: Colors.black,
@@ -5153,15 +5640,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                ),
              ),
            ),
-           // Senior UI Fix: El overlay se muestra durante TODA la carga (antes
-           // se ocultaba con `!_showControls`, pero al abrir el stream los
-           // controles ya son visibles y el usuario veía negro + 0:00).
-           if (_isLoading) 
+           // Overlay clásico para textura media_kit y WebView. En modo
+           // nativo lo reemplaza `showNativeLoading` para no duplicar spinners.
+           if (_isLoading && (!_useNativeMobileSurface || _webViewController != null))
              Positioned.fill(
                child: IgnorePointer(
                  child: Container(
-                   // Senior UI: Negro opaco durante la reanudación para ocultar flickeos
-                   color: (_resumePosition > 3000 && !_hasResetPosition) ? Colors.black : Colors.black45, 
+                   // Negro opaco durante la reanudación para ocultar flickeos.
+                   color: (_resumePosition > 3000 && !_hasResetPosition)
+                       ? Colors.black
+                       : Colors.black45, 
                    child: const Center(
                      child: Column(
                        mainAxisSize: MainAxisSize.min, 
@@ -5169,6 +5657,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                          SizedBox(width: 48, height: 48, child: CircularProgressIndicator(strokeWidth: 4, color: Colors.white)), 
                          SizedBox(height: 16), 
                          Text('Cargando...', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
+                       ],
+                     ),
+                   ),
+                 ),
+               ),
+             ),
+
+           // Único spinner del modo nativo: negro opaco (tapa el último frame
+           // de la textura) y naranja de marca. Se retira cuando el gate
+           // confirma que la posición ya avanzó y la Surface presentó el frame.
+           if (showNativeLoading)
+             const Positioned.fill(
+               child: IgnorePointer(
+                 child: ColoredBox(
+                   color: Colors.black,
+                   child: Center(
+                     child: Column(
+                       mainAxisSize: MainAxisSize.min,
+                       children: [
+                         SizedBox(
+                           width: 48,
+                           height: 48,
+                           child: CircularProgressIndicator(
+                             strokeWidth: 4,
+                             color: Color(0xFFEF7A1E),
+                           ),
+                         ),
+                         SizedBox(height: 16),
+                         Text(
+                           'Cargando...',
+                           style: TextStyle(
+                             color: Colors.white70,
+                             fontSize: 14,
+                             fontWeight: FontWeight.bold,
+                           ),
+                         ),
                        ],
                      ),
                    ),
@@ -5256,6 +5780,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               PlayerOverlay.server => 'Servidores (${_groupedSources.keys.length})',
               PlayerOverlay.quality => 'Calidad de Video',
               PlayerOverlay.episodes => 'Episodios',
+              PlayerOverlay.cast => 'Transmitir',
               _ => '',
             },
             panelContent: switch (_activeOverlay) {
@@ -5263,8 +5788,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               PlayerOverlay.server => _buildServerSelectorContent(isSidebar: true),
               PlayerOverlay.quality => _buildQualitySelectorContent(isSidebar: true),
               PlayerOverlay.episodes => _buildEpisodesSelectorContent(isSidebar: true),
+              PlayerOverlay.cast => _buildCastSelectorContent(isSidebar: true),
               _ => const SizedBox.shrink(),
             },
+            dismissOnBackgroundTap: false,
             onDismiss: () {
               setState(() => _activeOverlay = PlayerOverlay.none);
               _startHideTimer();
@@ -5311,15 +5838,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildControlsStack() {
-    return Stack(children: [
-        if (!_isLocked) ...[
-          _buildMobileHeader(),
-          _buildMobileCenterControls(),
-          _buildMobileBottomBar(),
-          _buildNextEpisodeOverlay(),
-        ],
-        if (_autoplayCountdown == -1 && _isMobileDevice) _buildLockToggle(),
-      ]);
+    final bool isAnyGestureActive = _isBrightnessGesture != null || _showSeekIndicator || _isLongPressSpeedActive;
+    final bool showAnyway = (_showControls || (_autoplayCountdown >= 0 && _isAutoplayResume)) && !isAnyGestureActive;
+
+    return AnimatedOpacity(
+      opacity: showAnyway ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 250),
+      child: IgnorePointer(
+        ignoring: !showAnyway,
+        child: Stack(
+          children: [
+            if (!_isLocked) ...[
+              _buildMobileHeader(),
+              _buildMobileCenterControls(),
+              _buildMobileBottomBar(),
+              _buildNextEpisodeOverlay(),
+            ] else if (_autoplayCountdown == -1 && _isMobileDevice) ...[
+              _buildLockToggle(),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildNextEpisodeOverlay() {
@@ -5450,10 +5990,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final screenHeight = MediaQuery.of(context).size.height;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final bool useMobileLayout = isMobile || screenHeight < 500;
+    final bool isTwoPanelOpen = _activeOverlay != PlayerOverlay.none;
 
     final bool hideBack = _isFullscreen && !isMobile;
-    final double iconSize = useMobileLayout ? (isLandscape ? 22 : 24) : 30;
-    final double spacing = useMobileLayout ? (isLandscape ? 6 : 8) : 12;
+    final double iconSize = isTwoPanelOpen ? 20 : (useMobileLayout ? (isLandscape ? 22 : 24) : 30);
+    final double spacing = isTwoPanelOpen ? 4 : (useMobileLayout ? (isLandscape ? 6 : 8) : 12);
+
+    final double hPadding = isTwoPanelOpen ? 8 : (useMobileLayout ? 24 : 48);
+    final double vPadding = isTwoPanelOpen ? 0 : (useMobileLayout ? (isLandscape ? 6 : 12) : 12);
 
     return Positioned(
       top: 0, 
@@ -5461,8 +6005,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       right: 0, 
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: useMobileLayout ? 24 : 48, 
-          vertical: useMobileLayout ? (isLandscape ? 8 : 12) : 12
+          horizontal: hPadding, 
+          vertical: vPadding,
         ), 
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center, 
@@ -5475,7 +6019,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             SizedBox(width: spacing),
             IconButton(
               iconSize: iconSize,
-              icon: AurisIcon(AurisIcons.chevronDown, color: Colors.white, size: 32),
+              icon: AurisIcon(AurisIcons.chevronDown, color: Colors.white, size: isTwoPanelOpen ? 24 : 32),
               onPressed: _minimizePlayer, // Botón dedicado para minimizar
             ),
             SizedBox(width: spacing),
@@ -5488,13 +6032,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         _displayTitle,
                         style: TextStyle(
                           color: Colors.white, 
                           fontWeight: FontWeight.w700, 
-                          fontSize: useMobileLayout ? (isLandscape ? 15 : 18) : 18
+                          fontSize: isTwoPanelOpen ? 14 : (useMobileLayout ? (isLandscape ? 15 : 18) : 18)
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -5502,11 +6047,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       if (targetDevice != null)
                         Row(
                           children: [
-                            AurisIcon(AurisIcons.cast, color: Color(0xFFEF7A1E), size: 14),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Reproduciendo en ${targetDevice.name}',
-                              style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 12, fontWeight: FontWeight.bold),
+                            AurisIcon(AurisIcons.cast, color: const Color(0xFFEF7A1E), size: 12),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Reproduciendo en ${targetDevice.name}',
+                                style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 11, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         )
@@ -5515,25 +6064,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           '${widget.episode}: ${widget.episodeTitle ?? ""}',
                           style: TextStyle(
                             color: Colors.white70, 
-                            fontSize: useMobileLayout ? (isLandscape ? 12 : 14) : 14, 
+                            fontSize: isTwoPanelOpen ? 11 : (useMobileLayout ? (isLandscape ? 12 : 14) : 14), 
                             fontWeight: FontWeight.bold
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         )
-else if (_activeEpisode != null && !_isMovie)
-Text(
-_episodeLabel(),
-style: TextStyle(
-color: Colors.white70,
-fontSize: useMobileLayout ? (isLandscape ? 12 : 14) : 14,
-fontWeight: FontWeight.bold
-),
-)
-],
-);
-},
-),
-),
-Builder(
+                      else if (_activeEpisode != null && !_isMovie)
+                        Text(
+                          _episodeLabel(),
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: isTwoPanelOpen ? 11 : (useMobileLayout ? (isLandscape ? 12 : 14) : 14),
+                            fontWeight: FontWeight.bold
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            Builder(
               builder: (context) {
                 final currentTrack = _allTracks.isNotEmpty
                     ? _allTracks[_selectedTrackIndex < _allTracks.length ? _selectedTrackIndex : 0]
@@ -5557,10 +6110,23 @@ Builder(
                 );
               },
             ),
-            const SizedBox(width: 16),
-          ]
-        )
-      )
+            const SizedBox(width: 8),
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: AurisIcon(_isLocked ? AurisIcons.lockClosed : AurisIcons.lockOpen, color: Colors.white, size: 20),
+              onPressed: () { 
+                setState(() { 
+                  _isLocked = !_isLocked; 
+                  if (_isLocked) _showControls = false; 
+                  else { _showControls = true; _startHideTimer(); } 
+                }); 
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+      ),
     );
   }
 
@@ -5911,10 +6477,11 @@ Builder(
 
     if (!_isMobileDevice) return const SizedBox.shrink();
     
-    // Senior Adaptive Scaling & Visual Hierarchy: Reducido tamaño de botones +10/-10 adicionalmente para mantener jerarquía visual respecto al Play/Pause (56px / 72px)
-    final double iconSize = isTablet ? 30 : 22;
-    final double playSize = isTablet ? 72 : 56;
-    final double spacing = isTablet ? 44 : 50;
+    final bool isTwoPanelOpen = _activeOverlay != PlayerOverlay.none;
+
+    final double iconSize = isTwoPanelOpen ? 18 : (isTablet ? 30 : 22);
+    final double playSize = isTwoPanelOpen ? 48 : (isTablet ? 72 : 56);
+    final double spacing = isTwoPanelOpen ? 32 : (isTablet ? 44 : 50);
 
     return Center(
       child: Row(
@@ -5946,11 +6513,13 @@ Builder(
     final screenHeight = MediaQuery.of(context).size.height;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final bool useMobileLayout = isMobile || screenHeight < 500;
+    final bool isTwoPanelOpen = _activeOverlay != PlayerOverlay.none;
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     final bool showLabels = screenWidth > 750;
 
-    final double vPadding = useMobileLayout && isLandscape ? 10 : 16;
+    final double vPadding = isTwoPanelOpen ? 2.0 : (useMobileLayout && isLandscape ? 10 : 16);
+    final double hPadding = isTwoPanelOpen ? 12.0 : (useMobileLayout ? 24 : 48);
     final double iconSize = useMobileLayout ? (isLandscape ? 24 : 24) : 30;
     final double spacing = useMobileLayout ? (isLandscape ? 8 : 8) : 12;
     final double playSize = useMobileLayout ? 28 : 44; 
@@ -5984,84 +6553,86 @@ Builder(
       left: 0,
       right: 0,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: useMobileLayout ? 24 : 48, vertical: vPadding),
+        padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: vPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildMobileTimeline(),
-            SizedBox(height: isLandscape ? 2 : 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: screenWidth - 48),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          iconSize: iconSize,
-                          icon: AurisIcon(
-                            _useVideoFitCycle 
-                              ? (_videoFit == BoxFit.contain
-                                  ? AurisIcons.aspectRatioSquare
-                                  : (_videoFit == BoxFit.fill ? AurisIcons.expand : AurisIcons.exitFullscreen))
-                              : (_isFullscreen ? AurisIcons.exitFullscreen : AurisIcons.expand),
-                            color: Colors.white,
-                            size: iconSize ?? 24,
+            if (!isTwoPanelOpen) ...[
+              SizedBox(height: isLandscape ? 2 : 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: screenWidth - 48),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            iconSize: iconSize,
+                            icon: AurisIcon(
+                              _useVideoFitCycle 
+                                ? (_videoFit == BoxFit.contain
+                                    ? AurisIcons.aspectRatioSquare
+                                    : (_videoFit == BoxFit.fill ? AurisIcons.expand : AurisIcons.exitFullscreen))
+                                : (_isFullscreen ? AurisIcons.exitFullscreen : AurisIcons.expand),
+                              color: Colors.white,
+                              size: iconSize ?? 24,
+                            ),
+                            onPressed: _toggleFullscreen,
                           ),
-                          onPressed: _toggleFullscreen,
-                        ),
-                        if (!_isMobileDevice) ...[
-                          SizedBox(width: spacing),
-                          _buildPlayPauseButton(size: playSize),
-                          const SizedBox(width: 12),
-                          _buildSeekCapsule(),
-                          const SizedBox(width: 12),
-                          _buildNavigationCapsule(hasPrevious, hasNext),
-                          const SizedBox(width: 12),
-                          _buildVolumePill(),
-                          const SizedBox(width: 12),
-                          _buildDurationCapsule(),
+                          if (!_isMobileDevice) ...[
+                            SizedBox(width: spacing),
+                            _buildPlayPauseButton(size: playSize),
+                            const SizedBox(width: 12),
+                            _buildSeekCapsule(),
+                            const SizedBox(width: 12),
+                            _buildNavigationCapsule(hasPrevious, hasNext),
+                            const SizedBox(width: 12),
+                            _buildVolumePill(),
+                            const SizedBox(width: 12),
+                            _buildDurationCapsule(),
+                          ],
+                          if (_isMobileDevice) ...[
+                            const SizedBox(width: 8),
+                            _buildUnifiedControlsCapsule(hasPrevious, hasNext),
+                          ],
                         ],
-                        if (_isMobileDevice) ...[
-                          const SizedBox(width: 8),
-                          _buildUnifiedControlsCapsule(hasPrevious, hasNext),
-                        ],
-                      ],
-                    ),
-                    
-                    Row(
-                      children: [
-                        if (_hasQualityOptions) ...[
-                          _PlayerTextButton(
-                            onPressed: _showQualitySelector,
-                            icon: AurisIcons.hd,
-                            label: _selectedQuality == 'auto'
-                                ? 'Calidad'
-                                : (_qualityMenuOptions.firstWhereOrNull((o) => o['key'] == _selectedQuality)?['label'] as String? ?? 'Calidad'),
-                            useBackground: true,
+                      ),
+                      
+                      Row(
+                        children: [
+                          if (_hasQualityOptions) ...[
+                            _PlayerTextButton(
+                              onPressed: _showQualitySelector,
+                              icon: AurisIcons.hd,
+                              label: _selectedQuality == 'auto'
+                                  ? 'Calidad'
+                                  : (_qualityMenuOptions.firstWhereOrNull((o) => o['key'] == _selectedQuality)?['label'] as String? ?? 'Calidad'),
+                              useBackground: true,
+                            ),
+                            SizedBox(width: spacing),
+                          ],
+                          if (!_isOpEd && !_isMovie && !_isTrailer)
+                          IconButton(
+                            iconSize: iconSize, 
+                            icon: AurisIcon(AurisIcons.videoLib, color: Colors.white, size: iconSize),
+                            onPressed: _showEpisodesPanel
                           ),
                           SizedBox(width: spacing),
+                          _buildCastIcon(iconSize),
+                          if (!_isOpEd && !_isMovie && !_isTrailer) ...[
+                            SizedBox(width: spacing),
+                            _PlayerTextButton(onPressed: _skipOpEd, icon: AurisIcons.fastForward, label: 'OP / ED', useBackground: true),
+                          ],
                         ],
-                        if (!_isOpEd && !_isMovie && !_isTrailer)
-                        IconButton(
-                          iconSize: iconSize, 
-                          icon: AurisIcon(AurisIcons.videoLib, color: Colors.white, size: iconSize),
-                          onPressed: _showEpisodesPanel
-                        ),
-                        SizedBox(width: spacing),
-                        _buildCastIcon(iconSize),
-                        if (!_isOpEd && !_isMovie && !_isTrailer) ...[
-                          SizedBox(width: spacing),
-                          _PlayerTextButton(onPressed: _skipOpEd, icon: AurisIcons.fastForward, label: 'OP / ED', useBackground: true),
-                        ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -6231,8 +6802,9 @@ Builder(
 
   Widget _buildLockToggle() {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final bool isTwoPanelOpen = _activeOverlay != PlayerOverlay.none;
     return Positioned(
-      top: isLandscape ? 45 : 60, 
+      top: isTwoPanelOpen ? 8 : (isLandscape ? 45 : 60), 
       right: 16, 
       child: IconButton(
         icon: AurisIcon(_isLocked ? AurisIcons.lockClosed : AurisIcons.lockOpen, color: Colors.white, size: 24),

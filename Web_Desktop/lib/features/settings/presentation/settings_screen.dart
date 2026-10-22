@@ -79,7 +79,7 @@ class SettingsScreen extends ConsumerWidget {
                                       color: primaryColor,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.edit, size: 14, color: Colors.black),
+                                    child: AurisIcon(AurisIcons.penFilled, size: 14, color: Colors.black),
                                   ),
                                 ],
                               ),

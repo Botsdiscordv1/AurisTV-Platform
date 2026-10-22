@@ -32,6 +32,11 @@ class RemoteDevice {
   
   final Map<String, dynamic> lastCommand;
 
+  /// Transporte del cast hacia este dispositivo:
+  ///  - 'supabase': comandos vía remote_sessions (Postgres Changes).
+  ///  - 'local':    cast LAN por HTTP (local_cast_provider, sin login).
+  final String transport;
+
   RemoteDevice({
     required this.id,
     required this.userId,
@@ -39,6 +44,7 @@ class RemoteDevice {
     required this.type,
     this.isOnline = true,
     DateTime? lastSeen,
+    this.transport = 'supabase',
     this.mediaTitle,
     this.mediaSource,
     this.mediaUrl,
@@ -56,6 +62,25 @@ class RemoteDevice {
     this.selectedTrackIndex = 0,
     this.lastCommand = const {},
   }) : lastSeen = lastSeen ?? DateTime.now();
+
+  factory RemoteDevice.fromCastInfo(dynamic castDevice, [dynamic castMedia]) {
+    final String id = (castDevice?.id as String?) ?? 'chromecast';
+    final String name = (castDevice?.name as String?) ?? 'Chromecast';
+    final bool isPlaying = castMedia?.isPlaying == true;
+    final int posMs = (castMedia?.positionMs as num?)?.toInt() ?? 0;
+    final int durMs = (castMedia?.durationMs as num?)?.toInt() ?? 0;
+
+    return RemoteDevice(
+      id: id.isNotEmpty ? id : 'chromecast',
+      userId: '',
+      name: name.isNotEmpty ? name : 'Chromecast',
+      type: RemoteDeviceType.other,
+      transport: 'chromecast',
+      isPlaying: isPlaying,
+      positionMs: posMs,
+      durationMs: durMs,
+    );
+  }
 
   factory RemoteDevice.fromJson(Map<String, dynamic> json) {
     return RemoteDevice(
@@ -143,6 +168,7 @@ class RemoteDevice {
       userId: userId,
       name: name,
       type: type,
+      transport: transport,
       isOnline: isOnline ?? this.isOnline,
       lastSeen: lastSeen ?? this.lastSeen,
       mediaTitle: mediaTitle ?? this.mediaTitle,
@@ -174,4 +200,16 @@ class RemoteAction {
   static const String stop = 'stop';
   static const String skipOpEd = 'skip_oped';
   static const String switchTrack = 'switch_track';
+
+  // D-Pad y Navegación TV
+  static const String dpadUp = 'dpad_up';
+  static const String dpadDown = 'dpad_down';
+  static const String dpadLeft = 'dpad_left';
+  static const String dpadRight = 'dpad_right';
+  static const String dpadCenter = 'dpad_center';
+  static const String back = 'back';
+  static const String home = 'home';
+  static const String volumeUp = 'volume_up';
+  static const String volumeDown = 'volume_down';
+  static const String mute = 'mute';
 }

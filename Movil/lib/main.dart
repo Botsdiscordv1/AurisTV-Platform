@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import 'package:auris_core/auris_core.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/pip_service.dart';
+import 'features/player/presentation/mobile_video_surface.dart';
 import 'shared/widgets/min_width_wrapper.dart';
 // import 'features/windows/presentation/windows_web_wrapper.dart';
 import 'features/remote_control/presentation/providers/remote_control_provider.dart';
@@ -18,6 +20,27 @@ import 'features/remote_control/data/models/remote_device.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Render nativo solo en Móvil Android. TV/Web no tocan esta bandera y
+  // conservan la textura de media_kit (mini player, PiP, cast y subtítulos).
+  VideoSurfaceConfig.nativeAndroidSurface =
+      const bool.fromEnvironment('NATIVE_VIDEO_SURFACE', defaultValue: false);
+  debugPrint(
+      '[VideoSurface] native=${VideoSurfaceConfig.nativeAndroidSurface}');
+
+  // HCPP (Flutter 3.44+, Android 14+ / Vulkan) compone la PlatformView a nivel
+  // del sistema. Sin él, Hybrid Composition puede dejar un snapshot congelado
+  // de la UI encima del SurfaceView hasta que cambie el layout.
+  if (VideoSurfaceConfig.nativeAndroidSurface && !kIsWeb) {
+    try {
+      VideoSurfaceConfig.useHybridAndroidView =
+          await HybridAndroidViewController.checkIfSupported();
+    } catch (e) {
+      debugPrint('[VideoSurface] HCPP check failed: $e');
+    }
+    debugPrint(
+        '[VideoSurface] hcpp=${VideoSurfaceConfig.useHybridAndroidView}');
+  }
 
   final imageCache = PaintingBinding.instance.imageCache;
   imageCache.maximumSizeBytes = 64 << 20;
@@ -116,27 +139,54 @@ class PipVideoContainer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(activePlayerProvider);
     final controller = state.controller;
+    final player = state.player;
     final posterUrl = state.currentItem?.posterUrl;
+    final bool useNative = VideoSurfaceConfig.nativeAndroidSurface &&
+        player != null &&
+        controller == null;
 
     return ColoredBox(
       color: Colors.black,
       child: Center(
         child: AspectRatio(
           aspectRatio: 16 / 9,
-          child: controller != null
-              ? Video(
-                  key: state.videoKey,
-                  controller: controller,
-                  fill: Colors.black,
-                  controls: NoVideoControls,
+          child: useNative
+              ? ColoredBox(
+                  color: Colors.black,
+                  child: FittedMobileVideoSurface(
+                    player: player!,
+                    onSurface: (viewId, wid, width, height) {
+                      unawaited(NativeVideoSurfaceBinder.attach(
+                        player: player!,
+                        viewId: viewId,
+                        wid: wid,
+                        width: width,
+                        height: height,
+                      ));
+                    },
+                    onSurfaceDestroyed: (viewId, wid) {
+                      unawaited(NativeVideoSurfaceBinder.detach(
+                        player,
+                        viewId: viewId,
+                        wid: wid,
+                      ));
+                    },
+                  ),
                 )
-              : (posterUrl != null
-                  ? Image.network(
-                      posterUrl,
-                      fit: BoxFit.cover,
-                      cacheWidth: 640,
+              : controller != null
+                  ? Video(
+                      key: state.videoKey,
+                      controller: controller,
+                      fill: Colors.black,
+                      controls: NoVideoControls,
                     )
-                  : const SizedBox.shrink()),
+                  : (posterUrl != null
+                      ? Image.network(
+                          posterUrl,
+                          fit: BoxFit.cover,
+                          cacheWidth: 640,
+                        )
+                      : const SizedBox.shrink()),
         ),
       ),
     );
@@ -192,6 +242,15 @@ class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverla
     return KeyedSubtree(
       key: _key,
       child: MiniPlayerBar(
+        nativeSurfaceBuilder: VideoSurfaceConfig.nativeAndroidSurface
+            ? (context, player, onSurface, onSurfaceDestroyed) {
+                return FittedMobileVideoSurface(
+                  player: player,
+                  onSurface: onSurface,
+                  onSurfaceDestroyed: onSurfaceDestroyed,
+                );
+              }
+            : null,
         onExpand: () {          final state = ref.read(activePlayerProvider);
           if (state.currentItem != null) {
             // Senior: Sincroniza uiState antes del push para que PlayerScreen vea isFull=true y no oculte extract

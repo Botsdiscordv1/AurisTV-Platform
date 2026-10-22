@@ -233,7 +233,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                                         color: primaryColor,
                                         shape: BoxShape.circle,
                                       ),
-                                      child: AurisIcon(AurisIcons.settings, size: 16, color: Colors.black),
+                                      child: AurisIcon(AurisIcons.penFilled, size: 16, color: Colors.black),
                                     ),
                                   ],
                                 ),

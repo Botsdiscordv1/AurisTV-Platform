@@ -33,13 +33,16 @@ class RemoteControlState {
     List<RemoteDevice>? availableDevices,
     RemoteDevice? currentDevice,
     String? activeTargetDeviceId,
+    bool clearActiveTarget = false,
     bool? isInitialized,
     Map<String, dynamic>? lastReceivedCommand,
   }) {
     return RemoteControlState(
       availableDevices: availableDevices ?? this.availableDevices,
       currentDevice: currentDevice ?? this.currentDevice,
-      activeTargetDeviceId: activeTargetDeviceId ?? this.activeTargetDeviceId,
+      activeTargetDeviceId: clearActiveTarget
+          ? null
+          : (activeTargetDeviceId ?? this.activeTargetDeviceId),
       isInitialized: isInitialized ?? this.isInitialized,
       lastReceivedCommand: lastReceivedCommand ?? this.lastReceivedCommand,
     );
@@ -53,6 +56,16 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
   Timer? _heartbeatTimer;
   RealtimeChannel? _channel;
   StreamSubscription? _devicesSubscription;
+
+  /// Dispositivos cast LAN descubertos/emparejados localmente (local_cast).
+  /// Conviven con los de Supabase en `availableDevices` para que el overlay
+  /// del player y los selectores funcionen igual en ambos transportes.
+  final Map<String, RemoteDevice> _localDevices = {};
+
+  /// Delegado del transporte local (lo registra local_cast_provider al
+  /// inicializar). Evita la dependencia directa remote_control → local_cast.
+  Future<bool> Function(String action, Map<String, dynamic>? data)?
+      localCommandDelegate;
 
   RemoteControlNotifier(this._ref) : super(RemoteControlState()) {
     WidgetsBinding.instance.addObserver(this);
@@ -232,6 +245,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
         .listen((data) {
           final devices = data.map((d) => RemoteDevice.fromJson(d)).toList();
           state = state.copyWith(availableDevices: devices);
+          _mergeAvailableDevices();
         });
   }
 
@@ -268,16 +282,53 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
     state = state.copyWith(lastReceivedCommand: command);
   }
 
+  /// Registra/actualiza los dispositivos locales (cast LAN) visibles ahora
+  /// mismo. Se llama desde local_cast_provider con cada beacon/actualización.
+  void syncLocalDevices(List<RemoteDevice> devices) {
+    _localDevices
+      ..clear()
+      ..addEntries(devices.map((d) => MapEntry(d.id, d)));
+    _mergeAvailableDevices();
+  }
+
+  /// Combina Supabase (fuente principal de `availableDevices`) con locales.
+  void _mergeAvailableDevices() {
+    final supabaseDevices = state.availableDevices
+        .where((d) => d.transport != 'local')
+        .toList();
+    state = state.copyWith(
+      availableDevices: [...supabaseDevices, ..._localDevices.values],
+    );
+  }
+
   void setActiveTarget(String? deviceId) {
-    state = state.copyWith(activeTargetDeviceId: deviceId);
-    if (deviceId != null) {
-      _userBox.put('active_remote_target_id', deviceId);
-    } else {
+    if (deviceId == null) {
+      state = state.copyWith(clearActiveTarget: true);
       _userBox.delete('active_remote_target_id');
+    } else {
+      state = state.copyWith(activeTargetDeviceId: deviceId);
+      _userBox.put('active_remote_target_id', deviceId);
     }
   }
 
   Future<void> sendCommand(String targetDeviceId, String action, [Map<String, dynamic>? data]) async {
+    // Cast LAN (transporte local, sin login): el dispositivo no existe en
+    // Supabase; el comando viaja por HTTP directo al server de la TV.
+    if (targetDeviceId.startsWith('local:')) {
+      final delegate = localCommandDelegate;
+      if (delegate == null) {
+        debugPrint('[AurisRemote] Sin delegado LOCAL para $targetDeviceId');
+        return;
+      }
+      try {
+        await delegate(action, data);
+        debugPrint('[AurisRemote] Command LOCAL $action -> $targetDeviceId');
+      } catch (e) {
+        debugPrint('[AurisRemote] Error comando LOCAL $action: $e');
+      }
+      return;
+    }
+
     try {
       final command = {
         'action': action,

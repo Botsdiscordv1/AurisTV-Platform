@@ -42,7 +42,6 @@ class AurisIcons {
   static String get server => reiconSvg(Reicon.outline.ssd2);
   static String get subtitles => reiconSvg(Reicon.outline.subtitles);
   static String get language => reiconSvg(Reicon.outline.subtitles);
-
   static String get audioLanguage => reiconSvg(Reicon.outline.subtitles);
   static String get restart => reiconSvg(Reicon.outline.rotateLeft);
   static String get repeat => reiconSvg(Reicon.outline.rotateLeft);
@@ -77,6 +76,9 @@ class AurisIcons {
   static String get desktop => reiconSvg(Reicon.outline.desktop);
   static String get mobile => reiconSvg(Reicon.outline.mobile);
   static String get phoneRotate => reiconSvg(Reicon.outline.phoneRotate2);
+  static String get gamepadButtons => reiconSvg(Reicon.outline.gamepadButtons);
+  static String get dpad => reiconSvg(Reicon.outline.dpad);
+  static String get gamepad => reiconSvg(Reicon.outline.gamepad);
   static String get lockOpen => reiconSvg(Reicon.outline.lockKeyholeOpen);
   static String get lockClosed => reiconSvg(Reicon.outline.lockKeyhole);
   static String get aspectRatioSquare => reiconSvg(Reicon.outline.aspectRatioSquare);
@@ -105,6 +107,13 @@ class AurisIcons {
   static String get grid => reiconSvg(Reicon.outline.grid);
 
   // Usuario, Favoritos y Acciones (Outline / Filled)
+  static String get pen => reiconSvg(Reicon.outline.pen);
+  static String get penFilled => reiconSvg(Reicon.filled.pen);
+  static String get edit => pen;
+  static String get editFilled => penFilled;
+  static String get transferH => reiconSvg(Reicon.outline.transferH);
+  static String get transferHFilled => reiconSvg(Reicon.filled.transferH);
+  static String get swap => transferH;
   static String get bookmarkOutline => reiconSvg(Reicon.outline.bookmark);
   static String get bookmarkFilled => reiconSvg(Reicon.filled.bookmark);
   static String get bookmarkMinusFilled => reiconSvg(Reicon.filled.bookmarkMinus);
