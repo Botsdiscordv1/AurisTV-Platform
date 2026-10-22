@@ -36,7 +36,7 @@ android {
         versionName = flutter.versionName
 
         multiDexEnabled = true
-        manifestPlaceholders["appAuthRedirectScheme"] = "io.supabase.flutter"
+        manifestPlaceholders["appAuthRedirectScheme"] = "auristv"
     }
 
     signingConfigs {

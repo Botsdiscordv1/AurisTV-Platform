@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/responsive_utils.dart';
 
 class ActivateScreen extends ConsumerStatefulWidget {
   final String initialCode;
@@ -43,6 +44,49 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
 
   String get _fullCode => _controllers.map((c) => c.text).join().toUpperCase();
 
+  void _handleCodeInput(int index, String val) {
+    final clean = val.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+
+    if (clean.length >= 4) {
+      final startIdx = clean.length >= 6 ? 0 : index;
+      for (int i = 0; i < clean.length && (startIdx + i) < 6; i++) {
+        _controllers[startIdx + i].text = clean[i];
+      }
+      final nextFocus = (startIdx + clean.length).clamp(0, 5);
+      if (startIdx + clean.length >= 6) {
+        _focusNodes[5].unfocus();
+      } else {
+        _focusNodes[nextFocus].requestFocus();
+      }
+    } else if (clean.length > 1) {
+      final newChar = clean[clean.length - 1];
+      _controllers[index].text = newChar;
+      _controllers[index].selection = TextSelection.fromPosition(
+        const TextPosition(offset: 1),
+      );
+      if (index < 5) {
+        _focusNodes[index + 1].requestFocus();
+      } else {
+        _focusNodes[index].unfocus();
+      }
+    } else if (clean.length == 1) {
+      _controllers[index].text = clean;
+      _controllers[index].selection = TextSelection.fromPosition(
+        const TextPosition(offset: 1),
+      );
+      if (index < 5) {
+        _focusNodes[index + 1].requestFocus();
+      } else {
+        _focusNodes[index].unfocus();
+      }
+    } else {
+      _controllers[index].text = '';
+      if (index > 0) {
+        _focusNodes[index - 1].requestFocus();
+      }
+    }
+  }
+
   Future<void> _submitCode() async {
     final code = _fullCode;
     if (code.length < 6) {
@@ -79,6 +123,7 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider);
     final isLoggedIn = user != null && user.id != 'guest_user';
+    final isMobile = ResponsiveUtils.isMobile(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0C0C0C),
@@ -92,51 +137,57 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 24,
+            vertical: 24,
+          ),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 480),
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 20 : 32,
+              vertical: isMobile ? 24 : 32,
+            ),
             decoration: BoxDecoration(
               color: const Color(0xFF141416),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   blurRadius: 24,
                 ),
               ],
             ),
             child: _isSuccess
-                ? _buildSuccessView()
-                : (!isLoggedIn ? _buildLoginRequiredView() : _buildActivationForm()),
+                ? _buildSuccessView(isMobile)
+                : (!isLoggedIn ? _buildLoginRequiredView(isMobile) : _buildActivationForm(isMobile)),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildLoginRequiredView() {
+  Widget _buildLoginRequiredView(bool isMobile) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.tv, size: 54, color: AppTheme.brand),
-        const SizedBox(height: 16),
-        const Text(
+        Icon(Icons.tv, size: isMobile ? 44 : 54, color: AppTheme.brand),
+        SizedBox(height: isMobile ? 12 : 16),
+        Text(
           'Activar Tu Dispositivo',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 24,
+            fontSize: isMobile ? 20 : 24,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'Debes iniciar sesión en tu cuenta de AurisTV para dar acceso a tu televisor.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70, fontSize: 14),
+          style: TextStyle(color: Colors.white70, fontSize: isMobile ? 13 : 14),
         ),
-        const SizedBox(height: 28),
+        SizedBox(height: isMobile ? 20 : 28),
         SizedBox(
           width: double.infinity,
           height: 48,
@@ -159,74 +210,77 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
     );
   }
 
-  Widget _buildActivationForm() {
+  Widget _buildActivationForm(bool isMobile) {
+    final boxSpacing = isMobile ? 6.0 : 12.0;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.tv_rounded, size: 54, color: AppTheme.brand),
-        const SizedBox(height: 16),
-        const Text(
+        Icon(Icons.tv_rounded, size: isMobile ? 44 : 54, color: AppTheme.brand),
+        SizedBox(height: isMobile ? 12 : 16),
+        Text(
           'Activar Tu Dispositivo',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 24,
+            fontSize: isMobile ? 20 : 24,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Introduce el código de 6 caracteres que aparece en la pantalla de tu TV.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70, fontSize: 14),
+          style: TextStyle(color: Colors.white70, fontSize: isMobile ? 13 : 14),
         ),
-        const SizedBox(height: 28),
+        SizedBox(height: isMobile ? 20 : 28),
 
         // 6 Character Boxes
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(6, (index) {
-            return SizedBox(
-              width: 50,
-              height: 60,
-              child: TextField(
-                controller: _controllers[index],
-                focusNode: _focusNodes[index],
-                textAlign: TextAlign.center,
-                maxLength: 1,
-                textCapitalization: TextCapitalization.characters,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-                decoration: InputDecoration(
-                  counterText: '',
-                  filled: true,
-                  fillColor: const Color(0xFF1F1F23),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.white24),
+            return [
+              if (index > 0) SizedBox(width: boxSpacing),
+              Flexible(
+                child: Container(
+                  constraints: const BoxConstraints(
+                    maxWidth: 50,
+                    maxHeight: 60,
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppTheme.brand, width: 2),
+                  child: AspectRatio(
+                    aspectRatio: 0.83,
+                    child: TextField(
+                      controller: _controllers[index],
+                      focusNode: _focusNodes[index],
+                      textAlign: TextAlign.center,
+                      textAlignVertical: TextAlignVertical.center,
+                      textCapitalization: TextCapitalization.characters,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isMobile ? 20 : 24,
+                        fontWeight: FontWeight.bold,
+                        height: 1.0,
+                      ),
+                      decoration: InputDecoration(
+                        counterText: '',
+                        filled: true,
+                        fillColor: const Color(0xFF1F1F23),
+                        contentPadding: EdgeInsets.zero,
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.white24),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: AppTheme.brand, width: 2),
+                        ),
+                      ),
+                      onChanged: (val) => _handleCodeInput(index, val),
+                    ),
                   ),
                 ),
-                onChanged: (val) {
-                  if (val.isNotEmpty) {
-                    _controllers[index].text = val.toUpperCase();
-                    if (index < 5) {
-                      _focusNodes[index + 1].requestFocus();
-                    } else {
-                      _focusNodes[index].unfocus();
-                    }
-                  } else if (index > 0) {
-                    _focusNodes[index - 1].requestFocus();
-                  }
-                },
               ),
-            );
-          }),
+            ];
+          }).expand((element) => element).toList(),
         ),
 
         if (_errorMessage != null) ...[
@@ -238,7 +292,7 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
           ),
         ],
 
-        const SizedBox(height: 28),
+        SizedBox(height: isMobile ? 20 : 28),
 
         SizedBox(
           width: double.infinity,
@@ -265,27 +319,27 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
     );
   }
 
-  Widget _buildSuccessView() {
+  Widget _buildSuccessView(bool isMobile) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.check_circle_outline_rounded, size: 68, color: Colors.greenAccent),
-        const SizedBox(height: 18),
-        const Text(
+        Icon(Icons.check_circle_outline_rounded, size: isMobile ? 56 : 68, color: Colors.greenAccent),
+        SizedBox(height: isMobile ? 14 : 18),
+        Text(
           '¡Dispositivo Activado!',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 24,
+            fontSize: isMobile ? 20 : 24,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 12),
-        const Text(
+        Text(
           'Tu televisor ha iniciado sesión correctamente. Ya puedes disfrutar de AurisTV.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70, fontSize: 14),
+          style: TextStyle(color: Colors.white70, fontSize: isMobile ? 13 : 14),
         ),
-        const SizedBox(height: 28),
+        SizedBox(height: isMobile ? 20 : 28),
         SizedBox(
           width: double.infinity,
           height: 48,

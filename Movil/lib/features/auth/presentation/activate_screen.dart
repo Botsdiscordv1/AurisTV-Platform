@@ -40,7 +40,8 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
             backgroundColor: Color(0xFFEF7A1E),
           ),
         );
-        context.go('/inicio');
+        // El home del router de Movil es `/` (no `/inicio`: ruta solo de Web_Desktop).
+        context.go('/');
       } else {
         setState(() => _errorMessage = 'No se pudo vincular. Intenta de nuevo.');
       }
@@ -101,7 +102,7 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
                         right: 8,
                         child: IconButton(
                           icon: const Icon(Icons.close, color: Colors.white70, size: 24),
-                          onPressed: () => context.go('/inicio'),
+                          onPressed: () => context.go('/'),
                         ),
                       ),
                     ],
@@ -186,7 +187,7 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            onPressed: () => context.go('/inicio'),
+                            onPressed: () => context.go('/'),
                             child: const Text(
                               'Cancelar',
                               style: TextStyle(

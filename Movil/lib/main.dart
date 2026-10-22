@@ -393,12 +393,22 @@ class _DeepLinkHandlerState extends ConsumerState<DeepLinkHandler> {
 
   /// Intercambia el `?code` del callback OAuth por la sesión de Supabase
   /// (PKCE: el verificador quedó guardado cuando signInWithOAuth lanzó el
-  /// navegador). Al terminar, la app retoma en la ruta raíz ya logeada.
+  /// navegador). Al terminar, la app vuelve donde correspondía: si el login
+  /// se abrió desde el flujo de activación (`/login?redirect=...`), retoma
+  /// esa ruta (p. ej. `/#/activate?code=XYZ` para vincular la TV); si no, va
+  /// al home `/` ya logeado.
   Future<void> _completeOauthSignIn(Uri uri) async {
     try {
       await Supabase.instance.client.auth.getSessionFromUrl(uri);
       debugPrint('[AurisAuth] OAuth callback: sesión establecida');
-      if (mounted) appRouter.go('/');
+      if (!mounted) return;
+      final pending = appRouter
+          .routerDelegate.currentConfiguration.uri.queryParameters['redirect'];
+      if (pending != null && pending.startsWith('/')) {
+        appRouter.go(pending);
+      } else {
+        appRouter.go('/');
+      }
     } catch (e) {
       debugPrint('[AurisAuth] OAuth callback falló: $e');
     }
