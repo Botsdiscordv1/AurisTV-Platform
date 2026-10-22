@@ -75,4 +75,10 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Google Cast nativo (Chromecast). Importa play-services-cast-framework
+    // (que a su vez trae androidx.mediarouter + androidx.appcompat, necesarios
+    // para el MediaRouteChooserDialog). El App ID del receptor vive en
+    // CastOptionsProvider.kt (placeholder CC1AD845 = Default Media Receiver).
+    implementation("com.google.android.gms:play-services-cast-framework:22.3.1")
 }
