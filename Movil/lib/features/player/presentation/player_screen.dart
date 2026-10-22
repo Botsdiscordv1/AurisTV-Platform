@@ -31,7 +31,10 @@ import 'package:auris_core/auris_core.dart';
 
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
 import '../../remote_control/data/models/remote_device.dart';
-import '../../remote_control/presentation/widgets/device_selector_dialog.dart';
+import '../../cast/data/models/cast_state.dart';
+import '../../cast/presentation/providers/cast_provider.dart';
+import '../../cast/presentation/widgets/cast_picker_sheet.dart';
+import '../../cast/presentation/widgets/cast_mode_view.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final String contentId;
@@ -391,17 +394,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  void _showDeviceSelector() {
-    showDialog(
-      context: context,
-      builder: (context) => const DeviceSelectorDialog(),
-    );
-  }
-
   Widget _buildCastIcon(double iconSize, {Color? color}) {
     final remoteState = ref.watch(remoteControlProvider);
+    final castState = ref.watch(chromecastProvider);
     final activeTargetId = remoteState.activeTargetDeviceId;
-    final isCasting = activeTargetId != null;
+    final isCasting = activeTargetId != null || castState.isCasting;
     
     Color iconColor = color ?? Colors.white;
     if (isCasting) {
@@ -410,12 +407,137 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     return _buildCircularButton(
       icon: AurisIcons.cast,
-      onTap: _showDeviceSelector,
+      onTap: _showCastPicker,
       size: _isMobileDevice ? iconSize + 16 : 44, // Senior Fix: Unificado a 44px con Play
       fill: isCasting,
       backgroundColor: _isMobileDevice ? Colors.transparent : null,
       iconSize: _isMobileDevice ? iconSize : 30, // Unificado a 30px
       iconColor: iconColor,
+    );
+  }
+
+  // ==================================================================
+  // Chromecast NATIVO (Google Cast SDK Android) — sesión del receptor
+  // ==================================================================
+
+  void _initCast() {
+    Future.delayed(Duration.zero, () {
+      if (!mounted || _isDisposed) return;
+      ref.listenManual(
+        chromecastProvider,
+        (previous, next) => _handleCastStateChanged(previous, next),
+      );
+    });
+  }
+
+  void _handleCastStateChanged(CastState? previous, CastState next) {
+    if (!mounted || _isDisposed) return;
+    final bool wasCasting = previous?.phase == CastPhase.casting;
+    final bool isCasting = next.phase == CastPhase.casting;
+
+    if (isCasting && !wasCasting) {
+      _beginChromecastSession(next.device);
+    } else if (wasCasting && !isCasting) {
+      // La sesión nativa terminó (disconnect/stop desde Google o el app).
+      _endChromecastSession(next.finalPositionMs, next.finalDurationMs);
+    } else if (isCasting) {
+      // Sync de progreso remoto → "Continuar viendo" sigue contando.
+      final media = next.media;
+      if (media.loaded && media.durationMs > 0) {
+        _lastCastDurationMs = media.durationMs;
+        _updateHistory(positionMs: media.positionMs, durationMs: media.durationMs);
+      }
+    }
+  }
+
+  Future<void> _beginChromecastSession(CastDeviceInfo? device) async {
+    if (!mounted || _isDisposed) return;
+    debugPrint('[AurisCast] Session started: ${device?.name}');
+
+    // Solo streams directos (media_kit) son castable: embeds/YouTube/trailers
+    // requieren navegador o app propietaria.
+    final url = _currentSourceUrl;
+    final canCast = url.isNotEmpty &&
+        _player != null &&
+        !_isCurrentTrackEmbed(_allTracks) &&
+        _currentSource != 'YouTube';
+
+    if (!canCast) {
+      ref.read(chromecastProvider.notifier).stopCasting();
+      if (mounted && !_isDisposed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFFEF7A1E),
+            content: Text(
+                'La fuente actual no se puede transmitir. Abre una fuente directa para castear.',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        );
+      }
+      return;
+    }
+
+    final wasPlaying = _player!.state.playing;
+    _castWasPlaying = wasPlaying;
+    // El player local queda en pausas mientras castea (como el modo remoto).
+    _userHasPaused = true;
+    await _player!.pause();
+
+    final startMs = _player!.state.position.inMilliseconds;
+    final subtitle = _episodeLabel();
+    final artwork = widget.bannerUrl ?? widget.posterUrl;
+
+    await ref.read(chromecastProvider.notifier).loadMedia(
+      url: url,
+      startMs: startMs,
+      title: _displayTitle,
+      subtitle: subtitle,
+      imageUrl: (artwork != null && artwork.isNotEmpty)
+          ? ApiEndpoints.proxyImage(artwork)
+          : null,
+    );
+  }
+
+  /// Handback: el Chromecast terminó/desconectó → retomar local desde la
+  /// última posición remota (si estaba reproduciendo, con autoplay).
+  void _endChromecastSession(int positionMs, int durationMs) {
+    if (!mounted || _isDisposed) return;
+    debugPrint('[AurisCast] Session ended at $positionMs');
+
+    final resume = positionMs > 3000 ? positionMs : _resumePosition;
+    final duration = durationMs > 0 ? durationMs : _lastCastDurationMs;
+    if (resume > 3000) {
+      _updateHistory(positionMs: resume, durationMs: duration, force: true);
+    }
+
+    if (_player == null) return;
+
+    setState(() {
+      _resumePosition = resume;
+      _hasInitialized = false;
+      _isLoading = true;
+      _userHasPaused = !_castWasPlaying;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFFEF7A1E),
+        content: Text('Transmisión terminada. Recuperando reproducción local...',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  /// Sheet unificada: Chromecast nativo (diálogo de Google) + dispositivos AurisTV.
+  void _showCastPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => const CastPickerSheet(),
     );
   }
 
@@ -579,6 +701,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   int _lastStablePositionMs = 0;
   int _lastUiPersistenceMs = 0;
   int _lastRemoteUpdateMs = 0;
+
+  // Senior Chromecast: estado del handback nativo (Google Cast).
+  // Si el usuario estaba reproduciendo localmente antes de conectar el
+  // Chromecast, al cortar la sesión se retoma autoplay desde la posición
+  // remota; si estaba en pausa, la local queda en pausa.
+  bool _castWasPlaying = false;
+  int _lastCastDurationMs = 0;
   Timer? _bufferingDebounceTimer;
   // Senior Continuity Shield: Usar la llave global del provider para evitar reconstrucciones del hardware
   late final GlobalKey _videoKey;
@@ -760,6 +889,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
 
     _initRemoteControl();
+    _initCast();
 
     // Senior Bridge Listener: Escuchar señales de botones físicos desde Android
     _volumeControlChannel.setMethodCallHandler((call) async {
@@ -3290,6 +3420,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Widget _buildMainContent(BuildContext context, UserSettings settings) {
     final remoteState = ref.watch(remoteControlProvider);
     final targetId = remoteState.activeTargetDeviceId;
+
+    // ------------------------------------------------------------
+    // Senior Chromecast NATIVO: mientras castea a un Chromecast (Google
+    // Cast SDK), el video corre en el receptor y la pantalla muestra el
+    // overlay de control (poster + timeline + play/pause/stop).
+    // ------------------------------------------------------------
+    final castState = ref.watch(chromecastProvider);
+    if (castState.phase == CastPhase.casting && castState.device != null) {
+      return ChromecastModeView(
+        title: _displayTitle,
+        episodeLabel: _episodeLabel(),
+        posterUrl: widget.posterUrl,
+        bannerUrl: widget.bannerUrl,
+        logoUrl: widget.logoUrl,
+      );
+    }
     
     final activeState = ref.watch(activePlayerProvider);
     final bool isFull = activeState.uiState == PlayerUIState.full;

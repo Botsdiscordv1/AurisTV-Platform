@@ -42,6 +42,7 @@ class AurisIcons {
   static String get server => reiconSvg(Reicon.outline.ssd2);
   static String get subtitles => reiconSvg(Reicon.outline.subtitles);
   static String get language => reiconSvg(Reicon.outline.subtitles);
+
   static String get audioLanguage => reiconSvg(Reicon.outline.subtitles);
   static String get restart => reiconSvg(Reicon.outline.rotateLeft);
   static String get repeat => reiconSvg(Reicon.outline.rotateLeft);

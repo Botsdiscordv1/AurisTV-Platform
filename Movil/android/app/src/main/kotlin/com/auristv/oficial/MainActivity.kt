@@ -7,11 +7,16 @@ import android.os.Bundle
 import android.util.Rational
 import android.view.KeyEvent
 import android.view.WindowManager
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity: FlutterActivity() {
+/**
+ * FlutterFragmentActivity (y NO FlutterActivity): el diálogo NATIVO de Google
+ * Cast (MediaRouteChooserDialog) necesita getSupportFragmentManager() de un
+ * host FragmentActivity. Requisito del CastChannel / chromecast.
+ */
+class MainActivity: FlutterFragmentActivity() {
     private val BRIGHTNESS_CHANNEL = "auristv/brightness"
     private val VOLUME_CHANNEL = "auristv/volume"
     private val PIP_CHANNEL = "auristv/pip"
@@ -146,6 +151,8 @@ class MainActivity: FlutterActivity() {
             }
         }
 
+        installCastChannel(flutterEngine)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, INSTALL_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "canInstall" -> result.success(canRequestInstall())
@@ -188,6 +195,11 @@ class MainActivity: FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    /// Google Cast nativo (Chromecast): registra el canal una única vez.
+    private fun installCastChannel(flutterEngine: FlutterEngine) {
+        CastChannel.attach(this, flutterEngine.dartExecutor.binaryMessenger)
     }
 
     private fun canRequestInstall(): Boolean {

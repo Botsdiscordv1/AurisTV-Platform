@@ -2,6 +2,8 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- Descubrimiento de Chromecasts en la red local (Google Cast nativo) -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <application
         android:label="Auris TV"
         android:name="${applicationName}"
@@ -46,6 +48,11 @@
                 <data android:pathPrefix="/activate"/>
             </intent-filter>
         </activity>
+        <!-- Google Cast nativo (Chromecast): proveedor de opciones del SDK -->
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="com.auristv.oficial.CastOptionsProvider" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
