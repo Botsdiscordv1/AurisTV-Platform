@@ -54,14 +54,18 @@
                 <data android:host="auristv.dpdns.org"/>
                 <data android:pathPrefix="/activate"/>
             </intent-filter>
-            <!-- Deep Links para Series y Películas (WhatsApp / Web / Enlaces compartidos) -->
+            <!-- Deep Links para Anime, Series y Películas (WhatsApp / Web / Enlaces compartidos) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="auristv.dpdns.org" android:pathPrefix="/anime"/>
+                <data android:scheme="https" android:host="auristv.dpdns.org" android:pathPrefix="/serie"/>
                 <data android:scheme="https" android:host="auristv.dpdns.org" android:pathPrefix="/series"/>
                 <data android:scheme="https" android:host="auristv.dpdns.org" android:pathPrefix="/movie"/>
                 <data android:scheme="https" android:host="auristv.dpdns.org" android:pathPrefix="/detalles"/>
+                <data android:scheme="http" android:host="auristv.dpdns.org" android:pathPrefix="/anime"/>
+                <data android:scheme="http" android:host="auristv.dpdns.org" android:pathPrefix="/serie"/>
                 <data android:scheme="http" android:host="auristv.dpdns.org" android:pathPrefix="/series"/>
                 <data android:scheme="http" android:host="auristv.dpdns.org" android:pathPrefix="/movie"/>
                 <data android:scheme="http" android:host="auristv.dpdns.org" android:pathPrefix="/detalles"/>
@@ -71,8 +75,12 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="auristv" android:host="anime"/>
+                <data android:scheme="auristv" android:host="serie"/>
                 <data android:scheme="auristv" android:host="series"/>
                 <data android:scheme="auristv" android:host="movie"/>
+                <data android:scheme="auristv" android:pathPrefix="/anime"/>
+                <data android:scheme="auristv" android:pathPrefix="/serie"/>
                 <data android:scheme="auristv" android:pathPrefix="/series"/>
                 <data android:scheme="auristv" android:pathPrefix="/movie"/>
             </intent-filter>

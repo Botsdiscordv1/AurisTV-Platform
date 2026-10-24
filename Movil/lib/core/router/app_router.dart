@@ -23,6 +23,8 @@ import '../../features/settings/presentation/storage_screen.dart';
 import '../../shared/widgets/main_navigation_wrapper.dart';
 import '../../shared/widgets/auris_bottom_bar.dart';
 
+import '../utils/url_utils.dart';
+
 final RouteObserver<ModalRoute<void>> routeObserver =
     RouteObserver<ModalRoute<void>>();
 
@@ -33,37 +35,47 @@ Widget _buildContentFromDeepLink(
   GoRouterState state, {
   required bool isMovie,
 }) {
+  final token = state.pathParameters['token'] ?? '';
   final slug = state.pathParameters['slug'] ?? '';
-  String title = '';
+  Map<String, dynamic> params = {};
 
-  if (slug.isNotEmpty) {
-    final unencoded = Uri.decodeComponent(slug).replaceAll('-', ' ').trim();
-    title = unencoded.split(' ').map((word) {
-      if (word.isEmpty) return '';
-      return '${word[0].toUpperCase()}${word.substring(1)}';
-    }).join(' ');
+  if (token.isNotEmpty || slug.isNotEmpty) {
+    final decoded = UrlUtils.decodeShareableToken(token, slug: slug);
+    if (decoded != null) {
+      params = decoded;
+    }
   }
 
-  if (title.isEmpty) {
-    title = state.uri.queryParameters['title'] ?? 'Contenido';
+  if (params.isEmpty) {
+    params = Map<String, dynamic>.from(state.uri.queryParameters);
   }
 
-  final category = isMovie ? 'movie' : (state.uri.queryParameters['category'] ?? 'anime');
-  final kind = isMovie ? 'movie' : (state.uri.queryParameters['kind'] ?? 'series');
+  final title = (params['title'] as String?) ?? 'Contenido';
+  final source = (params['source'] as String?) ?? '';
+  final url = (params['url'] as String?) ?? '';
+
+  final category = isMovie ? 'movie' : ((params['category'] as String?) ?? 'anime');
+  final kind = isMovie ? 'movie' : ((params['kind'] as String?) ?? 'series');
+
+  final yearVal = params['year'];
+  final int? year = yearVal is int ? yearVal : int.tryParse(yearVal?.toString() ?? '');
+
+  final seasonVal = params['season'];
+  final int? season = seasonVal is int ? seasonVal : int.tryParse(seasonVal?.toString() ?? '');
 
   return ContentScreen(
     title: title,
-    source: state.uri.queryParameters['source'] ?? '',
-    url: state.uri.queryParameters['url'] ?? '',
-    quality: state.uri.queryParameters['quality'],
+    source: source,
+    url: url,
+    quality: params['quality'] as String?,
     type: kind,
     kind: kind,
-    metadataTitle: title,
-    banner: state.uri.queryParameters['banner'],
+    metadataTitle: (params['metadataTitle'] as String?) ?? title,
+    banner: params['banner'] as String?,
     category: category,
-    year: int.tryParse(state.uri.queryParameters['year'] ?? ''),
-    season: int.tryParse(state.uri.queryParameters['season'] ?? ''),
-    sectionId: state.uri.queryParameters['sectionId'],
+    year: year,
+    season: season,
+    sectionId: params['sectionId'] as String?,
   );
 }
 
@@ -217,7 +229,28 @@ final GoRouter appRouter = GoRouter(
         );
       },
     ),
-    // Series / Anime / Kdramas deep links (WhatsApp / Web)
+    // Anime deep links (/anime/:token/:slug)
+    GoRoute(
+      path: '/anime/:token/:slug',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: false),
+    ),
+    GoRoute(
+      path: '/anime/:token',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: false),
+    ),
+    // Series / Kdramas deep links (/serie/ y /series/)
+    GoRoute(
+      path: '/serie/:token/:slug',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: false),
+    ),
+    GoRoute(
+      path: '/serie/:token',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: false),
+    ),
     GoRoute(
       path: '/series/:token/:slug',
       builder: (context, state) =>
