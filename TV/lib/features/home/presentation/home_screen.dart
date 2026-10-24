@@ -9,7 +9,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 
@@ -659,24 +658,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
   Widget _buildTopNavContent(BuildContext context, WidgetRef ref, String currentCategory, double navHeight) {
     final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
-    final logoHeight = TVResponsiveUtils.sp(context, 32);
+    final logoHeight = TVResponsiveUtils.sp(context, 30);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+    return Container(
       height: navHeight,
       decoration: const BoxDecoration(
-        color: Color(0xFF000000), // Fondo sÃ³lido sin blur
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xEE000000), // ~93% negro en el borde superior
+            Color(0x88000000), // ~53% negro intermedio
+            Color(0x00000000), // Difuminado transparente hacia el contenido
+          ],
+          stops: [0.0, 0.65, 1.0],
+        ),
       ),
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Perfil de usuario (Estilo Netflix TV: cuadrado con esquinas redondeadas)
             _buildUserAvatar(context),
             SizedBox(width: TVResponsiveUtils.sp(context, 6)), 
-            AurisIcon(AurisIcons.chevronDown, color: Colors.white60, size: 16), 
+            AurisIcon(AurisIcons.chevronDown, color: Colors.white54, size: 14), 
             
             const Spacer(),
             
+            // Barra de cápsulas central (Clon Netflix TV)
             _PillNavBar(
               currentCategory: currentCategory,
               isSearchActive: _showSearch,
@@ -699,6 +709,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             
             const Spacer(),
             
+            // Logo AurisTV en el extremo derecho
             SvgPicture.asset(
               'assets/icons/auris-tv-icon.svg',
               height: logoHeight,
@@ -714,44 +725,96 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     return Consumer(
       builder: (context, ref, _) {
         final user = ref.watch(authProvider);
-        if (user == null) {
-          return _FocusIconButton(
-            icon: AurisIcons.userOutline,
-            size: TVResponsiveUtils.sp(context, 22),
-            focusNode: homeProfileIconFocusNode,
-            scaleOnFocus: true,
-            onPressed: () => context.go('/profile'),
-          );
-        }
-
-        return _FocusIconButton(
+        return _UserAvatarFocusable(
           focusNode: homeProfileIconFocusNode,
+          user: user,
           onPressed: () => context.go('/profile'),
-          scaleOnFocus: true,
-          child: Container(
-            width: 32.0,
-            height: 32.0,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white24, width: 1.5),
-              image: user.photoUrl != null
-                  ? DecorationImage(
-                      image: user.photoUrl!.startsWith('assets/')
-                          ? AssetImage(user.photoUrl!) as ImageProvider
-                          : NetworkImage(user.photoUrl!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-            child: user.photoUrl == null
-                ? AurisIcon(AurisIcons.user, size: TVResponsiveUtils.sp(context, 16), color: Colors.white70)
-                : null,
-          ),
         );
       },
     );
   }
 }
+
+class _UserAvatarFocusable extends StatefulWidget {
+  final FocusNode? focusNode;
+  final dynamic user;
+  final VoidCallback onPressed;
+
+  const _UserAvatarFocusable({
+    this.focusNode,
+    required this.user,
+    required this.onPressed,
+  });
+
+  @override
+  State<_UserAvatarFocusable> createState() => _UserAvatarFocusableState();
+}
+
+class _UserAvatarFocusableState extends State<_UserAvatarFocusable> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _focused = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          width: 36.0,
+          height: 36.0,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6.0), // Avatar cuadrado redondeado clásico de Netflix
+            border: Border.all(
+              color: _focused ? Colors.white : Colors.white24,
+              width: _focused ? 2.5 : 1.5,
+            ),
+            boxShadow: _focused
+                ? const [
+                    BoxShadow(
+                      color: Color(0x44FFFFFF),
+                      blurRadius: 10.0,
+                      spreadRadius: 1.0,
+                    ),
+                  ]
+                : null,
+            image: widget.user?.photoUrl != null
+                ? DecorationImage(
+                    image: widget.user.photoUrl!.startsWith('assets/')
+                        ? AssetImage(widget.user.photoUrl!) as ImageProvider
+                        : NetworkImage(widget.user.photoUrl!),
+                    fit: BoxFit.cover,
+                  )
+                : null,
+          ),
+          child: widget.user?.photoUrl == null
+              ? Center(
+                  child: AurisIcon(
+                    AurisIcons.user,
+                    size: TVResponsiveUtils.sp(context, 16),
+                    color: _focused ? Colors.white : Colors.white70,
+                  ),
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
 class _PillNavBar extends StatelessWidget {
   final String currentCategory;
   final bool isSearchActive;
@@ -783,15 +846,16 @@ class _PillNavBar extends StatelessWidget {
       {'id': 'kdrama', 'label': 'KDramas'},
     ];
 
-    final double hPadding = TVResponsiveUtils.sp(context, 16);
-    final double spacing = 8.0;
+    final double hPadding = TVResponsiveUtils.sp(context, 18);
+    const double spacing = 10.0;
     
     return Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Botón Buscar (lateral izquierdo)
+        // Botón Buscar (Cápsula circular estilo Netflix)
         Padding(
-          padding: EdgeInsets.only(right: spacing),
+          padding: const EdgeInsets.only(right: spacing),
           child: _FocusIconButton(
             focusNode: searchIconFocusNode,
             icon: AurisIcons.search,
@@ -801,12 +865,12 @@ class _PillNavBar extends StatelessWidget {
             onKeyEvent: onSearchKeyEvent,
           ),
         ),
-        // Categorías principales
+        // Cápsulas de navegación Netflix TV
         ...categories.map((cat) {
           final id = cat['id']!;
           final isSelected = id == currentCategory && !isSearchActive;
           return Padding(
-            padding: EdgeInsets.only(right: spacing),
+            padding: const EdgeInsets.only(right: spacing),
             child: _PillNavItem(
               key: ValueKey('pill_$id'),
               label: cat['label']!,
@@ -817,7 +881,7 @@ class _PillNavBar extends StatelessWidget {
             ),
           );
         }),
-        // Botón Calendario / Horarios (lateral derecho)
+        // Botón Calendario / Horarios
         _FocusIconButton(
           icon: AurisIcons.grid,
           size: TVResponsiveUtils.sp(context, 16),
@@ -856,7 +920,6 @@ class _PillNavItemState extends State<_PillNavItem> {
   @override
   Widget build(BuildContext context) {
     return Focus(
-      // Senior Fix: Desactivado autofocus inicial para permitir que el Hero tome el mando al cargar la App
       autofocus: false,
       focusNode: widget.focusNode,
       onFocusChange: (f) => setState(() => _focused = f),
@@ -877,33 +940,45 @@ class _PillNavItemState extends State<_PillNavItem> {
       },
       child: GestureDetector(
         onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _focused ? 1.08 : 1.0,
-          alignment: Alignment.center,
-          duration: const Duration(milliseconds: 150),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOutCubic,
-            height: 32.0, // Altura reducida a 32 px para mayor estilizaciÃ³n
-            alignment: Alignment.center,
-            padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16.0), // Radio de 16 px (mitad de 32px para pÃ­ldora perfecta)
-              // Senior Logic: Blanco si tiene el foco, Gris (#2D2D2D) si es la categorÃ­a activa sin foco
+          height: 36.0,
+          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18.0),
+            color: _focused 
+                ? const Color(0xFFFFFFFF) 
+                : (widget.isActive ? const Color(0xFF262626) : Colors.transparent),
+            border: Border.all(
               color: _focused 
-                  ? Colors.white 
-                  : (widget.isActive ? const Color(0xFF2D2D2D) : Colors.transparent),
-              border: _focused ? Border.all(color: Colors.white, width: 1.5) : null,
+                  ? Colors.transparent 
+                  : (widget.isActive ? const Color(0x26FFFFFF) : Colors.transparent),
+              width: 1.0,
             ),
-            child: Text(
-              widget.label,
-              style: GoogleFonts.poppins(
-                // Texto negro solo cuando la cÃ¡psula es blanca (estÃ¡ enfocada)
-                color: _focused ? Colors.black : Colors.white,
-                fontSize: TVResponsiveUtils.sp(context, 12.5), // Ajustado ligeramente para armonizar con 32px
-                fontWeight: FontWeight.w700,
-              ),
+            boxShadow: _focused
+                ? const [
+                    BoxShadow(
+                      color: Color(0x33FFFFFF),
+                      blurRadius: 10.0,
+                      spreadRadius: 0.0,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontFamily: 'NetflixSans',
+              color: _focused 
+                  ? const Color(0xFF0E0E0E) 
+                  : (widget.isActive ? const Color(0xFFFFFFFF) : const Color(0xB3FFFFFF)),
+              fontSize: TVResponsiveUtils.sp(context, 13.5),
+              fontWeight: _focused 
+                  ? FontWeight.w700 
+                  : (widget.isActive ? FontWeight.w600 : FontWeight.w500),
+              letterSpacing: -0.1,
             ),
           ),
         ),
@@ -962,36 +1037,48 @@ class _FocusIconButtonState extends State<_FocusIconButton> {
       },
       child: GestureDetector(
         onTap: widget.onPressed,
-        child: AnimatedScale(
-          scale: (widget.scaleOnFocus && _focused) ? 1.10 : 1.0,
-          duration: const Duration(milliseconds: 150),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOutCubic,
-            width: 32.0,
-            height: 32.0,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
+          width: 36.0,
+          height: 36.0,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18.0),
+            color: _focused
+                ? const Color(0xFFFFFFFF)
+                : (widget.isActive ? const Color(0xFF262626) : Colors.transparent),
+            border: Border.all(
               color: _focused
-                  ? Colors.white
-                  : (widget.isActive ? const Color(0xFF2D2D2D) : Colors.transparent),
-              border: _focused ? Border.all(color: Colors.white, width: 1.5) : null,
+                  ? Colors.transparent
+                  : (widget.isActive ? const Color(0x26FFFFFF) : Colors.transparent),
+              width: 1.0,
             ),
-            child: widget.child ?? (widget.icon is String
-                ? AurisIcon(
-                    widget.icon as String,
-                    color: _focused ? Colors.black : Colors.white,
-                    size: widget.size,
-                  )
-                : Icon(
-                    widget.icon as IconData?,
-                    // Senior Fix: Icono negro sobre fondo blanco cuando estÃ¡ enfocado
-                    color: _focused ? Colors.black : Colors.white,
-                    size: widget.size,
-                  )),
+            boxShadow: _focused
+                ? const [
+                    BoxShadow(
+                      color: Color(0x33FFFFFF),
+                      blurRadius: 10.0,
+                      spreadRadius: 0.0,
+                    ),
+                  ]
+                : null,
           ),
+          child: widget.child ?? (widget.icon is String
+              ? AurisIcon(
+                  widget.icon as String,
+                  color: _focused 
+                      ? const Color(0xFF0E0E0E) 
+                      : (widget.isActive ? const Color(0xFFFFFFFF) : const Color(0xB3FFFFFF)),
+                  size: widget.size,
+                )
+              : Icon(
+                  widget.icon as IconData?,
+                  color: _focused 
+                      ? const Color(0xFF0E0E0E) 
+                      : (widget.isActive ? const Color(0xFFFFFFFF) : const Color(0xB3FFFFFF)),
+                  size: widget.size,
+                )),
         ),
       ),
     );

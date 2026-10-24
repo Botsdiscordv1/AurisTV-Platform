@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
 import '../../../core/utils/tv_responsive_utils.dart';
@@ -179,21 +178,23 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                     children: [
                       Text(
                         widget.title,
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
+                          fontFamily: 'NetflixSans',
                           fontSize: TVResponsiveUtils.rowTitleFontSize(context),
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: -0.4,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFE5E5E5),
+                          letterSpacing: -0.2,
                         ),
                       ),
                       if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 1),
+                        const SizedBox(height: 2),
                         Text(
                           widget.subtitle!,
-                          style: GoogleFonts.poppins(
-                            fontSize: TVResponsiveUtils.sp(context, 11),
+                          style: TextStyle(
+                            fontFamily: 'NetflixSans',
+                            fontSize: TVResponsiveUtils.sp(context, 12),
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withOpacity(0.6),
                           ),
                         ),
                       ],

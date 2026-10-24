@@ -20,6 +20,7 @@ import '../../../shared/widgets/focusable_wide_card.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/tv_responsive_utils.dart';
+import '../../home/widgets/wide_content_row.dart';
 import 'content_details_screen.dart';
 import 'episodes_detail_overlay.dart';
 
@@ -256,6 +257,8 @@ class _ContentHeader extends ConsumerStatefulWidget {
   @override ConsumerState<_ContentHeader> createState() => _ContentHeaderState();
 }
 
+enum _ContentSection { header, episodes, related, openings, endings }
+
 class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   YouTubeTrailerPlayerController? _trailerController; Timer? _fadeTimer; String? _lastTrailerKey; bool _isMuted = true; bool _showPlayer = false; bool _isPlayedOnce = false; Timer? _delayTimer;
   bool _showTitle = true; Timer? _titleHideTimer;
@@ -270,8 +273,144 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   int? _lastSeenSeason;
   // Memoria de scroll de las filas horizontales (como las filas del Home).
   final ScrollController _episodesScrollController = ScrollController();
-  final ScrollController _openingsScrollController = ScrollController();
-  final ScrollController _endingsScrollController = ScrollController();
+  // Nodo único que intercepta el D-PAD de toda la fila de episodios
+  // (mismo patrón cursor-fijo que WideContentRow).
+  final FocusNode _episodeRowFocusNode = FocusNode(debugLabel: 'EpisodesRow');
+  /// Nodos dummy por episodio: skipTraversal + !canRequestFocus.
+  List<FocusNode> _episodeDummyNodes = [];
+  /// Índice lógico actualmente seleccionado en la fila de episodios.
+  int? _focusedEpisodeIndex;
+
+  // Sección activa para opacidad cinematográfica estilo Prime Video
+  _ContentSection _activeSection = _ContentSection.header;
+  bool get _isScrolled => _activeSection != _ContentSection.header || _scrollOffset > 30;
+
+  // Memoria y navegación vertical entre secciones (patrón Home)
+  int _lastFocusedActionIndex = 0;
+  final List<FocusNode> _actionFocusNodes = [];
+  int _lastFocusedSelector = 0; // 0 = temporada, 1 = fuente
+  int? _lastFocusedEpisodeIndex;
+  final GlobalKey<_RelatedCarouselState> _relatedCarouselKey = GlobalKey<_RelatedCarouselState>();
+  final GlobalKey<WideContentRowState> _openingsRowKey = GlobalKey<WideContentRowState>();
+  final GlobalKey<WideContentRowState> _endingsRowKey = GlobalKey<WideContentRowState>();
+
+  void _syncActionFocusNodes(int count) {
+    while (_actionFocusNodes.length < count) {
+      final idx = _actionFocusNodes.length;
+      final node = FocusNode(debugLabel: 'action_$idx');
+      node.addListener(() {
+        if (node.hasFocus) {
+          _lastFocusedActionIndex = idx;
+          if (_activeSection != _ContentSection.header && mounted) {
+            setState(() => _activeSection = _ContentSection.header);
+          }
+        }
+      });
+      _actionFocusNodes.add(node);
+    }
+    while (_actionFocusNodes.length > count) {
+      _actionFocusNodes.removeLast().dispose();
+    }
+  }
+
+  /// Sincroniza los nodos dummy para la fila de episodios.
+  void _syncEpisodeDummyNodes(int count) {
+    if (_episodeDummyNodes.length == count) return;
+    for (final n in _episodeDummyNodes) {
+      n.dispose();
+    }
+    _episodeDummyNodes = List.generate(
+      count,
+      (_) => FocusNode(skipTraversal: true, canRequestFocus: false),
+    );
+  }
+
+  bool get _hasSeasonOrSourceSelectors =>
+      !widget.isMovieish && (widget.totalSeasons > 1 || widget.sources.isNotEmpty);
+
+  bool _focusRememberedAction() {
+    if (_mainScrollController.hasClients) {
+      _mainScrollController.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (_actionFocusNodes.isEmpty) return false;
+    final idx = _lastFocusedActionIndex.clamp(0, _actionFocusNodes.length - 1);
+    if (idx < _actionFocusNodes.length && _actionFocusNodes[idx].canRequestFocus) {
+      _actionFocusNodes[idx].requestFocus();
+      return true;
+    }
+    if (_actionsRowFirstNode.canRequestFocus) {
+      _actionsRowFirstNode.requestFocus();
+      return true;
+    }
+    return false;
+  }
+
+  bool _focusRememberedSelector() {
+    _scrollToEpisodesSection();
+    if (_lastFocusedSelector == 1 && widget.sources.isNotEmpty && _sourceSelectorFocusNode.canRequestFocus) {
+      _sourceSelectorFocusNode.requestFocus();
+      return true;
+    }
+    if (widget.totalSeasons > 1 && _seasonSelectorFocusNode.canRequestFocus) {
+      _seasonSelectorFocusNode.requestFocus();
+      return true;
+    }
+    if (widget.sources.isNotEmpty && _sourceSelectorFocusNode.canRequestFocus) {
+      _sourceSelectorFocusNode.requestFocus();
+      return true;
+    }
+    return false;
+  }
+
+  bool _focusRememberedEpisode() {
+    if (_episodeDummyNodes.isEmpty) return false;
+    _scrollToEpisodesSection();
+    final idx = (_lastFocusedEpisodeIndex ?? 0).clamp(0, _episodeDummyNodes.length - 1);
+    _episodeRowFocusNode.requestFocus();
+    _setEpisodeFocusedIndex(idx);
+    return true;
+  }
+
+  bool _focusBelowActions() {
+    if (_hasSeasonOrSourceSelectors && _focusRememberedSelector()) return true;
+    if (_focusRememberedEpisode()) return true;
+    if (_relatedCarouselKey.currentState?.focusRememberedCard() == true) return true;
+    if (_openingsRowKey.currentState?.focusRememberedCard() == true) return true;
+    if (_endingsRowKey.currentState?.focusRememberedCard() == true) return true;
+    return false;
+  }
+
+  bool _focusBelowEpisodes() {
+    if (_relatedCarouselKey.currentState?.focusRememberedCard() == true) return true;
+    if (_openingsRowKey.currentState?.focusRememberedCard() == true) return true;
+    if (_endingsRowKey.currentState?.focusRememberedCard() == true) return true;
+    return false;
+  }
+
+  bool _focusAboveRelated() {
+    if (_focusRememberedEpisode()) return true;
+    if (_hasSeasonOrSourceSelectors && _focusRememberedSelector()) return true;
+    if (_focusRememberedAction()) return true;
+    return false;
+  }
+
+  bool _focusBelowRelated() {
+    if (_openingsRowKey.currentState?.focusRememberedCard() == true) return true;
+    if (_endingsRowKey.currentState?.focusRememberedCard() == true) return true;
+    return false;
+  }
+
+  bool _focusAboveOpenings() {
+    if (_relatedCarouselKey.currentState?.focusRememberedCard() == true) return true;
+    if (_focusRememberedEpisode()) return true;
+    if (_hasSeasonOrSourceSelectors && _focusRememberedSelector()) return true;
+    if (_focusRememberedAction()) return true;
+    return false;
+  }
 
   void _scrollToEpisodesSection() {
     if (!_mainScrollController.hasClients) return;
@@ -279,8 +418,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     if (ctx != null) {
       Scrollable.ensureVisible(
         ctx,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
         alignment: 0.0,
       );
     }
@@ -288,13 +427,30 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   void _scrollToEpisodeIndex(int index, double cardWidth) {
     if (!_episodesScrollController.hasClients) return;
-    const double spacing = 10.0;
+    const double spacing = 14.0;
     final double targetOffset = index * (cardWidth + spacing);
+    final double maxScroll = _episodesScrollController.position.maxScrollExtent;
     _episodesScrollController.animateTo(
-      targetOffset,
-      duration: const Duration(milliseconds: 280),
+      targetOffset.clamp(0.0, maxScroll),
+      duration: const Duration(milliseconds: 240),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  /// Actualiza el índice de episodio seleccionado, refresca la info superior
+  /// y ancla la tarjeta bajo el cursor fijo (idéntico a Prime Video y WideContentRow).
+  void _setEpisodeFocusedIndex(int index, [EpisodeInfo? episode]) {
+    if (!mounted) return;
+    setState(() {
+      _focusedEpisodeIndex = index;
+      _lastFocusedEpisodeIndex = index;
+      _activeSection = _ContentSection.episodes;
+      if (episode != null) {
+        _focusedEpisode = episode;
+      }
+    });
+    final cardWidth = TVResponsiveUtils.bannerWidth(context);
+    _scrollToEpisodeIndex(index, cardWidth);
   }
 
   void _startTitleHideTimer() {
@@ -404,25 +560,35 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     });
 
     _actionsRowFirstNode.addListener(() {
-      if (_actionsRowFirstNode.hasFocus && _mainScrollController.hasClients && _mainScrollController.offset > 0.0) {
-        _mainScrollController.animateTo(
-          0.0,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
+      if (_actionsRowFirstNode.hasFocus) {
+        if (_activeSection != _ContentSection.header && mounted) {
+          setState(() => _activeSection = _ContentSection.header);
+        }
+        if (_mainScrollController.hasClients && _mainScrollController.offset > 0.0) {
+          _mainScrollController.animateTo(
+            0.0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+          );
+        }
       }
     });
   }
 
   @override void dispose() { 
     _revealTimeout?.cancel();
+    for (final n in _actionFocusNodes) {
+      n.dispose();
+    }
+    for (final n in _episodeDummyNodes) {
+      n.dispose();
+    }
     _actionsRowFirstNode.dispose();
+    _episodeRowFocusNode.dispose();
     _seasonSelectorFocusNode.dispose();
     _sourceSelectorFocusNode.dispose();
     _mainScrollController.dispose();
     _episodesScrollController.dispose();
-    _openingsScrollController.dispose();
-    _endingsScrollController.dispose();
     _disposeController(); 
     super.dispose(); 
   }
@@ -472,27 +638,50 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         onPointerHover: (_) => _handleInteraction(),
         child: Stack(
           children: [
-            // Backdrop persistente fijo de fondo: solo aparece al hacer scroll (_scrollOffset > 20)
-            AnimatedOpacity(
-              opacity: _scrollOffset > 20 ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
+            // Backdrop cinematográfico estático fijo en la pantalla (patrón Prime Video)
+            Positioned.fill(
               child: Stack(
                 fit: StackFit.expand,
                 children: [
+                  // Capa 1: Fondo y backdrop fotográfico fijado
                   Positioned.fill(
                     child: ColoredBox(
-                      color: const Color(0xFF101014),
+                      color: const Color(0xFF000000),
                       child: b != null && b.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: b,
                               fit: BoxFit.cover,
                               alignment: Alignment.centerRight,
-                              fadeInDuration: const Duration(milliseconds: 300),
-                              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                              memCacheWidth: (MediaQuery.sizeOf(context).width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 1920),
+                              fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                              fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                              cacheManager: AurisImageCacheManager.instance,
+                              errorWidget: (_, __, ___) => const ColoredBox(color: Color(0xFF000000)),
                             )
                           : const SizedBox.shrink(),
                     ),
                   ),
+                  // Capa 2: Gradiente horizontal inicial (izquierda sólida a derecha transparente)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            const Color(0xFF000000),
+                            const Color(0xFF000000).withOpacity(0.95),
+                            const Color(0xFF000000).withOpacity(0.85),
+                            const Color(0xFF000000).withOpacity(0.40),
+                            const Color(0xFF000000).withOpacity(0.10),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.20, 0.35, 0.55, 0.75, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Capa 3: Gradiente vertical inicial (fading inferior hacia oscuro)
                   Positioned.fill(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -500,13 +689,25 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.black.withValues(alpha: 0.70),
-                            Colors.black.withValues(alpha: 0.70),
-                            Colors.black.withValues(alpha: 0.70),
+                            const Color(0xFF000000).withOpacity(0.45),
+                            Colors.transparent,
+                            Colors.transparent,
+                            const Color(0xFF000000).withOpacity(0.80),
+                            const Color(0xFF000000),
                           ],
-                          stops: const [0.0, 0.5, 1.0],
+                          stops: const [0.0, 0.15, 0.60, 0.85, 1.0],
                         ),
                       ),
+                    ),
+                  ),
+                  // Capa 4: Scrim de transición animada al hacer scroll o enfocar secciones inferiores
+                  // Oscurece uniformemente el backdrop manteniendo el mismo fondo estático
+                  Positioned.fill(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      opacity: _isScrolled ? 0.75 : 0.0,
+                      child: const ColoredBox(color: Color(0xFF000000)),
                     ),
                   ),
                 ],
@@ -514,6 +715,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             ),
             SingleChildScrollView(
               controller: _mainScrollController,
+              physics: const ClampingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -526,53 +728,35 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                       final pw = MediaQuery.sizeOf(context).width;
                       return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
                         Container(color: Colors.transparent),
-                        if (b != null) Positioned.fill(child: ShaderMask(
-                          shaderCallback: (rect) => const LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
-                            stops: [0.0, 0.3, 0.6, 1.0],
-                          ).createShader(rect),
-                          blendMode: BlendMode.dstIn,
-                          child: TweenAnimationBuilder<double>(
-                            duration: const Duration(milliseconds: 800), 
-                            tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
-                            builder: (context, blur, child) => ImageFiltered(
-                              imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 800), 
-                                foregroundDecoration: BoxDecoration(color: Colors.black.withOpacity(_showPlayer ? 0.45 : 0.0)), 
-                                child: CachedNetworkImage(
-                                  imageUrl: b,
-                                  fit: BoxFit.cover,
-                                  alignment: Alignment.centerRight,
-                                  memCacheWidth: (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 1600),
-                                  fadeInDuration: AurisImageConfig.defaultFadeInDuration,
-                                  fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
-                                  cacheManager: AurisImageCacheManager.instance,
-                                  errorWidget: (_, __, ___) => Container(color: Colors.black12),
-                                )
-                              )
-                            )
-                          ),
-                        )),
-                        if (_trailerController != null && _lastTrailerKey != null) Positioned.fill(child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YouTubeTrailerPlayer(key: ValueKey(_lastTrailerKey), controller: _trailerController!, videoId: _lastTrailerKey!, autoPlay: true, mute: true, aspectRatio: 16 / 9))))))),
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                const Color(0xFF000000).withOpacity(0.98),
-                                const Color(0xFF000000).withOpacity(0.90),
-                                const Color(0xFF000000).withOpacity(0.40),
-                                const Color(0xFF000000).withOpacity(0.10),
-                                Colors.transparent,
-                              ],
-                              stops: const [0.0, 0.25, 0.45, 0.65, 1.0],
+                        if (_trailerController != null && _lastTrailerKey != null)
+                          Positioned.fill(
+                            child: AnimatedOpacity(
+                              duration: const Duration(milliseconds: 500),
+                              opacity: _showPlayer ? 1.0 : 0.0,
+                              child: PointerInterceptor(
+                                child: IgnorePointer(
+                                  ignoring: true,
+                                  child: ClipRect(
+                                    child: OverflowBox(
+                                      alignment: Alignment.center,
+                                      minWidth: pw,
+                                      maxWidth: pw,
+                                      minHeight: ph,
+                                      maxHeight: ph,
+                                      child: YouTubeTrailerPlayer(
+                                        key: ValueKey(_lastTrailerKey),
+                                        controller: _trailerController!,
+                                        videoId: _lastTrailerKey!,
+                                        autoPlay: true,
+                                        mute: true,
+                                        aspectRatio: 16 / 9,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
                         Positioned(
                           left: TVResponsiveUtils.horizontalPadding(context), 
                           top: h * 0.06,
@@ -582,16 +766,30 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                             child: _buildNetflixContentColumn(context, d, width, heroTitle, logoReady, metaPending),
                           ),
                         ),
-                        DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.center, colors: [const Color(0xFF000000).withOpacity(0.5), Colors.transparent], stops: const [0.0, 0.4]))),
                       ]);
                     }),
                   ),
                   const SizedBox(height: 6),
-                  _buildIntegratedEpisodesSection(context, d, widget.detailParams, widget.currentSource, heroBanner),
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    opacity: (_activeSection == _ContentSection.episodes || _activeSection == _ContentSection.header) ? 1.0 : 0.45,
+                    child: _buildIntegratedEpisodesSection(context, d, widget.detailParams, widget.currentSource, heroBanner),
+                  ),
                   const SizedBox(height: 8),
-                  _buildRelatedCarousel(),
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    opacity: _activeSection == _ContentSection.related ? 1.0 : 0.45,
+                    child: _buildRelatedCarousel(),
+                  ),
                   const SizedBox(height: 8),
-                  _buildThemesSection(),
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    opacity: (_activeSection == _ContentSection.openings || _activeSection == _ContentSection.endings) ? 1.0 : 0.45,
+                    child: _buildThemesSection(),
+                  ),
                 ],
               ),
             ),
@@ -611,9 +809,12 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       data: (result) {
         final eps = result?.response.episodes ?? [];
         if (eps.isEmpty) return const SizedBox.shrink();
+        _syncEpisodeDummyNodes(eps.length);
 
         if (_lastSeenSeason != widget.currentSeason || _focusedEpisode == null) {
           _lastSeenSeason = widget.currentSeason;
+          _lastFocusedEpisodeIndex = 0;
+          _focusedEpisodeIndex = null;
           if (eps.isNotEmpty) {
             _focusedEpisode = eps.first;
           }
@@ -649,152 +850,268 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 padding: EdgeInsets.only(left: horizontalPadding),
                 child: SizedBox(
                   height: 105,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        displayEpisode.title != null && displayEpisode.title!.isNotEmpty
-                            ? '${displayEpisode.number}. ${displayEpisode.title}'
-                            : '${displayEpisode.number}. Episodio ${displayEpisode.number}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      if (displayEpisode.description != null && displayEpisode.description!.isNotEmpty)
-                        SizedBox(
-                          width: MediaQuery.sizeOf(context).width * 0.55,
-                          height: 32,
-                          child: Text(
-                            displayEpisode.description!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.3),
-                          ),
-                        )
-                      else
-                        const SizedBox.shrink(),
-                      const SizedBox(height: 6),
-                      Row(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    child: KeyedSubtree(
+                      key: ValueKey(displayEpisode.number),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _buildAgeBadge(context, (d is MovieDetail ? d.certification : (d is AnimeDetail ? d.certification : null)) ?? '13+', small: true),
-                          const SizedBox(width: 8),
-                          Text(displayEpisode.duration ?? '24 min', style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                          if (_pickDisplayDate(displayEpisode.airDate, widget.year?.toString()) != null) ...[
-                            const SizedBox(width: 8),
-                            Text(_formatDate(_pickDisplayDate(displayEpisode.airDate, widget.year?.toString())), style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                          ],
+                          Text(
+                            displayEpisode.title != null && displayEpisode.title!.isNotEmpty
+                                ? '${displayEpisode.number}. ${displayEpisode.title}'
+                                : '${displayEpisode.number}. Episodio ${displayEpisode.number}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          if (displayEpisode.description != null && displayEpisode.description!.isNotEmpty)
+                            SizedBox(
+                              width: MediaQuery.sizeOf(context).width * 0.55,
+                              height: 32,
+                              child: Text(
+                                displayEpisode.description!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.3),
+                              ),
+                            )
+                          else
+                            const SizedBox(height: 32),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              _buildAgeBadge(context, (d is MovieDetail ? d.certification : (d is AnimeDetail ? d.certification : null)) ?? '13+', small: true),
+                              const SizedBox(width: 8),
+                              Text(displayEpisode.duration ?? '24 min', style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                              if (_pickDisplayDate(displayEpisode.airDate, widget.year?.toString()) != null) ...[
+                                const SizedBox(width: 8),
+                                Text(_formatDate(_pickDisplayDate(displayEpisode.airDate, widget.year?.toString())), style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                              ],
+                            ],
+                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              SizedBox(
-                height: 140,
-                child: ListView.separated(
-                  key: const PageStorageKey('content-episodes-row'),
-                  controller: _episodesScrollController,
-                  scrollDirection: Axis.horizontal,
-                  itemCount: eps.length,
-                  padding: EdgeInsets.only(
-                    left: horizontalPadding,
-                    right: (MediaQuery.sizeOf(context).width - 220 - horizontalPadding).clamp(20.0, 2000.0),
-                    top: 0,
-                    bottom: 0,
-                  ),
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    final ep = eps[index];
-                    final epSource = result?.sourceForNumber(ep.number) ?? currentSource;
-                    final thumbUrl = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
-                    final String playCategory = widget.category;
-                    final String? playKind = widget.kind;
+              // --- Fila de episodios con cursor fijo (mismo patrón que WideContentRow y Prime Video) ---
+              Builder(builder: (context) {
+                final cardWidth = TVResponsiveUtils.bannerWidth(context);
+                final cardHeight = TVResponsiveUtils.bannerHeight(context);
 
-                    return Focus(
-                      onFocusChange: (hasFocus) {
-                        if (hasFocus) {
-                          setState(() => _focusedEpisode = ep);
-                          _scrollToEpisodeIndex(index, 220.0);
-                        }
-                      },
-                      onKeyEvent: (node, event) {
-                        if (event is KeyDownEvent) {
-                          if (event.logicalKey == LogicalKeyboardKey.enter ||
-                              event.logicalKey == LogicalKeyboardKey.select ||
-                              event.logicalKey == LogicalKeyboardKey.space) {
-                            _playEpisode(ep, epSource, eps.length, detailParams, currentSource, heroBanner, playCategory, playKind, d);
+                return SizedBox(
+                  height: cardHeight,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Focus(
+                        focusNode: _episodeRowFocusNode,
+                        onFocusChange: (focused) {
+                          if (!mounted) return;
+                          if (focused) {
+                            // Al entrar: restaurar el último episodio visto y marcar sección activa
+                            final idx = (_lastFocusedEpisodeIndex ?? 0)
+                                .clamp(0, eps.length - 1);
+                            setState(() {
+                              _activeSection = _ContentSection.episodes;
+                              if (_focusedEpisodeIndex == null) {
+                                _focusedEpisodeIndex = idx;
+                                _focusedEpisode = eps[idx];
+                              }
+                            });
+                            _scrollToEpisodeIndex(idx, cardWidth);
+                            _scrollToEpisodesSection();
+                          } else {
+                            // Al salir: guardar memoria, quitar cursor
+                            if (_focusedEpisodeIndex != null) {
+                              _lastFocusedEpisodeIndex = _focusedEpisodeIndex;
+                            }
+                            setState(() => _focusedEpisodeIndex = null);
+                          }
+                        },
+                        onKeyEvent: (node, event) {
+                          if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+                            return KeyEventResult.ignored;
+                          }
+                          final key = event.logicalKey;
+                          final current = _focusedEpisodeIndex ?? 0;
+                          final last = eps.length - 1;
+
+                          if (key == LogicalKeyboardKey.arrowRight) {
+                            if (current < last) {
+                              _setEpisodeFocusedIndex(current + 1, eps[current + 1]);
+                            }
+                            // En el último: no escapar (blocked)
+                            return KeyEventResult.handled;
+                          } else if (key == LogicalKeyboardKey.arrowLeft) {
+                            if (current > 0) {
+                              _setEpisodeFocusedIndex(current - 1, eps[current - 1]);
+                            }
+                            // En el primero: no escapar (blocked)
+                            return KeyEventResult.handled;
+                          } else if (key == LogicalKeyboardKey.arrowUp) {
+                            if (_hasSeasonOrSourceSelectors && _focusRememberedSelector()) {
+                              return KeyEventResult.handled;
+                            }
+                            if (_focusRememberedAction()) return KeyEventResult.handled;
+                            return KeyEventResult.handled;
+                          } else if (key == LogicalKeyboardKey.arrowDown) {
+                            if (_focusBelowEpisodes()) return KeyEventResult.handled;
+                            return KeyEventResult.handled;
+                          } else if (key == LogicalKeyboardKey.enter ||
+                              key == LogicalKeyboardKey.select ||
+                              key == LogicalKeyboardKey.space) {
+                            if (_focusedEpisodeIndex != null && _focusedEpisodeIndex! < eps.length) {
+                              final ep = eps[_focusedEpisodeIndex!];
+                              final epSrc = result?.sourceForNumber(ep.number) ?? currentSource;
+                              SafeTap.run(() => _playEpisode(ep, epSrc, eps.length, detailParams, currentSource, heroBanner, widget.category, widget.kind, d));
+                            }
                             return KeyEventResult.handled;
                           }
-                          if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == eps.length - 1) {
-                            return KeyEventResult.handled;
-                          }
-                          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                            _seasonSelectorFocusNode.requestFocus();
-                            return KeyEventResult.handled;
-                          }
-                        }
-                        return KeyEventResult.ignored;
-                      },
-                      child: Builder(
-                        builder: (context) {
-                          final focused = Focus.of(context).hasFocus;
-                          return GestureDetector(
-                            onTap: () => _playEpisode(ep, epSource, eps.length, detailParams, currentSource, heroBanner, playCategory, playKind, d),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 220,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: focused ? Colors.white : Colors.transparent,
-                                  width: 3,
-                                ),
-                                boxShadow: focused ? [const BoxShadow(color: Colors.black54, blurRadius: 10, spreadRadius: 2)] : [],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    CachedNetworkImage(
-                                      imageUrl: ApiEndpoints.proxyImage(thumbUrl),
-                                      fit: BoxFit.cover,
-                                      memCacheWidth: (220 * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
-                                      memCacheHeight: ((220 * MediaQuery.of(context).devicePixelRatio) / (16 / 9)).round().clamp(1, 225),
-                                      fadeInDuration: AurisImageConfig.defaultFadeInDuration,
-                                      fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
-                                      cacheManager: AurisImageCacheManager.instance,
-                                      errorWidget: (_, __, ___) => Container(color: Colors.white10),
-                                    ),
-                                    Positioned(
-                                      bottom: 8,
-                                      left: 8,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withOpacity(0.3),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          'E${ep.number}',
-                                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          return KeyEventResult.ignored;
+                        },
+                        child: ListView.separated(
+                          key: const PageStorageKey('content-episodes-row'),
+                          controller: _episodesScrollController,
+                          // NeverScrollableScrollPhysics: scroll únicamente programático
+                          // (_scrollToEpisodeIndex). El cursor blanco queda fijo y las
+                          // tarjetas se deslizan debajo con animación fluida.
+                          physics: const NeverScrollableScrollPhysics(),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: eps.length,
+                          padding: EdgeInsets.only(
+                            left: horizontalPadding,
+                            right: (MediaQuery.sizeOf(context).width - cardWidth - horizontalPadding).clamp(horizontalPadding, 2000.0),
+                            top: 0,
+                            bottom: 0,
+                          ),
+                          separatorBuilder: (_, __) => const SizedBox(width: 14),
+                          itemBuilder: (context, index) {
+                            final ep = eps[index];
+                            final epSrc = result?.sourceForNumber(ep.number) ?? currentSource;
+                            final thumbUrl = (ep.thumbnail?.isNotEmpty ?? false)
+                                ? ep.thumbnail!
+                                : (epSrc?.thumbnail ?? currentSource?.thumbnail ?? '');
+                            // isSelected: reservado para uso futuro (no genera translucidez intra-fila)
+                            return GestureDetector(
+                              onTap: () => _playEpisode(ep, epSrc, eps.length, detailParams,
+                                  currentSource, heroBanner, widget.category, widget.kind, d),
+                              child: SizedBox(
+                                width: cardWidth,
+                                height: cardHeight,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      CachedNetworkImage(
+                                        imageUrl: ApiEndpoints.proxyImage(thumbUrl),
+                                        fit: BoxFit.cover,
+                                        memCacheWidth: (cardWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 640),
+                                        memCacheHeight: (cardHeight * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
+                                        fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                        fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                        cacheManager: AurisImageCacheManager.instance,
+                                        errorWidget: (_, __, ___) => Container(color: Colors.white10),
+                                      ),
+                                      Positioned.fill(
+                                        child: IgnorePointer(
+                                          child: DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  Colors.transparent,
+                                                  Colors.black.withOpacity(0.75),
+                                                ],
+                                                stops: const [0.48, 1.0],
+                                              ),
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      Positioned(
+                                        bottom: 8,
+                                        left: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(0.65),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.white.withOpacity(0.20), width: 1.0),
+                                          ),
+                                          child: Text(
+                                            'E${ep.number}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (widget.latestHistory != null &&
+                                          int.tryParse(widget.latestHistory!.episode ?? '') == ep.number &&
+                                          widget.latestHistory!.progress > 0)
+                                        Positioned(
+                                          bottom: 0,
+                                          left: 0,
+                                          right: 0,
+                                          child: Container(
+                                            height: 3,
+                                            color: Colors.white24,
+                                            child: FractionallySizedBox(
+                                              alignment: Alignment.centerLeft,
+                                              widthFactor: widget.latestHistory!.progress.clamp(0.0, 1.0),
+                                              child: Container(
+                                                color: const Color(0xFFEF7A1E),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      // Borde blanco FIJO anclado en el padding izquierdo (estilo Prime Video).
+                      // El cursor no se mueve; las tarjetas se deslizan debajo.
+                      Positioned(
+                        left: horizontalPadding,
+                        top: 0,
+                        width: cardWidth,
+                        height: cardHeight,
+                        child: IgnorePointer(
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 150),
+                            opacity: _focusedEpisodeIndex != null ? 1.0 : 0.0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2.5,
                                 ),
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    );
-                  },
-                ),
-              ),
+                    ],
+                  ),
+                );
+              }),
             ],
           ),
         );
@@ -1045,6 +1362,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     ];
 
     final int totalCount = rawButtons.length;
+    _syncActionFocusNodes(totalCount);
     final buttonWidgets = <Widget>[];
 
     for (int idx = 0; idx < totalCount; idx++) {
@@ -1061,7 +1379,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           iconSize: btn.iconSize,
           color: btn.color,
           autofocus: btn.autofocus,
-          focusNode: btn.focusNode,
+          focusNode: _actionFocusNodes[idx],
+          onArrowDown: () => _focusBelowActions(),
           isFirst: idx == 0,
           isLast: idx == totalCount - 1 && !hasSources,
         ),
@@ -1236,10 +1555,21 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                 style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
               ),
             ),
-            _RelatedCarousel(
-              items: items,
-              category: widget.category,
-              sourceFallback: widget.currentSource?.source ?? widget.source,
+            Focus(
+              canRequestFocus: false,
+              onFocusChange: (f) {
+                if (f && mounted) {
+                  setState(() => _activeSection = _ContentSection.related);
+                }
+              },
+              child: _RelatedCarousel(
+                key: _relatedCarouselKey,
+                items: items,
+                category: widget.category,
+                sourceFallback: widget.currentSource?.source ?? widget.source,
+                onArrowUpToPrev: _focusAboveRelated,
+                onArrowDownToNext: _focusBelowRelated,
+              ),
             ),
           ],
         );
@@ -1279,7 +1609,11 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           ),
         ),
         const SizedBox(width: 12),
-        _MoreButton(onPressed: () => _openFullscreenDetails(d)),
+        _MoreButton(
+          onPressed: () => _openFullscreenDetails(d),
+          onArrowLeft: () => _focusRememberedAction(),
+          onArrowDown: () => _focusBelowActions(),
+        ),
       ],
     );
   }
@@ -1292,73 +1626,66 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         final endings = themesData.endings;
         if (openings.isEmpty && endings.isEmpty) return const SizedBox.shrink();
 
-        final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
+        // Adapta AnimeThemeInfo → WideContentItem para reutilizar WideContentRow
+        // con exactamente el mismo diseño, foco y animación de cursor fijo que Home.
+        WideContentItem themeToItem(AnimeThemeInfo th, int idx, bool isOP) {
+          return WideContentItem(
+            id: th.videoUrl.isNotEmpty ? th.videoUrl : '${isOP ? 'op' : 'ed'}_$idx',
+            title: th.title,
+            imageUrl: th.imageUrl ?? '',
+            subtitle: th.artist.isNotEmpty ? th.artist : 'Artista desconocido',
+            originalItem: th,
+          );
+        }
+
+        final openingItems = [
+          for (int i = 0; i < openings.length; i++) themeToItem(openings[i], i, true)
+        ];
+        final endingItems = [
+          for (int i = 0; i < endings.length; i++) themeToItem(endings[i], i, false)
+        ];
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (openings.isNotEmpty) ...[
-              Padding(
-                padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 8),
-                child: const Text(
-                  'Openings',
-                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+            if (openingItems.isNotEmpty)
+              Focus(
+                canRequestFocus: false,
+                onFocusChange: (f) {
+                  if (f && mounted) {
+                    setState(() => _activeSection = _ContentSection.openings);
+                  }
+                },
+                child: WideContentRow(
+                  key: _openingsRowKey,
+                  title: 'Openings',
+                  items: openingItems,
+                  onItemTap: (item) => _playTheme(item.originalItem as AnimeThemeInfo, true),
+                  onArrowUpToPrev: _focusAboveOpenings,
+                  onArrowDownToNext: endingItems.isNotEmpty
+                      ? () => _endingsRowKey.currentState?.focusRememberedCard() == true
+                      : null,
                 ),
               ),
-              SizedBox(
-                height: 200,
-                child: ListView.separated(
-                  key: const PageStorageKey('content-openings-row'),
-                  controller: _openingsScrollController,
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                  itemCount: openings.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 16),
-                  itemBuilder: (context, index) {
-                    final th = openings[index];
-                    return FocusableWideCard(
-                      title: th.title,
-                      imageUrl: th.imageUrl ?? '',
-                      subtitle: th.artist.isNotEmpty ? th.artist : 'Artista desconocido',
-                      width: 280,
-                      height: 158,
-                      onTap: () => _playTheme(th, true),
-                    );
-                  },
+            if (endingItems.isNotEmpty)
+              Focus(
+                canRequestFocus: false,
+                onFocusChange: (f) {
+                  if (f && mounted) {
+                    setState(() => _activeSection = _ContentSection.endings);
+                  }
+                },
+                child: WideContentRow(
+                  key: _endingsRowKey,
+                  title: 'Endings',
+                  items: endingItems,
+                  onItemTap: (item) => _playTheme(item.originalItem as AnimeThemeInfo, false),
+                  onArrowUpToPrev: openingItems.isNotEmpty
+                      ? () => _openingsRowKey.currentState?.focusRememberedCard() == true
+                      : _focusAboveOpenings,
+                  onArrowDownToNext: null,
                 ),
               ),
-            ],
-            if (endings.isNotEmpty) ...[
-              Padding(
-                padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 8),
-                child: const Text(
-                  'Endings',
-                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                ),
-              ),
-              SizedBox(
-                height: 200,
-                child: ListView.separated(
-                  key: const PageStorageKey('content-endings-row'),
-                  controller: _endingsScrollController,
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                  itemCount: endings.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 16),
-                  itemBuilder: (context, index) {
-                    final th = endings[index];
-                    return FocusableWideCard(
-                      title: th.title,
-                      imageUrl: th.imageUrl ?? '',
-                      subtitle: th.artist.isNotEmpty ? th.artist : 'Artista desconocido',
-                      width: 280,
-                      height: 158,
-                      onTap: () => _playTheme(th, false),
-                    );
-                  },
-                ),
-              ),
-            ],
           ],
         );
       },
@@ -1381,17 +1708,6 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 
   Widget _buildSeasonAndSourceSelectors(BuildContext context, UnifiedDetailParams detailParams, SearchResult? currentSource) {
-    void handleUpKey() {
-      if (_mainScrollController.hasClients) {
-        _mainScrollController.animateTo(
-          0.0,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-      }
-      _actionsRowFirstNode.requestFocus();
-    }
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1399,13 +1715,36 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           Focus(
             focusNode: _seasonSelectorFocusNode,
             onFocusChange: (hasFocus) {
-              if (hasFocus) _scrollToEpisodesSection();
+              if (hasFocus) {
+                _lastFocusedSelector = 0;
+                if (_activeSection != _ContentSection.header && mounted) {
+                  _activeSection = _ContentSection.header;
+                }
+                _scrollToEpisodesSection();
+              }
               setState(() {});
             },
             onKeyEvent: (node, event) {
-              if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                handleUpKey();
-                return KeyEventResult.handled;
+              if (event is KeyDownEvent) {
+                if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                  if (widget.sources.isNotEmpty &&
+                      _sourceSelectorFocusNode.canRequestFocus) {
+                    _sourceSelectorFocusNode.requestFocus();
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                  _focusRememberedAction();
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                  if (_focusRememberedEpisode()) return KeyEventResult.handled;
+                  if (_focusBelowEpisodes()) return KeyEventResult.handled;
+                }
               }
               return KeyEventResult.ignored;
             },
@@ -1460,13 +1799,36 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           Focus(
             focusNode: _sourceSelectorFocusNode,
             onFocusChange: (hasFocus) {
-              if (hasFocus) _scrollToEpisodesSection();
+              if (hasFocus) {
+                _lastFocusedSelector = 1;
+                if (_activeSection != _ContentSection.header && mounted) {
+                  _activeSection = _ContentSection.header;
+                }
+                _scrollToEpisodesSection();
+              }
               setState(() {});
             },
             onKeyEvent: (node, event) {
-              if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                handleUpKey();
-                return KeyEventResult.handled;
+              if (event is KeyDownEvent) {
+                if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                  if (widget.totalSeasons > 1 &&
+                      _seasonSelectorFocusNode.canRequestFocus) {
+                    _seasonSelectorFocusNode.requestFocus();
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                  _focusRememberedAction();
+                  return KeyEventResult.handled;
+                }
+                if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                  if (_focusRememberedEpisode()) return KeyEventResult.handled;
+                  if (_focusBelowEpisodes()) return KeyEventResult.handled;
+                }
               }
               return KeyEventResult.ignored;
             },
@@ -1530,8 +1892,14 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
 class _MoreButton extends StatefulWidget {
   final VoidCallback onPressed;
+  final VoidCallback? onArrowLeft;
+  final VoidCallback? onArrowDown;
 
-  const _MoreButton({required this.onPressed});
+  const _MoreButton({
+    required this.onPressed,
+    this.onArrowLeft,
+    this.onArrowDown,
+  });
 
   @override
   State<_MoreButton> createState() => _MoreButtonState();
@@ -1545,12 +1913,33 @@ class _MoreButtonState extends State<_MoreButton> {
     return Focus(
       onFocusChange: (f) => setState(() => _focused = f),
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.enter ||
-                event.logicalKey == LogicalKeyboardKey.select ||
-                event.logicalKey == LogicalKeyboardKey.space)) {
-          widget.onPressed();
-          return KeyEventResult.handled;
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            if (widget.onArrowLeft != null) {
+              widget.onArrowLeft!();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            if (widget.onArrowDown != null) {
+              widget.onArrowDown!();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.handled;
+          }
         }
         return KeyEventResult.ignored;
       },
@@ -1589,6 +1978,7 @@ class _DetailIconButton extends StatefulWidget {
   final FocusNode? focusNode;
   final bool isFirst;
   final bool isLast;
+  final VoidCallback? onArrowDown;
 
   const _DetailIconButton({
     super.key,
@@ -1603,6 +1993,7 @@ class _DetailIconButton extends StatefulWidget {
     this.focusNode,
     this.isFirst = false,
     this.isLast = false,
+    this.onArrowDown,
   });
 
   @override
@@ -1634,6 +2025,13 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
             return KeyEventResult.handled;
           }
           if (widget.isFirst && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown && widget.onArrowDown != null) {
+            widget.onArrowDown!();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
             return KeyEventResult.handled;
           }
         }
@@ -1895,7 +2293,17 @@ class _RelatedCarousel extends StatefulWidget {
   final List<RelatedInfo> items;
   final String category;
   final String sourceFallback;
-  const _RelatedCarousel({required this.items, required this.category, required this.sourceFallback});
+  final bool Function()? onArrowUpToPrev;
+  final bool Function()? onArrowDownToNext;
+
+  const _RelatedCarousel({
+    super.key,
+    required this.items,
+    required this.category,
+    required this.sourceFallback,
+    this.onArrowUpToPrev,
+    this.onArrowDownToNext,
+  });
 
   @override
   State<_RelatedCarousel> createState() => _RelatedCarouselState();
@@ -1906,10 +2314,13 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
   bool _isHovered = false;
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
+  int? _lastFocusedIndex;
+  List<FocusNode> _focusNodes = [];
 
   @override
   void initState() {
     super.initState();
+    _initFocusNodes();
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
   }
 
@@ -1917,7 +2328,45 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
   void didUpdateWidget(covariant _RelatedCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.items.length != oldWidget.items.length) {
+      _initFocusNodes();
       WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
+    }
+  }
+
+  void _initFocusNodes() {
+    for (final n in _focusNodes) {
+      n.dispose();
+    }
+    _focusNodes = List.generate(widget.items.length, (i) {
+      final n = FocusNode(debugLabel: 'related_$i');
+      n.addListener(() {
+        if (n.hasFocus) {
+          _lastFocusedIndex = i;
+        }
+      });
+      return n;
+    });
+  }
+
+  bool focusRememberedCard() {
+    if (widget.items.isEmpty) return false;
+    _ensureRowVisible();
+    final idx = (_lastFocusedIndex ?? 0).clamp(0, widget.items.length - 1);
+    if (idx < _focusNodes.length && _focusNodes[idx].canRequestFocus) {
+      _focusNodes[idx].requestFocus();
+      return true;
+    }
+    return false;
+  }
+
+  void _ensureRowVisible() {
+    if (mounted) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        alignment: 0.1,
+      );
     }
   }
 
@@ -1944,6 +2393,9 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
 
   @override
   void dispose() {
+    for (final n in _focusNodes) {
+      n.dispose();
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -2026,6 +2478,31 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
                                 width: cardWidth,
                                 child: FocusablePosterCard(
                                   key: ValueKey(widget.items[index].url),
+                                  focusNode: index < _focusNodes.length ? _focusNodes[index] : null,
+                                  onKeyEvent: (node, event) {
+                                    if (event is KeyDownEvent) {
+                                      if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
+                                          index == widget.items.length - 1) {
+                                        return KeyEventResult.handled;
+                                      }
+                                      if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+                                          index == 0) {
+                                        return KeyEventResult.handled;
+                                      }
+                                      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                        if (widget.onArrowDownToNext?.call() == true) {
+                                          return KeyEventResult.handled;
+                                        }
+                                        return KeyEventResult.handled;
+                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                        if (widget.onArrowUpToPrev?.call() == true) {
+                                          return KeyEventResult.handled;
+                                        }
+                                        return KeyEventResult.handled;
+                                      }
+                                    }
+                                    return KeyEventResult.ignored;
+                                  },
                                   title: widget.items[index].title,
                                   posterUrl: widget.items[index].cover,
                                   showInfo: true,
@@ -2089,6 +2566,253 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Fila horizontal de temas (Openings o Endings) con memoria de foco vertical (estilo Home).
+class _ThemeRow extends StatefulWidget {
+  final String title;
+  final List<AnimeThemeInfo> items;
+  final ScrollController scrollController;
+  final ValueChanged<AnimeThemeInfo> onPlayTheme;
+  final bool Function()? onArrowUpToPrev;
+  final bool Function()? onArrowDownToNext;
+
+  const _ThemeRow({
+    super.key,
+    required this.title,
+    required this.items,
+    required this.scrollController,
+    required this.onPlayTheme,
+    this.onArrowUpToPrev,
+    this.onArrowDownToNext,
+  });
+
+  @override
+  State<_ThemeRow> createState() => _ThemeRowState();
+}
+
+class _ThemeRowState extends State<_ThemeRow> {
+  int? _focusedIndex;
+  int? _lastFocusedIndex;
+  final FocusNode _rowFocusNode = FocusNode(debugLabel: 'ThemeRow');
+  late List<FocusNode> _dummyNodes;
+
+  List<FocusNode> _buildDummyNodes(int count) => List.generate(
+        count,
+        (_) => FocusNode(skipTraversal: true, canRequestFocus: false),
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _dummyNodes = _buildDummyNodes(widget.items.length);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ThemeRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.items.length != oldWidget.items.length) {
+      if (_lastFocusedIndex != null &&
+          _lastFocusedIndex! >= widget.items.length) {
+        _lastFocusedIndex = null;
+      }
+      if (_focusedIndex != null && _focusedIndex! >= widget.items.length) {
+        setState(() => _focusedIndex = null);
+      }
+      for (final n in _dummyNodes) {
+        n.dispose();
+      }
+      _dummyNodes = _buildDummyNodes(widget.items.length);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final n in _dummyNodes) {
+      n.dispose();
+    }
+    _rowFocusNode.dispose();
+    super.dispose();
+  }
+
+  bool focusRememberedCard() {
+    if (widget.items.isEmpty) return false;
+    _ensureRowVisible();
+    final int idx = (_lastFocusedIndex ?? 0).clamp(0, widget.items.length - 1);
+    _rowFocusNode.requestFocus();
+    _setFocusedIndex(idx);
+    return true;
+  }
+
+  void _ensureRowVisible() {
+    if (mounted) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        alignment: 0.1,
+      );
+    }
+  }
+
+  void _scrollToIndex(int index, double cardWidth) {
+    if (!widget.scrollController.hasClients) return;
+    const double spacing = 16.0;
+    final double targetOffset = index * (cardWidth + spacing);
+    final double maxScroll = widget.scrollController.position.maxScrollExtent;
+    final double clampedOffset = targetOffset.clamp(0.0, maxScroll);
+    widget.scrollController.animateTo(
+      clampedOffset,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _setFocusedIndex(int index) {
+    if (!mounted) return;
+    setState(() => _focusedIndex = index);
+    _lastFocusedIndex = index;
+    _scrollToIndex(index, 280.0);
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final current = _focusedIndex ?? 0;
+    final last = widget.items.length - 1;
+
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (current < last) {
+        _setFocusedIndex(current + 1);
+        return KeyEventResult.handled;
+      } else {
+        return KeyEventResult.handled;
+      }
+    } else if (key == LogicalKeyboardKey.arrowLeft) {
+      if (current > 0) {
+        _setFocusedIndex(current - 1);
+        return KeyEventResult.handled;
+      } else {
+        return KeyEventResult.handled;
+      }
+    } else if (key == LogicalKeyboardKey.arrowDown) {
+      if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.arrowUp) {
+      if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.space) {
+      if (_focusedIndex != null && _focusedIndex! < widget.items.length) {
+        widget.onPlayTheme(widget.items[_focusedIndex!]);
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
+    return Focus(
+      focusNode: _rowFocusNode,
+      onFocusChange: (focused) {
+        setState(() {
+          if (focused) {
+            final idx =
+                (_lastFocusedIndex ?? 0).clamp(0, widget.items.length - 1);
+            _focusedIndex = idx;
+            _scrollToIndex(idx, 280.0);
+          } else {
+            _focusedIndex = null;
+          }
+        });
+      },
+      onKeyEvent: _handleKeyEvent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding:
+                EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 8),
+            child: Text(
+              widget.title,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold),
+            ),
+          ),
+          SizedBox(
+            height: 200,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ListView.separated(
+                  key: PageStorageKey('content-${widget.title.toLowerCase()}-row'),
+                  controller: widget.scrollController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  itemCount: widget.items.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) {
+                    final th = widget.items[index];
+                    final bool isSelected = _focusedIndex == index;
+                    return FocusableWideCard(
+                      key: ValueKey(th.videoUrl.isNotEmpty
+                          ? th.videoUrl
+                          : '${widget.title}_$index'),
+                      focusNode: _dummyNodes[index],
+                      disableAutoEnsureVisible: true,
+                      forceSelected: isSelected,
+                      showBorder: false,
+                      title: th.title,
+                      imageUrl: th.imageUrl ?? '',
+                      subtitle: th.artist.isNotEmpty
+                          ? th.artist
+                          : 'Artista desconocido',
+                      width: 280,
+                      height: 158,
+                      onTap: () {
+                        _setFocusedIndex(index);
+                        widget.onPlayTheme(th);
+                      },
+                    );
+                  },
+                ),
+                // Marco blanco de foco FIJO (estilo Prime Video)
+                Positioned(
+                  left: horizontalPadding,
+                  top: 0,
+                  width: 280,
+                  height: 158,
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      opacity: _focusedIndex != null ? 1.0 : 0.0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 2.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

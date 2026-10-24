@@ -109,6 +109,25 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
     });
   }
 
+  String? _formatMovieDuration(String? durationStr, int? runtimeMin) {
+    int? totalMins = runtimeMin;
+    if ((totalMins == null || totalMins <= 0) && durationStr != null && durationStr.isNotEmpty) {
+      totalMins = int.tryParse(durationStr.replaceAll(RegExp(r'[^0-9]'), ''));
+    }
+    if (totalMins == null || totalMins <= 0) {
+      return durationStr;
+    }
+    final hours = totalMins ~/ 60;
+    final mins = totalMins % 60;
+    if (hours > 0 && mins > 0) {
+      return '$hours h $mins min';
+    } else if (hours > 0) {
+      return '$hours h';
+    } else {
+      return '$mins min';
+    }
+  }
+
   int _bgMemCacheWidth() {
     final mq = MediaQuery.of(context);
     // Senior 1GB TV Box Tuning: Banner con tope de 1280px en RAM (720p/1080p downscaled)
@@ -555,71 +574,63 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
     final bgItem = _currentBackgroundItem;
     final contentItem = _currentContentItem;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 12), // Usamos el nuevo padding base alineado
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF000000),
-          borderRadius: BorderRadius.circular(24),
-          // Senior Fix: Borde estático original solo cuando tiene el foco
-          border: _isFocused 
-              ? Border.all(color: Colors.white.withOpacity(0.15), width: 2.0)
-              : null,
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Background
-              _buildBackgroundLayer(bgItem),
-              // Trailer
-              if (_ytController != null && _showTrailerLayer)
-                _buildTrailerLayer(screenWidth),
-              if (_nativeVideoController != null && _showTrailerLayer)
-                _buildTrailerLayer(screenWidth),
-              
-              // Gradient Scrim
-              _buildCinematicGradients(),
+    return Container(
+      color: const Color(0xFF000000),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 1. Fondo de imagen con crossfade cinemático
+          _buildBackgroundLayer(bgItem),
 
-              // Content Overlay
-              Positioned(
-                left: 0, bottom: 0, top: 0,
-                child: Container(
-                  width: screenWidth * 0.6,
-                  padding: const EdgeInsets.only(left: 20, bottom: 10), // Reducido de 20 a 10 para bajar la cabecera
+          // 2. Capa de tráiler si está activo
+          if (_ytController != null && _showTrailerLayer)
+            _buildTrailerLayer(screenWidth),
+          if (_nativeVideoController != null && _showTrailerLayer)
+            _buildTrailerLayer(screenWidth),
+          
+          // 3. Gradientes cinematográficos idénticos a Netflix TV
+          _buildCinematicGradients(),
+
+          // 4. Contenido superpuesto (Logo, Badges, Sinopsis y Botones)
+          Positioned(
+            left: horizontalPadding,
+            bottom: 28,
+            top: 0,
+            right: horizontalPadding,
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+                return Stack(
                   alignment: Alignment.bottomLeft,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 400),
-                    layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
-                      return Stack(
-                        alignment: Alignment.bottomLeft,
-                        children: <Widget>[
-                          ...previousChildren,
-                          if (currentChild != null) currentChild,
-                        ],
-                      );
-                    },
-                    transitionBuilder: (child, anim) => FadeTransition(
-                      opacity: anim,
-                      child: SlideTransition(
-                        position: anim.drive(Tween<Offset>(begin: const Offset(0.02, 0), end: Offset.zero)),
-                        child: child,
-                      ),
-                    ),
-                    child: contentItem == null 
-                        ? const SizedBox(key: ValueKey('hiding'), width: 1, height: 1) 
-                        : _buildCinematicContent(contentItem, screenWidth),
+                  children: <Widget>[
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                );
+              },
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position: anim.drive(
+                    Tween<Offset>(begin: const Offset(0.015, 0), end: Offset.zero)
+                        .chain(CurveTween(curve: Curves.easeOutCubic)),
                   ),
+                  child: child,
                 ),
               ),
-              // Nav Arrows
-              _buildNavArrows(),
-              // Dots
-              _buildDotsIndicator(15),
-            ],
+              child: contentItem == null 
+                  ? const SizedBox(key: ValueKey('hiding'), width: 1, height: 1) 
+                  : _buildCinematicContent(contentItem, screenWidth),
+            ),
           ),
         ),
+
+          // 5. Controles de navegación y estado
+          _buildNavArrows(),
+          _buildDotsIndicator(20),
+        ],
       ),
     );
   }
@@ -726,53 +737,59 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
     return Stack(
       fit: StackFit.expand,
       children: [
-        DecoratedBox(
+        // 1. Viñeta superior sutil para legibilidad del TopBar
+        const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                const Color(0xFF000000).withOpacity(0.5),
+                Color(0x99000000),
                 Colors.transparent,
               ],
-              stops: const [0.0, 0.25],
+              stops: [0.0, 0.22],
             ),
           ),
         ),
 
+        // 2. Gradientes cuando se muestra imagen estática
         AnimatedOpacity(
           duration: const Duration(milliseconds: 500),
           opacity: showTrailer ? 0.0 : 1.0,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Container(color: Colors.black.withOpacity(0.15)),
-              DecoratedBox(
+              // Viñeta horizontal de izquierda a derecha (estilo Netflix)
+              const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      const Color(0xFF000000).withOpacity(0.85), 
-                      const Color(0xFF000000).withOpacity(0.4),
-                      const Color(0xFF000000).withOpacity(0.1),
+                      Color(0xFF000000),
+                      Color(0xF2000000),
+                      Color(0xB3000000),
+                      Color(0x33000000),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.3, 0.5, 0.8],
+                    stops: [0.0, 0.28, 0.48, 0.70, 0.95],
                   ),
                 ),
               ),
-              DecoratedBox(
+              // Viñeta vertical de abajo hacia arriba (fusión al 100% con el fondo de la pantalla)
+              const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      const Color(0xFF000000).withOpacity(0.8),
-                      const Color(0xFF000000).withOpacity(0.2),
+                      Color(0xFF000000),
+                      Color(0xEB000000),
+                      Color(0x80000000),
+                      Color(0x26000000),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.15, 0.5],
+                    stops: [0.0, 0.12, 0.32, 0.58, 0.85],
                   ),
                 ),
               ),
@@ -780,10 +797,11 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
           ),
         ),
 
+        // 3. Gradientes cuando se reproduce el video de fondo
         AnimatedOpacity(
           duration: const Duration(milliseconds: 500),
           opacity: showTrailer ? 1.0 : 0.0,
-          child: Stack(
+          child: const Stack(
             fit: StackFit.expand,
             children: [
               DecoratedBox(
@@ -792,12 +810,12 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      const Color(0xFF000000),
-                      const Color(0xFF000000),
-                      const Color(0xFF000000).withOpacity(0.9),
+                      Color(0xFF000000),
+                      Color(0xFF000000),
+                      Color(0xCC000000),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.38, 0.45, 1.0],
+                    stops: [0.0, 0.35, 0.52, 1.0],
                   ),
                 ),
               ),
@@ -807,11 +825,11 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      const Color(0xFF000000),
-                      const Color(0xFF000000).withOpacity(0.3),
+                      Color(0xFF000000),
+                      Color(0x99000000),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.15, 0.4],
+                    stops: [0.0, 0.18, 0.55],
                   ),
                 ),
               ),
@@ -822,6 +840,32 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
     );
   }
 
+  String _formatMediaType(MediaItem item) {
+    final kind = item.kind?.toLowerCase();
+    if (kind == 'anime' || item.type == MediaType.anime) {
+      return 'A N I M E';
+    } else if (kind == 'kdrama' || item.type == MediaType.kdrama) {
+      return 'K D R A M A';
+    } else if (kind == 'movie' || item.type == MediaType.movie) {
+      return 'P E L Í C U L A';
+    } else {
+      return 'S E R I E';
+    }
+  }
+
+  String _formatMediaTypePlural(MediaItem item) {
+    final kind = item.kind?.toLowerCase();
+    if (kind == 'anime' || item.type == MediaType.anime) {
+      return 'animes';
+    } else if (kind == 'kdrama' || item.type == MediaType.kdrama) {
+      return 'k-dramas';
+    } else if (kind == 'movie' || item.type == MediaType.movie) {
+      return 'películas';
+    } else {
+      return 'series';
+    }
+  }
+
   Widget _buildCinematicContent(MediaItem item, double screenWidth) {
     final titleFontSize = TVResponsiveUtils.heroTitleFontSize(context);
     
@@ -830,33 +874,65 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 1. Icono + Categoría (Label superior)
+        // 1. Branding Header (Logo AurisTV + Tipo de Medio + TOP 10)
         Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SvgPicture.asset(
-              'assets/icons/auris-tv-icon.svg', 
-              height: 18, 
-              colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn)
+              'assets/icons/auris-tv-icon.svg',
+              height: 16,
             ),
             const SizedBox(width: 8),
             Text(
-              item.type.name.toUpperCase(), 
+              _formatMediaType(item),
               style: TextStyle(
-                color: Colors.white, 
-                fontSize: TVResponsiveUtils.sp(context, 9), 
-                fontWeight: FontWeight.w900, 
-                letterSpacing: 2.0
-              )
+                fontFamily: 'NetflixSans',
+                color: Colors.white.withOpacity(0.92),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 3.2,
+              ),
             ),
+            if (item.rating != null && item.rating! >= 7.0) ...[
+              const SizedBox(width: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE50914),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: const Text(
+                  'TOP 10',
+                  style: TextStyle(
+                    fontFamily: 'NetflixSans',
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'N.º 1 en ${_formatMediaTypePlural(item)} hoy',
+                style: const TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
 
         // 2. Logo / Título
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
           Builder(builder: (context) {
             final dpr = MediaQuery.of(context).devicePixelRatio;
-            final logoWidth = MediaQuery.of(context).size.width * 0.38;
+            final logoWidth = MediaQuery.of(context).size.width * 0.40;
             final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
             return SizedBox(
               height: TVResponsiveUtils.heroLogoHeight(context),
@@ -883,248 +959,289 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
           Text(
             item.title.toUpperCase(), 
             style: TextStyle(
+              fontFamily: 'NetflixSans',
               fontSize: titleFontSize, 
               fontWeight: FontWeight.w900, 
               color: Colors.white, 
-              height: 0.9,
-              letterSpacing: -1,
+              height: 0.95,
+              letterSpacing: -0.8,
               shadows: [
-                Shadow(color: Colors.black.withOpacity(0.5), offset: const Offset(0, 4), blurRadius: 10)
+                Shadow(color: Colors.black.withOpacity(0.6), offset: const Offset(0, 4), blurRadius: 10)
               ]
             )
           ),
         
         const SizedBox(height: 12),
 
-        // 3. Metadata (Episodio, Rating, Géneros)
+        // 3. Metadata idéntica a Netflix TV (Coincidencia verde, Año, Clasificación, Duración, Badges Ultra HD)
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (item.type == MediaType.anime && item.episode != null) ...[
-              Text(
-                'NUEVO EPISODIO ${item.episode}', 
+            // Coincidencia verde de Netflix
+            const Text(
+              '98% para ti',
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                color: Color(0xFF46D369), // Verde Netflix exacto
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Año
+            Text(
+              item.year != null ? '${item.year}' : '2024',
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                color: Colors.white.withOpacity(0.85),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Clasificación por edad (Cajita delimitada)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white38, width: 1.0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: Text(
+                item.certification ?? '16+',
                 style: const TextStyle(
-                  color: Color(0xFFEF7A1E), 
-                  fontSize: 12, 
-                  fontWeight: FontWeight.w900, 
-                  letterSpacing: 0.5
-                )
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white,
+                  fontSize: 11.0,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              const SizedBox(width: 12),
-              Container(width: 1.2, height: 12, color: Colors.white30),
-              const SizedBox(width: 12),
-            ],
-            
-            if (item.rating != null && item.rating! > 0) ...[
-              AurisIcon(AurisIcons.star, color: const Color(0xFFEF7A1E), size: 16),
-              const SizedBox(width: 4),
+            ),
+            const SizedBox(width: 10),
+            // Duración o Temporadas de forma null-safe
+            if ((item.duration != null && item.duration!.isNotEmpty) || (item.runtime != null && item.runtime! > 0)) ...[
               Text(
-                item.rating!.toStringAsFixed(1), 
-                style: const TextStyle(
-                  color: Colors.white, 
-                  fontSize: 13, 
-                  fontWeight: FontWeight.w900
-                )
-              ),
-              const SizedBox(width: 12),
-              Container(width: 1.2, height: 12, color: Colors.white30),
-              const SizedBox(width: 12),
-            ],
-
-            if (item.genres.isNotEmpty) ...[
-              Flexible(
-                child: Text(
-                  item.genres.join('  •  '), 
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6), 
-                    fontSize: 12, 
-                    fontWeight: FontWeight.w600
-                  )
+                _formatMovieDuration(item.duration, item.runtime) ?? '',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(width: 12),
-              Container(width: 1.2, height: 12, color: Colors.white30),
-              const SizedBox(width: 12),
-            ],
-
-            if (item.certification != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white38), 
-                  borderRadius: BorderRadius.circular(2)
-                ),
-                child: Text(
-                  item.certification!, 
-                  style: const TextStyle(
-                    color: Colors.white70, 
-                    fontSize: 10, 
-                    fontWeight: FontWeight.bold
-                  )
+              const SizedBox(width: 10),
+            ] else if (item.totalSeasons != null && item.totalSeasons! > 0) ...[
+              Text(
+                item.totalSeasons == 1 ? '1 temporada' : '${item.totalSeasons} temporadas',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
+              const SizedBox(width: 10),
+            ] else if (item.episode != null && item.episode! > 0) ...[
+              Text(
+                'Episodio ${item.episode}',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 10),
             ],
+            // Calidad Ultra HD
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white38, width: 1.0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: const Text(
+                'Ultra HD',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white70,
+                  fontSize: 10.0,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white38, width: 1.0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: const Text(
+                'HDR',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white70,
+                  fontSize: 10.0,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ],
         ),
 
-        // BLOQUE DINÁMICO (Sinopsis y Botones)
-        // Fade de opacidad (sin animación de layout) para que enfocar el hero sea fluido
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, animation) {
-            return FadeTransition(
-              opacity: animation,
-              child: child,
-            );
-          },
-          child: _isFocused 
-            ? Column(
-                key: const ValueKey('expanded_hero_content'),
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 14),
-                  // 4. Sinopsis
-                  SizedBox(
-                    width: screenWidth * 0.44,
-                    child: Text(
-                      item.synopsis ?? '', 
-                      maxLines: 3, 
-                      overflow: TextOverflow.ellipsis, 
-                      style: TextStyle(
-                        color: Colors.white, 
-                        fontSize: TVResponsiveUtils.heroSynopsisFontSize(context), 
-                        height: 1.4, 
-                        fontWeight: FontWeight.w400
-                      )
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // 5. Botones de Acción
-                  Row(
-                    children: [
-                      _BannerButton(
-                        focusNode: _playButtonFocusNode, // Asignamos el nodo para la captura de foco
-                        onPressed: () => widget.onDetails(item), 
-                        icon: AurisIcons.play,
-                        label: 'Reproducir', 
-                        isPrimary: true,
-                        autofocus: widget.autofocus, // Senior Fix: Autofocus inicial para TV
-                      ),
-                      const SizedBox(width: 12),
-                      Builder(builder: (context) {
-                        final isFav = ref
-                            .watch(favoritesProvider)
-                            .any((f) => f.id == item.id);
-                        return _BannerIconButton(
-                          focusNode: _favButtonFocusNode,
-                          icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.add,
-                          label: isFav ? 'En mi lista' : 'Mi lista',
-                          onPressed: () {
-                            final user = ref.read(authProvider);
-                            ref
-                                .read(favoritesProvider.notifier)
-                                .toggleFavorite(
-                                  favoriteFromMedia(
-                                      item,
-                                      user?.activeProfileId ??
-                                          'guest_profile'),
-                                );
-                          },
-                        );
-                      }),
-                      if (item.trailerKey != null) ...[
-                        const SizedBox(width: 12),
-                        _BannerIconButton(
-                          focusNode: _trailerButtonFocusNode,
-                          icon: (kIsWeb && _showTrailerLayer) ? AurisIcons.close : AurisIcons.trailer,
-                          label: 'Tráiler',
-                          isLoading: _isTrailerLoading,
-                          onPressed: () async {
-                            if (_isTrailerLoading) return;
-                            if (kIsWeb && _showTrailerLayer) {
-                              _stopCycle();
-                              return;
-                            }
-                            
-                            if (kIsWeb) {
-                              _initController();
-                            } else {
-                              setState(() => _isTrailerLoading = true);
-                              try {
-                                final result = widget.onTrailer?.call(item);
-                                if (result is Future) await result;
-                              } finally {
-                                if (mounted) setState(() => _isTrailerLoading = false);
-                              }
-                            }
-                          },
-                        ),
-                      ],
-                      if (_showTrailerLayer && _videoReady) ...[
-                        const SizedBox(width: 12),
-                        Consumer(builder: (context, ref, _) {
-                          final isMuted = ref.watch(heroBannerMutedProvider);
-                          return _BannerIconButton(
-                            focusNode: _muteButtonFocusNode,
-                            icon: isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp,
-                            label: isMuted ? 'Activar audio' : 'Silenciar',
-                            onPressed: () => ref.read(heroBannerMutedProvider.notifier).state = !isMuted,
-                          );
-                        }),
-                      ],
-                      if (widget.items.length > 1) ...[
-                        const SizedBox(width: 12),
-                        _BannerIconButton(
-                          focusNode: _prevButtonFocusNode,
-                          icon: AurisIcons.arrowLeft2,
-                          label: 'Anterior',
-                          onPressed: () {
-                            _manualPreviousPage();
-                            _startAutoPlay();
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _BannerIconButton(
-                          focusNode: _nextButtonFocusNode,
-                          icon: AurisIcons.arrowRight2,
-                          label: 'Siguiente',
-                          onPressed: () {
-                            _manualNextPage();
-                            _startAutoPlay();
-                          },
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              )
-            : const SizedBox(key: ValueKey('collapsed_hero_content')),
+        const SizedBox(height: 12),
+
+        // 4. Sinopsis (limpia, siempre legible estilo Netflix)
+        SizedBox(
+          width: screenWidth * 0.46,
+          child: Text(
+            item.synopsis ?? '', 
+            maxLines: 3, 
+            overflow: TextOverflow.ellipsis, 
+            style: TextStyle(
+              fontFamily: 'NetflixSans',
+              color: const Color(0xFFE5E5E5), 
+              fontSize: TVResponsiveUtils.heroSynopsisFontSize(context), 
+              height: 1.38, 
+              fontWeight: FontWeight.w400,
+              letterSpacing: 0.1,
+              shadows: [
+                Shadow(color: Colors.black.withOpacity(0.5), offset: const Offset(0, 1), blurRadius: 4),
+              ],
+            )
+          ),
+        ),
+
+        const SizedBox(height: 18),
+        
+        // 5. Botones de Acción (Clon exacto Netflix TV: Rectangulares con radio 4px y foco con fondo blanco)
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Botón 1: REPRODUCIR (Fondo blanco sólido, texto negro)
+              _NetflixHeroButton(
+                focusNode: _playButtonFocusNode,
+                onPressed: () => widget.onDetails(item),
+                icon: AurisIcons.play,
+                label: 'Reproducir',
+                isPrimary: true,
+                autofocus: widget.autofocus,
+              ),
+              const SizedBox(width: 10),
+
+              // Botón 2: MI LISTA (Fondo gris translúcido -> Fondo blanco y texto negro al enfocarse)
+              Builder(builder: (context) {
+                final isFav = ref.watch(favoritesProvider).any((f) => f.id == item.id);
+                return _NetflixHeroButton(
+                  focusNode: _favButtonFocusNode,
+                  icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.add,
+                  label: isFav ? 'En mi lista' : 'Mi lista',
+                  onPressed: () {
+                    final user = ref.read(authProvider);
+                    ref.read(favoritesProvider.notifier).toggleFavorite(
+                      favoriteFromMedia(item, user?.activeProfileId ?? 'guest_profile'),
+                    );
+                  },
+                );
+              }),
+
+              // Botón 3: TRÁILER (si existe)
+              if (item.trailerKey != null) ...[
+                const SizedBox(width: 10),
+                _NetflixHeroButton(
+                  focusNode: _trailerButtonFocusNode,
+                  icon: (kIsWeb && _showTrailerLayer) ? AurisIcons.close : AurisIcons.trailer,
+                  label: 'Tráiler',
+                  isLoading: _isTrailerLoading,
+                  onPressed: () async {
+                    if (_isTrailerLoading) return;
+                    if (kIsWeb && _showTrailerLayer) {
+                      _stopCycle();
+                      return;
+                    }
+                    if (kIsWeb) {
+                      _initController();
+                    } else {
+                      setState(() => _isTrailerLoading = true);
+                      try {
+                        final result = widget.onTrailer?.call(item);
+                        if (result is Future) await result;
+                      } finally {
+                        if (mounted) setState(() => _isTrailerLoading = false);
+                      }
+                    }
+                  },
+                ),
+              ],
+
+              // Botón 4: AUDIO / SILENCIAR
+              if (_showTrailerLayer && _videoReady) ...[
+                const SizedBox(width: 10),
+                Consumer(builder: (context, ref, _) {
+                  final isMuted = ref.watch(heroBannerMutedProvider);
+                  return _NetflixHeroIconButton(
+                    focusNode: _muteButtonFocusNode,
+                    icon: isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp,
+                    label: isMuted ? 'Activar audio' : 'Silenciar',
+                    onPressed: () => ref.read(heroBannerMutedProvider.notifier).state = !isMuted,
+                  );
+                }),
+              ],
+
+              // Botón 5: ANTERIOR / SIGUIENTE
+              if (widget.items.length > 1) ...[
+                const SizedBox(width: 10),
+                _NetflixHeroIconButton(
+                  focusNode: _prevButtonFocusNode,
+                  icon: AurisIcons.arrowLeft2,
+                  label: 'Anterior',
+                  onPressed: () {
+                    _manualPreviousPage();
+                    _startAutoPlay();
+                  },
+                ),
+                const SizedBox(width: 8),
+                _NetflixHeroIconButton(
+                  focusNode: _nextButtonFocusNode,
+                  icon: AurisIcons.arrowRight2,
+                  label: 'Siguiente',
+                  onPressed: () {
+                    _manualNextPage();
+                    _startAutoPlay();
+                  },
+                ),
+              ],
+            ],
+          ),
         ),
       ],
     );
   }
 
   Widget _buildNavArrows() {
-    return const SizedBox.shrink(); // Desactivadas flechas en TV para evitar trampas de foco
+    return const SizedBox.shrink(); // Desactivadas flechas táctiles en TV
   }
 
   Widget _buildDotsIndicator(double bottom) {
     return Positioned(
-      bottom: bottom, left: 0, right: 24,
+      bottom: bottom, left: 0, right: 32,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: List.generate(widget.items.length, (index) {
           final isCurrent = (_backgroundIndex % widget.items.length) == index;
           return AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            width: isCurrent ? 12 : 7, height: 7,
-            decoration: BoxDecoration(color: isCurrent ? Colors.white : Colors.white38, borderRadius: BorderRadius.circular(4)),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(horizontal: 2.5),
+            width: isCurrent ? 14 : 6, 
+            height: 3.5,
+            decoration: BoxDecoration(
+              color: isCurrent ? Colors.white : Colors.white24, 
+              borderRadius: BorderRadius.circular(2),
+            ),
           );
         }),
       ),
@@ -1132,98 +1249,52 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   }
 }
 
-class _BannerButton extends StatefulWidget {
+/// Botón rectangular de acción para el Hero con la firma visual de Netflix TV:
+/// - Esquinas cuadradas ligeramente redondeadas (BorderRadius 4px).
+/// - El botón primario es blanco con texto negro siempre.
+/// - Los botones secundarios son grises translúcidos con texto blanco; pero al
+///   recibir el foco del control remoto, SE CONVIERTEN EN BLANCO SÓLIDO CON TEXTO
+///   E ICONO NEGRO y se escalan un 6% con transición suave.
+class _NetflixHeroButton extends StatefulWidget {
   final VoidCallback onPressed;
   final String icon;
   final String label;
   final bool isPrimary;
   final bool autofocus;
-  final FocusNode? focusNode; // Añadido soporte para FocusNode
-  const _BannerButton({
-    required this.onPressed, 
-    required this.icon, 
-    required this.label, 
+  final FocusNode? focusNode;
+  final bool isLoading;
+
+  const _NetflixHeroButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
     this.isPrimary = false,
     this.autofocus = false,
     this.focusNode,
+    this.isLoading = false,
   });
 
-  @override State<_BannerButton> createState() => _BannerButtonState();
+  @override
+  State<_NetflixHeroButton> createState() => _NetflixHeroButtonState();
 }
 
-class _BannerButtonState extends State<_BannerButton> {
+class _NetflixHeroButtonState extends State<_NetflixHeroButton> {
   bool _isFocused = false;
 
   @override
   Widget build(BuildContext context) {
+    final bool activeWhite = widget.isPrimary || _isFocused;
+    final Color bgColor = activeWhite ? Colors.white : const Color(0x80545454);
+    final Color textColor = activeWhite ? Colors.black : Colors.white;
+
     final String effectiveIcon = (_isFocused && (widget.icon == AurisIcons.play || widget.icon == AurisIcons.playFilled))
         ? AurisIcons.playFilled
         : widget.icon;
-    final Color iconColor = _isFocused ? Colors.black : (widget.isPrimary ? Colors.black : Colors.white);
 
     return Focus(
       focusNode: widget.focusNode,
       autofocus: widget.autofocus,
       onFocusChange: (f) => setState(() => _isFocused = f),
-      // El OK/select del mando de TV no activa `ElevatedButton` cuando el foco
-      // vive en este `Focus` externo: la acción del botón es un descendiente,
-      // no un ancestro del foco primario, así que `ActivateIntent` no la
-      // encuentra. Se resuelve aquí, igual que en las pills/AurisOptionCard.
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          final key = event.logicalKey;
-          if (key == LogicalKeyboardKey.select ||
-              key == LogicalKeyboardKey.enter ||
-              key == LogicalKeyboardKey.numpadEnter ||
-              key == LogicalKeyboardKey.space) {
-            widget.onPressed();
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
-      child: ElevatedButton.icon(
-        onPressed: widget.onPressed,
-        icon: AurisIcon(effectiveIcon, size: 20, color: iconColor),
-        label: Text(widget.label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: widget.isPrimary ? Colors.white : Colors.white10,
-          foregroundColor: widget.isPrimary ? Colors.black : Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        ),
-      ),
-    );
-  }
-}
-
-class _BannerIconButton extends StatefulWidget {
-  final String icon;
-  final String label;
-  final VoidCallback onPressed;
-  final bool isLoading;
-  final FocusNode? focusNode;
-  const _BannerIconButton({
-    required this.icon, 
-    required this.label, 
-    required this.onPressed,
-    this.isLoading = false,
-    this.focusNode,
-  });
-
-  @override State<_BannerIconButton> createState() => _BannerIconButtonState();
-}
-
-class _BannerIconButtonState extends State<_BannerIconButton> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      focusNode: widget.focusNode,
-      onFocusChange: (f) => setState(() => _focused = f),
-      // OK/select del mando: la acción del `IconButton` es descendiente del
-      // foco externo, así que se activa aquí (ver _BannerButton).
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent && !widget.isLoading) {
           final key = event.logicalKey;
@@ -1237,23 +1308,149 @@ class _BannerIconButtonState extends State<_BannerIconButton> {
         }
         return KeyEventResult.ignored;
       },
-      child: AnimatedScale(
-        scale: _focused ? 1.12 : 1.0,
-        duration: const Duration(milliseconds: 200),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        child: Tooltip(
-          message: widget.label,
-          child: IconButton.filledTonal(
-            onPressed: widget.isLoading ? null : widget.onPressed,
-            icon: widget.isLoading
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
-              : AurisIcon(widget.icon, size: 18, color: Colors.white),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white10, 
-              foregroundColor: Colors.white, 
-              padding: const EdgeInsets.all(7)
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(4), // Rectángulo exacto de Netflix TV
+          // Borde siempre presente con ancho fijo para evitar que el cambio de
+          // tamaño al enfocar cause un relayout que sacuda el header.
+          border: Border.all(
+            color: _isFocused ? Colors.white : Colors.transparent,
+            width: 2.5,
+          ),
+          boxShadow: _isFocused
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.isLoading ? null : widget.onPressed,
+            borderRadius: BorderRadius.circular(4),
+            // Netflix TV no tiene tinte de splash — eliminamos el color del tema.
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            overlayColor: WidgetStateProperty.all(Colors.transparent),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8.5),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.isLoading)
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: textColor,
+                      ),
+                    )
+                  else
+                    AurisIcon(
+                      effectiveIcon,
+                      size: 20,
+                      color: textColor,
+                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    widget.label,
+                    style: TextStyle(
+                      fontFamily: 'NetflixSans',
+                      color: textColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15.5,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Botón circular para acciones complementarias del Hero (Audio, Navegación de carrusel)
+/// con retroalimentación inmediata en foco estilo Netflix.
+class _NetflixHeroIconButton extends StatefulWidget {
+  final String icon;
+  final String label;
+  final VoidCallback onPressed;
+  final bool isLoading;
+  final FocusNode? focusNode;
+
+  const _NetflixHeroIconButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.isLoading = false,
+    this.focusNode,
+  });
+
+  @override
+  State<_NetflixHeroIconButton> createState() => _NetflixHeroIconButtonState();
+}
+
+class _NetflixHeroIconButtonState extends State<_NetflixHeroIconButton> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bgColor = _focused ? Colors.white : const Color(0x66000000);
+    final Color iconColor = _focused ? Colors.black : Colors.white;
+
+    return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _focused = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && !widget.isLoading) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.numpadEnter ||
+              key == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Tooltip(
+        message: widget.label,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: bgColor,
+            shape: BoxShape.circle,
+            // Ancho fijo (2px) para que el botón circular no cambie de tamaño
+            // al enfocar, evitando temblor del header.
+            border: Border.all(
+              color: _focused ? Colors.white : Colors.white38,
+              width: 2.0,
+            ),
+          ),
+          child: widget.isLoading
+              ? SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: iconColor,
+                  ),
+                )
+              : AurisIcon(widget.icon, size: 18, color: iconColor),
         ),
       ),
     );

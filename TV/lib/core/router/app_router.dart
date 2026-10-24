@@ -226,7 +226,10 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: 'avatar',
-          builder: (context, state) => const AvatarSelectorScreen(),
+          builder: (context, state) {
+            final profileId = state.uri.queryParameters['profileId'];
+            return AvatarSelectorScreen(profileId: profileId);
+          },
         ),
       ],
     ),

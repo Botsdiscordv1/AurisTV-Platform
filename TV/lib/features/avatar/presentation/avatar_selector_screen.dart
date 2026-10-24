@@ -1,684 +1,729 @@
-// AurisTV Avatar Selector Screen
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
-
-import '../domain/avatar_catalog.dart';
-import '../domain/avatar_franchise.dart';
-import '../domain/avatar_selection.dart';
-import 'providers/avatar_providers.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
-// import '../../../shared/widgets/nav_arrow.dart';
+
+import '../domain/avatar_franchise.dart';
+import 'providers/avatar_providers.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Netflix Ninja TV "Elige un icono" (Choose an Icon) — Pixel-Perfect Clone
+//
+// Key Netflix Ninja (TV) specifications:
+//  • Canvas: Deep cinematic pure black (#000000)
+//  • Header: Bold white title "Elige un icono" (32sp NetflixSans Bold)
+//  • Subtitle: "Selecciona un nuevo icono para tu perfil." (#808080)
+//  • Profile badge: Displays current avatar & profile name
+//  • Organization: Horizontal carousels grouped by franchise / series
+//  • Avatar tiles: Square 112×112dp with 8dp rounded corners
+//  • Focused state: 3.5dp solid pure white border + 1.12x scale + deep drop shadow
+//  • Unfocused state: Transparent border, 1.0x scale
+//  • Selection dialog: Signature Netflix "¿Cambiar el icono del perfil?" modal
+//    with side-by-side preview and [DE ACUERDO] / [AHORA NO] TV action buttons
+//  • D-Pad traversal: Smooth horizontal and vertical remote navigation
+// ─────────────────────────────────────────────────────────────────────────────
 
 class AvatarSelectorScreen extends ConsumerStatefulWidget {
-  const AvatarSelectorScreen({super.key});
+  final String? profileId;
+
+  const AvatarSelectorScreen({super.key, this.profileId});
 
   @override
-  ConsumerState<AvatarSelectorScreen> createState() => _AvatarSelectorScreenState();
+  ConsumerState<AvatarSelectorScreen> createState() =>
+      _AvatarSelectorScreenState();
 }
 
 class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
+  final ScrollController _verticalScrollController = ScrollController();
+
   @override
-  void initState() {
-    super.initState();
-    // Resetear la selección temporal al entrar para evitar heredar selecciones de otros perfiles
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(avatarSelectionProvider.notifier).reset();
-    });
+  void dispose() {
+    _verticalScrollController.dispose();
+    super.dispose();
+  }
+
+  void _showChangeConfirmation({
+    required BuildContext context,
+    required String targetProfileId,
+    required String? currentPhotoUrl,
+    required String newPhotoUrl,
+  }) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.75),
+      builder: (ctx) => _NetflixAvatarConfirmDialog(
+        currentPhotoUrl: currentPhotoUrl,
+        newPhotoUrl: newPhotoUrl,
+        onConfirm: () {
+          ref
+              .read(authProvider.notifier)
+              .updateProfileAvatar(targetProfileId, newPhotoUrl);
+          ref.read(authProvider.notifier).updateAvatar(newPhotoUrl);
+          Navigator.pop(ctx);
+          if (context.mounted) {
+            context.pop();
+          }
+        },
+        onCancel: () => Navigator.pop(ctx),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     const backgroundColor = Color(0xFF000000);
-    const surfaceColor = Color(0xFF1A1D24);
-    const primaryColor = Color(0xFFEF7A1E);
-
     final user = ref.watch(authProvider);
     final catalogAsync = ref.watch(avatarCatalogProvider);
-    final selection = ref.watch(avatarSelectionProvider);
-    final currentCategory = ref.watch(avatarCategoryProvider);
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        title: const Text('Editar Perfil'),
-        backgroundColor: backgroundColor,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: () {
-              final catalog = catalogAsync.valueOrNull;
-              if (catalog != null) {
-                // Guardar avatar
-                final selectedAvatar = _selectedPath(catalog, selection);
-                if (selectedAvatar != null) {
-                  ref.read(authProvider.notifier).updateAvatar(selectedAvatar);
-                }
-              }
-              
-              // Senior Fix: Navegación segura diferida
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  if (Navigator.canPop(context)) {
-                    context.pop();
-                  } else {
-                    context.go('/select-profile');
-                  }
-                }
-              });
-            },
-            child: const Text(
-              'Listo',
-              style: TextStyle(
-                color: primaryColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-        ],
+    final targetProfile = user?.profiles.firstWhere(
+      (p) => p.id == widget.profileId,
+      orElse: () => user.profiles.firstWhere(
+        (p) => p.id == user.activeProfileId,
+        orElse: () => user.profiles.first,
       ),
-      body: Column(
-        children: [
-          // Barra de Categorias (Estilo Prime Video / HomeScreen)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _CategoryPillBar(
-                    currentCategory: currentCategory,
-                    onCategoryChanged: (cat) =>
-                        ref.read(avatarCategoryProvider.notifier).state = cat,
-                  ),
+    );
+
+    final profileIdToUpdate = targetProfile?.id ?? user?.activeProfileId ?? '';
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (Navigator.canPop(context)) {
+          context.pop();
+        } else {
+          context.go('/select-profile');
+        }
+      },
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header Section ──────────────────────────────────────────
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 50, vertical: 24),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Elige un icono',
+                          style: TextStyle(
+                            fontFamily: 'NetflixSans',
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Selecciona un nuevo icono para tu perfil de AurisTV.',
+                          style: TextStyle(
+                            fontFamily: 'NetflixSans',
+                            color: Color(0xFF808080),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Current Profile Badge
+                    if (targetProfile != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF181818),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: SizedBox(
+                                width: 34,
+                                height: 34,
+                                child: _AvatarImage(
+                                    photoUrl: targetProfile.photoUrl),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'ICONO ACTUAL',
+                                  style: TextStyle(
+                                    fontFamily: 'NetflixSans',
+                                    color: Color(0xFF808080),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                                Text(
+                                  targetProfile.name,
+                                  style: const TextStyle(
+                                    fontFamily: 'NetflixSans',
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          ),
-          
-          Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 900),
+
+              // ── Franchise / Category Rows ────────────────────────────────
+              Expanded(
                 child: catalogAsync.when(
                   loading: () => const Center(
-                    child: CircularProgressIndicator(color: primaryColor),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
                   ),
                   error: (err, _) => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.image_not_supported_outlined,
-                              size: 48, color: Colors.white24),
-                          const SizedBox(height: 12),
-                          const Text('No se pudo cargar el catálogo de avatares',
-                              style: TextStyle(color: Colors.white70)),
-                          const SizedBox(height: 8),
-                          Text('$err',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  color: Colors.white38, fontSize: 12)),
-                        ],
+                    child: Text(
+                      'No se pudo cargar el catálogo de avatares.',
+                      style: TextStyle(
+                        fontFamily: 'NetflixSans',
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 16,
                       ),
                     ),
                   ),
                   data: (catalog) {
-                    final filteredFranchises = catalog.franchises
-                        .where((f) => f.category == currentCategory)
-                        .toList();
-
-                    // Calculamos qué mostrar en la preview: la selección actual o el avatar que ya tiene el usuario
-                    final previewPath = _selectedPath(catalog, selection) ?? user?.photoUrl;
-
-                    if (filteredFranchises.isEmpty) {
-                      return Column(
-                        children: [
-                          _PreviewAvatar(
-                            selectedPath: previewPath,
-                            primaryColor: primaryColor,
+                    final franchises = catalog.franchises;
+                    if (franchises.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No hay avatares disponibles.',
+                          style: TextStyle(
+                            fontFamily: 'NetflixSans',
+                            color: Colors.white60,
+                            fontSize: 16,
                           ),
-                          Expanded(
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.category_outlined,
-                                      size: 64, color: Colors.white10),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'No hay avatares en esta categoria aun',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.3),
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       );
                     }
 
-                    return CustomScrollView(
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: _PreviewAvatar(
-                            selectedPath: previewPath,
-                            primaryColor: primaryColor,
-                          ),
-                        ),
-                        ...filteredFranchises.map((franchise) {
-                          return SliverToBoxAdapter(
-                            child: _AvatarFranchiseRow(
-                              franchise: franchise,
-                              selection: selection,
-                              surfaceColor: surfaceColor,
-                              primaryColor: primaryColor,
-                            ),
-                          );
-                        }),
-                        const SliverToBoxAdapter(child: SizedBox(height: 40)),
-                      ],
+                    return ListView.builder(
+                      controller: _verticalScrollController,
+                      padding: const EdgeInsets.only(bottom: 40),
+                      itemCount: franchises.length,
+                      itemBuilder: (context, rowIndex) {
+                        final franchise = franchises[rowIndex];
+                        return _NetflixFranchiseCarousel(
+                          franchise: franchise,
+                          isFirstRow: rowIndex == 0,
+                          onAvatarSelected: (avatarPath) {
+                            _showChangeConfirmation(
+                              context: context,
+                              targetProfileId: profileIdToUpdate,
+                              currentPhotoUrl: targetProfile?.photoUrl,
+                              newPhotoUrl: avatarPath,
+                            );
+                          },
+                        );
+                      },
                     );
                   },
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  String? _selectedPath(AvatarCatalog catalog, AvatarSelection selection) {
-    for (final franchise in catalog.franchises) {
-      for (final character in franchise.characters) {
-        if (character.characterId == selection.characterId) {
-          return character.variantAt(selection.variantIndex);
-        }
-      }
-    }
-    return null;
-  }
-}
-
-class _PreviewAvatar extends StatelessWidget {
-  final String? selectedPath;
-  final Color primaryColor;
-
-  const _PreviewAvatar({
-    required this.selectedPath,
-    required this.primaryColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Column(
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: primaryColor, width: 4),
-              image: selectedPath != null
-                  ? DecorationImage(
-                      image: selectedPath!.startsWith('assets/')
-                          ? AssetImage(selectedPath!) as ImageProvider
-                          : NetworkImage(selectedPath!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-            child: selectedPath == null
-                ? const Icon(Icons.person, size: 80, color: Colors.white24)
-                : null,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AvatarItem extends StatelessWidget {
-  final String characterName;
-  final List<String> characterVariants;
-  final bool isSelected;
-  final int selectedVariantIndex;
-  final Color surfaceColor;
-  final Color primaryColor;
-  final ValueChanged<int> onTap;
-
-  const _AvatarItem({
-    super.key,
-    required this.characterName,
-    required List<String> variants,
-    required this.isSelected,
-    required this.selectedVariantIndex,
-    required this.surfaceColor,
-    required this.primaryColor,
-    required this.onTap,
-  }) : characterVariants = variants;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onTap(selectedVariantIndex),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              _AvatarCircle(
-                assetPath: characterVariants.isNotEmpty
-                    ? characterVariants[selectedVariantIndex.clamp(0, characterVariants.length - 1)]
-                    : null,
-                isSelected: isSelected,
-                surfaceColor: surfaceColor,
-                primaryColor: primaryColor,
-              ),
-              if (characterVariants.length > 1)
-                Positioned(
-                  right: 4,
-                  bottom: 4,
-                  child: GestureDetector(
-                    onTap: () {
-                      final next = (selectedVariantIndex + 1) % characterVariants.length;
-                      onTap(next);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: primaryColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF000000), width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            blurRadius: 4,
-                          )
-                        ],
-                      ),
-                      child: AurisIcon(AurisIcons.transferH,
-                          size: 14, color: Colors.black),
+              // ── Bottom Remote Hint ───────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white.withValues(alpha: 0.4),
+                      size: 14,
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Presiona Atrás para cancelar',
+                      style: TextStyle(
+                        fontFamily: 'NetflixSans',
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            characterName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.white60,
-              fontSize: 15,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AvatarCircle extends StatelessWidget {
-  final String? assetPath;
-  final bool isSelected;
-  final Color surfaceColor;
-  final Color primaryColor;
-
-  const _AvatarCircle({
-    required this.assetPath,
-    required this.isSelected,
-    required this.surfaceColor,
-    required this.primaryColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 120,
-      height: 120,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isSelected ? primaryColor : Colors.white10,
-          width: 3.5,
         ),
-        boxShadow: isSelected
-            ? [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.4),
-                  blurRadius: 12,
-                  spreadRadius: 3,
-                )
-              ]
-            : null,
-      ),
-      child: ClipOval(
-        child: assetPath != null
-            ? Image.asset(
-                assetPath!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stack) =>
-                    Container(color: surfaceColor, child: const Icon(Icons.person, color: Colors.white24)),
-              )
-            : Container(
-                color: surfaceColor,
-                child: const Icon(Icons.person, color: Colors.white24),
-              ),
       ),
     );
   }
 }
 
-class _CategoryPillBar extends StatelessWidget {
-  final String currentCategory;
-  final ValueChanged<String> onCategoryChanged;
+// ─────────────────────────────────────────────────────────────────────────────
+// Franchise Carousel Row
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _CategoryPillBar({
-    required this.currentCategory,
-    required this.onCategoryChanged,
+class _NetflixFranchiseCarousel extends StatelessWidget {
+  final AvatarFranchise franchise;
+  final bool isFirstRow;
+  final ValueChanged<String> onAvatarSelected;
+
+  const _NetflixFranchiseCarousel({
+    required this.franchise,
+    required this.isFirstRow,
+    required this.onAvatarSelected,
   });
-
-  double _calculateTextWidth(String text) {
-    final TextPainter textPainter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700),
-      ),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    return textPainter.size.width;
-  }
 
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = ResponsiveUtils.isMobile(context);
-    final double hPadding = isMobile ? 24.0 : 36.0;
-    const double spacing = 8.0;
-
-    final categories = [
-      {'id': 'anime', 'label': 'Anime'},
-      {'id': 'peliculas', 'label': 'Peliculas'},
-      {'id': 'series', 'label': 'Series'},
-      {'id': 'kdrama', 'label': 'KDrama'},
-    ];
-
-    final List<double> itemWidths = categories
-        .map((c) => _calculateTextWidth(c['label']!) + hPadding)
-        .toList();
-    final activeIndex = categories.indexWhere((c) => c['id'] == currentCategory);
-
-    double leftOffset = 0;
-    for (int i = 0; i < activeIndex; i++) {
-      leftOffset += itemWidths[i] + spacing;
+    // Flatten all variants from all characters in this franchise
+    final List<String> allVariants = [];
+    for (final char in franchise.characters) {
+      allVariants.addAll(char.variants);
     }
 
-    return SizedBox(
-      height: 40,
-      child: Stack(
-        alignment: Alignment.centerLeft,
-        children: [
-          // LA PILDORA (El fondo que desliza)
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOutCubic,
-            left: leftOffset,
-            child: Container(
-              width: itemWidths[activeIndex],
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    if (allVariants.isEmpty) return const SizedBox.shrink();
 
-          // LOS TEXTOS
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(categories.length, (index) {
-              final cat = categories[index];
-              final isSelected = index == activeIndex;
-              return Padding(
-                padding: EdgeInsets.only(
-                    right: index == categories.length - 1 ? 0 : spacing),
-                child: _PillNavItem(
-                  label: cat['label']!,
-                  isActive: isSelected,
-                  width: itemWidths[index],
-                  onTap: () => onCategoryChanged(cat['id']!),
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PillNavItem extends StatefulWidget {
-  final String label;
-  final bool isActive;
-  final double width;
-  final VoidCallback onTap;
-
-  const _PillNavItem({
-    required this.label,
-    required this.isActive,
-    required this.width,
-    required this.onTap,
-  });
-
-  @override
-  State<_PillNavItem> createState() => _PillNavItemState();
-}
-
-class _PillNavItemState extends State<_PillNavItem> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          width: widget.width,
-          height: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: (!widget.isActive && _hovered)
-                ? Colors.white.withValues(alpha: 0.1)
-                : Colors.transparent,
-          ),
-          child: AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 250),
-            style: GoogleFonts.poppins(
-              color: widget.isActive ? Colors.black : Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-            child: Text(widget.label),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AvatarFranchiseRow extends ConsumerStatefulWidget {
-  final AvatarFranchise franchise;
-  final AvatarSelection selection;
-  final Color surfaceColor;
-  final Color primaryColor;
-
-  const _AvatarFranchiseRow({
-    required this.franchise,
-    required this.selection,
-    required this.surfaceColor,
-    required this.primaryColor,
-  });
-
-  @override
-  ConsumerState<_AvatarFranchiseRow> createState() => _AvatarFranchiseRowState();
-}
-
-class _AvatarFranchiseRowState extends ConsumerState<_AvatarFranchiseRow> {
-  final ScrollController _scrollController = ScrollController();
-  bool _isHovered = false;
-  bool _canScrollLeft = false;
-  bool _canScrollRight = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_updateScrollIndicators);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_updateScrollIndicators);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _updateScrollIndicators() {
-    if (!mounted || !_scrollController.hasClients) return;
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final currentScroll = _scrollController.offset;
-    setState(() {
-      _canScrollLeft = currentScroll > 5;
-      _canScrollRight = maxScroll > currentScroll + 5;
-    });
-  }
-
-  void _scroll(double offset) {
-    if (!_scrollController.hasClients) return;
-    final target = (_scrollController.offset + offset).clamp(0.0, _scrollController.position.maxScrollExtent);
-    _scrollController.animateTo(target, duration: const Duration(milliseconds: 600), curve: Curves.easeOutQuart);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isTactic = ResponsiveUtils.isTactic(context);
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Section Title
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+            padding: const EdgeInsets.symmetric(horizontal: 50),
             child: Text(
-              widget.franchise.name.toUpperCase(),
+              franchise.name,
               style: const TextStyle(
+                fontFamily: 'NetflixSans',
                 color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
               ),
             ),
           ),
-          Stack(
-            children: [
-              SizedBox(
-                height: 180,
-                child: ListView.separated(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: widget.franchise.characters.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final character = widget.franchise.characters[index];
-                    return SizedBox(
-                      width: 130,
-                      child: _AvatarItem(
-                        key: ValueKey('avatar_${character.characterId}'),
-                        characterName: character.name,
-                        variants: character.variants,
-                        isSelected: widget.selection.characterId != null &&
-                            widget.selection.characterId == character.characterId,
-                        selectedVariantIndex: widget.selection.characterId == character.characterId
-                            ? widget.selection.variantIndex
-                            : 0,
-                        surfaceColor: widget.surfaceColor,
-                        primaryColor: widget.primaryColor,
-                        onTap: (variantIndex) {
-                          ref.read(avatarSelectionProvider.notifier).select(
-                                character.characterId,
-                                variantIndex: variantIndex,
-                              );
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ),
-              if (!isTactic) ...[
-                // Flecha Izquierda
-                Positioned(
-                  left: 0, top: 0, height: 120, // Senior Fix: Centrado exacto con el círculo de 120px
-                  child: AnimatedOpacity(
-                    opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: Center(
-                      child: NavArrow(
-                        icon: Icons.arrow_back_ios_new,
-                        onTap: () => _scroll(-400),
-                      ),
-                    ),
-                  ),
-                ),
-                // Flecha Derecha
-                Positioned(
-                  right: 0, top: 0, height: 120, // Senior Fix: Centrado exacto con el círculo de 120px
-                  child: AnimatedOpacity(
-                    opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: Center(
-                      child: NavArrow(
-                        icon: Icons.arrow_forward_ios,
-                        onTap: () => _scroll(400),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
+          const SizedBox(height: 12),
+
+          // Horizontal Carousel
+          SizedBox(
+            height: 136, // accommodates 112px tile + 1.12x scale + shadow
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 8),
+              itemCount: allVariants.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (context, index) {
+                final variantPath = allVariants[index];
+                return _NetflixAvatarTile(
+                  avatarPath: variantPath,
+                  autofocus: isFirstRow && index == 0,
+                  onSelect: () => onAvatarSelected(variantPath),
+                );
+              },
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Individual Avatar Tile with Netflix 10-foot Focus
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NetflixAvatarTile extends StatefulWidget {
+  final String avatarPath;
+  final bool autofocus;
+  final VoidCallback onSelect;
+
+  const _NetflixAvatarTile({
+    required this.avatarPath,
+    required this.autofocus,
+    required this.onSelect,
+  });
+
+  @override
+  State<_NetflixAvatarTile> createState() => _NetflixAvatarTileState();
+}
+
+class _NetflixAvatarTileState extends State<_NetflixAvatarTile> {
+  bool _hasFocus = false;
+
+  static const double kTileSize = 112.0;
+  static const double kRadius = 8.0;
+  static const double kBorderWidth = 3.5;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      autofocus: widget.autofocus,
+      onFocusChange: (f) => setState(() => _hasFocus = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onSelect();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onSelect,
+        child: AnimatedScale(
+          scale: _hasFocus ? 1.12 : 1.0,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            width: kTileSize,
+            height: kTileSize,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(kRadius),
+              border: Border.all(
+                color: _hasFocus ? Colors.white : Colors.transparent,
+                width: kBorderWidth,
+              ),
+              boxShadow: _hasFocus
+                  ? [
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        blurRadius: 16,
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.85),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(
+                  _hasFocus ? kRadius - kBorderWidth / 2 : kRadius),
+              child: _AvatarImage(photoUrl: widget.avatarPath),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Confirmation Modal Dialog (Netflix TV "¿Cambiar el icono del perfil?")
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NetflixAvatarConfirmDialog extends StatelessWidget {
+  final String? currentPhotoUrl;
+  final String newPhotoUrl;
+  final VoidCallback onConfirm;
+  final VoidCallback onCancel;
+
+  const _NetflixAvatarConfirmDialog({
+    required this.currentPhotoUrl,
+    required this.newPhotoUrl,
+    required this.onConfirm,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF181818),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      title: const Text(
+        '¿Cambiar el icono del perfil?',
+        style: TextStyle(
+          fontFamily: 'NetflixSans',
+          color: Colors.white,
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      content: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Comparison Preview Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Current Icon
+                Column(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          width: 2,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: _AvatarImage(photoUrl: currentPhotoUrl),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Actual',
+                      style: TextStyle(
+                        fontFamily: 'NetflixSans',
+                        color: Color(0xFF808080),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white70,
+                    size: 26,
+                  ),
+                ),
+
+                // New Selected Icon
+                Column(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 2.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: _AvatarImage(photoUrl: newPhotoUrl),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Nuevo',
+                      style: TextStyle(
+                        fontFamily: 'NetflixSans',
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+            Text(
+              'Tu nuevo icono se sincronizará y actualizará en todos tus dispositivos.',
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            // AHORA NO
+            _NetflixDialogButton(
+              label: 'AHORA NO',
+              isPrimary: false,
+              autofocus: false,
+              onPressed: onCancel,
+            ),
+            const SizedBox(width: 12),
+            // DE ACUERDO
+            _NetflixDialogButton(
+              label: 'DE ACUERDO',
+              isPrimary: true,
+              autofocus: true,
+              onPressed: onConfirm,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dialog Action Button with TV Focus Inversion
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NetflixDialogButton extends StatefulWidget {
+  final String label;
+  final bool isPrimary;
+  final bool autofocus;
+  final VoidCallback onPressed;
+
+  const _NetflixDialogButton({
+    required this.label,
+    required this.isPrimary,
+    required this.autofocus,
+    required this.onPressed,
+  });
+
+  @override
+  State<_NetflixDialogButton> createState() => _NetflixDialogButtonState();
+}
+
+class _NetflixDialogButtonState extends State<_NetflixDialogButton> {
+  bool _hasFocus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color backgroundColor = _hasFocus
+        ? Colors.white
+        : (widget.isPrimary
+            ? const Color(0xFF333333)
+            : const Color(0xFF262626));
+    final Color textColor = _hasFocus ? Colors.black : Colors.white;
+
+    return Focus(
+      autofocus: widget.autofocus,
+      onFocusChange: (f) => setState(() => _hasFocus = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.select ||
+                event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onPressed();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: _hasFocus ? Colors.white : Colors.transparent,
+              width: 1.5,
+            ),
+            boxShadow: _hasFocus
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontFamily: 'NetflixSans',
+              color: textColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Avatar Image Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AvatarImage extends StatelessWidget {
+  final String? photoUrl;
+  const _AvatarImage({this.photoUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    if (photoUrl == null || photoUrl!.isEmpty) {
+      return Container(
+        color: const Color(0xFF1C1C1C),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.person_rounded,
+          color: Color(0xFF808080),
+          size: 40,
+        ),
+      );
+    }
+    if (photoUrl!.startsWith('assets/')) {
+      return Image.asset(photoUrl!, fit: BoxFit.cover);
+    }
+    return CachedNetworkImage(
+      imageUrl: photoUrl!,
+      fit: BoxFit.cover,
+      placeholder: (_, __) => Container(color: const Color(0xFF1C1C1C)),
+      errorWidget: (_, __, ___) => Container(
+        color: const Color(0xFF1C1C1C),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.person_rounded,
+          color: Color(0xFF808080),
+          size: 40,
+        ),
       ),
     );
   }

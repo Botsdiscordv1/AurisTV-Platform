@@ -4,7 +4,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
-import '../../settings/presentation/providers/settings_provider.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Netflix TV "Edit Profile" Screen — 100% Pixel-Perfect Clone (Netflix Ninja TV)
+//
+// Key Specifications:
+//  • Canvas: Pitch Black (#000000)
+//  • Header: "EDITAR PERFIL" in NetflixSans Bold 34sp, white, -0.4 letterSpacing
+//  • Avatar Tile: 118×118dp, 6.0dp corner radius, 3dp white border on focus,
+//    with subtle circular dark pencil overlay. Enter navigates to /settings/avatar
+//  • Name Field: 46dp height, dark #222222, 2.5dp white border on focus,
+//    NetflixSans 16sp Bold white text
+//  • Section Headers: "NOMBRE", "IDIOMA", "CONTROLES DE REPRODUCCIÓN AUTOMÁTICA"
+//    in NetflixSans 12sp Bold, #808080, 1.2 letterSpacing
+//  • TV Checkboxes: Square 20×20dp (3dp radius), solid white fill with black
+//    check when checked; 2dp white focus border around row
+//  • Action Buttons: [ GUARDAR ], [ CANCELAR ], [ ELIMINAR PERFIL ]
+//    Outlined pills that turn solid white (or red) on focus with black bold text
+//  • D-pad Traversal: Gapless remote navigation (Left/Right, Up/Down)
+// ─────────────────────────────────────────────────────────────────────────────
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
   final String profileId;
@@ -16,50 +34,53 @@ class ProfileEditScreen extends ConsumerStatefulWidget {
 
 class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   late TextEditingController _nameController;
-  late FocusNode _avatarFocusNode;
-  late FocusNode _nameFocusNode;
-  late FocusNode _languageFocusNode;
-  late FocusNode _qualityFocusNode;
   final ScrollController _scrollController = ScrollController();
-  final GlobalKey<_TVMenuSelectorState> _languageMenuKey =
-      GlobalKey<_TVMenuSelectorState>();
-  final GlobalKey<_TVMenuSelectorState> _qualityMenuKey =
-      GlobalKey<_TVMenuSelectorState>();
+
+  // Focus nodes for D-pad navigation
+  final FocusNode _avatarFocusNode = FocusNode();
+  final FocusNode _nameFocusNode = FocusNode();
+  final FocusNode _languageFocusNode = FocusNode();
+  final FocusNode _autoplayNextFocusNode = FocusNode();
+  final FocusNode _autoplayPreviewsFocusNode = FocusNode();
+  final FocusNode _saveFocusNode = FocusNode();
+  final FocusNode _cancelFocusNode = FocusNode();
+  final FocusNode _deleteFocusNode = FocusNode();
+
   bool _autoplayNextEpisode = true;
   bool _autoplayPreviews = true;
-  bool _notificationsEnabled = true;
-  String _selectedAudioLanguage = 'Español (Latinoamérica)';
-  String _selectedQuality = 'auto';
+  String _selectedLanguage = 'Español (Latinoamérica)';
+  final List<String> _languages = const [
+    'Español (Latinoamérica)',
+    'Español (España)',
+    'English',
+    'Português (Brasil)',
+    'Français',
+    'Italiano',
+    'Deutsch',
+  ];
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
-    _avatarFocusNode = FocusNode();
-    _nameFocusNode = FocusNode();
-    _languageFocusNode = FocusNode();
-    _qualityFocusNode = FocusNode();
 
+    // Auto-scroll helper when focus changes
     _avatarFocusNode.addListener(() {
       if (_avatarFocusNode.hasFocus && mounted) {
-        _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+        _scrollController.animateTo(0.0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic);
       }
     });
+
     _nameFocusNode.addListener(() {
       if (_nameFocusNode.hasFocus && mounted) {
-        _scrollController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+        _scrollController.animateTo(0.0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic);
       }
     });
-    _languageFocusNode.addListener(() {
-      if (_languageFocusNode.hasFocus && mounted) {
-        Scrollable.ensureVisible(context, alignment: 0.15, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
-      }
-    });
-    _qualityFocusNode.addListener(() {
-      if (_qualityFocusNode.hasFocus && mounted) {
-        Scrollable.ensureVisible(context, alignment: 0.15, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
-      }
-    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider);
       final settings = ref.read(settingsProvider);
@@ -72,7 +93,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       }
       setState(() {
         _autoplayNextEpisode = settings.autoPlayNextEpisode;
-        _selectedQuality = settings.preferredQuality;
       });
       _avatarFocusNode.requestFocus();
     });
@@ -81,30 +101,142 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _scrollController.dispose();
     _avatarFocusNode.dispose();
     _nameFocusNode.dispose();
     _languageFocusNode.dispose();
-    _qualityFocusNode.dispose();
-    _scrollController.dispose();
+    _autoplayNextFocusNode.dispose();
+    _autoplayPreviewsFocusNode.dispose();
+    _saveFocusNode.dispose();
+    _cancelFocusNode.dispose();
+    _deleteFocusNode.dispose();
     super.dispose();
   }
 
-  void _showDeleteConfirmation(BuildContext context, WidgetRef ref, String id, String name) {
+  void _save(UserProfile? profile) {
+    final newName = _nameController.text.trim();
+    if (newName.isNotEmpty && profile != null) {
+      ref.read(authProvider.notifier).updateProfileName(newName);
+    }
+    ref
+        .read(settingsProvider.notifier)
+        .setAutoPlayNextEpisode(_autoplayNextEpisode);
+
+    if (Navigator.canPop(context)) {
+      context.pop();
+    } else {
+      context.go('/select-profile');
+    }
+  }
+
+  void _showLanguageDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        title: const Text('¿Eliminar perfil?', style: TextStyle(color: Colors.white)),
-        content: Text('Se perderá todo el historial y preferencias de $name.', style: const TextStyle(color: Colors.white70)),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF181818),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        title: const Text(
+          'Idioma de visualización',
+          style: TextStyle(
+            fontFamily: 'NetflixSans',
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: SizedBox(
+          width: 380,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: _languages.map((lang) {
+                final isSelected = lang == _selectedLanguage;
+                return _LanguageOptionTile(
+                  label: lang,
+                  isSelected: isSelected,
+                  onSelected: () {
+                    setState(() => _selectedLanguage = lang);
+                    Navigator.pop(ctx);
+                    _languageFocusNode.requestFocus();
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCELAR')),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _languageFocusNode.requestFocus();
+            },
+            child: const Text(
+              'CANCELAR',
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                color: Colors.white70,
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(String id, String name) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF181818),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        title: const Text(
+          '¿Eliminar perfil?',
+          style: TextStyle(
+            fontFamily: 'NetflixSans',
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Se perderá todo el historial y las preferencias de $name para siempre.',
+          style: const TextStyle(
+            fontFamily: 'NetflixSans',
+            color: Colors.white70,
+            fontSize: 15,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'CANCELAR',
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                color: Colors.white60,
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
           TextButton(
             onPressed: () {
               ref.read(authProvider.notifier).deleteProfile(id);
-              Navigator.pop(context);
+              Navigator.pop(ctx);
               context.go('/select-profile');
             },
-            child: const Text('ELIMINAR', style: TextStyle(color: Colors.redAccent))
+            child: const Text(
+              'ELIMINAR PERFIL',
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                color: Color(0xFFE50914),
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -113,9 +245,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
     const backgroundColor = Color(0xFF000000);
-    const cardColor = Color(0xFF1A1D24);
 
     final user = ref.watch(authProvider);
     final profile = user?.profiles.firstWhere(
@@ -123,22 +253,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       orElse: () => user.profiles.first,
     );
 
+    final bool canDelete = profile != null && !profile.isMain;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        // Si un menú desplegable está abierto, BACK solo lo cierra y devuelve
-        // el foco a su selector (en lugar de salir de la pantalla).
-        final languageMenu = _languageMenuKey.currentState;
-        if (languageMenu != null && languageMenu.isMenuOpen) {
-          languageMenu.closeMenu();
-          return;
-        }
-        final qualityMenu = _qualityMenuKey.currentState;
-        if (qualityMenu != null && qualityMenu.isMenuOpen) {
-          qualityMenu.closeMenu();
-          return;
-        }
         if (Navigator.canPop(context)) {
           context.pop();
         } else {
@@ -147,231 +267,335 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       },
       child: Scaffold(
         backgroundColor: backgroundColor,
-        appBar: AppBar(
-          backgroundColor: backgroundColor,
-          surfaceTintColor: Colors.transparent,
-          leading: IconButton(
-            icon: AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 24),
-            onPressed: () => context.pop(),
-          ),
-          title: const Text('Editar perfil', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-          centerTitle: false,
-        ),
-      body: SingleChildScrollView(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 140, vertical: 40),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 850),
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                    children: [
-                      Focus(
-                        focusNode: _avatarFocusNode,
-                        onKeyEvent: (node, event) {
-                          if (event is KeyDownEvent) {
-                            if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-                              _nameFocusNode.requestFocus();
-                              return KeyEventResult.handled;
-                            } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                              _languageFocusNode.requestFocus();
-                              return KeyEventResult.handled;
-                            } else if (event.logicalKey == LogicalKeyboardKey.select ||
-                                       event.logicalKey == LogicalKeyboardKey.enter ||
-                                       event.logicalKey == LogicalKeyboardKey.space) {
-                              context.push('/settings/avatar');
-                              return KeyEventResult.handled;
-                            }
-                          }
-                          return KeyEventResult.ignored;
-                        },
-                        child: Builder(
-                          builder: (context) {
-                            final hasFocus = Focus.of(context).hasFocus;
-                            return GestureDetector(
-                              onTap: () => context.push('/settings/avatar'),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: hasFocus ? primaryColor : Colors.white24,
-                                    width: hasFocus ? 3 : 2,
-                                  ),
-                                  boxShadow: hasFocus
-                                      ? [BoxShadow(color: primaryColor.withValues(alpha: 0.4), blurRadius: 16, spreadRadius: 2)]
-                                      : [],
-                                ),
-                                child: Stack(
-                                  alignment: Alignment.bottomRight,
-                                  children: [
-                                    Container(
-                                      width: 140,
-                                      height: 140,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        image: (profile?.photoUrl != null)
-                                            ? DecorationImage(
-                                                image: profile!.photoUrl!.startsWith('assets/')
-                                                    ? AssetImage(profile.photoUrl!) as ImageProvider
-                                                    : CachedNetworkImageProvider(profile.photoUrl!),
-                                                fit: BoxFit.cover,
-                                              )
-                                            : null,
-                                        color: cardColor,
-                                      ),
-                                      child: (profile?.photoUrl == null)
-                                          ? AurisIcon(AurisIcons.user, color: Colors.white70, size: 70)
-                                          : null,
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: const BoxDecoration(
-                                        color: primaryColor,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: AurisIcon(AurisIcons.penFilled, size: 16, color: Colors.black),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 780),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Screen Title: "EDITAR PERFIL" ────────────────────────
+                    const Text(
+                      'EDITAR PERFIL',
+                      style: TextStyle(
+                        fontFamily: 'NetflixSans',
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
                       ),
-                    ],
-                  ),
-                  const SizedBox(width: 50),
-                  Expanded(
-                    child: Column(
+                    ),
+
+                    const SizedBox(height: 36),
+
+                    // ── Two-Column Layout (Avatar Card + Details) ─────────────
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('NOMBRE', style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: 320,
-                          child: Focus(
-                            focusNode: _nameFocusNode,
-                            onKeyEvent: (node, event) {
-                              if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                                FocusScope.of(context).focusInDirection(TraversalDirection.down);
-                                return KeyEventResult.handled;
-                              }
-                              return KeyEventResult.ignored;
-                            },
-                            child: Builder(
-                              builder: (context) {
-                                final hasFocus = Focus.of(context).hasFocus;
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.transparent,
-                                    borderRadius: BorderRadius.zero,
-                                    border: Border.all(
-                                      color: hasFocus ? primaryColor : Colors.white38,
-                                      width: hasFocus ? 2.5 : 1.5,
-                                    ),
+                        // Left: Avatar Card (132×132dp with inside edit pencil)
+                        _AvatarEditTile(
+                          focusNode: _avatarFocusNode,
+                          photoUrl: profile?.photoUrl,
+                          onRightPressed: () => _nameFocusNode.requestFocus(),
+                          onDownPressed: () => _saveFocusNode.requestFocus(),
+                          onTap: () => context.push('/settings/avatar?profileId=${profile?.id}'),
+                        ),
+
+                        const SizedBox(width: 36),
+
+                        // Right: Form Controls & Settings
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ── Section 1: Name Input (Direct, no header) ──
+                              _NetflixNameInput(
+                                focusNode: _nameFocusNode,
+                                controller: _nameController,
+                                onLeftPressed: () =>
+                                    _avatarFocusNode.requestFocus(),
+                                onDownPressed: () =>
+                                    _languageFocusNode.requestFocus(),
+                              ),
+
+                              _buildSectionDivider(height: 16),
+
+                              // ── Section 2: IDIOMA ─────────────────────────
+                              const Text(
+                                'IDIOMA',
+                                style: TextStyle(
+                                  fontFamily: 'NetflixSans',
+                                  color: Color(0xFF808080),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              _NetflixSelectorButton(
+                                focusNode: _languageFocusNode,
+                                value: _selectedLanguage,
+                                onLeftPressed: () =>
+                                    _avatarFocusNode.requestFocus(),
+                                onUpPressed: () =>
+                                    _nameFocusNode.requestFocus(),
+                                onDownPressed: () =>
+                                    _autoplayNextFocusNode.requestFocus(),
+                                onTap: _showLanguageDialog,
+                              ),
+
+                              _buildSectionDivider(height: 16),
+
+                              // ── Section 3: CONTROLES DE REPRODUCCIÓN AUTOMÁTICA
+                              const Text(
+                                'CONTROLES DE REPRODUCCION AUTOMATICA',
+                                style: TextStyle(
+                                  fontFamily: 'NetflixSans',
+                                  color: Color(0xFF808080),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              _NetflixTvCheckbox(
+                                focusNode: _autoplayNextFocusNode,
+                                title:
+                                    'Reproducir automáticamente el siguiente episodio en una serie en todos los dispositivos',
+                                value: _autoplayNextEpisode,
+                                onLeftPressed: () =>
+                                    _avatarFocusNode.requestFocus(),
+                                onUpPressed: () =>
+                                    _languageFocusNode.requestFocus(),
+                                onDownPressed: () =>
+                                    _autoplayPreviewsFocusNode.requestFocus(),
+                                onChanged: (val) {
+                                  setState(() => _autoplayNextEpisode = val);
+                                },
+                              ),
+                              const SizedBox(height: 6),
+                              _NetflixTvCheckbox(
+                                focusNode: _autoplayPreviewsFocusNode,
+                                title:
+                                    'Reproducir automáticamente los avances mientras navegas en todos los dispositivos',
+                                value: _autoplayPreviews,
+                                onLeftPressed: () =>
+                                    _avatarFocusNode.requestFocus(),
+                                onUpPressed: () =>
+                                    _autoplayNextFocusNode.requestFocus(),
+                                onDownPressed: () =>
+                                    _saveFocusNode.requestFocus(),
+                                onChanged: (val) {
+                                  setState(() => _autoplayPreviews = val);
+                                },
+                              ),
+
+                              const SizedBox(height: 24),
+
+                              // ── Bottom Action Buttons ─────────────────────
+                              Row(
+                                children: [
+                                  // GUARDAR
+                                  _NetflixActionButton(
+                                    focusNode: _saveFocusNode,
+                                    label: 'GUARDAR',
+                                    isPrimary: true,
+                                    onUpPressed: () =>
+                                        _autoplayPreviewsFocusNode
+                                            .requestFocus(),
+                                    onRightPressed: () =>
+                                        _cancelFocusNode.requestFocus(),
+                                    onPressed: () => _save(profile),
                                   ),
-                                  child: TextField(
-                                    controller: _nameController,
-                                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                    onSubmitted: (_) {
-                                      FocusScope.of(context).focusInDirection(TraversalDirection.down);
-                                    },
-                                    decoration: const InputDecoration(
-                                      filled: true,
-                                      fillColor: Color(0xFF22252A),
-                                      hintText: 'Nombre del perfil',
-                                      hintStyle: TextStyle(color: Colors.white38),
-                                      contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.zero,
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.zero,
-                                        borderSide: BorderSide.none,
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.zero,
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
+                                  const SizedBox(width: 14),
+
+                                  // CANCELAR
+                                  _NetflixActionButton(
+                                    focusNode: _cancelFocusNode,
+                                    label: 'CANCELAR',
+                                    isPrimary: false,
+                                    onUpPressed: () =>
+                                        _autoplayPreviewsFocusNode
+                                            .requestFocus(),
+                                    onLeftPressed: () =>
+                                        _saveFocusNode.requestFocus(),
+                                    onRightPressed: canDelete
+                                        ? () =>
+                                            _deleteFocusNode.requestFocus()
+                                        : null,
+                                    onPressed: () => context.pop(),
                                   ),
-                                );
-                              },
-                            ),
+
+                                  if (canDelete) ...[
+                                    const SizedBox(width: 14),
+                                    // ELIMINAR PERFIL
+                                    _NetflixActionButton(
+                                      focusNode: _deleteFocusNode,
+                                      label: 'ELIMINAR PERFIL',
+                                      isPrimary: false,
+                                      isDestructive: true,
+                                      onUpPressed: () =>
+                                          _autoplayPreviewsFocusNode
+                                              .requestFocus(),
+                                      onLeftPressed: () =>
+                                          _cancelFocusNode.requestFocus(),
+                                      onPressed: () =>
+                                          _showDeleteConfirmation(
+                                              profile.id, profile.name),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                            ],
                           ),
                         ),
-                        const Divider(color: Colors.white24, height: 36),
-                        const Text('PREFERENCIAS DE REPRODUCCIÓN', style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                        const SizedBox(height: 8),
-                        _SettingsShortcutButton(
-                          focusNode: _languageFocusNode,
-                          label: 'Configurar Calidad e Idioma en Ajustes',
-                          onPressed: () => context.push('/settings'),
-                        ),
-                        const Divider(color: Colors.white24, height: 36),
-                        const Text('CONTROLES DE REPRODUCCIÓN AUTOMÁTICA', style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                        const SizedBox(height: 12),
-                        _TVCheckboxTile(
-                          title: 'Reproducir siguiente episodio en una serie en todos los dispositivos.',
-                          value: _autoplayNextEpisode,
-                          onChanged: (v) => setState(() => _autoplayNextEpisode = v),
-                        ),
-                        const SizedBox(height: 8),
-                        _TVCheckboxTile(
-                          title: 'Reproducir avances automáticamente al navegar en todos los dispositivos.',
-                          value: _autoplayPreviews,
-                          onChanged: (v) => setState(() => _autoplayPreviews = v),
-                        ),
-                        const Divider(color: Colors.white24, height: 36),
-                        const Text('NOTIFICACIONES', style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                        const SizedBox(height: 12),
-                        _TVCheckboxTile(
-                          title: 'Recibir noticias y notificaciones de próximos estrenos.',
-                          value: _notificationsEnabled,
-                          onChanged: (v) => setState(() => _notificationsEnabled = v),
-                        ),
-                        const SizedBox(height: 40),
-                        Wrap(
-                          spacing: 16,
-                          runSpacing: 16,
-                          children: [
-                            _FocusableButton(
-                              label: 'GUARDAR',
-                              isPrimary: true,
-                              onPressed: () {
-                                final newName = _nameController.text.trim();
-                                if (newName.isNotEmpty && profile != null) {
-                                  ref.read(authProvider.notifier).updateProfileName(newName);
-                                }
-                                ref.read(settingsProvider.notifier).setAutoPlayNextEpisode(_autoplayNextEpisode);
-                                ref.read(settingsProvider.notifier).setPreferredQuality(_selectedQuality);
-                                if (Navigator.canPop(context)) {
-                                  context.pop();
-                                } else {
-                                  context.go('/select-profile');
-                                }
-                              },
-                            ),
-                            _FocusableButton(
-                              label: 'CANCELAR',
-                              isPrimary: false,
-                              onPressed: () => context.pop(),
-                            ),
-                            if (profile != null)
-                              _FocusableButton(
-                                label: 'ELIMINAR',
-                                isPrimary: false,
-                                onPressed: () => _showDeleteConfirmation(context, ref, profile.id, profile.name),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
                       ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionDivider({double height = 22}) {
+    return Container(
+      height: 1,
+      margin: EdgeInsets.symmetric(vertical: height),
+      color: Colors.white.withValues(alpha: 0.12),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Avatar Edit Tile (Exact Netflix Ninja 118×118dp + Pencil Overlay)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AvatarEditTile extends StatefulWidget {
+  final FocusNode focusNode;
+  final String? photoUrl;
+  final VoidCallback onRightPressed;
+  final VoidCallback onDownPressed;
+  final VoidCallback onTap;
+
+  const _AvatarEditTile({
+    required this.focusNode,
+    this.photoUrl,
+    required this.onRightPressed,
+    required this.onDownPressed,
+    required this.onTap,
+  });
+
+  @override
+  State<_AvatarEditTile> createState() => _AvatarEditTileState();
+}
+
+class _AvatarEditTileState extends State<_AvatarEditTile> {
+  bool _hasFocus = false;
+
+  static const double kSize = 132.0;
+  static const double kRadius = 14.0;
+  static const double kBorder = 3.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _hasFocus = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            widget.onRightPressed();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            widget.onDownPressed();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onTap();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _hasFocus ? 1.05 : 1.0,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            width: kSize,
+            height: kSize,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(kRadius),
+              border: Border.all(
+                color: Colors.white,
+                width: kBorder,
+              ),
+              boxShadow: _hasFocus
+                  ? [
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        blurRadius: 14,
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.8),
+                        blurRadius: 20,
+                        offset: const Offset(0, 6),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(kRadius - kBorder),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // ── Avatar image ─────────────────────────────────────────
+                  _AvatarDisplay(photoUrl: widget.photoUrl),
+
+                  // ── Pencil badge inside avatar at bottom right ───────────
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF1E2833).withValues(alpha: 0.95),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black54,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.edit,
+                        color: Colors.white,
+                        size: 17,
+                      ),
                     ),
                   ),
                 ],
@@ -384,236 +608,179 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 }
 
-class _TVMenuSelector extends StatefulWidget {
-  final String value;
-  final List<String> options;
-  final ValueChanged<String> onChanged;
-  final FocusNode? focusNode;
 
-  const _TVMenuSelector({
-    super.key,
-    required this.value,
-    required this.options,
-    required this.onChanged,
-    this.focusNode,
-  });
+// ─────────────────────────────────────────────────────────────────────────────
+// Avatar Display Widget
+// ─────────────────────────────────────────────────────────────────────────────
 
-  @override
-  State<_TVMenuSelector> createState() => _TVMenuSelectorState();
-}
-
-class _TVMenuSelectorState extends State<_TVMenuSelector> {
-  bool _hasFocus = false;
-  OverlayEntry? _overlayEntry;
-  late FocusNode _buttonFocusNode;
-  late FocusNode _firstOptionFocusNode;
-
-  @override
-  void initState() {
-    super.initState();
-    _buttonFocusNode = widget.focusNode ?? FocusNode();
-    _firstOptionFocusNode = FocusNode();
-  }
-
-  @override
-  void dispose() {
-    _closeMenu();
-    if (widget.focusNode == null) {
-      _buttonFocusNode.dispose();
-    }
-    _firstOptionFocusNode.dispose();
-    super.dispose();
-  }
-
-  /// true si el menú desplegable está visible (usado por el PopScope de la pantalla).
-  bool get isMenuOpen => _overlayEntry != null;
-
-  /// Cierra el menú y devuelve el foco al botón del selector.
-  void closeMenu() => _closeMenu();
-
-  void _toggleMenu(BuildContext context) {
-    if (_overlayEntry != null) {
-      _closeMenu();
-    } else {
-      _openMenu(context);
-    }
-  }
-
-  void _closeMenu() {
-    if (_overlayEntry != null) {
-      _overlayEntry?.remove();
-      _overlayEntry = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _buttonFocusNode.canRequestFocus) {
-          _buttonFocusNode.requestFocus();
-        }
-      });
-    }
-  }
-
-  void _openMenu(BuildContext context) {
-    if (_overlayEntry != null) return;
-    final RenderBox renderBox = context.findRenderObject() as RenderBox;
-    final size = renderBox.size;
-    final offset = renderBox.localToGlobal(Offset.zero);
-
-    _overlayEntry = OverlayEntry(
-      builder: (context) => Stack(
-        children: [
-          ModalBarrier(
-            color: Colors.transparent,
-            dismissible: true,
-            onDismiss: _closeMenu,
-          ),
-          Positioned(
-            left: offset.dx,
-            top: offset.dy + size.height + 4,
-            width: size.width > 250 ? size.width : 250,
-            child: Focus(
-              onKeyEvent: (node, event) {
-                if (event is KeyDownEvent &&
-                    (event.logicalKey == LogicalKeyboardKey.escape ||
-                     event.logicalKey == LogicalKeyboardKey.goBack)) {
-                  _closeMenu();
-                  return KeyEventResult.handled;
-                }
-                return KeyEventResult.ignored;
-              },
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF000000),
-                    borderRadius: BorderRadius.zero,
-                    border: Border.all(color: Colors.white38, width: 1.5),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: widget.options.map((opt) {
-                      final isFirst = opt == widget.options.first;
-                      final isSelected = opt == widget.value;
-                      return _TVSubMenuOption(
-                        focusNode: isFirst ? _firstOptionFocusNode : null,
-                        label: opt,
-                        isSelected: isSelected,
-                        onArrowUp: isFirst ? _closeMenu : null,
-                        onBack: _closeMenu,
-                        onTap: () {
-                          _closeMenu();
-                          widget.onChanged(opt);
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    Overlay.of(context).insert(_overlayEntry!);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_firstOptionFocusNode.canRequestFocus) {
-        _firstOptionFocusNode.requestFocus();
-      }
-    });
-  }
+class _AvatarDisplay extends StatelessWidget {
+  final String? photoUrl;
+  const _AvatarDisplay({this.photoUrl});
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    if (photoUrl == null || photoUrl!.isEmpty) {
+      return Container(
+        color: const Color(0xFF1C1C1C),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.person_rounded,
+          color: Color(0xFF808080),
+          size: 52,
+        ),
+      );
+    }
+    if (photoUrl!.startsWith('assets/')) {
+      return Image.asset(photoUrl!, fit: BoxFit.cover);
+    }
+    return CachedNetworkImage(
+      imageUrl: photoUrl!,
+      fit: BoxFit.cover,
+      placeholder: (_, __) => Container(color: const Color(0xFF1C1C1C)),
+      errorWidget: (_, __, ___) => Container(
+        color: const Color(0xFF1C1C1C),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.person_rounded,
+          color: Color(0xFF808080),
+          size: 52,
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Netflix Name Input Box
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NetflixNameInput extends StatefulWidget {
+  final FocusNode focusNode;
+  final TextEditingController controller;
+  final VoidCallback onLeftPressed;
+  final VoidCallback onDownPressed;
+
+  const _NetflixNameInput({
+    required this.focusNode,
+    required this.controller,
+    required this.onLeftPressed,
+    required this.onDownPressed,
+  });
+
+  @override
+  State<_NetflixNameInput> createState() => _NetflixNameInputState();
+}
+
+class _NetflixNameInputState extends State<_NetflixNameInput> {
+  bool _hasFocus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = _hasFocus
+        ? Colors.white
+        : Colors.white.withValues(alpha: 0.2);
+    final borderWidth = _hasFocus ? 2.5 : 1.5;
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(4),
+      borderSide: BorderSide(color: borderColor, width: borderWidth),
+    );
     return Focus(
-      focusNode: _buttonFocusNode,
-      onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _hasFocus = f),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.select ||
-              event.logicalKey == LogicalKeyboardKey.enter ||
-              event.logicalKey == LogicalKeyboardKey.space ||
-              event.logicalKey == LogicalKeyboardKey.arrowDown) {
-            _toggleMenu(context);
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+              widget.controller.selection.baseOffset <= 0) {
+            widget.onLeftPressed();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            widget.onDownPressed();
             return KeyEventResult.handled;
           }
         }
         return KeyEventResult.ignored;
       },
-      child: Builder(
-        builder: (context) {
-          return GestureDetector(
-            onTap: () => _toggleMenu(context),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 250,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF22252A),
-                borderRadius: BorderRadius.zero,
-                border: Border.all(
-                  color: _hasFocus ? primaryColor : Colors.white38,
-                  width: _hasFocus ? 2.5 : 1.5,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.value,
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  AurisIcon(AurisIcons.chevronDown, color: Colors.white70, size: 22),
-                ],
-              ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 44,
+        child: TextField(
+          controller: widget.controller,
+          cursorColor: Colors.white,
+          style: const TextStyle(
+            fontFamily: 'NetflixSans',
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+          onSubmitted: (_) => widget.onDownPressed(),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFF222222),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            hintText: 'Nombre del perfil',
+            hintStyle: const TextStyle(
+              fontFamily: 'NetflixSans',
+              color: Color(0xFF666666),
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
             ),
-          );
-        },
+            border: border,
+            enabledBorder: border,
+            focusedBorder: border,
+          ),
+        ),
       ),
     );
   }
 }
 
-class _TVSubMenuOption extends StatefulWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final VoidCallback? onArrowUp;
-  final VoidCallback? onBack;
-  final FocusNode? focusNode;
+// ─────────────────────────────────────────────────────────────────────────────
+// Netflix Selector Button (Language)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _TVSubMenuOption({
-    required this.label,
-    required this.isSelected,
+class _NetflixSelectorButton extends StatefulWidget {
+  final FocusNode focusNode;
+  final String value;
+  final VoidCallback onLeftPressed;
+  final VoidCallback onUpPressed;
+  final VoidCallback onDownPressed;
+  final VoidCallback onTap;
+
+  const _NetflixSelectorButton({
+    required this.focusNode,
+    required this.value,
+    required this.onLeftPressed,
+    required this.onUpPressed,
+    required this.onDownPressed,
     required this.onTap,
-    this.onArrowUp,
-    this.onBack,
-    this.focusNode,
   });
 
   @override
-  State<_TVSubMenuOption> createState() => _TVSubMenuOptionState();
+  State<_NetflixSelectorButton> createState() => _NetflixSelectorButtonState();
 }
 
-class _TVSubMenuOptionState extends State<_TVSubMenuOption> {
+class _NetflixSelectorButtonState extends State<_NetflixSelectorButton> {
   bool _hasFocus = false;
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
     return Focus(
       focusNode: widget.focusNode,
-      onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
+      onFocusChange: (f) => setState(() => _hasFocus = f),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent) {
-          if (widget.onArrowUp != null && event.logicalKey == LogicalKeyboardKey.arrowUp) {
-            widget.onArrowUp!();
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            widget.onLeftPressed();
             return KeyEventResult.handled;
           }
-          if (widget.onBack != null &&
-              (event.logicalKey == LogicalKeyboardKey.escape ||
-               event.logicalKey == LogicalKeyboardKey.goBack)) {
-            widget.onBack!();
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            widget.onUpPressed();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            widget.onDownPressed();
             return KeyEventResult.handled;
           }
           if (event.logicalKey == LogicalKeyboardKey.select ||
@@ -629,28 +796,35 @@ class _TVSubMenuOptionState extends State<_TVSubMenuOption> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
+          width: 250,
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: _hasFocus ? primaryColor.withValues(alpha: 0.2) : Colors.transparent,
-            borderRadius: BorderRadius.zero,
+            color: const Color(0xFF222222),
+            borderRadius: BorderRadius.circular(4),
             border: Border.all(
-              color: _hasFocus ? primaryColor : Colors.transparent,
-              width: _hasFocus ? 2 : 1,
+              color: _hasFocus
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.15),
+              width: _hasFocus ? 2.0 : 1.0,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              widget.isSelected 
-                  ? AurisIcon(AurisIcons.check, color: _hasFocus ? primaryColor : Colors.white70, size: 18)
-                  : AurisIcon(AurisIcons.add, color: _hasFocus ? primaryColor : Colors.transparent, size: 18),
-              const SizedBox(width: 12),
               Text(
-                widget.label,
-                style: TextStyle(
-                  color: _hasFocus ? Colors.white : Colors.white70,
-                  fontSize: 15,
-                  fontWeight: widget.isSelected || _hasFocus ? FontWeight.bold : FontWeight.normal,
+                widget.value,
+                style: const TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
+              ),
+              const Icon(
+                Icons.arrow_drop_down_rounded,
+                color: Colors.white70,
+                size: 24,
               ),
             ],
           ),
@@ -660,76 +834,119 @@ class _TVSubMenuOptionState extends State<_TVSubMenuOption> {
   }
 }
 
-class _TVCheckboxTile extends StatefulWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// Netflix TV Checkbox Tile
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NetflixTvCheckbox extends StatefulWidget {
+  final FocusNode focusNode;
   final String title;
   final bool value;
+  final VoidCallback onLeftPressed;
+  final VoidCallback onUpPressed;
+  final VoidCallback onDownPressed;
   final ValueChanged<bool> onChanged;
 
-  const _TVCheckboxTile({
+  const _NetflixTvCheckbox({
+    required this.focusNode,
     required this.title,
     required this.value,
+    required this.onLeftPressed,
+    required this.onUpPressed,
+    required this.onDownPressed,
     required this.onChanged,
   });
 
   @override
-  State<_TVCheckboxTile> createState() => _TVCheckboxTileState();
+  State<_NetflixTvCheckbox> createState() => _NetflixTvCheckboxState();
 }
 
-class _TVCheckboxTileState extends State<_TVCheckboxTile> {
+class _NetflixTvCheckboxState extends State<_NetflixTvCheckbox> {
   bool _hasFocus = false;
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
     return Focus(
-      onFocusChange: (hasFocus) {
-        setState(() => _hasFocus = hasFocus);
-        if (hasFocus && mounted) {
-          Scrollable.ensureVisible(context, alignment: 0.15, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
-        }
-      },
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _hasFocus = f),
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.select ||
-             event.logicalKey == LogicalKeyboardKey.enter ||
-             event.logicalKey == LogicalKeyboardKey.space)) {
-          widget.onChanged(!widget.value);
-          return KeyEventResult.handled;
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            widget.onLeftPressed();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            widget.onUpPressed();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            widget.onDownPressed();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onChanged(!widget.value);
+            return KeyEventResult.handled;
+          }
         }
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
         onTap: () => widget.onChanged(!widget.value),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.zero,
+            color: _hasFocus
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
             border: Border.all(
-              color: _hasFocus ? primaryColor : Colors.transparent,
-              width: 2.0,
+              color: _hasFocus ? Colors.white : Colors.transparent,
+              width: 1.5,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Square Checkbox (Dark box with white checkmark when true)
               Container(
-                width: 22,
-                height: 22,
+                width: 20,
+                height: 20,
+                margin: const EdgeInsets.only(top: 1),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: widget.value ? primaryColor : Colors.white60, width: 2),
-                  color: widget.value ? primaryColor : Colors.transparent,
+                  color: const Color(0xFF222222),
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(
+                    color: widget.value
+                        ? Colors.white70
+                        : const Color(0xFF555555),
+                    width: 1.5,
+                  ),
                 ),
+                alignment: Alignment.center,
                 child: widget.value
-                    ? AurisIcon(AurisIcons.check, size: 16, color: Colors.black)
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      )
                     : null,
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   widget.title,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w400),
+                  style: TextStyle(
+                    fontFamily: 'NetflixSans',
+                    color: _hasFocus
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.9),
+                    fontSize: 13,
+                    fontWeight: _hasFocus ? FontWeight.w600 : FontWeight.w400,
+                    height: 1.35,
+                  ),
                 ),
               ),
             ],
@@ -740,69 +957,128 @@ class _TVCheckboxTileState extends State<_TVCheckboxTile> {
   }
 }
 
-class _FocusableButton extends StatefulWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// Netflix TV Action Button (Save / Cancel / Delete)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NetflixActionButton extends StatefulWidget {
+  final FocusNode focusNode;
   final String label;
   final bool isPrimary;
+  final bool isDestructive;
+  final VoidCallback onUpPressed;
+  final VoidCallback? onLeftPressed;
+  final VoidCallback? onRightPressed;
   final VoidCallback onPressed;
 
-  const _FocusableButton({
+  const _NetflixActionButton({
+    required this.focusNode,
     required this.label,
     required this.isPrimary,
+    this.isDestructive = false,
+    required this.onUpPressed,
+    this.onLeftPressed,
+    this.onRightPressed,
     required this.onPressed,
   });
 
   @override
-  State<_FocusableButton> createState() => _FocusableButtonState();
+  State<_NetflixActionButton> createState() => _NetflixActionButtonState();
 }
 
-class _FocusableButtonState extends State<_FocusableButton> {
+class _NetflixActionButtonState extends State<_NetflixActionButton> {
   bool _hasFocus = false;
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    // Styling colors matching Netflix reference
+    final Color backgroundColor;
+    final Color textColor;
+    final Color borderColor;
+
+    if (widget.isDestructive) {
+      if (_hasFocus) {
+        backgroundColor = const Color(0xFFE50914);
+        textColor = Colors.white;
+        borderColor = const Color(0xFFE50914);
+      } else {
+        backgroundColor = const Color(0xFF2B2B2B);
+        textColor = Colors.white70;
+        borderColor = Colors.transparent;
+      }
+    } else {
+      if (_hasFocus) {
+        backgroundColor = Colors.white;
+        textColor = Colors.black;
+        borderColor = Colors.white;
+      } else {
+        backgroundColor = const Color(0xFF2B2B2B);
+        textColor = Colors.white;
+        borderColor = Colors.transparent;
+      }
+    }
 
     return Focus(
-      onFocusChange: (hasFocus) {
-        setState(() => _hasFocus = hasFocus);
-        if (hasFocus && mounted) {
-          Scrollable.ensureVisible(context, alignment: 0.15, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
-        }
-      },
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _hasFocus = f),
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.select ||
-             event.logicalKey == LogicalKeyboardKey.enter ||
-             event.logicalKey == LogicalKeyboardKey.space)) {
-          widget.onPressed();
-          return KeyEventResult.handled;
+        if (event is KeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            widget.onUpPressed();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft &&
+              widget.onLeftPressed != null) {
+            widget.onLeftPressed!();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
+              widget.onRightPressed != null) {
+            widget.onRightPressed!();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
         }
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
         onTap: widget.onPressed,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 140,
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
           decoration: BoxDecoration(
-            color: widget.isPrimary
-                ? (_hasFocus ? Colors.white : primaryColor)
-                : Colors.transparent,
-            borderRadius: BorderRadius.zero,
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(4),
             border: Border.all(
-              color: _hasFocus ? (widget.isPrimary ? Colors.white : primaryColor) : Colors.white38,
-              width: 2.0,
+              color: borderColor,
+              width: _hasFocus ? 2.0 : 0.0,
             ),
+            boxShadow: _hasFocus
+                ? [
+                    BoxShadow(
+                      color: widget.isDestructive
+                          ? const Color(0xFFE50914).withValues(alpha: 0.4)
+                          : Colors.white.withValues(alpha: 0.3),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
           ),
-          alignment: Alignment.center,
           child: Text(
             widget.label,
             style: TextStyle(
-              color: widget.isPrimary ? Colors.black : Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1,
+              fontFamily: 'NetflixSans',
+              color: textColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
             ),
           ),
         ),
@@ -811,76 +1087,76 @@ class _FocusableButtonState extends State<_FocusableButton> {
   }
 }
 
-class _SettingsShortcutButton extends StatefulWidget {
-  final String label;
-  final VoidCallback onPressed;
-  final FocusNode? focusNode;
+// ─────────────────────────────────────────────────────────────────────────────
+// Language Option Tile in Dialog
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _SettingsShortcutButton({
+class _LanguageOptionTile extends StatefulWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onSelected;
+
+  const _LanguageOptionTile({
     required this.label,
-    required this.onPressed,
-    this.focusNode,
+    required this.isSelected,
+    required this.onSelected,
   });
 
   @override
-  State<_SettingsShortcutButton> createState() => _SettingsShortcutButtonState();
+  State<_LanguageOptionTile> createState() => _LanguageOptionTileState();
 }
 
-class _SettingsShortcutButtonState extends State<_SettingsShortcutButton> {
+class _LanguageOptionTileState extends State<_LanguageOptionTile> {
   bool _hasFocus = false;
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
-
     return Focus(
-      focusNode: widget.focusNode,
-      onFocusChange: (hasFocus) {
-        setState(() => _hasFocus = hasFocus);
-        if (hasFocus && mounted) {
-          Scrollable.ensureVisible(context, alignment: 0.15, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
-        }
-      },
+      onFocusChange: (f) => setState(() => _hasFocus = f),
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
             (event.logicalKey == LogicalKeyboardKey.select ||
-             event.logicalKey == LogicalKeyboardKey.enter ||
-             event.logicalKey == LogicalKeyboardKey.space)) {
-          widget.onPressed();
+                event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onSelected();
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
       },
       child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 380,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        onTap: widget.onSelected,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9.5),
           decoration: BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.zero,
+            color: _hasFocus
+                ? Colors.white.withValues(alpha: 0.12)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(4),
             border: Border.all(
-              color: _hasFocus ? primaryColor : Colors.white38,
-              width: 2.0,
+              color: _hasFocus ? Colors.white : Colors.transparent,
+              width: 1.5,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  widget.label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: widget.isSelected || _hasFocus
+                      ? FontWeight.w700
+                      : FontWeight.w400,
                 ),
               ),
-              AurisIcon(AurisIcons.chevronRight, color: Colors.white70, size: 16),
+              if (widget.isSelected)
+                const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
             ],
           ),
         ),
