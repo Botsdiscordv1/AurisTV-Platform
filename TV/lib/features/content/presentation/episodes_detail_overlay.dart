@@ -783,6 +783,11 @@ class _ExpandedEpisodeCardState extends State<_ExpandedEpisodeCard> {
                           ? CachedNetworkImage(
                               imageUrl: ApiEndpoints.proxyImage(widget.episode.thumbnail!),
                               fit: BoxFit.cover,
+                              memCacheWidth: (widget.thumbWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
+                              memCacheHeight: ((widget.thumbWidth * MediaQuery.of(context).devicePixelRatio) / (16 / 9)).round().clamp(1, 225),
+                              fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                              fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                              cacheManager: AurisImageCacheManager.instance,
                               placeholder: (_, __) => Container(color: Colors.white.withOpacity(0.05)),
                               errorWidget: (_, __, ___) => Container(color: Colors.white.withOpacity(0.05), child: const Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 30)),
                             )
@@ -897,6 +902,11 @@ class _ThemeRowCardState extends State<_ThemeRowCard> {
                         ? CachedNetworkImage(
                             imageUrl: ApiEndpoints.proxyImage(widget.theme.imageUrl!),
                             fit: BoxFit.cover,
+                            memCacheWidth: (280 * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 480),
+                            memCacheHeight: ((280 * MediaQuery.of(context).devicePixelRatio) / (16 / 9)).round().clamp(1, 270),
+                            fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                            fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                            cacheManager: AurisImageCacheManager.instance,
                             placeholder: (_, __) => Container(color: Colors.white.withOpacity(0.05)),
                             errorWidget: (_, __, ___) => Container(color: Colors.white.withOpacity(0.05), child: const Icon(Icons.music_note_rounded, color: Colors.white24, size: 40)),
                           )

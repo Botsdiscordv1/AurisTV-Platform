@@ -77,8 +77,8 @@ class AurisIcons {
   static String get mobile => reiconSvg(Reicon.outline.mobile);
   static String get phoneRotate => reiconSvg(Reicon.outline.phoneRotate2);
   static String get gamepadButtons => reiconSvg(Reicon.outline.gamepadButtons);
-  static String get dpad => reiconSvg(Reicon.outline.dpad);
-  static String get gamepad => reiconSvg(Reicon.outline.gamepad);
+  static String get dpad => gamepadButtons;
+  static String get gamepad => gamepadButtons;
   static String get lockOpen => reiconSvg(Reicon.outline.lockKeyholeOpen);
   static String get lockClosed => reiconSvg(Reicon.outline.lockKeyhole);
   static String get aspectRatioSquare => reiconSvg(Reicon.outline.aspectRatioSquare);

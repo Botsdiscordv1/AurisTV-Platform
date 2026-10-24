@@ -267,10 +267,16 @@ class _WideContentRowState extends State<WideContentRow>
                           child: ListView.separated(
                             controller: _scrollController,
                             physics: const ClampingScrollPhysics(),
+                            cacheExtent: 600,
                             clipBehavior: Clip.none, 
                             scrollDirection: Axis.horizontal,
                             primary: false, 
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0),
+                            padding: EdgeInsets.only(
+                              left: horizontalPadding,
+                              right: (MediaQuery.sizeOf(context).width - cardWidth - horizontalPadding).clamp(horizontalPadding, 2000.0),
+                              top: 0,
+                              bottom: 0,
+                            ),
                             itemCount: widget.items.length,
                             separatorBuilder: (_, __) => const SizedBox(width: 14),
                             itemBuilder: (context, index) {
@@ -281,6 +287,7 @@ class _WideContentRowState extends State<WideContentRow>
                                 child: FocusableWideCard(
                                   key: ValueKey(item.id),
                                   focusNode: _itemFocusNodes[index],
+                                  disableAutoEnsureVisible: true,
                                   onKeyEvent: (node, event) {
                                     if (event is KeyDownEvent) {
                                       if (event.logicalKey == LogicalKeyboardKey.arrowDown) {

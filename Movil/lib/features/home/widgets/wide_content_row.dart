@@ -221,6 +221,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                         child: ListView.separated(
                           controller: _scrollController,
                           physics: const ClampingScrollPhysics(),
+                          cacheExtent: 600,
                           clipBehavior: Clip.none, 
                           scrollDirection: Axis.horizontal,
                           padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), // Senior: Unificado a 0px vertical
@@ -230,6 +231,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                             final item = widget.items[index];
                             
                             return FocusableWideCard(
+                              key: ValueKey('wide_${item.title}_$index'),
                               title: item.title,
                               imageUrl: item.imageUrl,
                               logoUrl: item.logoUrl,

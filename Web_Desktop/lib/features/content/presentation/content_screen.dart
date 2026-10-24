@@ -742,11 +742,19 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                             child: CachedNetworkImage(
                               imageUrl: widget.imageUrl,
                               fit: BoxFit.cover,
-                              memCacheWidth: (ResponsiveUtils.sp(context, 160) * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
+                              memCacheWidth: (ResponsiveUtils.sp(context, 160) * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
+                              memCacheHeight: ((ResponsiveUtils.sp(context, 160) * MediaQuery.of(context).devicePixelRatio) / (16 / 9)).round().clamp(1, 225),
+                              fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                              fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                              cacheManager: AurisImageCacheManager.instance,
                               errorWidget: (_, __, ___) => CachedNetworkImage(
                                 imageUrl: widget.fallbackImageUrl,
                                 fit: BoxFit.cover,
-                                memCacheWidth: (ResponsiveUtils.sp(context, 160) * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
+                                memCacheWidth: (ResponsiveUtils.sp(context, 160) * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
+                                memCacheHeight: ((ResponsiveUtils.sp(context, 160) * MediaQuery.of(context).devicePixelRatio) / (16 / 9)).round().clamp(1, 225),
+                                fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                cacheManager: AurisImageCacheManager.instance,
                                 errorWidget: (_, __, ___) => _ContentScreenState._episodePlaceholder(widget.episodeNumber),
                               ),
                             ),
@@ -1425,6 +1433,7 @@ class _CastCreditsModal extends ConsumerWidget {
                                       url: item.url,
                                       category: cat,
                                       year: item.year,
+                                      kind: cat,
                                     );
                                     context.go(shareableUri, extra: item);
                                   } else {
@@ -4095,6 +4104,7 @@ void _openPlayer(PlayerScreen player) {
             source: result.source,
             url: result.url,
             category: widget.category, // Senior: Mantener la categoría actual
+            kind: widget.kind ?? widget.category,
             from: widget.from ?? '/inicio',
           );
           context.go(uri, extra: result);

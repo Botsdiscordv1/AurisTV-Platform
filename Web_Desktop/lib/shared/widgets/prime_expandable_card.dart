@@ -100,7 +100,11 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> {
                                     child: CachedNetworkImage(
                                       imageUrl: widget.media.posterUrl,
                                       fit: BoxFit.cover,
-                                      memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 2048),
+                                      memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
+                                      memCacheHeight: ((normalWidth * MediaQuery.of(context).devicePixelRatio) * 1.5).round().clamp(1, 600),
+                                      fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                      fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                      cacheManager: AurisImageCacheManager.instance,
                                       filterQuality: FilterQuality.low,
                                     ),
                                   ),

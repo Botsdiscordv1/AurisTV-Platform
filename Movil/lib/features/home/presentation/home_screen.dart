@@ -355,6 +355,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         children: [
           CustomScrollView(
             controller: _scrollController,
+            cacheExtent: 1000,
             slivers: [
               // Espaciador para que el contenido empiece debajo de la barra fija
               SliverToBoxAdapter(

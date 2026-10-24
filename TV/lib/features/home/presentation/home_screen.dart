@@ -400,6 +400,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
         children: [
           CustomScrollView(
             controller: _scrollController,
+            cacheExtent: 700,
             slivers: [
               // Espaciador para el Navbar
               SliverToBoxAdapter(

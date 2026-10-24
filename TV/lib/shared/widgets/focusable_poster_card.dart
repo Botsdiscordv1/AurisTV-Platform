@@ -181,8 +181,10 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                         child: Builder(
                           builder: (context) {
                             final dpr = MediaQuery.of(context).devicePixelRatio;
-                            final targetWidth = (normalWidth * dpr).round();
-                            final targetHeight = (targetWidth * 1.5).round();
+                            // Senior 1GB TV Box Tuning: Límite estricto de 360x540 en memoria RAM
+                            // Evita agotar los ~250MB utilizables de Android y anula el LRU Thrashing
+                            final targetWidth = (normalWidth * dpr).round().clamp(1, 360);
+                            final targetHeight = (targetWidth * 1.5).round().clamp(1, 540);
 
                             return CachedNetworkImage(
                               imageUrl: ApiEndpoints.proxyImage(
@@ -190,7 +192,11 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                                 policy: ImageSize.poster,
                               ),
                               fit: BoxFit.cover,
-                              memCacheWidth: targetWidth.clamp(1, 2048),
+                              memCacheWidth: targetWidth,
+                              memCacheHeight: targetHeight,
+                              fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                              fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                              cacheManager: AurisImageCacheManager.instance,
                               filterQuality: FilterQuality.medium,
                               placeholder: (context, url) => _letterPlaceholder(widget.title),
                               errorWidget: (context, url, error) => _letterPlaceholder(widget.title),

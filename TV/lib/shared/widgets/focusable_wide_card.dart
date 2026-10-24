@@ -30,6 +30,7 @@ class FocusableWideCard extends StatefulWidget {
   final bool forceSelected;
   final FocusNode? focusNode;
   final FocusOnKeyEventCallback? onKeyEvent;
+  final bool disableAutoEnsureVisible;
 
   const FocusableWideCard({
     super.key,
@@ -50,6 +51,7 @@ class FocusableWideCard extends StatefulWidget {
     this.forceSelected = false,
     this.focusNode,
     this.onKeyEvent,
+    this.disableAutoEnsureVisible = false,
   });
 
   @override
@@ -82,11 +84,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
       onFocusChange: (focused) {
         setState(() => _isFocused = focused);
         widget.onFocusChanged?.call(focused);
-        if (focused) {
-          // Scroll MÍNIMO (solo si no cabe entera) con la misma duración que
-          // el glide: la fila permanece quieta en el cambio de foco normal y
-          // el efecto de transición se ve nítido también en carruseles largos.
-          // (El ancla vertical la dispara la FILA al recibir el foco.)
+        if (focused && !widget.disableAutoEnsureVisible) {
           TvScroll.ensureCardVisible(context);
         }
       },
@@ -138,13 +136,23 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            CachedNetworkImage(
-                              imageUrl: widget.imageUrl,
-                              fit: BoxFit.cover,
-                              filterQuality: FilterQuality.medium,
-                              placeholder: (context, url) => Container(color: Colors.white10),
-                              errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
-                            ),
+                            Builder(builder: (context) {
+                              final dpr = MediaQuery.of(context).devicePixelRatio;
+                              final targetW = (widget.width * dpr).round().clamp(1, 540);
+                              final targetH = (targetW / (16 / 9)).round().clamp(1, 310);
+                              return CachedNetworkImage(
+                                imageUrl: widget.imageUrl,
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.medium,
+                                memCacheWidth: targetW,
+                                memCacheHeight: targetH,
+                                fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                cacheManager: AurisImageCacheManager.instance,
+                                placeholder: (context, url) => Container(color: Colors.white10),
+                                errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+                              );
+                            }),
                             Positioned.fill(
                               child: IgnorePointer(
                                 child: DecoratedBox(
@@ -176,7 +184,10 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                       fit: BoxFit.contain,
                                       alignment: Alignment.bottomLeft,
                                       filterQuality: FilterQuality.medium,
-                                      fadeInDuration: const Duration(milliseconds: 150),
+                                      memCacheWidth: (widget.width * 0.65 * MediaQuery.of(context).devicePixelRatio).round().clamp(120, 480),
+                                      fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                      fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                      cacheManager: AurisImageCacheManager.instance,
                                       placeholder: (context, url) => Container(
                                         width: widget.width * 0.65,
                                         height: widget.height * 0.35,

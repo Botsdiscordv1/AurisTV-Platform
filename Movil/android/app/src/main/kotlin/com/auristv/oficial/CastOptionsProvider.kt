@@ -30,6 +30,11 @@ class CastOptionsProvider : OptionsProvider {
     override fun getCastOptions(context: Context): CastOptions {
         // MediaOptions por defecto: habilita notificación/controles de media
         // en pantalla de bloqueo con el Expanded Controller estándar del SDK.
+        // MediaOptions por defecto: habilita la notificaci\u00f3n/controles de media
+        // en pantalla de bloqueo con el Expanded Controller est\u00e1ndar del SDK.
+        // La notificaci\u00f3n propia (AurisAudioHandler) solo se usa en reproducci\u00f3n
+        // local y en cast Auris; en cast nativo manda la del SDK (incluye el
+        // bot\u00f3n de cast para cambiar de dispositivo).
         val mediaOptions = CastMediaOptions.Builder().build()
 
         return CastOptions.Builder()

@@ -46,6 +46,7 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
     url: effectiveUrl,
     category: category,
     year: item.year,
+    kind: item.card?.kind,
     type: item.card?.type ?? item.card?.kind,
     sectionId: item.sectionId,
     from: '/inicio',
@@ -72,6 +73,7 @@ void openHomeScheduleItem(BuildContext context, MediaItem item) {
     url: url,
     category: 'anime',
     year: itemYear,
+    kind: item.card?.kind ?? 'anime',
     type: item.card?.kind ?? (item.type == MediaType.anime ? 'anime' : null),
     from: '/horario',
   );
@@ -235,6 +237,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         children: [
           CustomScrollView(
             controller: _scrollController,
+            cacheExtent: 1500,
             slivers: [
               SliverToBoxAdapter(
                 child: SizedBox(height: useMobileLayout ? (MediaQuery.of(context).padding.top + 58) : 78),

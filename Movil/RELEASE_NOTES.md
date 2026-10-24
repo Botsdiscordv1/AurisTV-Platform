@@ -1,4 +1,4 @@
-# 🚀 AurisTV v1.1.0 - Actualización Mayor: Sistema de Casting & Control Remoto D-Pad
+#                                              🚀 AurisTV v1.1.0 - Actualización Mayor: Sistema de Casting & Control Remoto D-Pad
 
 ¡Nos complace anunciar el lanzamiento de **AurisTV v1.1.0**! Esta importante actualización mayor introduce el nuevo **Sistema de Casting local/remoto**, hojas flotantes de control D-Pad, optimizaciones nativas de reproducción de video en superficie, gestión avanzada de perfiles y avatares, y sincronización completa en todas las plataformas (**Móvil, Android TV y Web/Desktop**).
 

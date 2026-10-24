@@ -7,6 +7,7 @@ export 'core/api/image_policy.dart';
 export 'core/constants/auris_icons.dart';
 export 'core/config/playback_config.dart';
 export 'core/config/video_surface_config.dart';
+export 'core/config/image_config.dart';
 export 'core/errors/playback_error_catalog.dart';
 export 'core/telemetry/playback_telemetry.dart';
 export 'data/models/media_item.dart';

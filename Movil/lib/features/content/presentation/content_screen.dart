@@ -13,6 +13,12 @@ import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/auris_bottom_bar.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../cast/data/models/cast_state.dart';
+import '../../cast/data/providers/local_cast_provider.dart';
+import '../../cast/presentation/providers/cast_provider.dart';
+import '../../cast/presentation/widgets/cast_picker_sheet.dart';
+import '../../remote_control/data/models/remote_device.dart';
+import '../../remote_control/presentation/providers/remote_control_provider.dart';
 
 // --- Galería Local Helpers ---
 final _galleryLocalProvider = FutureProvider.family<GalleryResponse, GalleryParams>((ref, params) async {
@@ -430,15 +436,29 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                         children: [
                           AspectRatio(
                             aspectRatio: 16 / 9,
-                            child: CachedNetworkImage(
-                              imageUrl: widget.imageUrl,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => CachedNetworkImage(
-                                imageUrl: widget.fallbackImageUrl,
+                            child: Builder(builder: (context) {
+                              final thumbW = (ResponsiveUtils.sp(context, 160) * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400);
+                              final thumbH = (thumbW / (16 / 9)).round().clamp(1, 225);
+                              return CachedNetworkImage(
+                                imageUrl: widget.imageUrl,
                                 fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) => _episodePlaceholder(widget.episodeNumber),
-                              ),
-                            ),
+                                memCacheWidth: thumbW,
+                                memCacheHeight: thumbH,
+                                fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                cacheManager: AurisImageCacheManager.instance,
+                                errorWidget: (_, __, ___) => CachedNetworkImage(
+                                  imageUrl: widget.fallbackImageUrl,
+                                  fit: BoxFit.cover,
+                                  memCacheWidth: thumbW,
+                                  memCacheHeight: thumbH,
+                                  fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                  fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                  cacheManager: AurisImageCacheManager.instance,
+                                  errorWidget: (_, __, ___) => _episodePlaceholder(widget.episodeNumber),
+                                ),
+                              );
+                            }),
                           ),
                           if (widget.progress != null && widget.progress! > 0)
                             Positioned(
@@ -1282,6 +1302,59 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   bool _showPlayer = false;
   bool _isPlayedOnce = false;
 
+  void _showCastPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => CastPickerSheet(
+        onConnectAurisDevice: (device) => _beginAurisCastFromContent(device),
+      ),
+    );
+  }
+
+  /// Parámetros del detalle compartidos por el `build` y por el cast directo
+  /// desde la ficha: el callback del picker corre fuera del build y antes
+  /// referenciaba un `detailParams` local que no existe.
+  UnifiedDetailParams get _detailParams => UnifiedDetailParams(
+        title: widget.title,
+        metadataTitle: widget.metadataTitle,
+        category: widget.category,
+        kind: widget.kind ?? widget.result?.kind,
+        year: widget.year,
+        season: widget.season ?? widget.result?.season,
+        source: widget.source,
+        url: widget.url,
+        type: widget.result?.type ?? widget.type,
+        sectionId: widget.sectionId,
+        initialSources:
+            widget.result != null ? List.unmodifiable([widget.result!]) : null,
+      );
+
+  void _beginAurisCastFromContent(RemoteDevice device) {
+    final detailState = ref.read(unifiedContentProvider(_detailParams));
+    final detailData = detailState.detail.valueOrNull?.main;
+    final history = ref.read(playbackHistoryStateProvider).valueOrNull ?? [];
+    final activeSources = ref.read(activeContentSourcesProvider);
+    final banner = ApiEndpoints.proxyImage(
+      DetailBackdropResolver.resolve(
+        detail: detailData,
+        bannerParam: widget.banner,
+        sourceBanner: activeSources.isNotEmpty ? activeSources.first.banner : null,
+        season: detailState.currentSeason,
+      ),
+      width: 1920,
+      height: 1080,
+    );
+    // El player abre el contenido y, cuando el stream está resuelto, dispara
+    // el cast al target (castTargetId) con url + headers reales.
+    _handlePlay(context, detailState, history, banner, detailData,
+        castTargetId: device.id);
+  }
+
   @override void initState() {
     super.initState();
     _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () {
@@ -1444,8 +1517,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     UnifiedContentState state, 
     List<PlaybackHistory> history,
     String? heroBanner,
-    dynamic detailData,
-  ) {
+    dynamic detailData, {
+    String? castTargetId,
+  }) {
     final currentSource = state.selectedSource;
     if (currentSource == null) return;
     
@@ -1478,7 +1552,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final posterParam = '&title=${Uri.encodeComponent(state.seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
     final meta = _effectivePlayerMeta(isMovieCategory);
     
-    context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource.source}&url=${Uri.encodeComponent(playUrl)}&episode=$episodeLabel&season=$currentSeason&serverName=${simplifySourceName(tapSource.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${meta.category}&totalEpisodes=${state.episodes.valueOrNull?.response.total ?? 1}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${meta.kind != null && meta.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(meta.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
+    context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource.source}&url=${Uri.encodeComponent(playUrl)}&episode=$episodeLabel&season=$currentSeason&serverName=${simplifySourceName(tapSource.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${meta.category}&totalEpisodes=${state.episodes.valueOrNull?.response.total ?? 1}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${meta.kind != null && meta.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(meta.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}${castTargetId != null ? '&castTarget=${Uri.encodeComponent(castTargetId)}' : ''}');
   }
 
   Widget _buildMetaRow(dynamic d, {required bool isMobile, double? sourceRating, String? kind}) {
@@ -1745,19 +1819,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final episodesCrossAxisCount = isMobile ? 1 : (width < 700 ? 2 : (width < 1150 ? 3 : (width < 1550 ? 4 : (width < 2100 ? 5 : 6))));
     final episodesAspectRatio = isMobile ? 1.15 : (width < 1150 ? 1.05 : 1.1);
 
-    final detailParams = UnifiedDetailParams(
-      title: widget.title,
-      metadataTitle: widget.metadataTitle,
-      category: widget.category,
-      kind: widget.kind ?? widget.result?.kind,
-      year: widget.year,
-      season: widget.season ?? widget.result?.season,
-      source: widget.source,
-      url: widget.url,
-      type: widget.result?.type ?? widget.type,
-      sectionId: widget.sectionId,
-      initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
-    );
+    final detailParams = _detailParams;
 
     final detailState = ref.watch(unifiedContentProvider(detailParams));
     
@@ -1917,7 +1979,27 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ) : null,
           topBar: Stack(children: [
             Positioned(top: 12, left: 15, child: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28), onPressed: () => Navigator.of(context).pop())),
-            Positioned(top: 12, right: 15, child: IconButton(icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 24), onPressed: () {})),
+            Positioned(
+              top: 12, 
+              right: 15, 
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final remoteState = ref.watch(remoteControlProvider);
+                  final castState = ref.watch(chromecastProvider);
+                  final activeTargetId = remoteState.activeTargetDeviceId;
+                  final isCasting = activeTargetId != null || castState.isCasting;
+                  
+                  return IconButton(
+                    icon: AurisIcon(
+                      AurisIcons.cast, 
+                      color: isCasting ? const Color(0xFFEF7A1E) : Colors.white, 
+                      size: 24,
+                    ), 
+                    onPressed: _showCastPicker,
+                  );
+                },
+              ),
+            ),
           ]),
           backdrop: DetailBackdrop(
             imageUrl: heroBanner,
@@ -2849,6 +2931,11 @@ class _CastCardState extends ConsumerState<_CastCard> {
                     imageUrl: widget.person.profile ?? '',
                     fit: BoxFit.cover,
                     alignment: const Alignment(0, -0.35),
+                    memCacheWidth: 160,
+                    memCacheHeight: 160,
+                    fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                    fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                    cacheManager: AurisImageCacheManager.instance,
                     placeholder: (context, url) => Container(
                       decoration: const BoxDecoration(
                         color: Colors.white10,

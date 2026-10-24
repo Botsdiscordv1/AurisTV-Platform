@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:collection/collection.dart';
 import '../../auris_core.dart';
 import '../../core/utils/content_logic.dart';
@@ -697,12 +698,21 @@ final d23SeasonCheckProvider = FutureProvider.family<bool, ({String url, String?
 
 final episodeImagePrefetchProvider = Provider.family<void, ({List<EpisodeInfo> episodes, int startFrom})>((ref, params) {
   if (kIsWeb) return;
-  final windowSize = 12;
+  final context = ref.read(navigatorKeyProvider).currentContext;
+  if (context == null || !context.mounted) return;
+
+  // Senior 1GB TV Box Tuning: Ventana reducida a 6 episodios para evitar
+  // ráfagas de decodificación y saturación del ancho de banda y la memoria RAM
+  const windowSize = 6;
   final endAt = (params.startFrom + windowSize).clamp(0, params.episodes.length);
   final targetEpisodes = params.episodes.sublist(params.startFrom.clamp(0, params.episodes.length), endAt);
   for (final ep in targetEpisodes) {
     if (ep.thumbnail != null && ep.thumbnail!.isNotEmpty) {
-      precacheImage(NetworkImage(ep.thumbnail!), ref.read(navigatorKeyProvider).currentContext!).catchError((_) => null);
+      final proxied = ApiEndpoints.proxyImage(ep.thumbnail!);
+      precacheImage(
+        CachedNetworkImageProvider(proxied, cacheManager: AurisImageCacheManager.instance),
+        context,
+      ).catchError((_) => null);
     }
   }
 });

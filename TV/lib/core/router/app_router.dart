@@ -326,6 +326,9 @@ final GoRouter appRouter = GoRouter(
         final video720 = state.uri.queryParameters['video720'];
         final video1080 = state.uri.queryParameters['video1080'];
         final skipResume = state.uri.queryParameters['skipResume'] == '1';
+        // Sesión de cast espejo: la TV reproduce para el emisor y no debe
+        // escribir historial (ver PlayerScreen.isCastMirror).
+        final isCastMirror = state.uri.queryParameters['cast'] == '1';
 
         // Cabeceras HTTP del stream (Referer/UA) serializadas como JSON string
         // por el canal de cast (open_media con stream ya resuelto).
@@ -366,6 +369,7 @@ final GoRouter appRouter = GoRouter(
           kind: kind,
           year: year,
           initialHeaders: initialHeaders,
+          isCastMirror: isCastMirror,
           ),
         );
       },

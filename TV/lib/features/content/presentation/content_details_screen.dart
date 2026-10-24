@@ -95,9 +95,9 @@ class ContentDetailsScreen extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withValues(alpha: 0.5),
-                        Colors.black.withValues(alpha: 0.65),
-                        Colors.black.withValues(alpha: 0.8),
+                        Colors.black.withValues(alpha: 0.70),
+                        Colors.black.withValues(alpha: 0.70),
+                        Colors.black.withValues(alpha: 0.70),
                       ],
                       stops: const [0.0, 0.5, 1.0],
                     ),

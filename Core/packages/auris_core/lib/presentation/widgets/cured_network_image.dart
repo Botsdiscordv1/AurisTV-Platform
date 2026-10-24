@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import '../../core/api/api_endpoints.dart';
+import '../../core/config/image_config.dart';
 
 /// Imagen con cura reactiva 2→1 para OnlyPelis.
 ///
@@ -16,6 +18,10 @@ class CuredNetworkImage extends StatefulWidget {
   final BoxFit? fit;
   final FilterQuality filterQuality;
   final int? memCacheWidth;
+  final int? memCacheHeight;
+  final Duration fadeInDuration;
+  final Duration fadeOutDuration;
+  final BaseCacheManager? cacheManager;
   final Widget Function(BuildContext, String)? placeholder;
   final Widget Function(BuildContext, String, dynamic)? errorWidget;
   final String? source;
@@ -27,6 +33,10 @@ class CuredNetworkImage extends StatefulWidget {
     this.fit,
     this.filterQuality = FilterQuality.medium,
     this.memCacheWidth,
+    this.memCacheHeight,
+    this.fadeInDuration = AurisImageConfig.defaultFadeInDuration,
+    this.fadeOutDuration = AurisImageConfig.defaultFadeOutDuration,
+    this.cacheManager,
     this.placeholder,
     this.errorWidget,
     this.source,
@@ -123,6 +133,10 @@ class _CuredNetworkImageState extends State<CuredNetworkImage> {
       fit: widget.fit,
       filterQuality: widget.filterQuality,
       memCacheWidth: widget.memCacheWidth,
+      memCacheHeight: widget.memCacheHeight,
+      fadeInDuration: widget.fadeInDuration,
+      fadeOutDuration: widget.fadeOutDuration,
+      cacheManager: widget.cacheManager ?? AurisImageCacheManager.instance,
       placeholder: widget.placeholder,
       errorWidget: (context, url, error) {
         _scheduleCure(url);

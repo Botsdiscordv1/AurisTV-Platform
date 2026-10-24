@@ -5,10 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:audio_service/audio_service.dart';
+import 'features/player/data/audio_handler.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_links/app_links.dart';
 import 'package:auris_core/auris_core.dart';
+import 'package:path_provider/path_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/pip_service.dart';
@@ -70,9 +73,59 @@ Future<void> main() async {
     publishableKey: ApiEndpoints.supabaseAnonKey,
   );
 
+  // Senior Fix: Asegurar que el directorio de soporte de la app exista antes de media_kit (evita PathNotFoundException en fresh installs)
+  try {
+    final appSupportDir = await getApplicationSupportDirectory();
+    if (!appSupportDir.existsSync()) {
+      appSupportDir.createSync(recursive: true);
+    }
+  } catch (e) {
+    debugPrint('[MediaKit] Error creating app support dir: $e');
+  }
+
   // Inicializa el motor de video (media_kit) — necesario antes de correr la app
   MediaKit.ensureInitialized();
   PipService.initialize();
+
+  // Senior Fix: El isolate de segundo plano de AudioService no tiene Activity/vistas.
+  // Llamar AudioService.init() desde ese isolate con FlutterFragmentActivity causa
+  // PlatformException → pantalla negra. Verificamos ANTES de inicializar.
+  if (PlatformDispatcher.instance.views.isEmpty) {
+    // Estamos en el isolate de background de audio_service: solo inicializamos
+    // el handler sin UI y retornamos inmediatamente.
+    audioHandler = await AudioService.init(
+      builder: () => AurisAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.auristv.oficial.audio',
+        androidNotificationChannelName: 'Reproducción',
+        androidNotificationOngoing: true,
+        androidShowNotificationBadge: true,
+        androidStopForegroundOnPause: true,
+      ),
+    );
+    return;
+  }
+
+  // Inicialización normal de AudioService en el isolate principal (con UI/Activity).
+  // Senior Fix: Wrapped en try-catch — si AudioServicePlugin.setActivity() en
+  // MainActivity.kt falla por incompatibilidad con FlutterFragmentActivity, la app
+  // sigue arrancando en modo degradado (sin controles en lock screen / shade).
+  try {
+    audioHandler = await AudioService.init(
+      builder: () => AurisAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.auristv.oficial.audio',
+        androidNotificationChannelName: 'Reproducción',
+        androidNotificationOngoing: true,
+        androidShowNotificationBadge: true,
+        androidStopForegroundOnPause: true,
+      ),
+    );
+  } catch (e) {
+    debugPrint('[AudioService] init falló (FlutterFragmentActivity incompatibility): $e');
+    // Fallback: handler sin notificaciones del sistema. La reproducción funciona normal.
+    audioHandler = AurisAudioHandler();
+  }
 
   runApp(
     ProviderScope(

@@ -3,6 +3,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:flutter/foundation.dart'; // Para kIsWeb
 import 'package:flutter/services.dart'; // Para SystemChrome
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -19,7 +20,12 @@ import 'features/remote_control/data/models/remote_device.dart';
 
 Future<void> main() async {
   usePathUrlStrategy(); // Usa URLs limpias sin # para web
+  // Senior Web Fix: Hace que context.push() sincronice y actualice la URL en el navegador
+  GoRouter.optionURLReflectsImperativeAPIs = true;
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Senior Web/Desktop Tuning: 384MB de caché para fluidez total en navegación de catálogo
+  AurisImageConfig.configureForDesktopWeb();
 
   // Configuración de la interfaz del sistema (Edge-to-Edge)
   SystemChrome.setSystemUIOverlayStyle(

@@ -342,11 +342,14 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                               children: [
                                 Builder(builder: (context) {
                                   final dpr = MediaQuery.of(context).devicePixelRatio;
+                                  final targetW = (widget.width * dpr).round().clamp(1, 540);
+                                  final targetH = (targetW / (16 / 9)).round().clamp(1, 310);
                                   return CuredNetworkImage(
                                     imageUrl: widget.imageUrl,
                                     fit: BoxFit.cover,
                                     filterQuality: FilterQuality.medium,
-                                    memCacheWidth: (widget.width * dpr).round().clamp(1, 2048),
+                                    memCacheWidth: targetW,
+                                    memCacheHeight: targetH,
                                     placeholder: (context, url) => Container(color: Colors.white10),
                                     errorWidget: (context, url, error) => Center(child: AurisIcon(AurisIcons.trailer, color: Colors.white24, size: 24)),
                                   );
@@ -386,9 +389,12 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                             filterQuality: FilterQuality.medium,
                                             memCacheWidth: (widget.width * 0.65 * dpr)
                                                 .round()
-                                                .clamp(320, 1280),
+                                                .clamp(120, 480),
                                             fadeInDuration:
-                                                const Duration(milliseconds: 150),
+                                                AurisImageConfig.defaultFadeInDuration,
+                                            fadeOutDuration:
+                                                AurisImageConfig.defaultFadeOutDuration,
+                                            cacheManager: AurisImageCacheManager.instance,
                                             placeholder: (context, url) => Container(
                                               width: widget.width * 0.65,
                                               height: widget.height * 0.35,

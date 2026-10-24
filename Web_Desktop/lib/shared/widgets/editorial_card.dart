@@ -127,7 +127,10 @@ class _EditorialCardState extends State<EditorialCard> {
                               CachedNetworkImage(
                                 imageUrl: widget.media.posterUrl,
                                 fit: BoxFit.cover,
-                                memCacheWidth: (widget.width * 2).toInt(),
+                                memCacheWidth: (widget.width * 2).round().clamp(1, 400),
+                                fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                cacheManager: AurisImageCacheManager.instance,
                                 placeholder: (context, url) => Container(color: Colors.white10),
                               ),
                               

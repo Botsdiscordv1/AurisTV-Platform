@@ -95,7 +95,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     if (imageUrl != null && imageUrl.isNotEmpty) {
       precacheImage(
         ResizeImage(
-          CachedNetworkImageProvider(imageUrl),
+          CachedNetworkImageProvider(imageUrl, cacheManager: AurisImageCacheManager.instance),
           width: _bgMemCacheWidth(),
         ),
         context,
@@ -563,6 +563,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         height: double.infinity,
         alignment: Alignment.topCenter,
         memCacheWidth: _bgMemCacheWidth(),
+        fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+        fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+        cacheManager: AurisImageCacheManager.instance,
         filterQuality: MediaQuery.of(context).size.width < 1600
             ? FilterQuality.medium
             : FilterQuality.high, // Senior Fix: Alta fidelidad solo en 4K/Desktop
