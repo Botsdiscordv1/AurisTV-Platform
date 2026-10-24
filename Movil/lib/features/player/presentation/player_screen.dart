@@ -61,6 +61,11 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? video1080;
   final bool skipResume;
 
+  /// Target de cast elegido en la ficha de contenido (antes de abrir el
+  /// player). Al resolverse el stream, el player dispara el mismo
+  /// `_beginAurisCast` del botón de cast con url + headers reales.
+  final String? castTargetId;
+
   const PlayerScreen({
     super.key,
     required this.contentId,
@@ -83,6 +88,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.video720,
     this.video1080,
     this.skipResume = false,
+    this.castTargetId,
   });
 
   @override
@@ -375,7 +381,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final vol = command['volume'];
         if (vol != null) {
           setState(() {
-            _volume = (vol as num).toDouble();
+            _volume = (vol as num).toDouble().clamp(0.0, 2.0);
+            if (_volume > 0) _lastAppliedVolume = _volume;
             _applyVolume();
           });
         }
@@ -393,16 +400,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         }
         break;
       case RemoteAction.dpadUp:
-        setState(() {
-          _volume = (_volume + 0.1).clamp(0.0, 1.0);
-          _applyVolume();
-        });
+        _handleVolumeStep(0.1);
         break;
       case RemoteAction.dpadDown:
-        setState(() {
-          _volume = (_volume - 0.1).clamp(0.0, 1.0);
-          _applyVolume();
-        });
+        _handleVolumeStep(-0.1);
         break;
       case RemoteAction.dpadLeft:
         _skipBackward();
@@ -426,22 +427,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         }
         break;
       case RemoteAction.volumeUp:
-        setState(() {
-          _volume = (_volume + 0.1).clamp(0.0, 1.0);
-          _applyVolume();
-        });
+        _handleVolumeStep(0.1);
         break;
       case RemoteAction.volumeDown:
-        setState(() {
-          _volume = (_volume - 0.1).clamp(0.0, 1.0);
-          _applyVolume();
-        });
+        _handleVolumeStep(-0.1);
         break;
       case RemoteAction.mute:
-        setState(() {
-          _volume = _volume > 0.01 ? 0.0 : 1.0;
-          _applyVolume();
-        });
+        // Igual que el botón local: guarda/restaura el volumen previo.
+        _toggleMute();
         break;
     }
   }
@@ -538,9 +531,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (!mounted || _isDisposed) return;
     debugPrint('[AurisCast] Session started: ${device?.name}');
 
-    // Solo streams directos (media_kit) son castable: embeds/YouTube/trailers
-    // requieren navegador o app propietaria.
-    final url = _currentSourceUrl;
+    // Streams con cabeceras no son castables directamente: se re-sirven por el
+    // proxy HTTP local del móvil, así que usamos el stream YA RESUELTO (con
+    // sus headers) en vez de la URL fuente (que puede ser una página HTML).
+    final url = _currentStreamUrl.isNotEmpty ? _currentStreamUrl : _currentSourceUrl;
+    final headers = _currentStreamUrl.isNotEmpty
+        ? _currentStreamHeaders
+        : const <String, String>{};
     final canCast = url.isNotEmpty &&
         _player != null &&
         !_isCurrentTrackEmbed(_allTracks) &&
@@ -573,6 +570,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     await ref.read(chromecastProvider.notifier).loadMedia(
       url: url,
+      headers: headers.isEmpty ? null : headers,
       startMs: startMs,
       title: _displayTitle,
       subtitle: subtitle,
@@ -675,6 +673,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   // Cast a dispositivo AurisTV (receptor propio vía Supabase)
   // ==================================================================
 
+  /// Cast elegido en la ficha de contenido (el picker abrió este player con
+  /// `castTarget`). El stream ya está resuelto: se reutiliza exactamente el
+  /// flujo del botón de cast para mandar url + headers reales a la TV.
+  Future<void> _maybeAutoCast() async {
+    final targetId = widget.castTargetId;
+    if (targetId == null || _autoCastHandled || !mounted || _isDisposed) return;
+    _autoCastHandled = true;
+
+    RemoteDevice? device;
+    try {
+      device = ref
+          .read(remoteControlProvider)
+          .availableDevices
+          .firstWhere((d) => d.id == targetId);
+    } catch (_) {
+      device = null;
+    }
+    // LAN: el listado fusionado puede no tenerlo aún; se reconstruye del beacon.
+    device ??= ref.read(localCastProvider.notifier).remoteDeviceFor(targetId);
+    if (device == null) return;
+
+    await _beginAurisCast(device);
+  }
+
   /// Conecta el stream RESUELTO actual al dispositivo destino: envía
   /// `open_media` con url + headers + posición para que su player (media_kit/mpv)
   /// reproduzca la MISMA fuente con las mismas cabeceras HTTP (Referer/UA).
@@ -717,6 +739,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         'url': url,
         'headers': jsonEncode(_currentStreamHeaders),
         'direct': '1',
+        // Marca de sesión espejo: la TV no escribe historial aunque la fuente
+        // deje de llegar resuelta (cae a re-extracción).
+        'cast': '1',
         'source': _currentSource,
         if (_currentEpisode != null) 'episode': _currentEpisode!,
         if (widget.season != null) 'season': widget.season.toString(),
@@ -725,7 +750,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         'category': widget.category ?? '',
         'title': widget.title ?? '',
         'posterUrl': widget.posterUrl ?? '',
-        'startPosition': posMs.toString(),
+        'startPosition': posMs > 3000 ? posMs.toString() : '0',
       },
     });
 
@@ -734,6 +759,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _aurisCastTargetId = device.id;
       _aurisWasPlaying = wasPlaying;
       _userHasPaused = true;
+    });
+    // Emitter owns the history: mientras la sesión viva, el progreso que
+    // reporta el receptor alimenta el historial del emisor (10 s cadencia,
+    // el propio _updateHistory throttling a 1 s el persist al provider).
+    _aurisHistorySyncTimer?.cancel();
+    _aurisHistorySyncTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted || _isDisposed || _aurisCastTargetId == null) return;
+      RemoteDevice? t;
+      try {
+        t = ref
+            .read(remoteControlProvider)
+            .availableDevices
+            .firstWhere((d) => d.id == _aurisCastTargetId);
+      } catch (_) {
+        t = null;
+      }
+      // Sin posición aún (receptor abriendo el player): nada que guardar.
+      if (t == null || t.positionMs < 1000) return;
+      _updateHistory(positionMs: t.positionMs, durationMs: t.durationMs);
     });
     await _player!.pause();
   }
@@ -746,6 +790,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _enforceLandscapeOrientation();
     final targetId = _aurisCastTargetId;
     _aurisCastTargetId = null;
+    _aurisHistorySyncTimer?.cancel();
+    _aurisHistorySyncTimer = null;
     if (!mounted || _isDisposed) return;
 
     final devices = ref.read(remoteControlProvider).availableDevices;
@@ -982,6 +1028,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   // autoplay desde la última posición reportada por el receptor.
   String? _aurisCastTargetId;
   bool _aurisWasPlaying = false;
+  /// Cast pedido desde la ficha de contenido: se dispara una sola vez, cuando
+  /// el player ya tiene el stream resuelto.
+  bool _autoCastHandled = false;
+  /// Sync de historial durante el cast propio: el EMISOR es dueño del
+  /// progreso (la TV solo espeja), así que mientras la sesión viva el móvil
+  /// persiste periódicamente la posición reportada por el receptor
+  /// (polling /cast/status o Supabase, según transporte).
+  Timer? _aurisHistorySyncTimer;
   Timer? _bufferingDebounceTimer;
   // Senior Continuity Shield: Usar la llave global del provider para evitar reconstrucciones del hardware
   late final GlobalKey _videoKey;
@@ -3474,6 +3528,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         });
         _startHideTimer();
       }
+      await _maybeAutoCast();
       return;
     }
 
@@ -3485,6 +3540,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (!mounted) return;
       setState(() => _showControls = true);
       _startHideTimer();
+      unawaited(_maybeAutoCast());
 
       if (_isAutoplayResume) {
         player.pause();
@@ -3832,6 +3888,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _stabilizationTimer?.cancel();
     _indicatorTimer?.cancel();
     _historySaveTimer?.cancel();
+    _aurisHistorySyncTimer?.cancel();
     _bufferingDebounceTimer?.cancel();
     _volumeExitTimer?.cancel();
     _centerIndicatorTimer?.cancel();
@@ -4502,12 +4559,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
           ),
           const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.gamepad_rounded, color: Color(0xFFEF7A1E), size: 24),
-            tooltip: 'Mando D-PAD',
-            onPressed: () => showDpadRemoteSheet(context, target),
-          ),
-          const SizedBox(width: 4),
           _buildCastIcon(28),
         ],
       ),
@@ -4642,16 +4693,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             Container(
               width: 72,
               height: 72,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white, 
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFEF7A1E).withOpacity(0.4),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                ],
               ),
               child: IconButton(
                 iconSize: 40,
@@ -4972,6 +5016,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       'params': {
         'contentId': widget.contentId,
         'url': nextSourceUrl,
+        // Episodio del cast: la URL del siguiente capítulo aún no está
+        // resuelta (la TV re-extrae), pero sigue siendo sesión espejo: el
+        // historial lo escribe el emisor, nunca la TV.
+        'cast': '1',
         'source': _currentSource,
         'episode': nextNum.toString(),
         'season': widget.season?.toString(),

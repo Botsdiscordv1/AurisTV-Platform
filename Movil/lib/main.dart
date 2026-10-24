@@ -42,9 +42,8 @@ Future<void> main() async {
         '[VideoSurface] hcpp=${VideoSurfaceConfig.useHybridAndroidView}');
   }
 
-  final imageCache = PaintingBinding.instance.imageCache;
-  imageCache.maximumSizeBytes = 64 << 20;
-  imageCache.maximumSize = 500;
+  // Senior Mobile Tuning: 160MB de caché para móviles (evita desalojo al navegar entre pantallas)
+  AurisImageConfig.configureForMobile();
 
   // Configuración de la interfaz del sistema (Edge-to-Edge)
   SystemChrome.setSystemUIOverlayStyle(
