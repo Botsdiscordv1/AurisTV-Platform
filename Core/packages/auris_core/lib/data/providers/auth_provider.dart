@@ -164,6 +164,20 @@ class AuthNotifier extends StateNotifier<UserAccount?> {
     _syncToCloud(updated);
   }
 
+  void updateProfileAvatar(String profileId, String newUrl) {
+    if (state == null) return;
+    final updatedProfiles = state!.profiles.map((p) {
+      if (p.id == profileId) {
+        return p.copyWith(photoUrl: newUrl);
+      }
+      return p;
+    }).toList();
+    final updated = state!.copyWith(profiles: updatedProfiles);
+    state = updated;
+    _saveLocally(updated);
+    _syncToCloud(updated);
+  }
+
   void updateProfileName(String newName) {
     if (state == null) return;
     final active = state!.activeProfile;

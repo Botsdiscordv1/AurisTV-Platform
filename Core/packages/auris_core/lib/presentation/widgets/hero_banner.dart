@@ -125,6 +125,25 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     super.dispose();
   }
 
+  String? _formatMovieDuration(String? durationStr, int? runtimeMin) {
+    int? totalMins = runtimeMin;
+    if ((totalMins == null || totalMins <= 0) && durationStr != null && durationStr.isNotEmpty) {
+      totalMins = int.tryParse(durationStr.replaceAll(RegExp(r'[^0-9]'), ''));
+    }
+    if (totalMins == null || totalMins <= 0) {
+      return durationStr;
+    }
+    final hours = totalMins ~/ 60;
+    final mins = totalMins % 60;
+    if (hours > 0 && mins > 0) {
+      return '$hours h $mins min';
+    } else if (hours > 0) {
+      return '$hours h';
+    } else {
+      return '$mins min';
+    }
+  }
+
   MediaItem get _currentBackgroundItem => widget.items[_backgroundIndex % widget.items.length];
   MediaItem? get _currentContentItem {
     if (_contentIndex == -1) return null;
@@ -895,6 +914,22 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)),
                   child: Text('PRÓXIMAMENTE', style: TextStyle(color: Colors.white60, fontSize: ResponsiveUtils.sp(context, 10), fontWeight: FontWeight.w900, letterSpacing: 1)),
+                ),
+              )
+            else if ((item.duration != null && item.duration!.isNotEmpty) || (item.runtime != null && item.runtime! > 0))
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Text(
+                  _formatMovieDuration(item.duration, item.runtime) ?? '', 
+                  style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w900, letterSpacing: 0.5)
+                ),
+              )
+            else if (item.totalSeasons != null && item.totalSeasons! > 0)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Text(
+                  item.totalSeasons == 1 ? '1 TEMPORADA' : '${item.totalSeasons} TEMPORADAS', 
+                  style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w900, letterSpacing: 0.5)
                 ),
               )
             else if (item.episode != null)

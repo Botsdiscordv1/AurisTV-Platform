@@ -34,11 +34,12 @@ class CategoryShortcutsRow extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: Text(
               'Explorar por Categoría',
-              style: GoogleFonts.poppins(
-                fontSize: isMobile ? 18 : 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white70,
-                letterSpacing: -0.4,
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                fontSize: TVResponsiveUtils.rowTitleFontSize(context),
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFFE5E5E5),
+                letterSpacing: -0.2,
               ),
             ),
           ),
@@ -147,10 +148,11 @@ class _ShortcutCardState extends State<_ShortcutCard> {
                 const SizedBox(height: 8),
                 Text(
                   widget.label,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
+                    fontFamily: 'NetflixSans',
                     color: isSelected ? Colors.white : Colors.white70,
                     fontSize: isMobile ? 12 : 14,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
               ],

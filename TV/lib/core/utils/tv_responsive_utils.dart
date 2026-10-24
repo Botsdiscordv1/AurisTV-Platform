@@ -89,14 +89,14 @@ class TVResponsiveUtils {
     return bannerHeight(context) + extraSpace + 12.0;
   }
 
-  /// Títulos de secciones
+  /// Títulos de secciones estilo Netflix TV (18sp)
   static double rowTitleFontSize(BuildContext context) {
-    return sp(context, 17.0);
+    return sp(context, 18.0);
   }
 
   /// Títulos dentro de tarjetas
   static double bannerTitleFontSize(BuildContext context) {
-    return 16.0;
+    return sp(context, 15.0);
   }
 
   /// AspectRatio cinematográfico para el Hero en TV
@@ -109,14 +109,14 @@ class TVResponsiveUtils {
     return 120.0;
   }
 
-  /// Sinopsis en el Hero
+  /// Sinopsis en el Hero estilo Netflix TV (14sp)
   static double heroSynopsisFontSize(BuildContext context) {
-    return 13.0; // Reducido de 15.0 para una estética más limpia
+    return sp(context, 14.0);
   }
 
-  /// Título en el Hero (cuando no hay logo)
+  /// Título en el Hero cuando no hay logo (42sp)
   static double heroTitleFontSize(BuildContext context) {
-    return 42.0;
+    return sp(context, 42.0);
   }
 
   /// Ancho máximo de seguridad (4K)

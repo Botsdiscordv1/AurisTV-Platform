@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart' hide FocusableWideCard;
 import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/focusable_wide_card.dart';
@@ -12,7 +11,7 @@ class WideContentItem {
   final String imageUrl;
   final String? logoUrl; // Senior Fix: Soporte para logo en WideCard
   final String? subtitle;
-  /// Segunda línea opcional bajo el subtítulo (ej. "Quedan: X").
+  /// Segunda linea opcional bajo el subtitulo (ej. "Quedan: X").
   final String? subtitle2;
   final String? rating;
   final double? progress;
@@ -43,11 +42,9 @@ class WideContentRow extends StatefulWidget {
   final bool? hasSubtitle;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
-  /// D-pad abajo sobre cualquier wide card: enfoca la última tarjeta que tuvo
-  /// foco en la sección siguiente (memoria); si nunca tuvo, la primera.
+  /// D-pad abajo: enfoca la ultima tarjeta con foco en la seccion siguiente.
   final bool Function()? onArrowDownToNext;
-  /// D-pad arriba sobre cualquier wide card: igual que [onArrowDownToNext]
-  /// pero hacia la sección anterior.
+  /// D-pad arriba: igual pero hacia la seccion anterior.
   final bool Function()? onArrowUpToPrev;
 
   const WideContentRow({
@@ -64,91 +61,96 @@ class WideContentRow extends StatefulWidget {
   });
 
   @override
-  State<WideContentRow> createState() => _WideContentRowState();
+  State<WideContentRow> createState() => WideContentRowState();
 }
 
-class _WideContentRowState extends State<WideContentRow>
+class WideContentRowState extends State<WideContentRow>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
+
   final ScrollController _scrollController = ScrollController();
   bool _isHovered = false;
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
+
+  /// Indice logico actualmente seleccionado con el D-PAD.
+  /// El borde blanco se pinta en la posicion visual fija (primer slot);
+  /// solo las tarjetas se deslizan bajo el cursor.
   int? _focusedIndex;
-  // Memoria independiente de `_focusedIndex` (que se limpia al salir de la
-  // fila): permite volver a la misma tarjeta al regresar a la sección.
+
+  /// Memoria: permite volver a la misma tarjeta al regresar a la fila.
   int? _lastFocusedIndex;
-  late List<FocusNode> _itemFocusNodes;
+
+  /// Nodo unico para toda la fila - intercepta D-PAD sin ceder el foco
+  /// a los nodos individuales de cada tarjeta.
+  final FocusNode _rowFocusNode = FocusNode(debugLabel: 'WideRow');
+
+  /// Nodos dummy por tarjeta: skipTraversal + !canRequestFocus para que
+  /// Flutter no los incluya en la navegacion automatica.
+  late List<FocusNode> _dummyNodes;
+
+  List<FocusNode> _buildDummyNodes(int count) => List.generate(
+        count,
+        (_) => FocusNode(skipTraversal: true, canRequestFocus: false),
+      );
 
   @override
   void initState() {
     super.initState();
-    _initFocusNodes();
+    _dummyNodes = _buildDummyNodes(widget.items.length);
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
-  }
-
-  void _initFocusNodes() {
-    _lastFocusedIndex = null;
-    _itemFocusNodes = List.generate(widget.items.length, (index) {
-      final node = FocusNode();
-      node.addListener(() {
-        if (node.hasFocus) _lastFocusedIndex = index;
-      });
-      return node;
-    });
   }
 
   @override
   void didUpdateWidget(covariant WideContentRow oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.items.length != oldWidget.items.length) {
-      for (final node in _itemFocusNodes) {
-        node.dispose();
+      if (_lastFocusedIndex != null && _lastFocusedIndex! >= widget.items.length) {
+        _lastFocusedIndex = null;
       }
-      _initFocusNodes();
+      if (_focusedIndex != null && _focusedIndex! >= widget.items.length) {
+        setState(() => _focusedIndex = null);
+      }
+      for (final n in _dummyNodes) { n.dispose(); }
+      _dummyNodes = _buildDummyNodes(widget.items.length);
       WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollIndicators());
     }
   }
 
+  // --- API publica para que el padre pida foco ---
+
   bool focusFirstCard() {
-    if (_itemFocusNodes.isNotEmpty && _itemFocusNodes.first.canRequestFocus) {
-      _itemFocusNodes.first.requestFocus();
-      return true;
-    }
-    return false;
+    if (widget.items.isEmpty) return false;
+    _rowFocusNode.requestFocus();
+    _setFocusedIndex(0);
+    return true;
   }
 
   bool focusLastCard() {
-    if (_itemFocusNodes.isNotEmpty && _itemFocusNodes.last.canRequestFocus) {
-      _itemFocusNodes.last.requestFocus();
-      return true;
-    }
-    return false;
+    if (widget.items.isEmpty) return false;
+    _rowFocusNode.requestFocus();
+    _setFocusedIndex(widget.items.length - 1);
+    return true;
   }
 
-  /// Restaura la última tarjeta enfocada de la sección; si nunca tuvo foco
-  /// (o la tarjeta ya no existe) cae a la primera.
+  /// Restaura la ultima tarjeta enfocada; si nunca tuvo foco cae a la primera.
   bool focusRememberedCard() {
-    final int? index = _lastFocusedIndex;
-    if (index != null &&
-        index >= 0 &&
-        index < _itemFocusNodes.length &&
-        _itemFocusNodes[index].canRequestFocus) {
-      _itemFocusNodes[index].requestFocus();
-      return true;
-    }
-    return focusFirstCard();
+    final int idx = (_lastFocusedIndex ?? 0).clamp(0, widget.items.length - 1);
+    _rowFocusNode.requestFocus();
+    _setFocusedIndex(idx);
+    return true;
   }
 
   @override
   void dispose() {
-    for (final node in _itemFocusNodes) {
-      node.dispose();
-    }
+    for (final n in _dummyNodes) { n.dispose(); }
+    _rowFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
+
+  // --- Scroll ---
 
   void _updateScrollIndicators() {
     if (!mounted || !_scrollController.hasClients) return;
@@ -166,24 +168,80 @@ class _WideContentRowState extends State<WideContentRow>
 
   void _scroll(double offset) {
     if (!_scrollController.hasClients) return;
-    final target = (_scrollController.offset + offset).clamp(0.0, _scrollController.position.maxScrollExtent);
-    _scrollController.animateTo(target, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+    final target = (_scrollController.offset + offset)
+        .clamp(0.0, _scrollController.position.maxScrollExtent);
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
-  /// Desplaza la fila para anclar la tarjeta enfocada en el inicio (extremo izquierdo).
+  /// Ancla la tarjeta [index] en la posicion visual fija (padding izquierdo).
+  /// El borde blanco permanece fijo; las tarjetas se desplazan debajo.
   void _scrollToIndex(int index, double cardWidth) {
     if (!_scrollController.hasClients) return;
     const double spacing = 14.0;
     final double targetOffset = index * (cardWidth + spacing);
     final double maxScroll = _scrollController.position.maxScrollExtent;
     final double clampedOffset = targetOffset.clamp(0.0, maxScroll);
-
     _scrollController.animateTo(
       clampedOffset,
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
     );
   }
+
+  // --- Navegacion D-PAD ---
+
+  void _setFocusedIndex(int index) {
+    if (!mounted) return;
+    setState(() => _focusedIndex = index);
+    _lastFocusedIndex = index;
+    final cardWidth = TVResponsiveUtils.bannerWidth(context);
+    _scrollToIndex(index, cardWidth);
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final current = _focusedIndex ?? 0;
+    final last = widget.items.length - 1;
+
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (current < last) {
+        _setFocusedIndex(current + 1);
+        return KeyEventResult.handled;
+      } else {
+        if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
+        return KeyEventResult.handled;
+      }
+    } else if (key == LogicalKeyboardKey.arrowLeft) {
+      if (current > 0) {
+        _setFocusedIndex(current - 1);
+        return KeyEventResult.handled;
+      } else {
+        if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
+        return KeyEventResult.handled;
+      }
+    } else if (key == LogicalKeyboardKey.arrowDown) {
+      if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.arrowUp) {
+      if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.select ||
+        key == LogicalKeyboardKey.space) {
+      if (_focusedIndex != null && _focusedIndex! < widget.items.length) {
+        SafeTap.run(() => widget.onItemTap(widget.items[_focusedIndex!]));
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+
+  // --- Build ---
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +250,7 @@ class _WideContentRowState extends State<WideContentRow>
 
     const isMobile = false;
     final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
-    final cardWidth = TVResponsiveUtils.bannerWidth(context); 
+    final cardWidth = TVResponsiveUtils.bannerWidth(context);
     final cardHeight = TVResponsiveUtils.bannerHeight(context);
 
     return Padding(
@@ -211,21 +269,23 @@ class _WideContentRowState extends State<WideContentRow>
                     children: [
                       Text(
                         widget.title,
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
+                          fontFamily: 'NetflixSans',
                           fontSize: TVResponsiveUtils.rowTitleFontSize(context),
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: -0.4,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFE5E5E5),
+                          letterSpacing: -0.2,
                         ),
                       ),
                       if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 1),
+                        const SizedBox(height: 2),
                         Text(
                           widget.subtitle!,
-                          style: GoogleFonts.poppins(
-                            fontSize: TVResponsiveUtils.sp(context, 11),
+                          style: TextStyle(
+                            fontFamily: 'NetflixSans',
+                            fontSize: TVResponsiveUtils.sp(context, 12),
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.5),
+                            color: Colors.white.withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -244,7 +304,9 @@ class _WideContentRowState extends State<WideContentRow>
               children: [
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final bool hasSubtitle = widget.hasSubtitle ?? widget.items.any((i) => i.subtitle != null && i.subtitle!.isNotEmpty);
+                    final bool hasSubtitle = widget.hasSubtitle ??
+                        widget.items.any(
+                            (i) => i.subtitle != null && i.subtitle!.isNotEmpty);
                     return SizedBox(
                       height: TVResponsiveUtils.bannerRowHeight(
                         context,
@@ -256,24 +318,45 @@ class _WideContentRowState extends State<WideContentRow>
                           _updateScrollIndicators();
                           return false;
                         },
+                        // Nodo unico que captura todo el D-PAD de la fila
                         child: Focus(
-                          canRequestFocus: false,
+                          focusNode: _rowFocusNode,
                           onFocusChange: (focused) {
-                            if (focused && mounted) {
-                              TvScroll.anchorSectionBelowTopbar(this.context);
-                              TvScroll.anchorSectionBelowTopbarDeferred(this.context);
+                            if (!mounted) return;
+                            if (focused) {
+                              // Al entrar: restaurar la ultima tarjeta.
+                              if (_focusedIndex == null) {
+                                final idx = (_lastFocusedIndex ?? 0)
+                                    .clamp(0, widget.items.length - 1);
+                                setState(() => _focusedIndex = idx);
+                                _scrollToIndex(idx, cardWidth);
+                              }
+                              TvScroll.anchorSectionBelowTopbar(context);
+                              TvScroll.anchorSectionBelowTopbarDeferred(context);
+                            } else {
+                              // Al salir: conservar memoria, quitar borde.
+                              if (_focusedIndex != null) _lastFocusedIndex = _focusedIndex;
+                              setState(() => _focusedIndex = null);
                             }
                           },
+                          onKeyEvent: _handleKeyEvent,
                           child: ListView.separated(
                             controller: _scrollController,
-                            physics: const ClampingScrollPhysics(),
-                            cacheExtent: 600,
-                            clipBehavior: Clip.none, 
+                            // NeverScrollableScrollPhysics: el scroll SOLO ocurre
+                            // programaticamente (_scrollToIndex / _scroll).
+                            // Esto evita que el D-PAD desplace la lista por si
+                            // solo y mantiene el borde blanco visualmente fijo.
+                            physics: const NeverScrollableScrollPhysics(),
+                            cacheExtent: 600.0,
+                            clipBehavior: Clip.none,
                             scrollDirection: Axis.horizontal,
-                            primary: false, 
+                            primary: false,
                             padding: EdgeInsets.only(
                               left: horizontalPadding,
-                              right: (MediaQuery.sizeOf(context).width - cardWidth - horizontalPadding).clamp(horizontalPadding, 2000.0),
+                              right: (MediaQuery.sizeOf(context).width -
+                                      cardWidth -
+                                      horizontalPadding)
+                                  .clamp(horizontalPadding, 2000.0),
                               top: 0,
                               bottom: 0,
                             ),
@@ -281,27 +364,18 @@ class _WideContentRowState extends State<WideContentRow>
                             separatorBuilder: (_, __) => const SizedBox(width: 14),
                             itemBuilder: (context, index) {
                               final item = widget.items[index];
-                              
+                              final bool isSelected = _focusedIndex == index;
+
+                              // El foco real vive en _rowFocusNode. El borde blanco
+                              // lo activa forceSelected segun el indice logico.
                               return Align(
                                 alignment: Alignment.topCenter,
                                 child: FocusableWideCard(
                                   key: ValueKey(item.id),
-                                  focusNode: _itemFocusNodes[index],
+                                  focusNode: _dummyNodes[index],
                                   disableAutoEnsureVisible: true,
-                                  onKeyEvent: (node, event) {
-                                    if (event is KeyDownEvent) {
-                                      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                                        if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
-                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                                        if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
-                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
-                                        if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
-                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
-                                        if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
-                                      }
-                                    }
-                                    return KeyEventResult.ignored;
-                                  },
+                                  forceSelected: isSelected,
+                                  showBorder: false,
                                   title: item.title,
                                   imageUrl: item.imageUrl,
                                   logoUrl: item.logoUrl,
@@ -314,18 +388,6 @@ class _WideContentRowState extends State<WideContentRow>
                                   height: cardHeight,
                                   onTap: () => widget.onItemTap(item),
                                   onDelete: item.onDelete,
-                                  onFocusChanged: (focused) {
-                                    if (!mounted) return;
-                                    if (focused) {
-                                      setState(() => _focusedIndex = index);
-                                      _scrollToIndex(index, cardWidth);
-                                    } else if (_focusedIndex == index) {
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                        if (!mounted || _focusedIndex != index) return;
-                                        setState(() => _focusedIndex = null);
-                                      });
-                                    }
-                                  },
                                 ),
                               );
                             },
@@ -333,7 +395,31 @@ class _WideContentRowState extends State<WideContentRow>
                         ),
                       ),
                     );
-                  }
+                  },
+                ),
+                // Marco blanco de foco FIJO (estilo Prime Video)
+                // Se ancla exactamente en el padding izquierdo de la fila y
+                // NUNCA se desplaza: las tarjetas se deslizan por debajo.
+                Positioned(
+                  left: horizontalPadding,
+                  top: 0,
+                  width: cardWidth,
+                  height: cardHeight,
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      opacity: _focusedIndex != null ? 1.0 : 0.0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 2.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 if (!isMobile) ...[
                   Positioned(
@@ -351,9 +437,9 @@ class _WideContentRowState extends State<WideContentRow>
                             child: NavArrow(
                               icon: Icons.arrow_back_ios_new,
                               useBackground: true,
-                              onTap: () => _scroll(-cardWidth * 2)
+                              onTap: () => _scroll(-cardWidth * 2),
                             ),
-                          )
+                          ),
                         ),
                       ),
                     ),
@@ -373,9 +459,9 @@ class _WideContentRowState extends State<WideContentRow>
                             child: NavArrow(
                               icon: Icons.arrow_forward_ios,
                               useBackground: true,
-                              onTap: () => _scroll(cardWidth * 2)
+                              onTap: () => _scroll(cardWidth * 2),
                             ),
-                          )
+                          ),
                         ),
                       ),
                     ),

@@ -41,6 +41,9 @@ class MediaItem {
   /// MediaType no distingue series animadas en servidor de películas, y ese
   /// dato se perdía al guardar historial (reaperturas al servidor erróneo).
   final String? kind;
+  final String? duration;
+  final int? runtime;
+  final int? totalSeasons;
 
   final SearchResult? card;
 
@@ -75,6 +78,9 @@ class MediaItem {
     this.playbackHistory,
     this.sectionId,
     this.kind,
+    this.duration,
+    this.runtime,
+    this.totalSeasons,
     this.card,
   });
 
@@ -84,6 +90,9 @@ class MediaItem {
     String? sectionId,
     bool? available,
     String? kind,
+    String? duration,
+    int? runtime,
+    int? totalSeasons,
   }) {
     return MediaItem(
       id: id,
@@ -116,6 +125,9 @@ class MediaItem {
       playbackHistory: playbackHistory ?? this.playbackHistory,
       sectionId: sectionId ?? this.sectionId,
       kind: kind ?? this.kind,
+      duration: duration ?? this.duration,
+      runtime: runtime ?? this.runtime,
+      totalSeasons: totalSeasons ?? this.totalSeasons,
       card: card,
     );
   }

@@ -713,6 +713,9 @@ class AurisRepositoryImpl implements AurisRepository {
             detailUrl: scraperUrl,
             tmdbId: (m['tmdbId'] as num?)?.toInt() ?? (m['tmdb_id'] as num?)?.toInt(),
             source: m['source'] ?? (mediaType == MediaType.anime ? 'AniList' : 'TMDB'),
+            duration: m['duration']?.toString(),
+            runtime: (m['runtime'] as num?)?.toInt() ?? int.tryParse(m['runtime']?.toString() ?? ''),
+            totalSeasons: (m['totalSeasons'] as num?)?.toInt() ?? int.tryParse(m['totalSeasons']?.toString() ?? ''),
             card: card.copyWith(
               kind: rawKind,
               type: m['type']?.toString(),

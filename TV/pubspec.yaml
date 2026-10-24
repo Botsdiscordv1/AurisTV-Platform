@@ -1,7 +1,7 @@
 name: auris_tv_google
 description: "AurisTV Google/TV — Versión independiente con UI optimizada."
 publish_to: 'none'
-version: 1.1.0+10
+version: 1.1.0+11
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -96,6 +96,22 @@ flutter:
     - assets/avatars/animes/sakamoto_days/
     - assets/avatars/animes/seihantai_na_kimi_to_boku/
     - assets/avatars/animes/yofukashi_no_uta/
+    - assets/fonts/netflix_sans/
+
+  fonts:
+    - family: NetflixSans
+      fonts:
+        - asset: assets/fonts/netflix_sans/NetflixSans-Light.ttf
+          weight: 300
+        - asset: assets/fonts/netflix_sans/NetflixSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/netflix_sans/NetflixSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/netflix_sans/NetflixSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/netflix_sans/NetflixSans-Black.ttf
+          weight: 900
+
 
 flutter_launcher_icons:
   image_path: "assets/icons/icono_sobre_blanco.png"

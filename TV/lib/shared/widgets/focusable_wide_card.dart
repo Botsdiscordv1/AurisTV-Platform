@@ -31,6 +31,7 @@ class FocusableWideCard extends StatefulWidget {
   final FocusNode? focusNode;
   final FocusOnKeyEventCallback? onKeyEvent;
   final bool disableAutoEnsureVisible;
+  final bool showBorder;
 
   const FocusableWideCard({
     super.key,
@@ -52,6 +53,7 @@ class FocusableWideCard extends StatefulWidget {
     this.focusNode,
     this.onKeyEvent,
     this.disableAutoEnsureVisible = false,
+    this.showBorder = true,
   });
 
   @override
@@ -124,12 +126,15 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                 AspectRatio(
                   aspectRatio: 16 / 9,
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
+                    duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOutCubic,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(4),
                       boxShadow: isSelected ? [] : [],
-                      border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: isSelected ? 2.0 : 0.0),
+                      border: Border.all(
+                        color: (widget.showBorder && isSelected) ? Colors.white : Colors.transparent,
+                        width: (widget.showBorder && isSelected) ? 2.0 : 0.0,
+                      ),
                     ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(4),

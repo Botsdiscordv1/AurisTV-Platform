@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../core/utils/tv_responsive_utils.dart';
 
 class SkeletonContainer extends StatefulWidget {
   final double width;
@@ -54,9 +55,9 @@ class _SkeletonContainerState extends State<SkeletonContainer> with SingleTicker
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withOpacity(0.05),
-                Colors.white.withOpacity(0.12),
-                Colors.white.withOpacity(0.05),
+                Colors.white.withValues(alpha: 0.05),
+                Colors.white.withValues(alpha: 0.12),
+                Colors.white.withValues(alpha: 0.05),
               ],
               stops: [
                 (_animation.value - 0.3).clamp(0.0, 1.0),
@@ -89,10 +90,6 @@ class RowSkeleton extends StatelessWidget {
     final cardWidth = isWide 
         ? (isMobile ? ResponsiveUtils.sp(context, 280.0) : ResponsiveUtils.sp(context, 420.0)) 
         : (isMobile ? ResponsiveUtils.sp(context, 140.0) : ResponsiveUtils.sp(context, 200.0));
-    final cardHeight = isWide 
-        ? (isMobile ? ResponsiveUtils.sp(context, 160.0) : ResponsiveUtils.sp(context, 200.0)) 
-        : (isMobile ? ResponsiveUtils.sp(context, 230.0) : ResponsiveUtils.sp(context, 340.0));
-    
     final totalHeight = isWide 
         ? (isMobile ? ResponsiveUtils.sp(context, 215) : ResponsiveUtils.sp(context, 280))
         : (isMobile ? ResponsiveUtils.sp(context, 280) : ResponsiveUtils.sp(context, 400));
@@ -143,52 +140,149 @@ class HeroBannerSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = ResponsiveUtils.isMobile(context);
-    final hPadding = ResponsiveUtils.horizontalPadding(context);
-    final aspectRatio = isMobile ? 16 / 11 : 2.8 / 1;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
+    final double aspectRatio = TVResponsiveUtils.heroAspectRatio(context);
 
     return AspectRatio(
       aspectRatio: aspectRatio,
-      child: Stack(
-        children: [
-          const SkeletonContainer(
-            width: double.infinity, 
-            height: double.infinity, 
-            borderRadius: 0,
-          ),
-          Positioned(
-            left: hPadding,
-            bottom: isMobile ? 40 : 80,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SkeletonContainer(
-                  width: isMobile ? 180 : 500, 
-                  height: isMobile ? 24 : 64, // Título más grande en desktop
+      child: Container(
+        color: const Color(0xFF000000),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 1. Shimmering Background Base
+            const SkeletonContainer(
+              width: double.infinity,
+              height: double.infinity,
+              borderRadius: 0,
+            ),
+
+            // 2. Viñeta cinematográfica idéntica al HeroBanner (Netflix TV)
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xFF000000),
+                    Color(0xF2000000),
+                    Color(0xB3000000),
+                    Color(0x33000000),
+                    Colors.transparent,
+                  ],
+                  stops: [0.0, 0.28, 0.48, 0.70, 0.95],
                 ),
-                const SizedBox(height: 16),
-                // Línea de metadatos sutil
-                if (!isMobile) ...[
-                  const SkeletonContainer(width: 300, height: 20),
-                  const SizedBox(height: 24),
-                ],
-                Row(
+              ),
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Color(0xFF000000),
+                    Color(0xEB000000),
+                    Color(0x80000000),
+                    Color(0x26000000),
+                    Colors.transparent,
+                  ],
+                  stops: [0.0, 0.12, 0.32, 0.58, 0.85],
+                ),
+              ),
+            ),
+
+            // 3. Contenido en esqueleto alineado con el HeroBanner real
+            Positioned(
+              left: horizontalPadding,
+              bottom: 28,
+              right: horizontalPadding,
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    SkeletonContainer(
-                      width: isMobile ? 100 : 180, 
-                      height: isMobile ? 36 : 56,
+                    // A. Branding Header (Logo + Medio + TOP 10)
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SkeletonContainer(width: 80, height: 14, borderRadius: 3),
+                        SizedBox(width: 12),
+                        SkeletonContainer(width: 48, height: 16, borderRadius: 2),
+                        SizedBox(width: 8),
+                        SkeletonContainer(width: 130, height: 14, borderRadius: 3),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    const SkeletonContainer(width: 56, height: 56, borderRadius: 28),
-                    const SizedBox(width: 12),
-                    const SkeletonContainer(width: 56, height: 56, borderRadius: 28),
+                    const SizedBox(height: 14),
+
+                    // B. Title / Logo Placeholder
+                    SkeletonContainer(
+                      width: (screenWidth * 0.32).clamp(280.0, 480.0),
+                      height: 72,
+                      borderRadius: 6,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // C. Netflix TV Metadata Badges Row
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SkeletonContainer(width: 75, height: 15, borderRadius: 3),
+                        SizedBox(width: 10),
+                        SkeletonContainer(width: 40, height: 15, borderRadius: 3),
+                        SizedBox(width: 10),
+                        SkeletonContainer(width: 32, height: 18, borderRadius: 2),
+                        SizedBox(width: 10),
+                        SkeletonContainer(width: 70, height: 15, borderRadius: 3),
+                        SizedBox(width: 10),
+                        SkeletonContainer(width: 46, height: 18, borderRadius: 2),
+                        SizedBox(width: 6),
+                        SkeletonContainer(width: 34, height: 18, borderRadius: 2),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // D. Synopsis (3 lines matching Netflix TV)
+                    SkeletonContainer(
+                      width: (screenWidth * 0.44).clamp(340.0, 620.0),
+                      height: 13,
+                      borderRadius: 3,
+                    ),
+                    const SizedBox(height: 6),
+                    SkeletonContainer(
+                      width: (screenWidth * 0.38).clamp(300.0, 540.0),
+                      height: 13,
+                      borderRadius: 3,
+                    ),
+                    const SizedBox(height: 6),
+                    SkeletonContainer(
+                      width: (screenWidth * 0.24).clamp(200.0, 360.0),
+                      height: 13,
+                      borderRadius: 3,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // E. Action Buttons (Netflix TV Style: Rectangles with 4px border radius)
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Reproducir
+                        SkeletonContainer(width: 135, height: 42, borderRadius: 4),
+                        SizedBox(width: 10),
+                        // Mi lista
+                        SkeletonContainer(width: 110, height: 42, borderRadius: 4),
+                        SizedBox(width: 10),
+                        // Tráiler
+                        SkeletonContainer(width: 100, height: 42, borderRadius: 4),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

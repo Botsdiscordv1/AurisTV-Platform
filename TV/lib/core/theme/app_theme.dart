@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   AppTheme._();
@@ -57,12 +56,35 @@ class AppTheme {
   );
 
   static ThemeData get dark {
+    // TextTheme base con Netflix Sans aplicado a todos los estilos de texto
+    const netflixSansFamily = 'NetflixSans';
+    final baseTextTheme = ThemeData.dark().textTheme;
+    final netflixTextTheme = baseTextTheme.copyWith(
+      displayLarge:  baseTextTheme.displayLarge?.copyWith(fontFamily: netflixSansFamily),
+      displayMedium: baseTextTheme.displayMedium?.copyWith(fontFamily: netflixSansFamily),
+      displaySmall:  baseTextTheme.displaySmall?.copyWith(fontFamily: netflixSansFamily),
+      headlineLarge: baseTextTheme.headlineLarge?.copyWith(fontFamily: netflixSansFamily),
+      headlineMedium:baseTextTheme.headlineMedium?.copyWith(fontFamily: netflixSansFamily),
+      headlineSmall: baseTextTheme.headlineSmall?.copyWith(fontFamily: netflixSansFamily),
+      titleLarge:    baseTextTheme.titleLarge?.copyWith(fontFamily: netflixSansFamily),
+      titleMedium:   baseTextTheme.titleMedium?.copyWith(fontFamily: netflixSansFamily),
+      titleSmall:    baseTextTheme.titleSmall?.copyWith(fontFamily: netflixSansFamily),
+      bodyLarge:     baseTextTheme.bodyLarge?.copyWith(fontFamily: netflixSansFamily),
+      bodyMedium:    baseTextTheme.bodyMedium?.copyWith(fontFamily: netflixSansFamily),
+      bodySmall:     baseTextTheme.bodySmall?.copyWith(fontFamily: netflixSansFamily),
+      labelLarge:    baseTextTheme.labelLarge?.copyWith(fontFamily: netflixSansFamily),
+      labelMedium:   baseTextTheme.labelMedium?.copyWith(fontFamily: netflixSansFamily),
+      labelSmall:    baseTextTheme.labelSmall?.copyWith(fontFamily: netflixSansFamily),
+    );
+
     return ThemeData(
       brightness: Brightness.dark,
       colorScheme: auristvDarkScheme,
       scaffoldBackgroundColor: background,
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
+      fontFamily: netflixSansFamily,  // Fuente global por defecto
+      textTheme: netflixTextTheme,
       useMaterial3: true,
+
       
       // Extensiones de color personalizadas
       extensions: [
