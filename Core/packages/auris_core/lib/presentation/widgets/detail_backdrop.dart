@@ -60,8 +60,12 @@ class DetailBackdrop extends StatelessWidget {
                   imageUrl: imageUrl!,
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
-                  memCacheWidth: (width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 4096),
-                  fadeInDuration: const Duration(milliseconds: 300),
+                  // Senior Low-RAM Guard: Limitado a 1600px en memoria para evitar
+                  // que backdrops 4K (33MB de RAM c/u) causen OOM en TV Boxes de 1GB
+                  memCacheWidth: (width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 1600),
+                  fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                  fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                  cacheManager: AurisImageCacheManager.instance,
                   errorWidget: (_, __, ___) => Container(color: Colors.black12),
                 ),
               ),

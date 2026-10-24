@@ -7,22 +7,25 @@ import android.os.Bundle
 import android.util.Rational
 import android.view.KeyEvent
 import android.view.WindowManager
-import io.flutter.embedding.android.FlutterFragmentActivity
+import com.ryanheise.audioservice.AudioServiceFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * FlutterFragmentActivity (y NO FlutterActivity): el diálogo NATIVO de Google
- * Cast (MediaRouteChooserDialog) necesita getSupportFragmentManager() de un
- * host FragmentActivity. Requisito del CastChannel / chromecast.
+ * AudioServiceFragmentActivity (que hereda de FlutterFragmentActivity):
+ * - Google Cast necesita getSupportFragmentManager() de FragmentActivity para MediaRouteChooserDialog.
+ * - audio_service necesita su propia base para compartir el FlutterEngine y notificaciones en lock screen.
+ * AudioServiceFragmentActivity combina ambos requisitos a la perfección.
  */
-class MainActivity: FlutterFragmentActivity() {
+class MainActivity: AudioServiceFragmentActivity() {
     private val BRIGHTNESS_CHANNEL = "auristv/brightness"
     private val VOLUME_CHANNEL = "auristv/volume"
     private val PIP_CHANNEL = "auristv/pip"
     private val ORIENTATION_CHANNEL = "auristv/orientation"
     private val INSTALL_CHANNEL = "auristv/install"
     private val NETWORK_CHANNEL = "auristv/network"
+    private val WAKELOCK_CHANNEL = "auristv/wakelock"
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
     private var interceptVolume = false
     private var volumeMethodChannel: MethodChannel? = null
     private var isPipAllowed = false
@@ -165,6 +168,41 @@ class MainActivity: FlutterFragmentActivity() {
         }
 
         installCastChannel(flutterEngine)
+
+        // Wake lock parcial (CPU) para que el proxy HTTP local del cast siga
+        // sirviendo bytes aunque la pantalla se apague (no mantiene la pantalla
+        // encendida: mejor batería que wakelock_plus).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WAKELOCK_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "acquire" -> {
+                    try {
+                        if (wakeLock == null || wakeLock?.isHeld != true) {
+                            val pm = applicationContext.getSystemService(POWER_SERVICE) as android.os.PowerManager
+                            wakeLock = pm.newWakeLock(
+                                android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                                "auristv:cast_proxy")
+                            wakeLock?.setReferenceCounted(false)
+                            wakeLock?.acquire()
+                        }
+                        result.success(wakeLock?.isHeld == true)
+                    } catch (e: Exception) {
+                        android.util.Log.d("AurisWakeLock", "acquire falló: ${e.message}")
+                        result.success(false)
+                    }
+                }
+                "release" -> {
+                    try {
+                        wakeLock?.let { if (it.isHeld) it.release() }
+                        wakeLock = null
+                        result.success(true)
+                    } catch (e: Exception) {
+                        android.util.Log.d("AurisWakeLock", "release falló: ${e.message}")
+                        result.success(false)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         // Cast Local (LAN, sin login): muchos drivers de Wi-Fi filtran los
         // paquetes broadcast/multicast; el MulticastLock lo habilita.

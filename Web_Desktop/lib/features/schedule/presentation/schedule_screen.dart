@@ -385,6 +385,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                                         category: 'anime',
                                         year: itemYear,
                                         quality: item.quality,
+                                        kind: 'anime',
                                         type: item.type,
                                         from: '/horario',
                                       );

@@ -59,6 +59,12 @@ class PlayerScreen extends ConsumerStatefulWidget {
   /// DIRECTO con estas headers (sin re-extraer, latencia 0 y fuente idéntica).
   final Map<String, String>? initialHeaders;
 
+  /// Sesión de cast espejo (`open_media` del emisor): la TV reproduce pero NO
+  /// escribe historial. Necesario para los episodios del cast, que llegan sin
+  /// `initialHeaders` (la URL del siguiente episodio aún no está resuelta y la
+  /// TV re-extrae) y antes se colaban como sesión local.
+  final bool isCastMirror;
+
   const PlayerScreen({
     super.key,
     required this.contentId,
@@ -82,6 +88,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.video1080,
     this.skipResume = false,
     this.initialHeaders,
+    this.isCastMirror = false,
   });
 
   @override
@@ -441,7 +448,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final vol = command['volume'];
         if (vol != null) {
           setState(() {
-            _volume = (vol as num).toDouble();
+            _volume = (vol as num).toDouble().clamp(0.0, 2.0);
+            if (_volume > 0) _lastAppliedVolume = _volume;
             _applyVolume();
           });
         }
@@ -459,18 +467,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         }
         break;
       case RemoteAction.dpadUp:
-      case RemoteAction.volumeUp:
-        setState(() {
-          _volume = (_volume + 0.1).clamp(0.0, 1.0);
-          _applyVolume();
-        });
+        // D-PAD del mando móvil: navega la UI del player (igual que las
+        // flechas del mando físico del TV). El volumen va por los botones
+        // dedicados volume_up/volume_down/mute.
+        _handleKeyEvent(KeyDownEvent(
+          physicalKey: PhysicalKeyboardKey.arrowUp,
+          logicalKey: LogicalKeyboardKey.arrowUp,
+          timeStamp: Duration.zero,
+        ));
         break;
       case RemoteAction.dpadDown:
+        _handleKeyEvent(KeyDownEvent(
+          physicalKey: PhysicalKeyboardKey.arrowDown,
+          logicalKey: LogicalKeyboardKey.arrowDown,
+          timeStamp: Duration.zero,
+        ));
+        break;
+      case RemoteAction.volumeUp:
+        _handleVolumeStep(0.1);
+        break;
       case RemoteAction.volumeDown:
-        setState(() {
-          _volume = (_volume - 0.1).clamp(0.0, 1.0);
-          _applyVolume();
-        });
+        _handleVolumeStep(-0.1);
         break;
       case RemoteAction.dpadLeft:
         _skipBackward();
@@ -487,10 +504,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         if (context.canPop()) context.pop();
         break;
       case RemoteAction.mute:
-        setState(() {
-          _volume = _volume > 0.01 ? 0.0 : 1.0;
-          _applyVolume();
-        });
+        // _toggleMute guarda el volumen previo en _lastAppliedVolume, así el
+        // mute remoto se comporta igual que el botón de la TV al desmutear.
+        _toggleMute();
         break;
     }
     _reportStatusToRemote(force: true);
@@ -611,6 +627,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _updateHistory({required int positionMs, required int durationMs, bool force = false}) {
     if (_isDisposed) return;
+    // Cast propio (espejo): el EMISOR (móvil/Web) es dueño del progreso y
+    // persiste su historial mientras dura la sesión. La TV solo reproduce,
+    // así que no escribe (evita espejos que pisen la posición del emisor y
+    // resumes que "viajen" a una plataforma que no la generó).
+    if (widget.initialHeaders != null || widget.isCastMirror) return;
     if (widget.contentId.isEmpty || _historyNotifier == null || _isOpEd) return;
     
     // Senior Performance Fix: Throttling de guardado en base de datos.
@@ -695,6 +716,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Guardado final en dispose SIN usar ref (ver Movil: el ref muere con el
   /// widget y ref.read lanza StateError en finalizeTree).
   void _finalSaveOnDispose(int positionMs, int durationMs) {
+    // Cast propio (espejo): el historial del fan está en el emisor (ver
+    // _updateHistory); la TV no persiste al cerrarse el player del cast.
+    if (widget.initialHeaders != null || widget.isCastMirror) return;
     try {
       final hn = _historyNotifier;
       if (hn == null) return;
@@ -2683,12 +2707,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// confirma al soltar. Un toque simple equivale al ±10s de antes.
   void _beginHoldScrub(int dir) {
     if (_holdDir != 0) return;
-    final pos = _player?.state.position.inMilliseconds ?? 0;
+    final now = DateTime.now();
+    final bool isRapidFire = _lastManualSeekTime != null && 
+                             now.difference(_lastManualSeekTime!).inMilliseconds < 800;
+    final pos = isRapidFire 
+        ? _lastFrameMs 
+        : (_player?.state.position.inMilliseconds ?? 0);
     final dur = _player?.state.duration.inMilliseconds ?? 0;
     if (dur <= 0) return;
     _holdDir = dir;
     _holdBaseMs = pos;
-    _holdStart = DateTime.now();
+    _holdStart = now;
     final target = (pos + dir * 10000).clamp(0, dur);
     setState(() {
       _showControls = true;
@@ -2696,10 +2725,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _seekDiff = Duration(milliseconds: target - pos);
     });
     _holdTimer?.cancel();
-    _holdTimer = Timer.periodic(
-      const Duration(milliseconds: 200),
-      (_) => _tickHoldScrub(),
-    );
+    // Delay de 400ms antes de iniciar el tictac de aceleración (hold-scrub),
+    // para que un toque normal en control remoto de TV (~200-300ms) no dispare el segundo tick.
+    _holdTimer = Timer(const Duration(milliseconds: 400), () {
+      if (_holdDir == 0 || !mounted) return;
+      _holdTimer = Timer.periodic(
+        const Duration(milliseconds: 150),
+        (_) => _tickHoldScrub(),
+      );
+    });
     HapticFeedback.selectionClick();
   }
 
@@ -2898,15 +2932,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         if (!skipResume && widget.startPosition != null && widget.startPosition! > 3000) {
            _resumePosition = widget.startPosition!;
            _hasResetPosition = true;
-           WidgetsBinding.instance.addPostFrameCallback((_) {
-             if (mounted) _handleResumeAction();
-           });
         } else if (!skipResume && historyPos > 0) {
            _resumePosition = historyPos;
            _hasResetPosition = true;
-           WidgetsBinding.instance.addPostFrameCallback((_) {
-             if (mounted) _handleResumeAction();
-           });
         } else {
            _resumePosition = 0;
            _hasResetPosition = true; 
@@ -3393,17 +3421,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       
       if (needsResumeSeek) {
         debugPrint('[player] 4. RESUME SEEK to $_resumePosition (Duration: ${player.state.duration})');
-        // Senior Fix: Seek absoluto forzado después de que el demuxer está listo.
-        // Si mpv lo pierde, _resumeSeekWhenReady (tras el play) verifica y reintenta.
         await player.seek(Duration(milliseconds: _resumePosition));
-        // Senior: Retardo mayor para estabilización de hardware tras fallo de codec
-        await Future.delayed(const Duration(milliseconds: 1200));
+        await Future.delayed(const Duration(milliseconds: 300));
       } else {
         debugPrint('[player] 4. NEW VIDEO (Start from 0, play: true)');
-        // Senior Fix: Un stream recién abierto ya arranca en 0. No hacemos
-        // seek(Duration.zero): mientras el vo aún inicializa, ese seek falla
-        // ("error running command _command(seek, 0.0000, absolute)") y rompe
-        // la reproducción en el cambio de episodio.
       }
       
       if (_isAutoplayResume) {
@@ -3411,23 +3432,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         await player.pause();
       } else {
         debugPrint('[player] 5. PLAY');
-        // Guard: los re-inits (retry/switch) pueden haber disposed este player
-        // mientras la continuación de _initPlayer seguía viva. Llamar play()
-        // sobre un player disposed lanza "Assertion failed: [Player] has been
-        // disposed" como excepción no manejada.
         if (_isDisposed || !mounted) return;
         await player.play();
-        // Senior Autoplay Fix: Garantizar que el stream arranca aunque el motor
-        // reporte pausa justo después del open (común en HLS nativo).
         _ensureAutoplay(player);
       }
 
       if (!_isAutoplayResume && _resumePosition > 3000) {
-        // Senior Resume Fix: mpv/media_kit no confirma seek() (retorna sin
-        // lanzar excepción). Aunque el demuxer reporte duración y el seek
-        // "parezca" aplicado, a veces se pierde y el video arranca desde 0 con
-        // el overlay mostrando la posición guardada. Verificamos por posición
-        // SIEMPRE en reanudaciones y reintentamos hasta que aterrice.
+        // Resume Fix: el primer seek puede perderse si el demuxer aún no está
+        // listo (MP4 progresivo / stream directo del cast). Verifica por
+        // posición y reintenta una vez.
         unawaited(_resumeSeekWhenReady(
             Duration(milliseconds: _resumePosition), player, _resumeSeekGen));
       }
@@ -3523,36 +3536,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// reintentamos el seek absoluto, verificando por posición (no por errores,
   /// que llegan por player.stream y no lanzan excepción).
   Future<void> _resumeSeekWhenReady(Duration target, Player player, int gen) async {
-    int waited = 0;
-    while (waited < 60 && mounted && gen == _resumeSeekGen) {
-      await Future.delayed(const Duration(milliseconds: 100));
-      waited++;
-      final d = player.state.duration;
-      final p = player.state.position.inMilliseconds;
-      if (d > Duration.zero) break;
-      if (p > 150) break;
-    }
+    final tMs = target.inMilliseconds;
+    if (tMs <= 3000) return;
+
+    await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted || gen != _resumeSeekGen) return;
 
-    final tMs = target.inMilliseconds;
-    for (int attempt = 0; attempt < 3 && mounted && gen == _resumeSeekGen; attempt++) {
-      final before = player.state.position.inMilliseconds;
-      if (before >= tMs - 2000 && before <= tMs + 4000) {
-        debugPrint('[player] Resume confirmado en $before (objetivo $tMs)');
-        return;
-      }
-      if (gen != _resumeSeekGen) return;
-      debugPrint('[player] Resume retry seek a $tMs (attempt ${attempt + 1}, pos $before)');
-      await player.seek(target);
-      // Senior: 900ms de settle; el seek en MP4 progresivo dispara una petición
-      // de rango al CDN que tarda en responder por el primer byte.
-      await Future.delayed(const Duration(milliseconds: 900));
-      final after = player.state.position.inMilliseconds;
-      if (after >= tMs - 2000 && after <= tMs + 4000) {
-        debugPrint('[player] Resume retry OK -> $after');
-        return;
-      }
+    final pos = player.state.position.inMilliseconds;
+    if (pos >= tMs - 3000) {
+      debugPrint('[player] Resume confirmado en $pos (objetivo $tMs)');
+      return;
     }
+
+    debugPrint('[player] Resume retry seek a $tMs (pos $pos)');
+    await player.seek(target);
   }
 
   /// Web Resume Fix: hls.js/HTML5 descartan seek() mientras la metadata no está

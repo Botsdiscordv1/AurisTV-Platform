@@ -83,7 +83,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
 
   Future<void> _setOffline() async {
     final current = state.currentDevice;
-    if (current == null) return;
+    if (current == null || current.userId == 'guest_user') return;
     try {
       await _supabase.from('remote_sessions').update({
         'is_online': false,
@@ -100,7 +100,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
 
   Future<void> _setOnline() async {
     final current = state.currentDevice;
-    if (current == null) return;
+    if (current == null || current.userId == 'guest_user') return;
     try {
       await _supabase.from('remote_sessions').update({
         'is_online': true,
@@ -176,15 +176,18 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
       state = state.copyWith(activeTargetDeviceId: savedTargetId);
     }
 
-    // 4. Registrarse en Supabase y empezar Heartbeat
-    await _registerDevice();
-    await _purgeStaleSessions(user.id);
-    _startHeartbeat();
-    _listenToDevices();
-    _subscribeToCommands();
+    // 4. Registrarse en Supabase y empezar Heartbeat (solo si no es invitado)
+    if (user.id != 'guest_user') {
+      await _registerDevice();
+      await _purgeStaleSessions(user.id);
+      _startHeartbeat();
+      _listenToDevices();
+      _subscribeToCommands();
+    }
   }
 
   Future<void> _purgeStaleSessions(String userId) async {
+    if (userId == 'guest_user') return;
     try {
       // Senior Purgue Logic: Cualquier sesión que no se haya visto en más de 10 minutos
       // y esté marcada como online, se considera "estancada" y se limpia.
@@ -236,7 +239,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
   void _listenToDevices() {
     _devicesSubscription?.cancel();
     final user = _ref.read(authProvider);
-    if (user == null) return;
+    if (user == null || user.id == 'guest_user') return;
 
     _devicesSubscription = _supabase
         .from('remote_sessions')
@@ -251,7 +254,7 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
 
   void _subscribeToCommands() {
     final currentDevice = state.currentDevice;
-    if (currentDevice == null) return;
+    if (currentDevice == null || currentDevice.userId == 'guest_user') return;
 
     // Usamos Postgres Changes para escuchar actualizaciones en nuestro registro
     _supabase

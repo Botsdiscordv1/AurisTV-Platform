@@ -160,14 +160,18 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                               child: Builder(
                                   builder: (context) {
                                     final dpr = MediaQuery.of(context).devicePixelRatio;
-                                    final targetWidth = (normalWidth * dpr).round();
+                                    // Senior TV/Low-RAM Tuning: Pósters con tope de 400px en memoria
+                                    // para no desbordar RAM en TV Boxes de 1GB ni provocar descarte en cache
+                                    final targetWidth = (normalWidth * dpr).round().clamp(1, 400);
+                                    final targetHeight = (targetWidth * 1.5).round().clamp(1, 600);
                                     return CuredNetworkImage(
                                       imageUrl: ApiEndpoints.proxyImage(
                                         widget.posterUrl,
                                         policy: ImageSize.poster,
                                       ),
                                       fit: BoxFit.cover,
-                                      memCacheWidth: targetWidth.clamp(1, 2048),
+                                      memCacheWidth: targetWidth,
+                                      memCacheHeight: targetHeight,
                                       filterQuality: FilterQuality.medium,
                                       placeholder: (context, url) => _letterPlaceholder(widget.title),
                                       errorWidget: (context, url, error) => _letterPlaceholder(widget.title),

@@ -53,10 +53,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _showPassword = false;
 
   // Evita mostrar el collage a medio cargar cuando Login es la pantalla de
-  // arranque: se pinta SOLO cuando sus imágenes están decodificadas (lleno
-  // desde el primer frame). El Splash ya lo precarga, así que suele ser true
-  // casi de inmediato.
+  // arranque: se pinta SOLO cuando sus imágenes están decodificadas.
   bool _collageReady = false;
+  bool _showLoginControls = false;
 
   // Page-level animation
   late final AnimationController _fadeCtrl;
@@ -73,17 +72,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loginBtnFocus.requestFocus();
-    });
-
-    // Garantiza el collage lleno desde el frame 1 aunque Login se abra como
-    // primera pantalla (sin pasar por el Splash): precarga y solo entonces
-    // habilita el collage.
+    // Garantiza el flujo exacto para TV:
+    // Splash -> Spinner de carga (naranja) -> Widget (collage cargado) -> Login screen
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       await CollageGridBackground.precache(context);
-      if (mounted) setState(() => _collageReady = true);
+      if (!mounted) return;
+      setState(() => _collageReady = true);
+
+      await Future.delayed(const Duration(milliseconds: 150));
+      if (!mounted) return;
+      setState(() => _showLoginControls = true);
+
+      _loginBtnFocus.requestFocus();
     });
   }
 
@@ -189,6 +190,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
+    // Flujo TV - Paso 2: Spinner de carga (naranja solo) mientras precarga el collage
+    if (!_collageReady) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0C0C0C),
+        body: Center(
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: CircularProgressIndicator(
+              color: Color(0xFFEF7A1E),
+              strokeWidth: 3.8,
+            ),
+          ),
+        ),
+      );
+    }
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -200,17 +218,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           opacity: _fadeAnim,
           child: Stack(
             children: [
-              // Full screen background: Collage on welcome with opacity/gradient overlays (Web Desktop style), solid black on sub-menus
+              // Flujo TV - Paso 3: Widget con collage cargado en el fondo
               Positioned.fill(
                 child: _step == _LoginStep.welcome
                     ? Stack(
                         fit: StackFit.expand,
                         children: [
-                          // Capa 1: Grid de posters en perspectiva (solo cuando
-                          // ya está precargado -> sin tarjetas vacías)
-                          if (_collageReady) const CollageGridBackground(),
+                          const CollageGridBackground(),
 
-                          // Capa 2: Gradiente izquierda -> derecha
+                          // Gradiente izquierda -> derecha
                           Container(
                             decoration: const BoxDecoration(
                               gradient: LinearGradient(
@@ -221,7 +237,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ),
                             ),
                           ),
-                          // Capa 2b: Gradiente arriba/abajo
+                          // Gradiente arriba/abajo
                           Container(
                             decoration: const BoxDecoration(
                               gradient: LinearGradient(
@@ -237,116 +253,129 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     : const ColoredBox(color: Color(0xFF000000)),
               ),
 
-              if (_step == _LoginStep.welcome) ...[
-                // Suspended Chibi Mascot at top right starting from top edge
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Image.asset(
-                    'assets/icons/chibi_pelinaranja_suspendida.png',
-                    height: size.height * 0.42,
-                    fit: BoxFit.contain,
-                    alignment: Alignment.topRight,
-                  ),
-                ),
+              // Flujo TV - Paso 4: Login screen (se revela animadamente)
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 380),
+                curve: Curves.easeOut,
+                opacity: _showLoginControls ? 1.0 : 0.0,
+                child: IgnorePointer(
+                  ignoring: !_showLoginControls,
+                  child: Stack(
+                    children: [
+                      if (_step == _LoginStep.welcome) ...[
+                        // Suspended Chibi Mascot at top right starting from top edge
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Image.asset(
+                            'assets/icons/chibi_pelinaranja_suspendida.png',
+                            height: size.height * 0.42,
+                            fit: BoxFit.contain,
+                            alignment: Alignment.topRight,
+                          ),
+                        ),
 
-                // Content – left half
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: size.width * 0.58,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(64, 0, 24, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 52),
-                        Expanded(
-                          child: Align(
-                            alignment: const Alignment(0, -0.32),
-                            child: Transform.translate(
-                              offset: const Offset(-22, 0),
-                              child: _buildWelcomeStep(),
-                            ),
-                          ),
-                        ),
-                        Transform.translate(
-                          offset: const Offset(-22, 0),
-                          child: const Padding(
-                            padding: EdgeInsets.only(bottom: 16),
-                            child: SizedBox(
-                              width: 520,
-                              child: Text(
-                                'Al usar AurisTV muestras tu conformidad con nuestras\n'
-                                'Condiciones de Uso [auristv.dpdns.org/terms] y nuestra Política de\n'
-                                'Privacidad [auristv.dpdns.org/privacy], confirmando además que\n'
-                                'tienes 16 años o más.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11.5,
-                                  height: 1.45,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ] else ...[
-                // Sub-menu layout: Left Sidebar + Right Content
-                Row(
-                  children: [
-                    _LoginSidebar(
-                      currentStep: _step,
-                      backFocus: _backBtnFocus,
-                      scanQrFocus: _scanQrFocus,
-                      activateCodeFocus: _activateCodeFocus,
-                      loginEmailFocus: _loginEmailFocus,
-                      createAccountFocus: _createAccountFocus,
-                      forgotPassFocus: _forgotPassFocus,
-                      onBack: _goBack,
-                      onSelectStep: _selectSubMenu,
-                    ),
-                    Expanded(
-                      child: Container(
-                        color: Colors.transparent,
-                        padding: const EdgeInsets.fromLTRB(64, 52, 64, 36),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Align(
-                                alignment: _step == _LoginStep.scanQR
-                                    ? const Alignment(0, -0.15)
-                                    : const Alignment(-1, -0.15),
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 220),
-                                  switchInCurve: Curves.easeOut,
-                                  switchOutCurve: Curves.easeOut,
-                                  transitionBuilder: (child, anim) {
-                                    return FadeTransition(
-                                      opacity: anim,
-                                      child: child,
-                                    );
-                                  },
-                                  child: KeyedSubtree(
-                                    key: ValueKey(_step),
-                                    child: _buildSubMenuContent(),
+                        // Content – left half
+                        Positioned(
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: size.width * 0.58,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(64, 0, 24, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 52),
+                                Expanded(
+                                  child: Align(
+                                    alignment: const Alignment(0, -0.32),
+                                    child: Transform.translate(
+                                      offset: const Offset(-22, 0),
+                                      child: _buildWelcomeStep(),
+                                    ),
                                   ),
+                                ),
+                                Transform.translate(
+                                  offset: const Offset(-22, 0),
+                                  child: const Padding(
+                                    padding: EdgeInsets.only(bottom: 16),
+                                    child: SizedBox(
+                                      width: 520,
+                                      child: Text(
+                                        'Al usar AurisTV muestras tu conformidad con nuestras\n'
+                                        'Condiciones de Uso [auristv.dpdns.org/terms] y nuestra Política de\n'
+                                        'Privacidad [auristv.dpdns.org/privacy], confirmando además que\n'
+                                        'tienes 16 años o más.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 11.5,
+                                          height: 1.45,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        // Sub-menu layout: Left Sidebar + Right Content
+                        Row(
+                          children: [
+                            _LoginSidebar(
+                              currentStep: _step,
+                              backFocus: _backBtnFocus,
+                              scanQrFocus: _scanQrFocus,
+                              activateCodeFocus: _activateCodeFocus,
+                              loginEmailFocus: _loginEmailFocus,
+                              createAccountFocus: _createAccountFocus,
+                              forgotPassFocus: _forgotPassFocus,
+                              onBack: _goBack,
+                              onSelectStep: _selectSubMenu,
+                            ),
+                            Expanded(
+                              child: Container(
+                                color: Colors.transparent,
+                                padding: const EdgeInsets.fromLTRB(64, 52, 64, 36),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Align(
+                                        alignment: _step == _LoginStep.scanQR
+                                            ? const Alignment(0, -0.15)
+                                            : const Alignment(-1, -0.15),
+                                        child: AnimatedSwitcher(
+                                          duration: const Duration(milliseconds: 220),
+                                          switchInCurve: Curves.easeOut,
+                                          switchOutCurve: Curves.easeOut,
+                                          transitionBuilder: (child, anim) {
+                                            return FadeTransition(
+                                              opacity: anim,
+                                              child: child,
+                                            );
+                                          },
+                                          child: KeyedSubtree(
+                                            key: ValueKey(_step),
+                                            child: _buildSubMenuContent(),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ],
           ),
         ),

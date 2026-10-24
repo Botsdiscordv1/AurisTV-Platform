@@ -15,7 +15,6 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/connections_screen.dart';
 import '../../features/avatar/presentation/avatar_selector_screen.dart';
 import '../../features/avatar/presentation/profile_selection_screen.dart';
-import '../../features/avatar/presentation/profile_setup_screen.dart';
 import '../../features/legal/presentation/legal_screen.dart';
 import '../../features/intro/presentation/splash_screen.dart';
 import '../../shared/widgets/main_navigation_wrapper.dart';
@@ -25,6 +24,56 @@ final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<v
 
 /// Clave global para el Navigator Raíz
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
+/// Constructor centralizado de ContentScreen con soporte para tokens encriptados estilo Crunchyroll
+/// y fallback a query parameters tradicionales.
+Widget _buildContentScreen(BuildContext context, GoRouterState state) {
+  final token = state.pathParameters['token'];
+  final slug = state.pathParameters['slug'];
+  Map<String, dynamic> params = {};
+
+  if (token != null && token.isNotEmpty) {
+    final decoded = UrlUtils.decodeShareableToken(token, slug: slug);
+    if (decoded != null) {
+      params = decoded;
+    }
+  }
+
+  // Fallback a queryParameters si no vino token o si venía por la ruta legacy /detalles
+  if (params.isEmpty) {
+    params = Map<String, dynamic>.from(state.uri.queryParameters);
+  }
+
+  final title = (params['title'] as String?) ?? 'Contenido';
+  final source = (params['source'] as String?) ?? '';
+  final url = (params['url'] as String?) ?? '';
+
+  if (url.isEmpty) return const HomeScreen();
+
+  final extraResult = state.extra is SearchResult ? state.extra as SearchResult : null;
+
+  final yearVal = params['year'];
+  final int? year = yearVal is int ? yearVal : int.tryParse(yearVal?.toString() ?? '');
+
+  final seasonVal = params['season'];
+  final int? season = seasonVal is int ? seasonVal : int.tryParse(seasonVal?.toString() ?? '');
+
+  return ContentScreen(
+    title: title,
+    source: source,
+    url: url,
+    category: (params['category'] as String?) ?? 'all',
+    year: year,
+    season: season,
+    kind: params['kind'] as String?,
+    quality: params['quality'] as String?,
+    type: params['type'] as String?,
+    metadataTitle: params['metadataTitle'] as String?,
+    sectionId: params['sectionId'] as String?,
+    result: extraResult,
+    from: params['from'] as String?,
+  );
+}
 
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
@@ -92,37 +141,45 @@ final GoRouter appRouter = GoRouter(
       ],
     ),
 
-    // Detalles (Media)
+    // Series / Anime / Kdramas (Estilo Crunchyroll: /series/:token/:slug)
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/series/:token/:slug',
+      builder: _buildContentScreen,
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/series/:token',
+      builder: _buildContentScreen,
+    ),
+
+    // Películas (movie, movie_anime, movie_kdrama: /movie/:token/:slug)
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/movie/:token/:slug',
+      builder: _buildContentScreen,
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/movie/:token',
+      builder: _buildContentScreen,
+    ),
+
+    // Rutas legacy /detalles (soporta con token y con query params para 100% retrocompatibilidad)
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/detalles/:token/:slug',
+      builder: _buildContentScreen,
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/detalles/:token',
+      builder: _buildContentScreen,
+    ),
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,
       path: '/detalles',
-      builder: (context, state) {
-        final params = state.uri.queryParameters;
-        
-        final title = params['title'] ?? 'Contenido';
-        final source = params['source'] ?? '';
-        final url = params['url'] ?? '';
-
-        if (url.isEmpty) return const HomeScreen(); 
-
-        final extraResult = state.extra is SearchResult ? state.extra as SearchResult : null;
-
-        return ContentScreen(
-          title: title,
-          source: source,
-          url: url,
-          category: params['category'] ?? 'all',
-          year: int.tryParse(params['year'] ?? ''),
-          season: int.tryParse(params['season'] ?? ''),
-          kind: params['kind'],
-          quality: params['quality'],
-          type: params['type'],
-          metadataTitle: params['metadataTitle'],
-          sectionId: params['sectionId'],
-          result: extraResult,
-          from: params['from'],
-        );
-      },
+      builder: _buildContentScreen,
     ),
 
     // Reproductor

@@ -60,6 +60,12 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   bool _videoReady = false;
   bool _isAppActive = true;
   bool _isVisible = true;
+  // Senior Fix: evita que al regresar de Content → Home el banner
+  // reinicie la secuencia cinemática y recargue visualmente las imágenes.
+  bool _wasEverVisible = false;
+  // Guard para que _buildBackgroundLayer no cambie la key del
+  // AnimatedSwitcher cuando el índice no ha cambiado realmente.
+  int _lastRenderedBgIndex = -1;
 
   bool _isFocused = false; 
   bool _isTransitioning = false;
@@ -105,7 +111,9 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
 
   int _bgMemCacheWidth() {
     final mq = MediaQuery.of(context);
-    return (mq.size.width * mq.devicePixelRatio).round().clamp(640, 1920);
+    // Senior 1GB TV Box Tuning: Banner con tope de 1280px en RAM (720p/1080p downscaled)
+    // Reduce el consumo de 8.5MB a 3.5MB por fondo de banner
+    return (mq.size.width * mq.devicePixelRatio).round().clamp(640, 1280);
   }
 
   void _precacheNextImage() {
@@ -117,7 +125,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
     if (imageUrl != null && imageUrl.isNotEmpty) {
       precacheImage(
         ResizeImage(
-          CachedNetworkImageProvider(imageUrl),
+          CachedNetworkImageProvider(imageUrl, cacheManager: AurisImageCacheManager.instance),
           width: _bgMemCacheWidth(),
         ),
         context,
@@ -441,7 +449,15 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
             _stopCycle();
           } else if (_isAppActive) {
             _startAutoPlay();
-            _startCycle(delay: const Duration(seconds: 1));
+            // Senior Fix: Si el banner ya fue visible antes (vuelta de navegación),
+            // NO reiniciamos la secuencia cinemática — solo reanudamos el autoplay.
+            // Esto evita el flash/recarga de imagen al volver de Content → Home.
+            if (!_wasEverVisible) {
+              _wasEverVisible = true;
+              _startCycle(delay: const Duration(seconds: 1));
+            }
+            // En regresos normales, simplemente reiniciamos el timer de rotación
+            // sin tocar _backgroundIndex ni _contentIndex.
           }
         }
       },
@@ -609,6 +625,12 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   }
 
   Widget _buildBackgroundLayer(MediaItem item) {
+    // Senior Fix: Actualizamos el guard solo cuando el índice cambia de verdad.
+    // Si setState se dispara por razones ajenas (foco, hover, visibilidad al volver),
+    // la key del AnimatedSwitcher NO cambia → no hay fade-in innecesario.
+    if (_backgroundIndex != _lastRenderedBgIndex) {
+      _lastRenderedBgIndex = _backgroundIndex;
+    }
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 800),
       transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
@@ -622,13 +644,19 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
         );
       },
       child: CachedNetworkImage(
-        key: ValueKey('bg_${item.id}'),
+        // La key usa _lastRenderedBgIndex en lugar de _backgroundIndex directo,
+        // lo que garantiza que el AnimatedSwitcher solo recrea el widget
+        // cuando el fondo realmente cambia, no en rebuilds por otros motivos.
+        key: ValueKey('bg_${item.id}_$_lastRenderedBgIndex'),
         imageUrl: item.bannerUrl ?? item.posterUrl,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
         alignment: Alignment.topCenter,
         memCacheWidth: _bgMemCacheWidth(),
+        fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+        fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+        cacheManager: AurisImageCacheManager.instance,
         filterQuality: MediaQuery.of(context).size.width < 1600
             ? FilterQuality.medium
             : FilterQuality.high,

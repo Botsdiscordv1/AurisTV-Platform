@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'package:collection/collection.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
@@ -30,6 +31,7 @@ import '../../../core/utils/web_utils.dart';
 
 import 'mobile_video_surface.dart';
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
+import '../data/audio_handler.dart';
 import '../../remote_control/data/models/remote_device.dart';
 import '../../remote_control/presentation/widgets/dpad_remote_sheet.dart';
 import '../../cast/data/models/cast_state.dart';
@@ -578,6 +580,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           ? ApiEndpoints.proxyImage(artwork)
           : null,
     );
+
+    await _wakeLockChannel.invokeMethod('acquire');
+
+    // Durante el cast nativo la notificación la gestiona el SDK de Cast (incluye
+    // el botón de cast para cambiar de dispositivo); la nuestra se oculta.
+    audioHandler.detach();
+
   }
 
   /// Handback: el Chromecast terminó/desconectó → retomar local desde la
@@ -586,6 +595,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _endChromecastSession(int positionMs, int durationMs) {
     if (!mounted || _isDisposed) return;
     debugPrint('[AurisCast] Session ended at $positionMs');
+
+    _chromecastStatusSub?.close();
+    _chromecastStatusSub = null;
+    audioHandler.detach();
+    _wakeLockChannel.invokeMethod('release');
 
     _enforceLandscapeOrientation();
 
@@ -617,6 +631,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _isLoading = true;
         _userHasPaused = !_castWasPlaying;
       });
+    }
+
+    // Al terminar el cast nativo, la reproducción local se reanuda: volver a
+    // mostrar la notificación media propia.
+    if (_player != null) {
+      audioHandler.attach(
+        _player!,
+        title: widget.metadataTitle ?? widget.title ?? 'AurisTV',
+        artist: widget.category,
+        artUri: (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
+            ? widget.bannerUrl
+            : widget.posterUrl,
+      );
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -760,6 +787,40 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _aurisWasPlaying = wasPlaying;
       _userHasPaused = true;
     });
+
+    _wakeLockChannel.invokeMethod('acquire');
+
+    final aurisSub = ref.listenManual(remoteControlProvider, (prev, next) {
+      if (_aurisCastTargetId == null) return;
+      RemoteDevice? dev;
+      try {
+        dev = next.availableDevices.firstWhere((d) => d.id == _aurisCastTargetId);
+      } catch (_) {
+        dev = null;
+      }
+      if (dev == null) return;
+      audioHandler.updateRemoteState(
+        playing: dev.isPlaying,
+        position: Duration(milliseconds: dev.positionMs),
+        duration: Duration(milliseconds: dev.durationMs),
+      );
+    });
+    _aurisCastStatusSub = aurisSub;
+    audioHandler.attachRemote(
+      title: widget.metadataTitle ?? widget.title ?? 'AurisTV',
+      artist: widget.category,
+      artUri: (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
+          ? widget.bannerUrl
+          : widget.posterUrl,
+      playing: _aurisWasPlaying,
+      position: Duration(milliseconds: posMs),
+      duration: _player!.state.duration,
+      onPlay: () async => _sendRemoteAction(device, RemoteAction.play),
+      onPause: () async => _sendRemoteAction(device, RemoteAction.pause),
+      onSeek: (pos) async => _sendRemoteAction(
+          device, RemoteAction.seek, {'position_ms': pos.inMilliseconds}),
+      onStop: () async => _endAurisCastSession(),
+    );
     // Emitter owns the history: mientras la sesión viva, el progreso que
     // reporta el receptor alimenta el historial del emisor (10 s cadencia,
     // el propio _updateHistory throttling a 1 s el persist al provider).
@@ -788,6 +849,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// seek + play sin re-inicializar nada.
   void _endAurisCastSession() {
     _enforceLandscapeOrientation();
+    _aurisCastStatusSub?.close();
+    _aurisCastStatusSub = null;
+    audioHandler.detach();
+    _wakeLockChannel.invokeMethod('release');
     final targetId = _aurisCastTargetId;
     _aurisCastTargetId = null;
     _aurisHistorySyncTimer?.cancel();
@@ -1027,6 +1092,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   // estaba reproduciendo localmente, al desvincular el target se retoma con
   // autoplay desde la última posición reportada por el receptor.
   String? _aurisCastTargetId;
+  ProviderSubscription<CastState>? _chromecastStatusSub;
+  ProviderSubscription<RemoteControlState>? _aurisCastStatusSub;
   bool _aurisWasPlaying = false;
   /// Cast pedido desde la ficha de contenido: se dispara una sola vez, cuando
   /// el player ya tiene el stream resuelto.
@@ -1061,6 +1128,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   static const int _kMaxExtractRefresh = 2;
 
   static const _volumeControlChannel = MethodChannel('auristv/volume');
+  static const _wakeLockChannel = MethodChannel('auristv/wakelock');
   static const _orientationChannel = MethodChannel('auristv/orientation');
 
   bool get _isCastOrRemoteActive {
@@ -2999,6 +3067,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_player == null) return; // Fail safe
     final player = _player!;
 
+    // Notificación media del sistema (control desde el shade / lock screen).
+    try {
+      await Permission.notification.request();
+    } catch (_) {}
+    audioHandler.attach(
+      player,
+      title: widget.metadataTitle ?? widget.title ?? 'AurisTV',
+      artist: widget.category,
+      artUri: (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
+          ? widget.bannerUrl
+          : widget.posterUrl,
+    );
+
     _posSubscription?.cancel();
     _bufferingSubscription?.cancel();
     _completedSubscription?.cancel();
@@ -3944,6 +4025,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
 
     if (_player != null) {
+      audioHandler.detach();
       // Senior Fix: Ya no matamos al player aquí, lo gestiona el Global Provider
       _player = null;
     }

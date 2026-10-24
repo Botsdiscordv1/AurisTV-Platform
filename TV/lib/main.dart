@@ -18,9 +18,10 @@ import 'features/remote_control/data/models/remote_device.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final imageCache = PaintingBinding.instance.imageCache;
-  imageCache.maximumSizeBytes = 64 << 20;
-  imageCache.maximumSize = 500;
+  // Senior 1GB TV Box Tuning: Configuración de caché optimizada que previene
+  // el cierre por OOM en TV Boxes chinas de 1GB de RAM al tiempo que retiene
+  // cientos de pósters con memCacheWidth acotado sin forzar re-descargas.
+  AurisImageConfig.configureForTV(isLowRam: true);
 
   // Senior TV Optimization: Forzamos el modo inmersivo total para televisores.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);

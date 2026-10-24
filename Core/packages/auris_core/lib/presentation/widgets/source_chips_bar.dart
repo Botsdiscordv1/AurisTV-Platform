@@ -31,6 +31,8 @@ class SourceChipsBar extends ConsumerStatefulWidget {
   /// scroll). Usado en TV para embeber los chips al final de la fila de
   /// botones de acción con la misma jerarquía visual.
   final bool embedded;
+  /// Si es true, el último chip absorbe D-pad Derecha para no saltar abajo.
+  final bool absorbRightOnLast;
 
   const SourceChipsBar({
     super.key,
@@ -43,6 +45,7 @@ class SourceChipsBar extends ConsumerStatefulWidget {
     this.chipPadding,
     this.chipHeight,
     this.embedded = false,
+    this.absorbRightOnLast = true,
   });
 
   @override ConsumerState<SourceChipsBar> createState() => _SourceChipsBarState();
@@ -114,6 +117,7 @@ class _SourceChipsBarState extends ConsumerState<SourceChipsBar> {
               fontSize: widget.fontSize,
               chipPadding: widget.chipPadding,
               chipHeight: widget.chipHeight,
+              isLast: widget.absorbRightOnLast && (idx == indices.length - 1),
               onTap: () => widget.onSourceSelected(i),
             );
           }),
@@ -142,6 +146,7 @@ class _SourceItem extends ConsumerStatefulWidget {
   final double? fontSize;
   final EdgeInsetsGeometry? chipPadding;
   final double? chipHeight;
+  final bool isLast;
   final VoidCallback onTap;
 
   const _SourceItem({
@@ -153,6 +158,7 @@ class _SourceItem extends ConsumerStatefulWidget {
     this.fontSize,
     this.chipPadding,
     this.chipHeight,
+    this.isLast = false,
     required this.onTap,
   });
 
@@ -198,12 +204,16 @@ class _SourceItemState extends ConsumerState<_SourceItem> {
           // TV: OK explícito (InkWell no siempre activa con select en todos
           // los firmwares). Mismo patrón que _DetailIconButton/_NetflixListButton.
           onKeyEvent: (node, event) {
-            if (event is KeyDownEvent &&
-                (event.logicalKey == LogicalKeyboardKey.enter ||
-                    event.logicalKey == LogicalKeyboardKey.select ||
-                    event.logicalKey == LogicalKeyboardKey.space)) {
-              widget.onTap();
-              return KeyEventResult.handled;
+            if (event is KeyDownEvent || event is KeyRepeatEvent) {
+              if (event.logicalKey == LogicalKeyboardKey.enter ||
+                  event.logicalKey == LogicalKeyboardKey.select ||
+                  event.logicalKey == LogicalKeyboardKey.space) {
+                widget.onTap();
+                return KeyEventResult.handled;
+              }
+              if (widget.isLast && event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                return KeyEventResult.handled;
+              }
             }
             return KeyEventResult.ignored;
           },

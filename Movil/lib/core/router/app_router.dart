@@ -28,6 +28,45 @@ final RouteObserver<ModalRoute<void>> routeObserver =
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+Widget _buildContentFromDeepLink(
+  BuildContext context,
+  GoRouterState state, {
+  required bool isMovie,
+}) {
+  final slug = state.pathParameters['slug'] ?? '';
+  String title = '';
+
+  if (slug.isNotEmpty) {
+    final unencoded = Uri.decodeComponent(slug).replaceAll('-', ' ').trim();
+    title = unencoded.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return '${word[0].toUpperCase()}${word.substring(1)}';
+    }).join(' ');
+  }
+
+  if (title.isEmpty) {
+    title = state.uri.queryParameters['title'] ?? 'Contenido';
+  }
+
+  final category = isMovie ? 'movie' : (state.uri.queryParameters['category'] ?? 'anime');
+  final kind = isMovie ? 'movie' : (state.uri.queryParameters['kind'] ?? 'series');
+
+  return ContentScreen(
+    title: title,
+    source: state.uri.queryParameters['source'] ?? '',
+    url: state.uri.queryParameters['url'] ?? '',
+    quality: state.uri.queryParameters['quality'],
+    type: kind,
+    kind: kind,
+    metadataTitle: title,
+    banner: state.uri.queryParameters['banner'],
+    category: category,
+    year: int.tryParse(state.uri.queryParameters['year'] ?? ''),
+    season: int.tryParse(state.uri.queryParameters['season'] ?? ''),
+    sectionId: state.uri.queryParameters['sectionId'],
+  );
+}
+
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/splash',
@@ -178,6 +217,39 @@ final GoRouter appRouter = GoRouter(
         );
       },
     ),
+    // Series / Anime / Kdramas deep links (WhatsApp / Web)
+    GoRoute(
+      path: '/series/:token/:slug',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: false),
+    ),
+    GoRoute(
+      path: '/series/:token',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: false),
+    ),
+    // Películas deep links (WhatsApp / Web)
+    GoRoute(
+      path: '/movie/:token/:slug',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: true),
+    ),
+    GoRoute(
+      path: '/movie/:token',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: true),
+    ),
+    // Alias /detalles
+    GoRoute(
+      path: '/detalles/:token/:slug',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: false),
+    ),
+    GoRoute(
+      path: '/detalles/:token',
+      builder: (context, state) =>
+          _buildContentFromDeepLink(context, state, isMovie: false),
+    ),
     GoRoute(
       path: '/player/:contentId',
       pageBuilder: (context, state) {
@@ -205,6 +277,8 @@ final GoRouter appRouter = GoRouter(
         final video720 = state.uri.queryParameters['video720'];
         final video1080 = state.uri.queryParameters['video1080'];
         final skipResume = state.uri.queryParameters['skipResume'] == '1';
+        // Cast elegido en la ficha: el player lo dispara al resolver el stream.
+        final castTargetId = state.uri.queryParameters['castTarget'];
         
         return CustomTransitionPage<void>(
           key: state.pageKey,
@@ -241,6 +315,7 @@ final GoRouter appRouter = GoRouter(
               skipResume: skipResume,
               kind: kind,
               year: year,
+              castTargetId: castTargetId,
             ),
           ),
         );

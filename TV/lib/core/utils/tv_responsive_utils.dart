@@ -19,10 +19,9 @@ class TVResponsiveUtils {
   /// Margen horizontal estándar para televisores (Safe Area optimizado)
   static double horizontalPadding(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    // Margen adaptativo según la resolución para aprovechar mejor los bordes sin desbordar
-    if (width <= 1280) return 24.0;
-    if (width <= 1920) return 36.0;
-    return (width * 0.022).clamp(40.0, 64.0);
+    if (width > 2200) return (width - 2000) / 2 + 32.0;
+    final double percentage = width >= 1280 ? 0.03 : 0.04;
+    return (width * percentage).clamp(24.0, 100.0);
   }
 
   /// Altura del topbar fijo (misma fórmula que usa el home para su navbar):

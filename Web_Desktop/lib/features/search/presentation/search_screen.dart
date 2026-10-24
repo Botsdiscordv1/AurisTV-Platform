@@ -1,4 +1,4 @@
-﻿import 'package:skeletonizer/skeletonizer.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -214,6 +214,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
       url: result.url,
       category: openCategory,
       year: result.year,
+      kind: result.kind,
       type: result.type ?? result.kind,
       from: '/catalogo',
     );
@@ -478,6 +479,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
       source: detailParams.source,
       url: detailParams.url ?? item.contentId,
       category: detailParams.category,
+      kind: detailParams.kind,
       type: detailParams.type,
       sectionId: detailParams.sectionId,
       from: '/search',

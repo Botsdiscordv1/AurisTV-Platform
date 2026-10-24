@@ -14,8 +14,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
+import 'package:auris_core/auris_core.dart' hide FocusablePosterCard, FocusableWideCard;
 import '../../../shared/widgets/focusable_poster_card.dart';
+import '../../../shared/widgets/focusable_wide_card.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/tv_responsive_utils.dart';
@@ -101,8 +102,8 @@ Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) 
   if (text == null || text.isEmpty) return const SizedBox.shrink();
   return Container(
     padding: EdgeInsets.symmetric(
-      horizontal: ResponsiveUtils.sp(context, small ? 4 : 8), 
-      vertical: ResponsiveUtils.sp(context, small ? 1 : 3)
+      horizontal: ResponsiveUtils.sp(context, small ? 4 : 6), 
+      vertical: ResponsiveUtils.sp(context, small ? 1 : 2)
     ),
     decoration: BoxDecoration(
       color: Colors.white.withValues(alpha: 0.1),
@@ -116,7 +117,7 @@ Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) 
       text,
       style: TextStyle(
         color: Colors.white, 
-        fontSize: small ? 9 : 13, 
+        fontSize: small ? 9 : 11, 
         fontWeight: FontWeight.w900,
       ),
     ),
@@ -218,6 +219,8 @@ class _ContentHeader extends ConsumerStatefulWidget {
   final String? type;
   final VoidCallback? onShowEpisodes;
   final AsyncValue<Map<String, List<RelatedInfo>>> relations;
+  final UnifiedDetailParams detailParams;
+  final String? metadataTitle;
 
   const _ContentHeader({
     required this.title, 
@@ -246,6 +249,8 @@ class _ContentHeader extends ConsumerStatefulWidget {
     this.type,
     this.onShowEpisodes,
     required this.relations,
+    required this.detailParams,
+    this.metadataTitle,
   });
 
   @override ConsumerState<_ContentHeader> createState() => _ContentHeaderState();
@@ -257,6 +262,40 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   bool _revealed = false;
   Timer? _revealTimeout;
   final FocusNode _actionsRowFirstNode = FocusNode();
+  final ScrollController _mainScrollController = ScrollController();
+  final GlobalKey _episodesSectionKey = GlobalKey();
+  final FocusNode _seasonSelectorFocusNode = FocusNode(debugLabel: 'season_selector');
+  final FocusNode _sourceSelectorFocusNode = FocusNode(debugLabel: 'source_selector');
+  EpisodeInfo? _focusedEpisode;
+  int? _lastSeenSeason;
+  // Memoria de scroll de las filas horizontales (como las filas del Home).
+  final ScrollController _episodesScrollController = ScrollController();
+  final ScrollController _openingsScrollController = ScrollController();
+  final ScrollController _endingsScrollController = ScrollController();
+
+  void _scrollToEpisodesSection() {
+    if (!_mainScrollController.hasClients) return;
+    final ctx = _episodesSectionKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+        alignment: 0.0,
+      );
+    }
+  }
+
+  void _scrollToEpisodeIndex(int index, double cardWidth) {
+    if (!_episodesScrollController.hasClients) return;
+    const double spacing = 10.0;
+    final double targetOffset = index * (cardWidth + spacing);
+    _episodesScrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   void _startTitleHideTimer() {
     _titleHideTimer?.cancel();
@@ -348,21 +387,63 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
 
   void _disposeController() { _delayTimer?.cancel(); _fadeTimer?.cancel(); _titleHideTimer?.cancel(); _trailerController?.dispose(); _trailerController = null; }
   
+  double _scrollOffset = 0.0;
+
   @override void initState() {
     super.initState();
     _revealTimeout = Timer(ApiEndpoints.detailRevealTimeout, () {
       if (mounted && !_revealed) setState(() => _revealed = true);
+    });
+    _mainScrollController.addListener(() {
+      if (mounted) {
+        final offset = _mainScrollController.hasClients ? _mainScrollController.offset : 0.0;
+        if ((offset > 20) != (_scrollOffset > 20)) {
+          setState(() => _scrollOffset = offset);
+        }
+      }
+    });
+
+    _actionsRowFirstNode.addListener(() {
+      if (_actionsRowFirstNode.hasFocus && _mainScrollController.hasClients && _mainScrollController.offset > 0.0) {
+        _mainScrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
     });
   }
 
   @override void dispose() { 
     _revealTimeout?.cancel();
     _actionsRowFirstNode.dispose();
+    _seasonSelectorFocusNode.dispose();
+    _sourceSelectorFocusNode.dispose();
+    _mainScrollController.dispose();
+    _episodesScrollController.dispose();
+    _openingsScrollController.dispose();
+    _endingsScrollController.dispose();
     _disposeController(); 
     super.dispose(); 
   }
 
   @override Widget build(BuildContext context) {
+    ref.listen(unifiedContentProvider(widget.detailParams).select((s) => s.episodes), (prev, next) {
+      next.whenData((result) {
+        final eps = result?.response.episodes ?? [];
+        if (eps.isNotEmpty) {
+          if (_focusedEpisode == null || _lastSeenSeason != widget.currentSeason) {
+            _lastSeenSeason = widget.currentSeason;
+            if (mounted) {
+              setState(() {
+                _focusedEpisode = eps.first;
+              });
+            }
+          }
+        }
+      });
+    });
+
     final d = widget.detailAsync.valueOrNull?.main;
     // Mientras la respuesta de metadatos del servidor NO haya llegado, ocultamos
     // tanto el título (texto) como la imagen de fondo: el nombre/póster/banner
@@ -381,6 +462,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
           );
     final heroTitle = widget.title;
     final width = MediaQuery.sizeOf(context).width;
+    final heroBanner = ApiEndpoints.proxyImage(DetailBackdropResolver.resolve(detail: d, bannerParam: widget.banner, sourceBanner: widget.sources.isNotEmpty ? widget.sources.first.banner : null, season: widget.currentSeason), highQuality: true);
 
     return MouseRegion(
       onHover: (_) => _handleInteraction(),
@@ -388,76 +470,341 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         onPointerDown: (_) => _handleInteraction(),
         onPointerMove: (_) => _handleInteraction(),
         onPointerHover: (_) => _handleInteraction(),
-        child: Stack(clipBehavior: Clip.hardEdge, children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: LayoutBuilder(builder: (context, constraints) {
-              final h = constraints.maxHeight; 
-              final ph = h; 
-              final pw = ph * (16 / 9);
-              return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
-                Container(color: const Color(0xFF000000)),
-                if (b != null) Positioned.fill(child: ShaderMask(
-                  shaderCallback: (rect) => const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
-                    stops: [0.0, 0.3, 0.6, 1.0],
-                  ).createShader(rect),
-                  blendMode: BlendMode.dstIn,
-                  child: TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 800), 
-                    tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
-                    builder: (context, blur, child) => ImageFiltered(
-                      imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 800), 
-                        foregroundDecoration: BoxDecoration(color: Colors.black.withOpacity(_showPlayer ? 0.45 : 0.0)), 
-                        child: CachedNetworkImage(imageUrl: b, fit: BoxFit.cover, alignment: Alignment.centerRight, fadeInDuration: const Duration(milliseconds: 300), errorWidget: (_, __, ___) => Container(color: Colors.black12))
-                      )
-                    )
-                  ),
-                )),
-                if (_trailerController != null && _lastTrailerKey != null) Positioned.fill(child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YouTubeTrailerPlayer(key: ValueKey(_lastTrailerKey), controller: _trailerController!, videoId: _lastTrailerKey!, autoPlay: true, mute: true, aspectRatio: 16 / 9))))))),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        const Color(0xFF000000).withOpacity(0.98),
-                        const Color(0xFF000000).withOpacity(0.90),
-                        const Color(0xFF000000).withOpacity(0.40),
-                        const Color(0xFF000000).withOpacity(0.10),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.25, 0.45, 0.65, 1.0],
+        child: Stack(
+          children: [
+            // Backdrop persistente fijo de fondo: solo aparece al hacer scroll (_scrollOffset > 20)
+            AnimatedOpacity(
+              opacity: _scrollOffset > 20 ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: const Color(0xFF101014),
+                      child: b != null && b.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: b,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.centerRight,
+                              fadeInDuration: const Duration(milliseconds: 300),
+                              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ),
-                ),
-                Positioned(
-                  left: ResponsiveUtils.horizontalPadding(context), 
-                  top: h * 0.06,
-                  bottom: 20, 
-                  child: SizedBox(
-                    width: width - 2 * ResponsiveUtils.horizontalPadding(context),
-                    child: _buildNetflixContentColumn(context, d, width, heroTitle, logoReady, metaPending),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.70),
+                            Colors.black.withValues(alpha: 0.70),
+                            Colors.black.withValues(alpha: 0.70),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.center, colors: [const Color(0xFF000000).withOpacity(0.5), Colors.transparent], stops: const [0.0, 0.4]))),
-              ]);
-            }),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildRelatedCarousel(),
-          ),
-          Positioned.fill(child: _buildUpperButtons(context)),
-        ]),
+                ],
+              ),
+            ),
+            SingleChildScrollView(
+              controller: _mainScrollController,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: MediaQuery.sizeOf(context).height * 0.90,
+                    child: LayoutBuilder(builder: (context, constraints) {
+                      final h = constraints.maxHeight; 
+                      final ph = h; 
+                      final pw = MediaQuery.sizeOf(context).width;
+                      return Stack(fit: StackFit.expand, clipBehavior: Clip.hardEdge, children: [
+                        Container(color: Colors.transparent),
+                        if (b != null) Positioned.fill(child: ShaderMask(
+                          shaderCallback: (rect) => const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.black, Colors.black, Colors.black54, Colors.transparent],
+                            stops: [0.0, 0.3, 0.6, 1.0],
+                          ).createShader(rect),
+                          blendMode: BlendMode.dstIn,
+                          child: TweenAnimationBuilder<double>(
+                            duration: const Duration(milliseconds: 800), 
+                            tween: Tween<double>(begin: 0.0, end: _showPlayer ? 4.0 : 0.0), 
+                            builder: (context, blur, child) => ImageFiltered(
+                              imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur), 
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 800), 
+                                foregroundDecoration: BoxDecoration(color: Colors.black.withOpacity(_showPlayer ? 0.45 : 0.0)), 
+                                child: CachedNetworkImage(
+                                  imageUrl: b,
+                                  fit: BoxFit.cover,
+                                  alignment: Alignment.centerRight,
+                                  memCacheWidth: (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 1600),
+                                  fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                  fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                  cacheManager: AurisImageCacheManager.instance,
+                                  errorWidget: (_, __, ___) => Container(color: Colors.black12),
+                                )
+                              )
+                            )
+                          ),
+                        )),
+                        if (_trailerController != null && _lastTrailerKey != null) Positioned.fill(child: AnimatedOpacity(duration: const Duration(milliseconds: 500), opacity: _showPlayer ? 1.0 : 0.0, child: PointerInterceptor(child: IgnorePointer(ignoring: true, child: ClipRect(child: OverflowBox(alignment: Alignment.center, minWidth: pw, maxWidth: pw, minHeight: ph, maxHeight: ph, child: YouTubeTrailerPlayer(key: ValueKey(_lastTrailerKey), controller: _trailerController!, videoId: _lastTrailerKey!, autoPlay: true, mute: true, aspectRatio: 16 / 9))))))),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                const Color(0xFF000000).withOpacity(0.98),
+                                const Color(0xFF000000).withOpacity(0.90),
+                                const Color(0xFF000000).withOpacity(0.40),
+                                const Color(0xFF000000).withOpacity(0.10),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 0.25, 0.45, 0.65, 1.0],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: TVResponsiveUtils.horizontalPadding(context), 
+                          top: h * 0.06,
+                          bottom: 4,
+                          child: SizedBox(
+                            width: width - 2 * TVResponsiveUtils.horizontalPadding(context),
+                            child: _buildNetflixContentColumn(context, d, width, heroTitle, logoReady, metaPending),
+                          ),
+                        ),
+                        DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.center, colors: [const Color(0xFF000000).withOpacity(0.5), Colors.transparent], stops: const [0.0, 0.4]))),
+                      ]);
+                    }),
+                  ),
+                  const SizedBox(height: 6),
+                  _buildIntegratedEpisodesSection(context, d, widget.detailParams, widget.currentSource, heroBanner),
+                  const SizedBox(height: 8),
+                  _buildRelatedCarousel(),
+                  const SizedBox(height: 8),
+                  _buildThemesSection(),
+                ],
+              ),
+            ),
+            Positioned.fill(child: _buildUpperButtons(context)),
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildIntegratedEpisodesSection(BuildContext context, dynamic d, UnifiedDetailParams detailParams, SearchResult? currentSource, String? heroBanner) {
+    if (widget.isMovieish) return const SizedBox.shrink();
+
+    final episodesAsync = ref.watch(unifiedContentProvider(detailParams)).episodes;
+
+    return episodesAsync.when(
+      data: (result) {
+        final eps = result?.response.episodes ?? [];
+        if (eps.isEmpty) return const SizedBox.shrink();
+
+        if (_lastSeenSeason != widget.currentSeason || _focusedEpisode == null) {
+          _lastSeenSeason = widget.currentSeason;
+          if (eps.isNotEmpty) {
+            _focusedEpisode = eps.first;
+          }
+        }
+
+        // El episodio seleccionado puede haber llegado primero con datos
+        // parciales y luego actualizarse con metadata completa. Se busca por
+        // número en la lista actual para no quedarse con el objeto viejo.
+        final int selectedNumber = _focusedEpisode?.number ?? 1;
+        final displayEpisode = eps.firstWhereOrNull((e) => e.number == selectedNumber) ?? eps.first;
+
+        return Container(
+          key: _episodesSectionKey,
+          width: double.infinity,
+          padding: EdgeInsets.only(
+            left: TVResponsiveUtils.horizontalPadding(context),
+            top: 12,
+            bottom: 10,
+          ),
+          color: Colors.transparent,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!widget.isMovieish && (widget.totalSeasons > 1 || widget.sources.isNotEmpty)) ...[
+                _buildSeasonAndSourceSelectors(context, detailParams, currentSource),
+                const SizedBox(height: 16),
+              ],
+              SizedBox(
+                height: 105,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      displayEpisode.title != null && displayEpisode.title!.isNotEmpty
+                          ? '${displayEpisode.number}. ${displayEpisode.title}'
+                          : '${displayEpisode.number}. Episodio ${displayEpisode.number}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    if (displayEpisode.description != null && displayEpisode.description!.isNotEmpty)
+                      SizedBox(
+                        width: MediaQuery.sizeOf(context).width * 0.55,
+                        height: 32,
+                        child: Text(
+                          displayEpisode.description!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.3),
+                        ),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _buildAgeBadge(context, (d is MovieDetail ? d.certification : (d is AnimeDetail ? d.certification : null)) ?? '13+', small: true),
+                        const SizedBox(width: 8),
+                        Text(displayEpisode.duration ?? '24 min', style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                        if (_pickDisplayDate(displayEpisode.airDate, widget.year?.toString()) != null) ...[
+                          const SizedBox(width: 8),
+                          Text(_formatDate(_pickDisplayDate(displayEpisode.airDate, widget.year?.toString())), style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 140,
+                child: ListView.separated(
+                  key: const PageStorageKey('content-episodes-row'),
+                  controller: _episodesScrollController,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: eps.length,
+                  padding: EdgeInsets.only(
+                    left: TVResponsiveUtils.horizontalPadding(context),
+                    right: (MediaQuery.sizeOf(context).width - 220 - TVResponsiveUtils.horizontalPadding(context)).clamp(20.0, 2000.0),
+                    top: 0,
+                    bottom: 0,
+                  ),
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final ep = eps[index];
+                    final epSource = result?.sourceForNumber(ep.number) ?? currentSource;
+                    final thumbUrl = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
+                    final String playCategory = widget.category;
+                    final String? playKind = widget.kind;
+
+                    return Focus(
+                      onFocusChange: (hasFocus) {
+                        if (hasFocus) {
+                          setState(() => _focusedEpisode = ep);
+                          _scrollToEpisodeIndex(index, 220.0);
+                        }
+                      },
+                      onKeyEvent: (node, event) {
+                        if (event is KeyDownEvent) {
+                          if (event.logicalKey == LogicalKeyboardKey.enter ||
+                              event.logicalKey == LogicalKeyboardKey.select ||
+                              event.logicalKey == LogicalKeyboardKey.space) {
+                            _playEpisode(ep, epSource, eps.length, detailParams, currentSource, heroBanner, playCategory, playKind, d);
+                            return KeyEventResult.handled;
+                          }
+                          if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == eps.length - 1) {
+                            return KeyEventResult.handled;
+                          }
+                          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                            _seasonSelectorFocusNode.requestFocus();
+                            return KeyEventResult.handled;
+                          }
+                        }
+                        return KeyEventResult.ignored;
+                      },
+                      child: Builder(
+                        builder: (context) {
+                          final focused = Focus.of(context).hasFocus;
+                          return GestureDetector(
+                            onTap: () => _playEpisode(ep, epSource, eps.length, detailParams, currentSource, heroBanner, playCategory, playKind, d),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 220,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: focused ? Colors.white : Colors.transparent,
+                                  width: 3,
+                                ),
+                                boxShadow: focused ? [const BoxShadow(color: Colors.black54, blurRadius: 10, spreadRadius: 2)] : [],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    CachedNetworkImage(
+                                      imageUrl: ApiEndpoints.proxyImage(thumbUrl),
+                                      fit: BoxFit.cover,
+                                      memCacheWidth: (220 * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
+                                      memCacheHeight: ((220 * MediaQuery.of(context).devicePixelRatio) / (16 / 9)).round().clamp(1, 225),
+                                      fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                      fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                      cacheManager: AurisImageCacheManager.instance,
+                                      errorWidget: (_, __, ___) => Container(color: Colors.white10),
+                                    ),
+                                    Positioned(
+                                      bottom: 8,
+                                      left: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'E${ep.number}',
+                                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator(color: Colors.white24))),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  void _playEpisode(EpisodeInfo ep, SearchResult? epSource, int total, UnifiedDetailParams detailParams, SearchResult? currentSource, String? heroBanner, String playCategory, String? playKind, dynamic detailData) {
+    final epNum = ep.number;
+    final effectiveSrc = epSource?.source ?? widget.source;
+    final playEpisodesUrl = epSource?.url ?? widget.url;
+    final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, widget.currentSeason, epNum.toString());
+    final epThumb = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
+    
+    context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${widget.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=$playCategory&totalEpisodes=$total${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${playKind != null && playKind.isNotEmpty ? '&kind=${Uri.encodeComponent(playKind)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
   }
 
   Widget _buildNetflixContentColumn(BuildContext context, dynamic d, double width, String heroTitle, bool logoReady, bool metaPending) {
@@ -466,73 +813,157 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     // original bajo él sobra (HeroTitle solo pinta logo o texto, nunca ambos).
     final dynamic logo = d?.logo;
     final bool hasLogo = logo is String && logo.isNotEmpty;
-    
-    final double textWidth = 720 * (width / 1600.0).clamp(0.8, 1.2);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, 
-      children: [
-        SizedBox(
-          width: textWidth,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return SizedBox(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start, 
+        children: [
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 1200), 
+            curve: Curves.easeInOut, 
+            opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, 
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (metaPending)
+                  _SkeletonBox(
+                    width: width * 0.4,
+                    height: 80,
+                    borderRadius: 8,
+                  )
+                else
+                  HeroTitle(
+                    title: heroTitle,
+                    logo: d?.logo,
+                    logoReady: logoReady,
+                    maxWidth: width * 0.4,
+                    maxHeight: 80,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: titleSize * 1.5,
+                      fontWeight: FontWeight.w900,
+                      height: 1.0,
+                      letterSpacing: 1.5,
+                      shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
+                    ),
+                  ),
+                if (d is MovieDetail && !hasLogo && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    d.originalTitle!,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: titleSize * 0.65,
+                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Spacer(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 1200), 
-                curve: Curves.easeInOut, 
-                opacity: (_showPlayer && !_showTitle) ? 0.0 : 1.0, 
+              // 1. Izquierda: Fila de botones de acción exclusivamente
+              Expanded(
+                flex: 3,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: _buildCircularActions(context, d),
+                ),
+              ),
+              const SizedBox(width: 24),
+
+              // 2. Medio: Sinopsis reservada (3 líneas con botón Más) + Meta line reservada (1 línea)
+              Expanded(
+                flex: 7,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (metaPending)
-                      _SkeletonBox(
-                        width: width * 0.4,
-                        height: 80,
-                        borderRadius: 8,
-                      )
-                    else
-                      HeroTitle(
-                        title: heroTitle,
-                        logo: d?.logo,
-                        logoReady: logoReady,
-                        maxWidth: width * 0.4,
-                        maxHeight: 80,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: titleSize * 1.5,
-                          fontWeight: FontWeight.w900,
-                          height: 1.0,
-                          letterSpacing: 1.5,
-                          shadows: const [Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 8)]
-                        ),
-                      ),
-                    if (d is MovieDetail && !hasLogo && d.originalTitle != null && d.originalTitle!.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        d.originalTitle!,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: titleSize * 0.65,
-                          fontWeight: FontWeight.w500,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
+                    SizedBox(
+                      height: 58,
+                      child: _buildSynopsisWithMoreButton(d, d),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 24,
+                      child: _buildMiddleMetaLine(d),
+                    ),
                   ],
-                )
+                ),
               ),
-              const SizedBox(height: 10),
-              _buildNetflixMetaRow(d),
-              const SizedBox(height: 6),
-              _buildSynopsis(d),
-              const SizedBox(height: 6),
-              _buildCastInfo(d),
+              const SizedBox(width: 24),
+
+              // 3. Derecha: Cast reservado (hasta 3 líneas) + Etiqueta de edad
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 48,
+                      width: 200,
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: _buildCastInfo(d),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 32,
+                      child: Align(
+                        alignment: Alignment.bottomRight,
+                        child: _buildRightMetaAndBadge(d),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-        ),
-        const SizedBox(height: 6),
-        _buildCircularActions(context, d),
-      ]
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiddleMetaLine(dynamic detail) {
+    final rawDate = (detail is AnimeDetail) ? detail.firstAirDate : (detail is MovieDetail ? detail.releaseDate : null);
+    final d = _pickDisplayDate(rawDate, widget.inferredSeasonAirDate); 
+    final List<String> genres = (detail?.genres as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+
+    return Row(
+      children: [
+        if (genres.isNotEmpty) ...[
+          Text(genres.take(4).join(' • '), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
+          const SizedBox(width: 12),
+        ],
+        if (d != null && d.length >= 4)
+          Text(d.length > 4 ? d : d.substring(0, 4), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildRightMetaAndBadge(dynamic detail) {
+    final r = (detail?.rating ?? widget.sourceRating) as double?;
+    final cert = (detail is MovieDetail ? detail.certification : (detail is AnimeDetail ? detail.certification : null)) ?? '13+';
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (r != null && r > 0) ...[
+          Text(
+            'IMDb ${formatRating(r) ?? 'N/A'}/10',
+            style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(width: 10),
+        ],
+        _buildAgeBadge(context, cert, small: false),
+      ],
     );
   }
 
@@ -543,7 +974,93 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     final String currentId = widget.url.isNotEmpty ? widget.url : widget.title;
     final bool isFav = ref.watch(favoritesProvider).any((f) => f.id == currentId);
     final latestHistory = ref.watch(playbackHistoryStateProvider.notifier).getLatestWatched(widget.title);
-    
+    final bool hasSources = widget.currentSource != null;
+
+    final rawButtons = <_DetailIconButton>[
+      _DetailIconButton(
+        icon: AurisIcons.play,
+        label: (latestHistory != null && !latestHistory.isFinished) ? 'Reanudar' : 'Reproducir',
+        autofocus: true,
+        focusNode: _actionsRowFirstNode,
+        onPressed: widget.onPlay,
+        size: size,
+        iconSize: iconSize,
+      ),
+      _DetailIconButton(
+        icon: isFav ? AurisIcons.bookmarkMinusFilled : AurisIcons.addCircleOutline,
+        label: isFav ? 'En mi lista' : 'Añadir a mi lista',
+        onPressed: () {
+          final user = ref.read(authProvider);
+          final item = FavoriteItem(
+            id: currentId,
+            title: widget.title,
+            posterUrl: widget.poster ?? '',
+            bannerUrl: widget.banner ?? '',
+            category: widget.category,
+            source: widget.source,
+            url: widget.url,
+            addedAt: DateTime.now(),
+            profileId: user?.activeProfileId ?? 'guest_profile',
+            kind: widget.kind,
+            year: widget.year,
+            type: widget.type,
+            season: widget.season,
+            sources: flattenSources(
+                ref.read(activeContentSourcesProvider)),
+          );
+          ref.read(favoritesProvider.notifier).toggleFavorite(item);
+        },
+        size: size,
+        iconSize: iconSize,
+      ),
+      if (_lastTrailerKey != null)
+        _DetailIconButton(
+          icon: AurisIcons.trailer,
+          label: 'Ver tráiler',
+          onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true),
+          size: size,
+          iconSize: iconSize,
+        ),
+      if (_trailerController != null && _showPlayer)
+        _DetailIconButton(
+          icon: _isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp, 
+          label: _isMuted ? 'Activar audio' : 'Silenciar', 
+          onPressed: () { 
+            setState(() { 
+              _isMuted = !_isMuted; 
+              if (_isMuted) _trailerController?.mute(); 
+              else { _trailerController?.unmute(); _trailerController!.setVolume(100); } 
+            }); 
+          }, 
+          size: size, 
+          iconSize: iconSize,
+        ),
+    ];
+
+    final int totalCount = rawButtons.length;
+    final buttonWidgets = <Widget>[];
+
+    for (int idx = 0; idx < totalCount; idx++) {
+      if (idx > 0) buttonWidgets.add(SizedBox(width: spacing));
+      final btn = rawButtons[idx];
+      buttonWidgets.add(
+        _DetailIconButton(
+          key: btn.key,
+          icon: btn.icon,
+          filledIcon: btn.filledIcon,
+          onPressed: btn.onPressed,
+          label: btn.label,
+          size: btn.size,
+          iconSize: btn.iconSize,
+          color: btn.color,
+          autofocus: btn.autofocus,
+          focusNode: btn.focusNode,
+          isFirst: idx == 0,
+          isLast: idx == totalCount - 1 && !hasSources,
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -558,111 +1075,9 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: [
-                _DetailIconButton(
-                  icon: AurisIcons.play,
-                  label: (latestHistory != null && !latestHistory.isFinished) ? 'Reanudar' : 'Reproducir',
-                  autofocus: true,
-                  focusNode: _actionsRowFirstNode,
-                  onPressed: widget.onPlay,
-                  size: size,
-                  iconSize: iconSize,
-                ),
-                if (!widget.isMovieish) ...[
-                  SizedBox(width: spacing),
-                  _DetailIconButton(
-                    icon: AurisIcons.episodes,
-                    label: 'Episodios y más',
-                    onPressed: () => widget.onShowEpisodes?.call(),
-                    size: size,
-                    iconSize: iconSize,
-                  ),
-                ],
-                SizedBox(width: spacing),
-                _DetailIconButton(
-                  icon: isFav ? AurisIcons.bookmarkMinusFilled : AurisIcons.addCircleOutline,
-                  label: isFav ? 'En mi lista' : 'Añadir a mi lista',
-                  onPressed: () {
-                    final user = ref.read(authProvider);
-                    final item = FavoriteItem(
-                      id: currentId,
-                      title: widget.title,
-                      posterUrl: widget.poster ?? '',
-                      bannerUrl: widget.banner ?? '',
-                      category: widget.category,
-                      source: widget.source,
-                      url: widget.url,
-                      addedAt: DateTime.now(),
-                      profileId: user?.activeProfileId ?? 'guest_profile',
-                      kind: widget.kind,
-                      year: widget.year,
-                      type: widget.type,
-                      season: widget.season,
-                      // Todas las fuentes del detalle (paridad con search/home).
-                      sources: flattenSources(
-                          ref.read(activeContentSourcesProvider)),
-                    );
-                    ref.read(favoritesProvider.notifier).toggleFavorite(item);
-                  },
-                  size: size,
-                  iconSize: iconSize,
-                ),
-                SizedBox(width: spacing),
-                _DetailIconButton(
-                  icon: AurisIcons.docText,
-                  label: 'Detalles',
-                  onPressed: () => _openFullscreenDetails(d),
-                  size: size,
-                  iconSize: iconSize,
-                ), 
-                if (_lastTrailerKey != null) ...[
-                  SizedBox(width: spacing),
-                  _DetailIconButton(
-                    icon: AurisIcons.trailer,
-                    label: 'Ver tráiler',
-                    onPressed: () => _initTrailer(_lastTrailerKey!, immediate: true),
-                    size: size,
-                    iconSize: iconSize,
-                  ),
-                ],
-                if (_trailerController != null && _showPlayer) ...[
-                  SizedBox(width: spacing),
-                  _DetailIconButton(
-                    icon: _isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp, 
-                    label: _isMuted ? 'Activar audio' : 'Silenciar', 
-                    onPressed: () { 
-                      setState(() { 
-                        _isMuted = !_isMuted; 
-                        if (_isMuted) _trailerController?.mute(); 
-                        else { _trailerController?.unmute(); _trailerController!.setVolume(100); } 
-                      }); 
-                    }, 
-                    size: size, 
-                    iconSize: iconSize,
-                  ),
-                ],
-              ],
+              children: buttonWidgets,
             ),
           ),
-          // Opciones/fichas de fuentes (fuera de la cápsula)
-          if (widget.currentSource != null) ...[
-            SizedBox(width: ResponsiveUtils.sp(context, 16.0)),
-            SourceChipsBar(
-              sources: widget.sources,
-              currentSource: widget.currentSource,
-              onSourceSelected: widget.onSourceSelected,
-              unavailableSources: widget.unavailableSources,
-              season: widget.season,
-              embedded: true,
-              fontSize: ResponsiveUtils.sp(context, 13.0),
-              // Misma altura real que los _DetailIconButton:
-              // iconSize (20sp) + padding vertical del IconButton (4+4=8sp).
-              chipHeight: iconSize + ResponsiveUtils.sp(context, 8.0),
-              chipPadding: EdgeInsets.symmetric(
-                horizontal: ResponsiveUtils.sp(context, 14.0),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -735,7 +1150,45 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     if (d is AnimeDetail) castText = d.characters.take(3).map((c) => c.name).join(', ');
     else if (d is MovieDetail) castText = d.cast.take(3).map((c) => c.name).join(', ');
     if (castText.isEmpty) return const SizedBox.shrink();
-    return RichText(text: TextSpan(style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500), children: [const TextSpan(text: 'Cast: ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)), TextSpan(text: castText)]));
+    return SizedBox(
+      width: double.infinity,
+      child: RichText(
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.end,
+        text: TextSpan(
+          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+          children: [
+            const TextSpan(text: 'Cast: ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+            TextSpan(text: castText),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _resolveRelationTitle(dynamic detail) {
+    final bool isMovie = (detail is MovieDetail) ||
+        (detail is AnimeDetail && detail.kind == 'movie') ||
+        (widget.kind != null && widget.kind!.toLowerCase().contains('movie')) ||
+        (widget.category.toLowerCase().contains('movie'));
+
+    final bool isAnime = (detail is AnimeDetail) ||
+        (widget.kind != null && widget.kind!.toLowerCase().contains('anime')) ||
+        (widget.category.toLowerCase().contains('anime'));
+
+    final bool isDorama = (widget.kind != null && (widget.kind!.toLowerCase().contains('dorama') || widget.kind!.toLowerCase().contains('kdrama') || widget.kind!.toLowerCase().contains('c_drama'))) ||
+        (widget.category.toLowerCase().contains('dorama') || widget.category.toLowerCase().contains('kdrama'));
+
+    if (isMovie) {
+      return 'Los clientes que vieron esta película también vieron';
+    } else if (isAnime) {
+      return 'Los clientes que vieron este anime también vieron';
+    } else if (isDorama) {
+      return 'Los clientes que vieron este dorama también vieron';
+    } else {
+      return 'Los clientes que vieron este producto también vieron';
+    }
   }
 
   Widget _buildRelatedCarousel() {
@@ -762,10 +1215,26 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         final items = unique.values.toList();
         if (items.isEmpty) return const SizedBox.shrink();
 
-        return _RelatedCarousel(
-          items: items,
-          category: widget.category,
-          sourceFallback: widget.currentSource?.source ?? widget.source,
+        final detailData = widget.detailAsync.valueOrNull?.main;
+        final title = _resolveRelationTitle(detailData);
+        final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 4, horizontalPadding, 4),
+              child: Text(
+                title,
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ),
+            _RelatedCarousel(
+              items: items,
+              category: widget.category,
+              sourceFallback: widget.currentSource?.source ?? widget.source,
+            ),
+          ],
         );
       },
       loading: () => const SizedBox.shrink(),
@@ -773,10 +1242,278 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
     );
   }
 
-  Widget _buildSynopsis(dynamic detail) {
+  Widget _buildSynopsisWithMoreButton(dynamic detail, dynamic d) {
     final text = detail?.overview ?? '';
-    if (!_revealed && text.isEmpty) return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_SkeletonBox(width: ResponsiveUtils.sp(context, 400), height: ResponsiveUtils.sp(context, 16)), const SizedBox(height: 8), _SkeletonBox(width: ResponsiveUtils.sp(context, 380), height: ResponsiveUtils.sp(context, 16))]);
-    return Text(text, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, height: 1.2, fontWeight: FontWeight.w500));
+    if (!_revealed && text.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonBox(width: ResponsiveUtils.sp(context, 400), height: ResponsiveUtils.sp(context, 16)),
+          const SizedBox(height: 8),
+          _SkeletonBox(width: ResponsiveUtils.sp(context, 380), height: ResponsiveUtils.sp(context, 16)),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 13,
+              height: 1.2,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        _MoreButton(onPressed: () => _openFullscreenDetails(d)),
+      ],
+    );
+  }
+
+  Widget _buildThemesSection() {
+    final themesAsync = ref.watch(unifiedContentProvider(widget.detailParams)).themes;
+    return themesAsync.when(
+      data: (themesData) {
+        final openings = themesData.openings;
+        final endings = themesData.endings;
+        if (openings.isEmpty && endings.isEmpty) return const SizedBox.shrink();
+
+        final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (openings.isNotEmpty) ...[
+              Padding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 8),
+                child: const Text(
+                  'Openings',
+                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
+              SizedBox(
+                height: 200,
+                child: ListView.separated(
+                  key: const PageStorageKey('content-openings-row'),
+                  controller: _openingsScrollController,
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  itemCount: openings.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) {
+                    final th = openings[index];
+                    return FocusableWideCard(
+                      title: th.title,
+                      imageUrl: th.imageUrl ?? '',
+                      subtitle: th.artist.isNotEmpty ? th.artist : 'Artista desconocido',
+                      width: 280,
+                      height: 158,
+                      onTap: () => _playTheme(th, true),
+                    );
+                  },
+                ),
+              ),
+            ],
+            if (endings.isNotEmpty) ...[
+              Padding(
+                padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 8),
+                child: const Text(
+                  'Endings',
+                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
+              SizedBox(
+                height: 200,
+                child: ListView.separated(
+                  key: const PageStorageKey('content-endings-row'),
+                  controller: _endingsScrollController,
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  itemCount: endings.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) {
+                    final th = endings[index];
+                    return FocusableWideCard(
+                      title: th.title,
+                      imageUrl: th.imageUrl ?? '',
+                      subtitle: th.artist.isNotEmpty ? th.artist : 'Artista desconocido',
+                      width: 280,
+                      height: 158,
+                      onTap: () => _playTheme(th, false),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  void _playTheme(AnimeThemeInfo theme, bool isOP) {
+    final titleParam = '&title=${Uri.encodeComponent(widget.title)}&episodeTitle=${Uri.encodeComponent(theme.title)}';
+    String url = theme.videoUrl;
+    if (theme.video1080 != null && theme.video1080!.isNotEmpty) {
+      url = theme.video1080!;
+    } else if (theme.video720 != null && theme.video720!.isNotEmpty) {
+      url = theme.video720!;
+    }
+    final v720 = (theme.video720?.isNotEmpty ?? false) ? '&video720=${Uri.encodeComponent(theme.video720!)}' : '';
+    final v1080 = (theme.video1080?.isNotEmpty ?? false) ? '&video1080=${Uri.encodeComponent(theme.video1080!)}' : '';
+    context.push('/player/${Uri.encodeComponent(theme.title)}?source=&url=${Uri.encodeComponent(url)}&episode=${isOP ? 'OP' : 'ED'}&season=${widget.currentSeason}&category=anime$titleParam$v720$v1080&posterUrl=${Uri.encodeComponent(theme.imageUrl ?? '')}');
+  }
+
+  Widget _buildSeasonAndSourceSelectors(BuildContext context, UnifiedDetailParams detailParams, SearchResult? currentSource) {
+    void handleUpKey() {
+      if (_mainScrollController.hasClients) {
+        _mainScrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+      _actionsRowFirstNode.requestFocus();
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.totalSeasons > 1) ...[
+          Focus(
+            focusNode: _seasonSelectorFocusNode,
+            onFocusChange: (hasFocus) {
+              if (hasFocus) _scrollToEpisodesSection();
+              setState(() {});
+            },
+            onKeyEvent: (node, event) {
+              if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                handleUpKey();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              decoration: BoxDecoration(
+                color: _seasonSelectorFocusNode.hasFocus ? Colors.white : const Color(0xFF22252A),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _seasonSelectorFocusNode.hasFocus ? Colors.white : Colors.white24),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: widget.currentSeason,
+                  dropdownColor: const Color(0xFF1E2229),
+                  isDense: true,
+                  icon: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: _seasonSelectorFocusNode.hasFocus ? Colors.black : Colors.white,
+                  ),
+                  style: TextStyle(
+                    color: _seasonSelectorFocusNode.hasFocus ? Colors.black : Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  items: [
+                    for (int s = 1; s <= widget.totalSeasons; s++)
+                      DropdownMenuItem(
+                        value: s,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            'Temporada $s',
+                            style: TextStyle(
+                              color: _seasonSelectorFocusNode.hasFocus ? Colors.black : Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                  onChanged: (seasonNum) {
+                    if (seasonNum != null) {
+                      ref.setSeason(detailParams, seasonNum);
+                    }
+                  },
+                ),
+              ),
+            ),
+          ),
+          if (widget.sources.isNotEmpty) const SizedBox(width: 12),
+        ],
+        if (widget.sources.isNotEmpty) ...[
+          Focus(
+            focusNode: _sourceSelectorFocusNode,
+            onFocusChange: (hasFocus) {
+              if (hasFocus) _scrollToEpisodesSection();
+              setState(() {});
+            },
+            onKeyEvent: (node, event) {
+              if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                handleUpKey();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              decoration: BoxDecoration(
+                color: _sourceSelectorFocusNode.hasFocus ? Colors.white : const Color(0xFF22252A),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: _sourceSelectorFocusNode.hasFocus ? Colors.white : Colors.white24),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<SearchResult>(
+                  value: currentSource,
+                  dropdownColor: const Color(0xFF1E2229),
+                  isDense: true,
+                  icon: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: _sourceSelectorFocusNode.hasFocus ? Colors.black : Colors.white,
+                  ),
+                  style: TextStyle(
+                    color: _sourceSelectorFocusNode.hasFocus ? Colors.black : Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  items: [
+                    for (int i = 0; i < widget.sources.length; i++)
+                      DropdownMenuItem(
+                        value: widget.sources[i],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            simplifySourceName(widget.sources[i].source),
+                            style: TextStyle(
+                              color: _sourceSelectorFocusNode.hasFocus ? Colors.black : Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                  onChanged: (src) {
+                    if (src != null) {
+                      final idx = widget.sources.indexOf(src);
+                      if (idx != -1) {
+                        widget.onSourceSelected(idx);
+                      }
+                    }
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildUpperButtons(BuildContext context) {
@@ -784,16 +1521,93 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
   }
 }
 
+class _MoreButton extends StatefulWidget {
+  final VoidCallback onPressed;
+
+  const _MoreButton({required this.onPressed});
+
+  @override
+  State<_MoreButton> createState() => _MoreButtonState();
+}
+
+class _MoreButtonState extends State<_MoreButton> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (f) => setState(() => _focused = f),
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            (event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.select ||
+                event.logicalKey == LogicalKeyboardKey.space)) {
+          widget.onPressed();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: _focused ? Colors.white : const Color(0xFF2A2E35),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            'Más',
+            style: GoogleFonts.poppins(
+              color: _focused ? Colors.black : Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DetailIconButton extends StatefulWidget {
-  final Object icon; final Object? filledIcon; final VoidCallback onPressed; final String label; final double? size; final double? iconSize; final Color? color; final bool autofocus; final FocusNode? focusNode;
-  const _DetailIconButton({required this.icon, this.filledIcon, required this.onPressed, required this.label, this.size, this.iconSize, this.color, this.autofocus = false, this.focusNode});
-  @override State<_DetailIconButton> createState() => _DetailIconButtonState();
+  final Object icon;
+  final Object? filledIcon;
+  final VoidCallback onPressed;
+  final String label;
+  final double? size;
+  final double? iconSize;
+  final Color? color;
+  final bool autofocus;
+  final FocusNode? focusNode;
+  final bool isFirst;
+  final bool isLast;
+
+  const _DetailIconButton({
+    super.key,
+    required this.icon,
+    this.filledIcon,
+    required this.onPressed,
+    required this.label,
+    this.size,
+    this.iconSize,
+    this.color,
+    this.autofocus = false,
+    this.focusNode,
+    this.isFirst = false,
+    this.isLast = false,
+  });
+
+  @override
+  State<_DetailIconButton> createState() => _DetailIconButtonState();
 }
 
 class _DetailIconButtonState extends State<_DetailIconButton> {
   bool _isHovered = false;
   bool _isFocused = false;
-  @override Widget build(BuildContext context) {
+
+  @override
+  Widget build(BuildContext context) {
     final bool isActive = _isHovered || _isFocused;
     final Object displayIcon = widget.icon;
     final Color iconColor = widget.color ?? (isActive ? Colors.black : Colors.white);
@@ -802,8 +1616,19 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
       autofocus: widget.autofocus,
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       onKeyEvent: (node, event) {
-        if (event is KeyDownEvent && (event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.select)) {
-          widget.onPressed(); return KeyEventResult.handled;
+        if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.select ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            widget.onPressed();
+            return KeyEventResult.handled;
+          }
+          if (widget.isLast && event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            return KeyEventResult.handled;
+          }
+          if (widget.isFirst && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            return KeyEventResult.handled;
+          }
         }
         return KeyEventResult.ignored;
       },
@@ -828,7 +1653,7 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
               onPressed: widget.onPressed,
             ),
           ),
-        )
+        ),
       ),
     );
   }
@@ -1023,14 +1848,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         title: widget.title, source: widget.source, url: widget.url, category: widget.category, poster: ApiEndpoints.proxyImage(currentSource?.thumbnail), banner: heroBanner, detailAsync: detailState.detail, currentSource: currentSource, sources: detailState.allSources, totalSeasons: detailState.totalSeasons, isMovieish: detailState.isMovieish, currentSeason: detailState.currentSeason, onSourceSelected: (index) => ref.setSource(detailParams, detailState.allSources[index]), 
         kind: widget.kind ?? widget.result?.kind, year: widget.year, type: widget.result?.type ?? widget.type, season: widget.season ?? widget.result?.season,
         relations: detailState.relations,
-        onShowEpisodes: () {
-          debugPrint('[perf] overlay push t=${DateTime.now().millisecondsSinceEpoch}');
-          Navigator.of(context).push(PageRouteBuilder(opaque: false, barrierColor: Colors.black.withOpacity(0.5), pageBuilder: (context, _, __) => EpisodesDetailOverlay(detailData: detailData, sources: detailState.allSources, currentSource: currentSource, totalSeasons: detailState.totalSeasons, detailParams: detailParams, category: widget.category, title: widget.title, logoUrl: detailData?.logo, bannerUrl: heroBanner, onPlayEpisode: (ep, epSource, total) {
-            final epNum = ep.number; final effectiveSrc = epSource?.source ?? widget.source; final playEpisodesUrl = epSource?.url ?? widget.url; final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, detailState.currentSeason, epNum.toString());
-            final epThumb = (ep.thumbnail?.isNotEmpty ?? false) ? ep.thumbnail! : (epSource?.thumbnail ?? currentSource?.thumbnail ?? '');
-            context.push('/player/${Uri.encodeComponent(widget.title)}?source=${effectiveSrc}&url=${_episodeUrlFor(ep, playEpisodesUrl, effectiveSrc, epNum)}&episode=$epNum&season=${detailState.currentSeason}&serverName=${simplifySourceName(effectiveSrc)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=$playCategory&totalEpisodes=$total${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${playKind != null && playKind.isNotEmpty ? '&kind=${Uri.encodeComponent(playKind)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
-          })));
-        },
+        detailParams: detailParams,
+        metadataTitle: widget.metadataTitle,
         inferredSeasonAirDate: detailState.episodes.valueOrNull?.response.seasonAirDate, 
         latestHistory: ref.watch(playbackHistoryStateProvider).valueOrNull?.where((h) => h.contentId == widget.title).firstOrNull, 
         onPlay: () {
@@ -1157,7 +1976,7 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
     final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: true);
 
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.only(top: 8),
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),

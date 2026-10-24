@@ -1,4 +1,4 @@
-﻿import 'package:skeletonizer/skeletonizer.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -301,6 +301,7 @@ class ExploreScreen extends ConsumerWidget {
                                 url: item.id,
                                 category: item.type.name,
                                 year: item.year,
+                                kind: item.card?.kind ?? (item.type == MediaType.movie ? 'movie' : 'series'),
                                 type: item.card?.type ?? item.card?.kind ?? item.type.name,
                                 from: '/explore',
                               );

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/cast_state.dart';
 import '../../data/services/native_cast_service.dart';
+import '../../data/services/stream_proxy_service.dart';
 
 /// Estado global de la sesión Chromecast (compartido entre player screens,
 /// mini player y el sheet de selección). Singleton vía Riverpod.
@@ -103,9 +104,17 @@ class CastNotifier extends StateNotifier<CastState> {
     String? title,
     String? subtitle,
     String? imageUrl,
+    Map<String, String>? headers,
   }) async {
+    // Streams con cabeceras (Referer/UA/cookies) no son reproducibles por el
+    // Chromecast directamente: se re-sirven por el proxy HTTP local del móvil.
+    String finalUrl = url;
+    if (headers != null && headers.isNotEmpty) {
+      await StreamProxyService.instance.start();
+      finalUrl = StreamProxyService.instance.register(url, headers);
+    }
     await _service.loadMedia(
-      url: url,
+      url: finalUrl,
       startMs: startMs,
       title: title,
       subtitle: subtitle,
@@ -127,6 +136,8 @@ class CastNotifier extends StateNotifier<CastState> {
   /// Detiene la transmisión y desconecta (la sesión emite SessionEnded).
   Future<void> stopCasting() async {
     final ok = await _service.stopCasting();
+    // El proxy local solo vive mientras dura el cast.
+    await StreamProxyService.instance.stop();
     if (!ok && mounted && state.isCasting) {
       // Fallback: si el nativo no pudo cerrar (p. ej. receptor desconectado
       // de la red), restauramos el estado local igualmente.
