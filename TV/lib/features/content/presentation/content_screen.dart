@@ -625,11 +625,12 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         final int selectedNumber = _focusedEpisode?.number ?? 1;
         final displayEpisode = eps.firstWhereOrNull((e) => e.number == selectedNumber) ?? eps.first;
 
+        final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
+
         return Container(
           key: _episodesSectionKey,
           width: double.infinity,
-          padding: EdgeInsets.only(
-            left: TVResponsiveUtils.horizontalPadding(context),
+          padding: const EdgeInsets.only(
             top: 12,
             bottom: 10,
           ),
@@ -638,50 +639,56 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!widget.isMovieish && (widget.totalSeasons > 1 || widget.sources.isNotEmpty)) ...[
-                _buildSeasonAndSourceSelectors(context, detailParams, currentSource),
+                Padding(
+                  padding: EdgeInsets.only(left: horizontalPadding),
+                  child: _buildSeasonAndSourceSelectors(context, detailParams, currentSource),
+                ),
                 const SizedBox(height: 16),
               ],
-              SizedBox(
-                height: 105,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      displayEpisode.title != null && displayEpisode.title!.isNotEmpty
-                          ? '${displayEpisode.number}. ${displayEpisode.title}'
-                          : '${displayEpisode.number}. Episodio ${displayEpisode.number}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    if (displayEpisode.description != null && displayEpisode.description!.isNotEmpty)
-                      SizedBox(
-                        width: MediaQuery.sizeOf(context).width * 0.55,
-                        height: 32,
-                        child: Text(
-                          displayEpisode.description!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.3),
-                        ),
-                      )
-                    else
-                      const SizedBox.shrink(),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        _buildAgeBadge(context, (d is MovieDetail ? d.certification : (d is AnimeDetail ? d.certification : null)) ?? '13+', small: true),
-                        const SizedBox(width: 8),
-                        Text(displayEpisode.duration ?? '24 min', style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                        if (_pickDisplayDate(displayEpisode.airDate, widget.year?.toString()) != null) ...[
+              Padding(
+                padding: EdgeInsets.only(left: horizontalPadding),
+                child: SizedBox(
+                  height: 105,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        displayEpisode.title != null && displayEpisode.title!.isNotEmpty
+                            ? '${displayEpisode.number}. ${displayEpisode.title}'
+                            : '${displayEpisode.number}. Episodio ${displayEpisode.number}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      if (displayEpisode.description != null && displayEpisode.description!.isNotEmpty)
+                        SizedBox(
+                          width: MediaQuery.sizeOf(context).width * 0.55,
+                          height: 32,
+                          child: Text(
+                            displayEpisode.description!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.3),
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _buildAgeBadge(context, (d is MovieDetail ? d.certification : (d is AnimeDetail ? d.certification : null)) ?? '13+', small: true),
                           const SizedBox(width: 8),
-                          Text(_formatDate(_pickDisplayDate(displayEpisode.airDate, widget.year?.toString())), style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                          Text(displayEpisode.duration ?? '24 min', style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                          if (_pickDisplayDate(displayEpisode.airDate, widget.year?.toString()) != null) ...[
+                            const SizedBox(width: 8),
+                            Text(_formatDate(_pickDisplayDate(displayEpisode.airDate, widget.year?.toString())), style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -693,8 +700,8 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   scrollDirection: Axis.horizontal,
                   itemCount: eps.length,
                   padding: EdgeInsets.only(
-                    left: TVResponsiveUtils.horizontalPadding(context),
-                    right: (MediaQuery.sizeOf(context).width - 220 - TVResponsiveUtils.horizontalPadding(context)).clamp(20.0, 2000.0),
+                    left: horizontalPadding,
+                    right: (MediaQuery.sizeOf(context).width - 220 - horizontalPadding).clamp(20.0, 2000.0),
                     top: 0,
                     bottom: 0,
                   ),

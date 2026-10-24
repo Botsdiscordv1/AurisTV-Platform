@@ -48,7 +48,15 @@ Widget _buildContentScreen(BuildContext context, GoRouterState state) {
   final source = (params['source'] as String?) ?? '';
   final url = (params['url'] as String?) ?? '';
 
-  if (url.isEmpty) return const HomeScreen();
+  if (url.isEmpty) {
+    if (title.isNotEmpty && title != 'Contenido') {
+      return SearchScreen(
+        initialQuery: title,
+        initialCategory: (params['category'] as String?) ?? 'all',
+      );
+    }
+    return const HomeScreen();
+  }
 
   final extraResult = state.extra is SearchResult ? state.extra as SearchResult : null;
 
@@ -141,7 +149,29 @@ final GoRouter appRouter = GoRouter(
       ],
     ),
 
-    // Series / Anime / Kdramas (Estilo Crunchyroll: /series/:token/:slug)
+    // Anime (/anime/:token/:slug)
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/anime/:token/:slug',
+      builder: _buildContentScreen,
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/anime/:token',
+      builder: _buildContentScreen,
+    ),
+
+    // Series y Kdramas (/serie/:token/:slug y /series/ por compatibilidad)
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/serie/:token/:slug',
+      builder: _buildContentScreen,
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/serie/:token',
+      builder: _buildContentScreen,
+    ),
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,
       path: '/series/:token/:slug',

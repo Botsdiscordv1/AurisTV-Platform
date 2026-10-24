@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import '../../features/player/presentation/player_screen.dart';
@@ -144,20 +143,27 @@ class UrlUtils {
   }
 
   /// Normaliza el prefijo de ruta según el [kind]:
-  /// - 'movie', 'movie_anime', 'movie_kdrama' -> '/movie'
-  /// - 'anime', 'kdrama', 'series' y demás -> '/series'
+  /// - 'anime' -> 'anime'
+  /// - 'movie', 'movie_anime', 'movie_kdrama' -> 'movie'
+  /// - 'kdrama', 'series' y demás -> 'serie'
   static String determineRoutePrefix({String? kind, String? category, String? type}) {
     final k = (kind ?? category ?? type ?? '').toLowerCase().trim();
+    if (k == 'anime') {
+      return 'anime';
+    }
     if (k == 'movie' ||
         k == 'movie_anime' ||
         k == 'movie_kdrama' ||
         k.startsWith('movie')) {
       return 'movie';
     }
-    return 'series';
+    return 'serie';
   }
 
-  /// Encripta y comprime los metadatos y la fuente en un token opaco y URL-safe (fallback auto-contenido).
+  /// Delimitador interno para empaquetado ultra-compacto (ASCII Unit Separator 0x1F)
+  static const String _delimiter = '\x1F';
+
+  /// Encripta y comprime los metadatos y la fuente en un token opaco y URL-safe auto-contenido (estilo Prime Video).
   static String encodeShareableToken({
     required String title,
     required String source,
@@ -189,113 +195,170 @@ class UrlUtils {
       }
     }
 
-    // 2. Construir mapa compacto
-    final payload = <String, dynamic>{
-      't': title,
-      's': compressedSource,
-      'u': compressedUrl,
-      if (category != null && category.isNotEmpty) 'c': category,
-      if (year != null && year > 0) 'y': year,
-      if (quality != null && quality.isNotEmpty) 'q': quality,
-      if (type != null && type.isNotEmpty) 'ty': type,
-      if (kind != null && kind.isNotEmpty) 'k': kind,
-      if (metadataTitle != null && metadataTitle.isNotEmpty) 'mt': metadataTitle,
-      if (season != null && season > 0) 'se': season,
-      if (sectionId != null && sectionId.isNotEmpty) 'sec': sectionId,
-      if (from != null && from.isNotEmpty) 'f': from,
-    };
+    // 2. Empaquetar campos esenciales de forma ultra-compacta:
+    // [source, url, kind, year, season, title, category]
+    final effectiveKind = kind ?? category ?? type ?? '';
+    final effectiveYear = (year != null && year > 0) ? year.toString() : '';
+    final effectiveSeason = (season != null && season > 0) ? season.toString() : '';
+    final effectiveCat = category ?? '';
 
-    final jsonStr = jsonEncode(payload);
-    final rawBytes = utf8.encode(jsonStr);
+    final packed = [
+      compressedSource,
+      compressedUrl,
+      effectiveKind,
+      effectiveYear,
+      effectiveSeason,
+      title,
+      effectiveCat,
+    ].join(_delimiter);
 
-    final rand = Random();
-    final salt0 = rand.nextInt(256);
-    final salt1 = rand.nextInt(256);
+    final rawBytes = utf8.encode(packed);
 
-    final encrypted = List<int>.filled(rawBytes.length + 2, 0);
-    encrypted[0] = salt0;
-    encrypted[1] = salt1;
-
+    // 3. Encriptación XOR determinística y reversible contra la clave interna
+    final encrypted = List<int>.filled(rawBytes.length, 0);
     for (var i = 0; i < rawBytes.length; i++) {
-      final keyByte = _cipherKey[(i + salt0) % _cipherKey.length];
-      final shift = (salt1 * (i + 13)) & 0xFF;
-      encrypted[i + 2] = rawBytes[i] ^ keyByte ^ shift;
+      final keyByte = _cipherKey[i % _cipherKey.length];
+      encrypted[i] = rawBytes[i] ^ keyByte;
     }
 
     return base64Url.encode(encrypted).replaceAll('=', '');
   }
 
-  /// Desencripta un token de URL o lo recupera por su Short ID / Slug desde la caché.
+  /// Desencripta un token de URL auto-contenido o lo recupera por su Short ID / Slug desde la caché.
   static Map<String, dynamic>? decodeShareableToken(String token, {String? slug}) {
     try {
-      if (token.isEmpty) return null;
+      if (token.isEmpty && (slug == null || slug.isEmpty)) return null;
 
-      // 1. Intento rápido: buscar en cache por Short ID (ej: G4PH0WXVJ)
-      final cachedById = _getFromCache(token);
-      if (cachedById != null) return cachedById;
+      // 1. Intento rápido: buscar en cache por Token / ID
+      if (token.isNotEmpty) {
+        final cachedById = _getFromCache(token);
+        if (cachedById != null) return cachedById;
+      }
 
-      // 2. Intento por slug
+      // 2. Intento rápido por slug
       if (slug != null && slug.isNotEmpty) {
         final cachedBySlug = _getFromCache(slug);
         if (cachedBySlug != null) return cachedBySlug;
       }
 
-      // 3. Fallback: Desencriptar token largo si vino cifrado completo
-      if (token.length > 16) {
-        var normalized = token;
-        final pad = normalized.length % 4;
-        if (pad == 2) {
-          normalized += '==';
-        } else if (pad == 3) {
-          normalized += '=';
-        } else if (pad == 1) {
-          return null;
-        }
-
-        final bytes = base64Url.decode(normalized);
-        if (bytes.length <= 2) return null;
-
-        final salt0 = bytes[0];
-        final salt1 = bytes[1];
-
-        final decrypted = List<int>.filled(bytes.length - 2, 0);
-        for (var i = 0; i < decrypted.length; i++) {
-          final keyByte = _cipherKey[(i + salt0) % _cipherKey.length];
-          final shift = (salt1 * (i + 13)) & 0xFF;
-          decrypted[i] = bytes[i + 2] ^ keyByte ^ shift;
-        }
-
-        final jsonStr = utf8.decode(decrypted);
-        final dynamic parsed = jsonDecode(jsonStr);
-        if (parsed is! Map<String, dynamic>) return null;
-
-        var rawSource = (parsed['s'] as String?) ?? '';
-        var rawUrl = (parsed['u'] as String?) ?? '';
-
-        final mapped = _codeToSource[rawSource];
-        if (mapped != null) {
-          rawSource = mapped.name;
-          if (!rawUrl.startsWith('http://') &&
-              !rawUrl.startsWith('https://') &&
-              !rawUrl.startsWith('tmdb://') &&
-              !rawUrl.startsWith('anilist://')) {
-            rawUrl = '${mapped.base}$rawUrl';
+      // 3. Desencriptar token auto-contenido si vino en la URL
+      if (token.isNotEmpty) {
+        try {
+          var normalized = token;
+          final pad = normalized.length % 4;
+          if (pad == 2) {
+            normalized += '==';
+          } else if (pad == 3) {
+            normalized += '=';
           }
-        }
 
+          final bytes = base64Url.decode(normalized);
+          if (bytes.isNotEmpty) {
+            // Intentar descifrado XOR directo
+            final decrypted = List<int>.filled(bytes.length, 0);
+            for (var i = 0; i < decrypted.length; i++) {
+              final keyByte = _cipherKey[i % _cipherKey.length];
+              decrypted[i] = bytes[i] ^ keyByte;
+            }
+
+            final decodedStr = utf8.decode(decrypted, allowMalformed: true);
+
+            // Caso A: Formato compacto delimitado por Unit Separator (\x1F)
+            if (decodedStr.contains(_delimiter)) {
+              final parts = decodedStr.split(_delimiter);
+              if (parts.length >= 2) {
+                var rawSource = parts[0];
+                var rawUrl = parts[1];
+                final kind = parts.length > 2 ? parts[2] : '';
+                final year = parts.length > 3 ? int.tryParse(parts[3]) : null;
+                final season = parts.length > 4 ? int.tryParse(parts[4]) : null;
+                final title = parts.length > 5 && parts[5].isNotEmpty
+                    ? parts[5]
+                    : _titleFromSlug(slug);
+                final category = parts.length > 6 && parts[6].isNotEmpty
+                    ? parts[6]
+                    : (kind.isNotEmpty ? kind : 'all');
+
+                final mapped = _codeToSource[rawSource];
+                if (mapped != null) {
+                  rawSource = mapped.name;
+                  if (!rawUrl.startsWith('http://') &&
+                      !rawUrl.startsWith('https://') &&
+                      !rawUrl.startsWith('tmdb://') &&
+                      !rawUrl.startsWith('anilist://')) {
+                    rawUrl = '${mapped.base}$rawUrl';
+                  }
+                }
+
+                final result = <String, dynamic>{
+                  'title': title,
+                  'source': rawSource,
+                  'url': rawUrl,
+                  'category': category,
+                  'year': year,
+                  'season': season,
+                  'kind': kind.isNotEmpty ? kind : null,
+                  'type': kind.isNotEmpty ? kind : null,
+                  'metadataTitle': title,
+                };
+
+                _saveToCache(token, slug ?? '', result);
+                return result;
+              }
+            }
+
+            // Caso B: Formato JSON de retrocompatibilidad
+            if (decodedStr.startsWith('{') && decodedStr.endsWith('}')) {
+              final dynamic parsed = jsonDecode(decodedStr);
+              if (parsed is Map<String, dynamic>) {
+                var rawSource = (parsed['s'] as String?) ?? '';
+                var rawUrl = (parsed['u'] as String?) ?? '';
+
+                final mapped = _codeToSource[rawSource];
+                if (mapped != null) {
+                  rawSource = mapped.name;
+                  if (!rawUrl.startsWith('http://') &&
+                      !rawUrl.startsWith('https://') &&
+                      !rawUrl.startsWith('tmdb://') &&
+                      !rawUrl.startsWith('anilist://')) {
+                    rawUrl = '${mapped.base}$rawUrl';
+                  }
+                }
+
+                final result = <String, dynamic>{
+                  'title': (parsed['t'] as String?) ?? _titleFromSlug(slug),
+                  'source': rawSource,
+                  'url': rawUrl,
+                  'category': (parsed['c'] as String?) ?? 'all',
+                  'year': parsed['y'] is int ? parsed['y'] as int : int.tryParse(parsed['y']?.toString() ?? ''),
+                  'quality': parsed['q'] as String?,
+                  'type': parsed['ty'] as String?,
+                  'kind': parsed['k'] as String?,
+                  'metadataTitle': parsed['mt'] as String?,
+                  'season': parsed['se'] is int ? parsed['se'] as int : int.tryParse(parsed['se']?.toString() ?? ''),
+                  'sectionId': parsed['sec'] as String?,
+                  'from': parsed['f'] as String?,
+                };
+
+                _saveToCache(token, slug ?? '', result);
+                return result;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('[UrlUtils] Falló desencriptado directo: $e');
+        }
+      }
+
+      // 4. Salvavidas final: Reconstruir a partir del slug para que la app NUNCA quede en blanco
+      if (slug != null && slug.isNotEmpty) {
+        final fallbackTitle = _titleFromSlug(slug);
         return {
-          'title': (parsed['t'] as String?) ?? 'Contenido',
-          'source': rawSource,
-          'url': rawUrl,
-          'category': (parsed['c'] as String?) ?? 'all',
-          'year': parsed['y'] is int ? parsed['y'] as int : int.tryParse(parsed['y']?.toString() ?? ''),
-          'quality': parsed['q'] as String?,
-          'type': parsed['ty'] as String?,
-          'kind': parsed['k'] as String?,
-          'metadataTitle': parsed['mt'] as String?,
-          'season': parsed['se'] is int ? parsed['se'] as int : int.tryParse(parsed['se']?.toString() ?? ''),
-          'sectionId': parsed['sec'] as String?,
-          'from': parsed['f'] as String?,
+          'title': fallbackTitle,
+          'metadataTitle': fallbackTitle,
+          'source': '',
+          'url': '',
+          'category': 'all',
         };
       }
 
@@ -306,9 +369,19 @@ class UrlUtils {
     }
   }
 
-  /// Crea un link de detalles limpio, corto y con ID de 9 caracteres estilo Crunchyroll:
-  /// Ej: /series/G4PH0WXVJ/la-chispa-del-amor
-  /// Ej: /movie/M89AK109Z/spider-man-un-nuevo-dia
+  /// Convierte un slug de URL a título capitalizado legible
+  static String _titleFromSlug(String? slug) {
+    if (slug == null || slug.isEmpty) return 'Contenido';
+    final unencoded = Uri.decodeComponent(slug).replaceAll('-', ' ').trim();
+    return unencoded.split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return '${word[0].toUpperCase()}${word.substring(1)}';
+    }).join(' ');
+  }
+
+  /// Crea un link de detalles limpio, auto-contenido y estilo Prime Video / Crunchyroll:
+  /// Ej: /series/KxRtAwY-Iys2G04ZGBkHAApyJxlqEw0MMlcvAAYTFDV/jujutsu-kaisen
+  /// Ej: /movie/MxZ182-Y90LaA294PqZlm08Z/venom-el-ultimo-baile
   static String buildShareableUri({
     required String title,
     required String source,
@@ -325,7 +398,22 @@ class UrlUtils {
   }) {
     final prefix = determineRoutePrefix(kind: kind, category: category, type: type);
     final slug = slugify(title.isNotEmpty ? title : 'media');
-    final shortId = generateShortId(source, url, title);
+    
+    // Generar token auto-contenido
+    final token = encodeShareableToken(
+      title: title,
+      source: source,
+      url: url,
+      category: category,
+      year: year,
+      quality: quality,
+      type: type,
+      kind: kind,
+      metadataTitle: metadataTitle,
+      season: season,
+      sectionId: sectionId,
+      from: from,
+    );
 
     final payload = <String, dynamic>{
       'title': title,
@@ -343,9 +431,9 @@ class UrlUtils {
     };
 
     // Guardar en Hive y RAM para resolución instantánea (0 ms)
-    _saveToCache(shortId, slug, payload);
+    _saveToCache(token, slug, payload);
 
-    return '/$prefix/$shortId/$slug';
+    return '/$prefix/$token/$slug';
   }
 
   /// Genera una URL de reproductor simple
