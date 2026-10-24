@@ -49,7 +49,9 @@ jobs:
         run: |
           cd Movil
           flutter pub get
-          flutter build apk --release --split-per-abi
+          # Player nativo (SurfaceView + mediacodec_embed) solo en Movil Android.
+          # El default del flag es false; aqui se activa explicitamente para release.
+          flutter build apk --release --split-per-abi --dart-define=NATIVE_VIDEO_SURFACE=true
 
       - name: Rename Mobile APKs
         run: |

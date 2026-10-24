@@ -44,7 +44,7 @@ El **`versionName`** (lo que ve el usuario, ej. `1.0.3`) es lo que compara el ac
    git push origin v1.0.3
    ```
 4. El workflow `.github/workflows/release_all.yml` se dispara con el push del tag (`on: push: tags: v*`) y:
-   - construye los APKs con `flutter build apk --release --split-per-abi`,
+   - construye los APKs. En **Movil** debe incluir `--dart-define=NATIVE_VIDEO_SURFACE=true` para activar `SurfaceView` + `vo=mediacodec_embed`; en **TV** y **Web_Desktop** NO se pasa ese define (el flag queda apagado por defecto),
    - firma con el keystore de los secrets,
    - empaqueta Windows,
    - publica la release con `softprops/action-gh-release` (`body_path: RELEASE_NOTES.md`).
@@ -108,12 +108,30 @@ Mantén el workflow en `--split-per-abi` únicamente (como v1.0.1/v1.0.2).
 
 ---
 
+## Player nativo en Móvil (`NATIVE_VIDEO_SURFACE`)
+
+- El flag queda **apagado por defecto** en `Movil/lib/main.dart`.
+- Para la release de **Móvil**, compilar siempre con:
+  ```powershell
+  flutter build apk --release --split-per-abi --dart-define=NATIVE_VIDEO_SURFACE=true
+  ```
+  o:
+  ```powershell
+  flutter build appbundle --release --dart-define=NATIVE_VIDEO_SURFACE=true
+  ```
+- El workflow `.github/workflows/release_all.yml` ya aplica ese define en `build-mobile`.
+- **TV** y **Web_Desktop** no deben recibir ese define.
+- HCPP (`hcpp=true`) queda sin validar por falta de dispositivo compatible; la app tiene fallback automático a modo textura (`hcpp=false`).
+
 ## Checklist antes de dar una release por buena
 
 - [ ] `version` igual en `Movil`, `TV` y `Web_Desktop`.
 - [ ] `versionCode` (build number) **mayor** que la release anterior.
 - [ ] `versionName` **mayor** que la anterior (para que el usuario vea la actualización).
 - [ ] Workflow en `--split-per-abi` (sin universal).
+- [ ] Build de **Movil** con `--dart-define=NATIVE_VIDEO_SURFACE=true`.
+- [ ] Builds de **TV** y **Web_Desktop** sin `--dart-define=NATIVE_VIDEO_SURFACE=true`.
+- [ ] HCPP documentado como no validado por falta de dispositivo compatible; fallback a textura activo.
 - [ ] Commit en `main` + tag `vX.Y.Z` anotado subidos.
 - [ ] Run de CI en verde.
 - [ ] Release con exactamente 7 assets y nombres correctos (sin universales).
