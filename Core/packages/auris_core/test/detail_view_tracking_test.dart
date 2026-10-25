@@ -23,6 +23,8 @@ class MockAurisRepository implements AurisRepository {
     return mockDetail;
   }
 
+  @override Future<List<ContentSports>> getSportsEvents({bool live = true}) async => [];
+
   @override Future<AnimeThemesData> getAnimeThemes({required String title, String? english, String? native_, String? server}) async => const AnimeThemesData();
 
   // Otros stubs

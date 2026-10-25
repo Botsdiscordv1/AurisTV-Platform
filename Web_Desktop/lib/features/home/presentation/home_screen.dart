@@ -656,6 +656,7 @@ class _PillNavBar extends StatelessWidget {
       {'id': 'películas', 'label': 'Películas'},
       {'id': 'series', 'label': 'Series'},
       {'id': 'kdrama', 'label': 'KDramas'},
+      {'id': 'live', 'label': 'Live'},
     ];
     final categories = hideHome ? allCategories.where((c) => c['id'] != 'inicio').toList() : allCategories;
     

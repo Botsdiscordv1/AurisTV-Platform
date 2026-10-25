@@ -16,6 +16,8 @@ class AdaptiveDetailLayout extends StatelessWidget {
   final Widget? secondaryActions;
   /// Texto de sinopsis
   final Widget? synopsis;
+  /// Metadata adicional en texto plano para móvil vertical
+  final Widget? metadata;
   /// Selectores (Temporadas, Servidores)
   final Widget? selectors;
   /// Pestañas (Tabs) con scroll horizontal edge-to-edge
@@ -37,6 +39,7 @@ class AdaptiveDetailLayout extends StatelessWidget {
     this.mainAction,
     this.secondaryActions,
     this.synopsis,
+    this.metadata,
     this.selectors,
     this.tabs,
     required this.content,
@@ -77,7 +80,10 @@ class AdaptiveDetailLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+    final size = MediaQuery.sizeOf(context);
+    final width = size.width;
+    final orientation = MediaQuery.orientationOf(context);
+    final bool isPortrait = orientation == Orientation.portrait;
     final bool isDesktop = ResponsiveUtils.isDesktop(context) || width >= 1024;
     final bool isTablet = ResponsiveUtils.isTablet(context) || (width >= 768 && width < 1024);
     final bool isWide = width >= 768; // Botones de acción en horizontal para Tablet y Desktop
@@ -85,8 +91,13 @@ class AdaptiveDetailLayout extends StatelessWidget {
     final double contentPadding = isDesktop ? horizontalPadding : (isTablet ? 16.0 : horizontalPadding); // Móvil hereda el padding global (16px) tablets (iPad Mini) para aprovechar todo el ancho sin desbordes de 1px.
     final double topPadding = ResponsiveUtils.isNative ? MediaQuery.of(context).padding.top : 0;
 
+    // En móvil vertical (portrait), la imagen del backdrop debe cubrir todo el borde superior (edge-to-edge bajo la status bar).
+    final bool isMobilePortrait = isPortrait && !isDesktop && !isTablet && width < 768;
+    final double headerTopPadding = isMobilePortrait ? 0 : topPadding;
+    final double topBarTopOffset = isMobilePortrait ? topPadding : 0;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       bottomNavigationBar: bottomNavigationBar,
       body: CustomScrollView(
         key: const ValueKey('adaptive_detail_scroll_view'),
@@ -99,7 +110,7 @@ class AdaptiveDetailLayout extends StatelessWidget {
           SliverToBoxAdapter(
             key: const ValueKey('detail_header_sliver'),
             child: Padding(
-              padding: EdgeInsets.only(top: topPadding),
+              padding: EdgeInsets.only(top: headerTopPadding),
               child: Stack(
                 fit: StackFit.loose,
                 children: [
@@ -107,7 +118,7 @@ class AdaptiveDetailLayout extends StatelessWidget {
                   
                   if (topBar != null)
                     Positioned(
-                      top: 0, left: 0, right: 0,
+                      top: topBarTopOffset, left: 0, right: 0,
                       child: SizedBox(
                         height: 80,
                         child: topBar!,
@@ -125,13 +136,13 @@ class AdaptiveDetailLayout extends StatelessWidget {
                               contentPadding, 
                               0, 
                               contentPadding, 
-                              isWide ? 24 : 12
+                              isWide ? 24 : 16
                             ),
                             child: SizedBox(
                               width: double.infinity,
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.end,
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   logo!,
                                 ],
@@ -157,43 +168,78 @@ class AdaptiveDetailLayout extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: isWide ? 22.0 : 16.0),
-                    if (meta != null) Padding(
-                      padding: EdgeInsets.symmetric(horizontal: contentPadding),
-                      child: meta!,
-                    ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: isWide ? 22.0 : (isMobilePortrait ? 12.0 : 16.0)),
 
-                    if (isWide)
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: contentPadding),
-                        child: Row(
-                          children: [
-                            if (mainAction != null) SizedBox(width: 300, child: mainAction!),
-                            if (secondaryActions != null) ...[
-                              const SizedBox(width: 16),
-                              Expanded(child: secondaryActions!), // Senior Fix: Evitar overflow en plegables (Fold)
-                            ],
-                          ],
+                    if (isMobilePortrait) ...[
+                      // 1. Géneros (texto)
+                      if (meta != null) Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                          child: meta!,
                         ),
-                      )
-                    else ...[
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 2. Botón de acción play / + / share
                       if (mainAction != null) Padding(
                         padding: EdgeInsets.symmetric(horizontal: contentPadding),
                         child: mainAction!,
                       ),
-                      if (secondaryActions != null) ...[
-                        const SizedBox(height: 16),
-                        secondaryActions!,
-                      ],
-                    ],
+                      const SizedBox(height: 16),
 
-                    const SizedBox(height: 16),
-                    if (synopsis != null) Padding(
-                      padding: EdgeInsets.symmetric(horizontal: contentPadding),
-                      child: synopsis!,
-                    ),
-                    const SizedBox(height: 16),
+                      // 3. Sinopsis (2 líneas)
+                      if (synopsis != null) Padding(
+                        padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                        child: synopsis!,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 4. Metadata año / duración / etiqueta de edad / calidad
+                      if (metadata != null) Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                          child: metadata!,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ] else ...[
+                      if (meta != null) Padding(
+                        padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                        child: meta!,
+                      ),
+                      const SizedBox(height: 20),
+
+                      if (isWide)
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                          child: Row(
+                            children: [
+                              if (mainAction != null) SizedBox(width: 300, child: mainAction!),
+                              if (secondaryActions != null) ...[
+                                const SizedBox(width: 16),
+                                Expanded(child: secondaryActions!), // Senior Fix: Evitar overflow en plegables (Fold)
+                              ],
+                            ],
+                          ),
+                        )
+                      else ...[
+                        if (mainAction != null) Padding(
+                          padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                          child: mainAction!,
+                        ),
+                        if (secondaryActions != null) ...[
+                          const SizedBox(height: 16),
+                          secondaryActions!,
+                        ],
+                      ],
+
+                      const SizedBox(height: 16),
+                      if (synopsis != null) Padding(
+                        padding: EdgeInsets.symmetric(horizontal: contentPadding),
+                        child: synopsis!,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     if (selectors != null) Padding(
                       padding: EdgeInsets.only(
                         left: contentPadding,

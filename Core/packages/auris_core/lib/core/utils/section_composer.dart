@@ -21,6 +21,7 @@ class ComposedHomeSection {
   final String title;
   final String? subtitle;
   final List<MediaItem> items;
+  final List<ContentSports>? sportsItems;
   final SectionPresentation presentation;
   final dynamic data;
   final EditorialBadge? badge;
@@ -31,6 +32,7 @@ class ComposedHomeSection {
     required this.title,
     required this.presentation,
     required this.items,
+    this.sportsItems,
     this.subtitle,
     this.data,
     this.badge,
@@ -51,6 +53,9 @@ class SectionComposer {
       if (s.data is EditorialRow) {
         return (s.data as EditorialRow).items.isNotEmpty;
       }
+      if (s.data is SportsEditorialRow) {
+        return (s.data as SportsEditorialRow).items.isNotEmpty;
+      }
       return true;
     }).toList();
 
@@ -59,6 +64,7 @@ class SectionComposer {
     // para respetar estrictamente la jerarquía definida por el servidor.
     final List<ComposedHomeSection> composed = filtered.map((raw) {
       List<MediaItem> items = [];
+      List<ContentSports>? sportsItems;
       String title = raw.title ?? '';
       String? subtitle;
       EditorialBadge? badge;
@@ -70,6 +76,12 @@ class SectionComposer {
         title = row.title;
         subtitle = row.subtitle;
         badge = row.badge;
+      } else if (raw.data is SportsEditorialRow) {
+        final row = raw.data as SportsEditorialRow;
+        sportsItems = List.unmodifiable(row.items);
+        items = List.unmodifiable(row.items.map((e) => e.toMediaItem()).toList());
+        title = row.title;
+        subtitle = row.subtitle;
       } else if (raw.data is List<MediaItem>) {
         items = List.unmodifiable(raw.data as List<MediaItem>);
       }
@@ -98,6 +110,7 @@ class SectionComposer {
         title: title,
         subtitle: subtitle,
         items: items,
+        sportsItems: sportsItems,
         presentation: presentation,
         data: data,
         badge: badge,

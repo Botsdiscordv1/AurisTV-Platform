@@ -44,6 +44,7 @@ class MediaItem {
   final String? duration;
   final int? runtime;
   final int? totalSeasons;
+  final List<Map<String, dynamic>>? channels;
 
   final SearchResult? card;
 
@@ -81,6 +82,7 @@ class MediaItem {
     this.duration,
     this.runtime,
     this.totalSeasons,
+    this.channels,
     this.card,
   });
 
@@ -93,6 +95,7 @@ class MediaItem {
     String? duration,
     int? runtime,
     int? totalSeasons,
+    List<Map<String, dynamic>>? channels,
   }) {
     return MediaItem(
       id: id,
@@ -128,6 +131,7 @@ class MediaItem {
       duration: duration ?? this.duration,
       runtime: runtime ?? this.runtime,
       totalSeasons: totalSeasons ?? this.totalSeasons,
+      channels: channels ?? this.channels,
       card: card,
     );
   }
@@ -164,7 +168,8 @@ extension MediaItemToSeed on MediaItem {
 
 extension MediaItemToDetailParams on MediaItem {
   UnifiedDetailParams toUnifiedDetailParams({String? sectionId}) {
-    final String cat = switch (type) {
+    final bool isSports = source == 'ppv' || source == 'sport' || source == 'live' || (channels != null && channels!.isNotEmpty);
+    final String cat = isSports ? 'live' : switch (type) {
       MediaType.anime => 'anime',
       MediaType.movie => 'movie',
       MediaType.series => 'series',
@@ -174,13 +179,29 @@ extension MediaItemToDetailParams on MediaItem {
       title: title,
       metadataTitle: english ?? romaji,
       category: cat,
-      kind: card?.kind ?? type.name,
+      kind: isSports ? 'sports' : (card?.kind ?? type.name),
       year: year,
       source: source,
       url: detailUrl ?? id,
-      type: card?.type ?? type.name,
+      type: isSports ? 'sports' : (card?.type ?? type.name),
       sectionId: sectionId ?? this.sectionId,
-      initialSources: card != null ? [card!] : null,
+      initialSources: card != null ? [card!] : [
+        SearchResult(
+          title: title,
+          url: detailUrl ?? id,
+          quality: 'TV',
+          thumbnail: posterUrl,
+          banner: bannerUrl,
+          source: source,
+          kind: isSports ? 'sports' : type.name,
+          synopsis: synopsis,
+          sources: channels != null ? channels!.map((c) => SourceItem(
+            source: c['source']?.toString() ?? source,
+            url: c['url']?.toString() ?? '',
+            quality: c['name']?.toString() ?? 'HD',
+          )).toList() : [],
+        )
+      ],
     );
   }
 }

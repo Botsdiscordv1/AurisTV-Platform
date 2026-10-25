@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart';
+import '../../cast/presentation/widgets/cast_picker_sheet.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/web_utils.dart';
 import '../widgets/content_row.dart';
@@ -89,6 +90,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final scrolled = currentOffset > 5;
     if (scrolled != _isScrolled) {
       setState(() => _isScrolled = scrolled);
+    }
+  }
+
+  void _scrollToTop() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+      );
     }
   }
 
@@ -360,7 +371,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // Espaciador para que el contenido empiece debajo de la barra fija
               SliverToBoxAdapter(
                 child: SizedBox(height: isMobile 
-                  ? (MediaQuery.of(context).padding.top + 60) 
+                  ? (MediaQuery.of(context).padding.top + (_isScrolled ? 50 : 98)) 
                   : 0 // Senior Fix: En Web el banner sangra hasta arriba (detrás de la barra)
                 ),
               ),
@@ -487,17 +498,98 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildTopNavContent(BuildContext context, WidgetRef ref, String currentCategory, bool isMobile) {
+    final user = ref.watch(authProvider);
+    final activeProfile = user?.profiles.firstWhere(
+      (p) => p.id == user.activeProfileId,
+      orElse: () => UserProfile(id: 'guest', name: 'Inés'),
+    );
+    final greetingName = activeProfile?.name ?? 'Inés';
+
+    final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final width = MediaQuery.of(context).size.width;
     
-    // Breakpoints granulares para escritorio
+    // Breakpoints granulares para escritorio (Navbar / Spacer)
     final isCompactDesktop = width >= 800 && width < 1100;
-    
-    final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
-    final logoHeight = isCompactDesktop ? 28.0 : 32.0;
     final navHeight = isCompactDesktop ? 70.0 : 80.0;
+    final logoHeight = isCompactDesktop ? 28.0 : 32.0;
     
-    if (isMobile) {
+    if (!isMobile) {
       return ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: _isScrolled ? 20.0 : 0.0,
+            sigmaY: _isScrolled ? 20.0 : 0.0,
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            height: navHeight,
+            margin: EdgeInsets.zero,
+            decoration: BoxDecoration(
+              color: _isScrolled 
+                  ? const Color(0xFF000000).withValues(alpha: 0.4) 
+                  : Colors.transparent,
+              border: Border(
+                bottom: BorderSide(
+                  color: _isScrolled ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
+                  width: 0.5,
+                ),
+              ),
+            ),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Row(
+                children: [
+                  SvgPicture.asset(
+                    'assets/icons/auris-logo-web-flat.svg',
+                    height: logoHeight,
+                    fit: BoxFit.contain,
+                    colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                  ),
+                  SizedBox(width: isCompactDesktop ? 20 : 40),
+                  _PillNavBar(
+                    currentCategory: currentCategory,
+                    onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
+                  ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 24),
+                        onPressed: () => context.push('/search'),
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 24),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            isScrollControlled: true,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                            ),
+                            builder: (_) => CastPickerSheet(),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 16),
+                      GestureDetector(
+                        onTap: () => context.push('/profile-with-nav'),
+                        child: _buildUserAvatar(context, isCompactDesktop),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: _scrollToTop,
+      child: ClipRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(
             sigmaX: _isScrolled ? 15.0 : 0.0,
@@ -516,160 +608,119 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-            // Senior Fix: Reducimos padding para un look más compacto y fijo (como pidió el usuario)
-            padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 12),
+            padding: EdgeInsets.fromLTRB(horizontalPadding, 10, horizontalPadding, 12),
             child: SafeArea(
               bottom: false,
-              child: SizedBox(
-                height: 40, // Senior Fix: Altura fija absoluta para evitar cualquier "salto" vertical
-                child: Row(
-                  children: [
-                    // 1. Logo ESTÁTICO
-                    SvgPicture.asset(
-                      'assets/icons/auris-tv-icon.svg',
-                      height: 30,
-                      fit: BoxFit.contain,
-                      colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
-                    ),
-                    const SizedBox(width: 16),
-                    
-                    // 2. Contenido ANIMADO con Coreografía Refinada
-                    Expanded(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 700), // Senior: Más lento para máxima elegancia
-                        switchInCurve: Curves.easeInOutQuart, // Senior: Curva muy suave en los extremos
-                        switchOutCurve: Curves.easeInOutQuart,
-                        transitionBuilder: (child, animation) {
-                          final isFilter = child.key == const ValueKey('home_nav_filter');
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                // Senior Fix: Aumentamos el recorrido (0.4) para que incluso 
-                                // distancias cortas tengan un "viaje" visible y lento.
-                                begin: Offset(isFilter ? 0.4 : -0.4, 0),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: (currentCategory == 'inicio')
-                            ? Row(
-                                key: const ValueKey('home_nav_full'),
-                                children: [
-                                  Expanded(
-                                    child: ShaderMask(
-                                      shaderCallback: (Rect rect) {
-                                        return const LinearGradient(
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight,
-                                          colors: [Colors.black, Colors.transparent],
-                                          stops: [0.8, 1.0], // Senior UI: Desvanecimiento sutil al final para indicar scroll
-                                        ).createShader(rect);
-                                      },
-                                      blendMode: BlendMode.dstIn,
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        physics: const BouncingScrollPhysics(),
-                                        padding: const EdgeInsets.only(right: 20), // Espacio para que el desvanecimiento luzca mejor
-                                        child: _PillNavBar(
-                                          currentCategory: currentCategory,
-                                          hideHome: true,
-                                          onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Row(
-                                key: const ValueKey('home_nav_filter'),
-                                children: [
-                                  GestureDetector(
-                                    onTap: () => ref.read(homeCategoryProvider.notifier).state = 'inicio',
-                                    child: Container(
-                                      padding: const EdgeInsets.all(7),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      currentCategory[0].toUpperCase() + currentCategory.substring(1),
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.black,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Para $greetingName',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
+                        ),
                       ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                backgroundColor: Colors.transparent,
+                                isScrollControlled: true,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                ),
+                                builder: (_) => CastPickerSheet(),
+                              );
+                            },
+                            constraints: BoxConstraints(minWidth: 36, minHeight: 36),
+                            padding: EdgeInsets.zero,
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.download_rounded, color: Colors.white, size: 22),
+                            onPressed: () => context.push('/settings/library'),
+                            constraints: BoxConstraints(minWidth: 36, minHeight: 36),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (!_isScrolled) ...[
+                    const SizedBox(height: 10),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 700),
+                      switchInCurve: Curves.easeInOutQuart,
+                      switchOutCurve: Curves.easeInOutQuart,
+                      child: (currentCategory == 'inicio')
+                          ? ShaderMask(
+                              shaderCallback: (Rect rect) {
+                                return const LinearGradient(
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                  colors: [Colors.black, Colors.transparent],
+                                  stops: [0.8, 1.0],
+                                ).createShader(rect);
+                              },
+                              blendMode: BlendMode.dstIn,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                padding: const EdgeInsets.only(right: 20),
+                                child: _PillNavBar(
+                                  currentCategory: currentCategory,
+                                  hideHome: true,
+                                  onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
+                                ),
+                              ),
+                            )
+                          : Row(
+                              key: const ValueKey('home_nav_filter'),
+                              children: [
+                                GestureDetector(
+                                  onTap: () => ref.read(homeCategoryProvider.notifier).state = 'inicio',
+                                  child: Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    currentCategory[0].toUpperCase() + currentCategory.substring(1),
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.black,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: _isScrolled ? 20.0 : 0.0,
-          sigmaY: _isScrolled ? 20.0 : 0.0,
-        ),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          height: navHeight,
-          margin: EdgeInsets.zero,
-          decoration: BoxDecoration(
-            color: _isScrolled 
-                ? const Color(0xFF000000).withValues(alpha: 0.4) 
-                : Colors.transparent,
-            border: Border(
-              bottom: BorderSide(
-                color: _isScrolled ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
-                width: 0.5,
-              ),
-            ),
-          ),
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Row(
-              children: [
-                // Logo de Auris (Naranja de marca)
-                SvgPicture.asset(
-                  'assets/icons/auris-logo-web-flat.svg',
-                  height: logoHeight,
-                  fit: BoxFit.contain,
-                  colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
-                ),
-                SizedBox(width: isCompactDesktop ? 20 : 40),
-                
-                // Items de Navegación Estilo Píldora (Modern Netflix)
-                _PillNavBar(
-                  currentCategory: currentCategory,
-                  onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
-                ),
-                
-                const Spacer(),
-                
-                // Acciones (Removidas por simplificación móvil)
-              ],
             ),
           ),
         ),
@@ -880,7 +931,7 @@ class _PillNavBar extends StatelessWidget {
     final TextPainter textPainter = TextPainter(
       text: TextSpan(
         text: text,
-        style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700),
+        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700),
       ),
       maxLines: 1,
       textDirection: TextDirection.ltr,
@@ -888,31 +939,64 @@ class _PillNavBar extends StatelessWidget {
     return textPainter.size.width;
   }
 
+  void _showCategoriesMenu(BuildContext context, GlobalKey key) {
+    final RenderBox renderBox = key.currentContext?.findRenderObject() as RenderBox ?? context.findRenderObject() as RenderBox;
+    final position = renderBox.localToGlobal(Offset.zero);
+    
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy + 45, position.dx + 150, position.dy + 200),
+      color: const Color(0xFF18181B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      items: [
+        PopupMenuItem(
+          value: 'animes',
+          child: Text('Animes', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+        PopupMenuItem(
+          value: 'kdrama',
+          child: Text('KDramas', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+        PopupMenuItem(
+          value: 'live',
+          child: Text('Live', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+      ],
+    ).then((value) {
+      if (value != null) {
+        onCategoryChanged(value);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    
-    final allCategories = [
-      {'id': 'inicio', 'label': 'Inicio'},
-      {'id': 'animes', 'label': 'Animes'},
-      {'id': 'películas', 'label': 'Películas'},
-      {'id': 'series', 'label': 'Series'},
-      {'id': 'kdrama', 'label': 'KDramas'},
-    ];
+    final bool isSubCategory = ['animes', 'kdrama', 'live'].contains(currentCategory);
 
     final categories = hideHome 
-        ? allCategories.where((c) => c['id'] != 'inicio').toList()
-        : allCategories;
+        ? [
+            {'id': 'series', 'label': 'Series'},
+            {'id': 'películas', 'label': 'Películas'},
+            {'id': 'categorias', 'label': isSubCategory ? (currentCategory[0].toUpperCase() + currentCategory.substring(1)) : 'Categorías ⌄'},
+          ]
+        : [
+            {'id': 'inicio', 'label': 'Inicio'},
+            {'id': 'animes', 'label': 'Animes'},
+            {'id': 'películas', 'label': 'Películas'},
+            {'id': 'series', 'label': 'Series'},
+            {'id': 'kdrama', 'label': 'KDramas'},
+            {'id': 'live', 'label': 'Live'},
+          ];
 
-    // Senior UI Fix: Reducimos padding en móvil para que el 4to item asome (Affordance)
     final double hPadding = isMobile ? 24.0 : 36.0; 
     const double spacing = 8.0;
     
     final List<double> itemWidths = categories.map((c) => _calculateTextWidth(c['label']!) + hPadding).toList();
-    final activeIndex = categories.indexWhere((c) => c['id'] == currentCategory);
+    final activeIndex = hideHome
+        ? (currentCategory == 'series' ? 0 : (currentCategory == 'películas' ? 1 : (isSubCategory ? 2 : -1)))
+        : categories.indexWhere((c) => c['id'] == currentCategory);
     
-    // Senior Logic: Si estamos en una categoria oculta (como inicio en movil), 
-    // no mostramos la pildora de seleccion.
     final bool showPill = activeIndex != -1;
 
     double leftOffset = 0;
@@ -922,12 +1006,13 @@ class _PillNavBar extends StatelessWidget {
       }
     }
 
+    final GlobalKey categoriesKey = GlobalKey();
+
     return SizedBox(
       height: 40,
       child: Stack(
         alignment: Alignment.centerLeft,
         children: [
-          // LA PÍLDORA (El fondo que desliza)
           if (showPill)
             AnimatedPositioned(
               duration: const Duration(milliseconds: 300),
@@ -950,19 +1035,27 @@ class _PillNavBar extends StatelessWidget {
               ),
             ),
           
-          // LOS TEXTOS
           Row(
             mainAxisSize: MainAxisSize.min,
             children: List.generate(categories.length, (index) {
               final cat = categories[index];
               final isSelected = index == activeIndex;
+              final isCategoriesPill = hideHome && cat['id'] == 'categorias';
+              
               return Padding(
+                key: isCategoriesPill ? categoriesKey : null,
                 padding: EdgeInsets.only(right: index == categories.length - 1 ? 0 : spacing),
                 child: _PillNavItem(
                   label: cat['label']!,
                   isActive: isSelected,
                   width: itemWidths[index],
-                  onTap: () => onCategoryChanged(cat['id']!),
+                  onTap: () {
+                    if (isCategoriesPill) {
+                      _showCategoriesMenu(context, categoriesKey);
+                    } else {
+                      onCategoryChanged(cat['id']!);
+                    }
+                  },
                 ),
               );
             }),
@@ -1006,14 +1099,19 @@ class _PillNavItemState extends State<_PillNavItem> {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            color: (!widget.isActive && _hovered) ? Colors.white.withOpacity(0.1) : Colors.transparent,
+            color: widget.isActive 
+                ? Colors.white 
+                : ((!widget.isActive && _hovered) ? Colors.white.withOpacity(0.1) : Colors.transparent),
+            border: widget.isActive 
+                ? null 
+                : Border.all(color: Colors.white.withOpacity(0.25), width: 1.0),
           ),
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
             style: GoogleFonts.poppins(
               color: widget.isActive ? Colors.black : Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w700, // Senior Fix: Unificamos a w700 para consistencia total
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
             child: Text(widget.label),
           ),

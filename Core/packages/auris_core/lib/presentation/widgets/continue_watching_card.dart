@@ -267,7 +267,17 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
           builder: (context, hovered, _) {
             final isActive = hovered || _isFocused;
             return GestureDetector(
-              onTap: widget.onTap != null ? () => SafeTap.run(widget.onTap!) : null,
+              onTap: () {
+                handleCardTapOrSportsNavigation(
+                  context,
+                  title: widget.history.title ?? '',
+                  imageUrl: widget.history.bannerUrl ?? widget.history.posterUrl ?? '',
+                  onTap: widget.onTap,
+                  source: widget.history.source,
+                  subtitle: widget.history.category,
+                  id: widget.history.contentId,
+                );
+              },
               onLongPressStart: (details) {
                 if (isDesktopOrWeb) {
                   _showContextMenu(context, details.globalPosition, titleText);
@@ -282,7 +292,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
               },
               child: Container(
                 width: effectiveWidth,
-                margin: const EdgeInsets.only(right: 16),
+                margin: const EdgeInsets.only(right: 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -290,20 +300,22 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                     AspectRatio(
                       aspectRatio: 16 / 9,
                       child: AnimatedScale(
-                        scale: isActive ? 1.06 : 1.0,
+                        scale: isActive ? 1.0 : 0.98,
                         duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
                         curve: Curves.easeOutQuint,
                         alignment: Alignment.center,
                         child: AnimatedContainer(
                           duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
                           curve: Curves.easeOutQuint,
+                          padding: EdgeInsets.zero,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
-                            boxShadow: [],
-                            border: Border.all(color: isActive ? Colors.white : Colors.transparent, width: isActive ? 2.5 : 0.0),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: isActive
+                                ? [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4))]
+                                : [],
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(6),
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
@@ -393,6 +405,17 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                                             color: brandOrange,
                                             boxShadow: [BoxShadow(color: brandOrange, blurRadius: 4)],
                                           ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (isActive)
+                                  Positioned.fill(
+                                    child: IgnorePointer(
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: Colors.white, width: 4.0),
                                         ),
                                       ),
                                     ),

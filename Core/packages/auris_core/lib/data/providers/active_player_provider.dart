@@ -290,6 +290,36 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     String? episodeTitle,
   }) async {
     if (createPlayer) initPlayerIfNeeded();
+
+    if (source == 'ppv' || url.contains('/embed/') || (item.source == 'ppv') || (item.detailUrl != null && item.detailUrl!.contains('/embed/'))) {
+      final effectiveUrl = url.isNotEmpty ? url : (item.detailUrl ?? '');
+      final effectiveSource = source ?? (item.source.isNotEmpty ? item.source : 'ppv');
+      
+      state = state.copyWith(
+        currentItem: item,
+        url: effectiveUrl,
+        source: effectiveSource,
+        uiState: PlayerUIState.full,
+      );
+
+      try {
+        _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
+        await state.player?.open(Media(effectiveUrl));
+        await state.player?.play();
+
+        final auth = ref.read(authProvider);
+        ref.read(userEventTrackerProvider).record(
+          userId: auth?.activeProfileId ?? auth?.id,
+          animeId: item.animeId,
+          event: 'play',
+          sectionId: item.sectionId,
+          playbackSessionId: _currentSessionId,
+        );
+      } catch (e) {
+        debugPrint('[ActivePlayerNotifier] PPV embed play error: $e');
+      }
+      return;
+    }
     
     final bool isSameContent = state.currentItem?.id == item.id;
     final bool isSameUrl = state.url == url;

@@ -171,19 +171,18 @@ class ResponsiveUtils {
     
     if (b < Breakpoint.md) {
       if (width > 550 || orientation == Orientation.landscape) {
-        return (width / 3.2).clamp(200.0, 260.0);
+        return (width / 3.0).clamp(210.0, 260.0);
       }
-      return (width / 1.35).clamp(240.0, 310.0);
+      return (width / 1.35).clamp(230.0, 280.0);
     }
 
     // Senior Fix: Para Tablets y Plegables (Z Fold)
     if (b == Breakpoint.md) {
-      // Aumentamos densidad a ~3.2 para que los banners sean elegantes y no ocupen media pantalla
-      return (width / 3.2).clamp(240.0, 290.0);
+      return (width / 3.0).clamp(240.0, 290.0);
     }
     
-    if (b == Breakpoint.lg) return 380.0;
-    return 420.0;
+    if (b == Breakpoint.lg) return 340.0;
+    return 380.0;
   }
 
   /// Altura de banners (Wide Cards) manteniendo AspectRatio 16:9 aprox.
@@ -220,10 +219,10 @@ class ResponsiveUtils {
   static double bannerTitleFontSize(BuildContext context) {
     final b = getBreakpoint(context);
     if (b == Breakpoint.base) return 13.0;
-    if (b == Breakpoint.sm) return 14.0;
-    if (b == Breakpoint.md) return 15.0;
-    if (b == Breakpoint.lg) return 16.0;
-    return 17.0;
+    if (b == Breakpoint.sm) return 13.5;
+    if (b == Breakpoint.md) return 14.5;
+    if (b == Breakpoint.lg) return 15.5;
+    return 16.5;
   }
 
   /// Senior UI Strategy: Tamaños de fuente adaptativos para títulos de tarjetas (Posters).

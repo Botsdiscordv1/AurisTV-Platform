@@ -39,6 +39,7 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
   late AnimationController _shimmerController;
   late AnimationController _mythicController;
   bool _isHovered = false;
+  bool _isPressed = false;
 
   @override
   void initState() {
@@ -75,224 +76,227 @@ class _EditorialCardState extends State<EditorialCard> with TickerProviderStateM
     final isMythical = widget.badge == EditorialBadge.mythical;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
+      onEnter: (_) { if (!isMobile) setState(() => _isHovered = true); },
+      onExit: (_) { if (!isMobile) setState(() => _isHovered = false); },
       child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
         onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _isHovered ? 1.05 : 1.0,
-          duration: const Duration(milliseconds: 200),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: widget.width,
-                height: widget.height,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.primary.withOpacity(_isHovered ? 0.35 : 0.15),
-                      blurRadius: _isHovered ? 30 : 15,
-                      spreadRadius: _isHovered ? 2 : 0,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: widget.width,
+              height: widget.height,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // 1. Fondo Negro Base
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: darkBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.primary.withOpacity(0.3),
+                          width: 1.0,
+                        ),
+                      ),
                     ),
+                  ),
+
+                  // 2. Marco de Contorno Interno (Sutil)
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.all(3.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.05),
+                            width: 0.5,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 3. Imagen del Poster
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CachedNetworkImage(
+                              imageUrl: widget.media.posterUrl,
+                              fit: BoxFit.cover,
+                              memCacheWidth: (widget.width * 2).round().clamp(1, 400),
+                              fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                              fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                              cacheManager: AurisImageCacheManager.instance,
+                              filterQuality: FilterQuality.medium,
+                              placeholder: (context, url) => Container(color: Colors.white10),
+                              errorWidget: (context, url, error) => Container(
+                                color: darkBg,
+                                child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white24, size: 32)),
+                              ),
+                            ),
+                            
+                            // Efectos de rareza diferenciados (Estilo Netflix/Crunchyroll Premium)
+                            Positioned.fill(
+                              child: AnimatedBuilder(
+                                animation: Listenable.merge([_shimmerController, _pulseController]),
+                                builder: (context, _) {
+                                  if (widget.badge == EditorialBadge.mythical) {
+                                    return IgnorePointer(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: theme.shimmerColors,
+                                            stops: [
+                                              (_shimmerController.value - 0.1).clamp(0.0, 1.0),
+                                              _shimmerController.value.clamp(0.0, 1.0),
+                                              (_shimmerController.value + 0.1).clamp(0.0, 1.0),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  
+                                  if (widget.badge == EditorialBadge.masterpiece) {
+                                    return IgnorePointer(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: RadialGradient(
+                                            center: const Alignment(0.7, -0.8),
+                                            radius: 1.2,
+                                            colors: [
+                                              theme.primary.withOpacity(0.08 * (1.0 + _pulseController.value * 0.5)),
+                                              Colors.transparent,
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  if (_isHovered) {
+                                    return IgnorePointer(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              Colors.white.withOpacity(0.0),
+                                              Colors.white.withOpacity(0.1),
+                                              Colors.white.withOpacity(0.0),
+                                            ],
+                                            stops: [
+                                              (_shimmerController.value - 0.1).clamp(0.0, 1.0),
+                                              _shimmerController.value.clamp(0.0, 1.0),
+                                              (_shimmerController.value + 0.1).clamp(0.0, 1.0),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // 4. BORDE Y ESQUINAS MÍTICAS (Estilo Aniyae) o ARCOS TRIPLES
+                  if (isMythical && !isMobile) ...[
+                    Positioned.fill(
+                      child: _MythicBorder(animation: _mythicController, primaryColor: theme.primary),
+                    ),
+                    _MythicCorner(alignment: Alignment.topLeft, animation: _mythicController, primaryColor: theme.primary),
+                    _MythicCorner(alignment: Alignment.topRight, animation: _mythicController, primaryColor: theme.primary),
+                    _MythicCorner(alignment: Alignment.bottomLeft, animation: _mythicController, primaryColor: theme.primary),
+                    _MythicCorner(alignment: Alignment.bottomRight, animation: _mythicController, primaryColor: theme.primary),
+                  ] else if (!isMobile)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: TripleArcCornerPainter(color: theme.primary),
+                        ),
+                      ),
+                    ),
+
+                  // 5. BRILLO DE PULSAR
+                  if (!isMythical && !isMobile) ...[
+                    _CornerPulsar(alignment: Alignment.topLeft, animation: _pulseController, color: theme.primary),
+                    _CornerPulsar(alignment: Alignment.topRight, animation: _pulseController, color: theme.primary),
+                    _CornerPulsar(alignment: Alignment.bottomLeft, animation: _pulseController, color: theme.primary),
+                    _CornerPulsar(alignment: Alignment.bottomRight, animation: _pulseController, color: theme.primary),
                   ],
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // 1. Fondo Negro Base
+
+                  // 6. Capa de pulso / toque móvil (Scrim blanco translúcido)
+                  if (_isPressed || (!isMobile && _isHovered))
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: darkBg,
+                          color: Colors.white.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: theme.primary.withOpacity(0.3),
-                            width: 1.0,
-                          ),
                         ),
                       ),
                     ),
-
-                    // 2. Marco de Contorno Interno (Sutil)
-                    Positioned.fill(
-                      child: Padding(
-                        padding: const EdgeInsets.all(3.0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.05),
-                              width: 0.5,
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
+                ],
+              ),
+            ),
+            if (widget.showInfo) ...[
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: MarqueeText(
+                  text: widget.media.title,
+                  animate: isMobile ? true : _isHovered,
+                  style: TextStyle(
+                    color: _isHovered ? Colors.white : Colors.white.withOpacity(0.9),
+                    fontSize: isMobile ? 12 : 15,
+                    fontWeight: _isHovered ? FontWeight.w900 : FontWeight.bold,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 1, 4, 0),
+                child: Row(
+                  children: [
+                    AurisIcon(AurisIcons.star, color: Colors.amber, size: 9),
+                    const SizedBox(width: 4),
+                    Text(
+                      formatRating(widget.media.rating) ?? '0.0',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: isMobile ? 10 : 12,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-
-                    // 3. Imagen del Poster
-                    Positioned.fill(
-                      child: Padding(
-                        padding: const EdgeInsets.all(4.0),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              CachedNetworkImage(
-                                imageUrl: widget.media.posterUrl,
-                                fit: BoxFit.cover,
-                                memCacheWidth: (widget.width * 2).round().clamp(1, 400),
-                                fadeInDuration: AurisImageConfig.defaultFadeInDuration,
-                                fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
-                                cacheManager: AurisImageCacheManager.instance,
-                                placeholder: (context, url) => Container(color: Colors.white10),
-                              ),
-                              
-                              // Efectos de rareza diferenciados (Estilo Netflix/Crunchyroll Premium)
-                              Positioned.fill(
-                                child: AnimatedBuilder(
-                                  animation: Listenable.merge([_shimmerController, _pulseController]),
-                                  builder: (context, _) {
-                                    // 1. Efecto MÍTICO ("Títulos inolvidables"): Barrido de luz dorado lento
-                                    if (widget.badge == EditorialBadge.mythical) {
-                                      return IgnorePointer(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: theme.shimmerColors,
-                                              stops: [
-                                                (_shimmerController.value - 0.1).clamp(0.0, 1.0),
-                                                _shimmerController.value.clamp(0.0, 1.0),
-                                                (_shimmerController.value + 0.1).clamp(0.0, 1.0),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                    
-                                    // 2. Efecto OBRA MAESTRA: Brillo respiratorio (Aura) sutil y estático
-                                    if (widget.badge == EditorialBadge.masterpiece) {
-                                      return IgnorePointer(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            gradient: RadialGradient(
-                                              center: const Alignment(0.7, -0.8), // Luz desde la esquina superior derecha
-                                              radius: 1.2,
-                                              colors: [
-                                                theme.primary.withOpacity(0.08 * (1.0 + _pulseController.value * 0.5)),
-                                                Colors.transparent,
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }
-
-                                    // 3. Hover para otras categorías (Barrido sutil al interactuar)
-                                    if (_isHovered) {
-                                      return IgnorePointer(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                Colors.white.withOpacity(0.0),
-                                                Colors.white.withOpacity(0.1),
-                                                Colors.white.withOpacity(0.0),
-                                              ],
-                                              stops: [
-                                                (_shimmerController.value - 0.1).clamp(0.0, 1.0),
-                                                _shimmerController.value.clamp(0.0, 1.0),
-                                                (_shimmerController.value + 0.1).clamp(0.0, 1.0),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }
-
-                                    return const SizedBox.shrink();
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // 4. BORDE Y ESQUINAS MÍTICAS (Estilo Aniyae) o ARCOS TRIPLES
-                    if (isMythical) ...[
-                      // Borde Animado que conecta las esquinas
-                      Positioned.fill(
-                        child: _MythicBorder(animation: _mythicController, primaryColor: theme.primary),
-                      ),
-                      _MythicCorner(alignment: Alignment.topLeft, animation: _mythicController, primaryColor: theme.primary),
-                      _MythicCorner(alignment: Alignment.topRight, animation: _mythicController, primaryColor: theme.primary),
-                      _MythicCorner(alignment: Alignment.bottomLeft, animation: _mythicController, primaryColor: theme.primary),
-                      _MythicCorner(alignment: Alignment.bottomRight, animation: _mythicController, primaryColor: theme.primary),
-                    ] else
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: CustomPaint(
-                            painter: TripleArcCornerPainter(color: theme.primary),
-                          ),
-                        ),
-                      ),
-
-                    // 5. BRILLO DE PULSAR (Efecto luz, no punto sólido)
-                    if (!isMythical) ...[
-                      _CornerPulsar(alignment: Alignment.topLeft, animation: _pulseController, color: theme.primary),
-                      _CornerPulsar(alignment: Alignment.topRight, animation: _pulseController, color: theme.primary),
-                      _CornerPulsar(alignment: Alignment.bottomLeft, animation: _pulseController, color: theme.primary),
-                      _CornerPulsar(alignment: Alignment.bottomRight, animation: _pulseController, color: theme.primary),
-                    ],
                   ],
                 ),
               ),
-              if (widget.showInfo) ...[
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: MarqueeText(
-                    text: widget.media.title,
-                    animate: isMobile ? true : _isHovered,
-                    style: TextStyle(
-                      color: _isHovered ? Colors.white : Colors.white.withOpacity(0.9),
-                      fontSize: isMobile ? 12 : 15,
-                      fontWeight: _isHovered ? FontWeight.w900 : FontWeight.bold,
-                      height: 1.1,
-                    ),
-                  ),
-                ),
-                // Metadatos (Puntuación)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 1, 4, 0),
-                  child: Row(
-                    children: [
-                      AurisIcon(AurisIcons.star, color: Colors.amber, size: 9),
-                      const SizedBox(width: 4),
-                      Text(
-                        formatRating(widget.media.rating) ?? '0.0',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: isMobile ? 10 : 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
-          ),
+          ],
         ),
       ),
     );

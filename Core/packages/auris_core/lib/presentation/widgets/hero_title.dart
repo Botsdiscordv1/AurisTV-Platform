@@ -12,6 +12,7 @@ class HeroTitle extends StatefulWidget {
   final double maxHeight;
   final TextStyle style;
   final int timeoutSeconds;
+  final bool centerAlignment;
 
   const HeroTitle({
     super.key,
@@ -22,6 +23,7 @@ class HeroTitle extends StatefulWidget {
     required this.maxHeight,
     required this.style,
     this.timeoutSeconds = 3,
+    this.centerAlignment = false,
   });
 
   @override
@@ -76,12 +78,9 @@ class _HeroTitleState extends State<HeroTitle> {
       duration: const Duration(milliseconds: 600),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
-      // Alinear a la izquierda (topStart) en vez del centro por defecto: el
-      // layout del AnimatedSwitcher centraba el logo mientras coexistía con el
-      // placeholder saliente, y solo al retirarse este saltaba a la izquierda.
       layoutBuilder: (currentChild, previousChildren) {
         return Stack(
-          alignment: AlignmentDirectional.topStart,
+          alignment: widget.centerAlignment ? AlignmentDirectional.topCenter : AlignmentDirectional.topStart,
           children: <Widget>[
             ...previousChildren,
             if (currentChild != null) currentChild,
@@ -95,23 +94,19 @@ class _HeroTitleState extends State<HeroTitle> {
   Widget _buildIdentity() {
     // 1. Prioridad Máxima: Logo Gráfico (Si existe, lo mostramos ya)
     if (widget.logo != null && widget.logo!.isNotEmpty) {
-      // El box ocupa TODO el ancho desde el primer frame (igual que el
-      // placeholder saliente): si el logo entrara con su ancho natural, el
-      // AnimatedSwitcher lo centraría en el stage durante el crossfade y
-      // solo al retirarse el placeholder saltaría a la izquierda.
       final imageUrl = ApiEndpoints.proxyImage(widget.logo, highQuality: true);
       return SizedBox(
         key: const ValueKey('identity_logo'),
         width: widget.maxWidth,
         height: widget.maxHeight,
         child: Align(
-          alignment: Alignment.bottomLeft,
+          alignment: widget.centerAlignment ? Alignment.bottomCenter : Alignment.bottomLeft,
           child: LogoToneFilter(
             imageUrl: imageUrl,
             child: CachedNetworkImage(
               imageUrl: imageUrl,
               fit: BoxFit.contain,
-              alignment: Alignment.bottomLeft,
+              alignment: widget.centerAlignment ? Alignment.bottomCenter : Alignment.bottomLeft,
               fadeInDuration: const Duration(milliseconds: 300),
               fadeOutDuration: Duration.zero,
               placeholder: (_, __) => const SizedBox.shrink(),
@@ -145,13 +140,13 @@ class _HeroTitleState extends State<HeroTitle> {
       width: widget.maxWidth,
       height: widget.maxHeight,
       child: Align(
-        alignment: Alignment.bottomLeft,
+        alignment: widget.centerAlignment ? Alignment.bottomCenter : Alignment.bottomLeft,
         child: Text(
           widget.title.toUpperCase(),
           style: widget.style,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.left,
+          textAlign: widget.centerAlignment ? TextAlign.center : TextAlign.left,
         ),
       ),
     );

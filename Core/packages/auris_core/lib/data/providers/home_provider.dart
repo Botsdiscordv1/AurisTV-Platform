@@ -86,6 +86,31 @@ final heroBannerItemsProvider = FutureProvider.family<List<MediaItem>, String>((
     }
   }
 
+  // Senior Strategy: Si la categoría es 'live', consumimos el endpoint /api/home/hero del servidor sports con fallback a getSportsEvents
+  if (category == 'live') {
+    try {
+      final heroItems = await repo.getHomeHero(category: 'live', imgSize: '1080')
+          .timeout(const Duration(seconds: 10));
+      if (heroItems.isNotEmpty) return heroItems;
+
+      final sportsEvents = (await repo.getSportsEvents(live: true).timeout(const Duration(seconds: 10)))
+          .map((e) => e.toMediaItem())
+          .toList();
+      if (sportsEvents.isNotEmpty) return sportsEvents;
+
+      return [];
+    } catch (e) {
+      debugPrint('[heroBannerItemsProvider] Live sports hero error: $e');
+      try {
+        final sportsEvents = (await repo.getSportsEvents(live: true).timeout(const Duration(seconds: 5)))
+            .map((e) => e.toMediaItem())
+            .toList();
+        if (sportsEvents.isNotEmpty) return sportsEvents;
+      } catch (_) {}
+      return [];
+    }
+  }
+
   // --- LÓGICA PARA CATEGORÍAS ESPECÍFICAS ---
   final String heroCategory = (category == 'animes') ? 'anime' : category;
   
@@ -277,6 +302,18 @@ class EditorialRow {
   });
 }
 
+class SportsEditorialRow {
+  final String title;
+  final String? subtitle;
+  final List<ContentSports> items;
+
+  const SportsEditorialRow({
+    required this.title,
+    required this.items,
+    this.subtitle,
+  });
+}
+
 enum HomeSectionType {
   editorial,
   trendingAnime,
@@ -372,6 +409,50 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
   final String userId = authState?.activeProfileId ?? authState?.id ?? 'guest_profile';
   final box = Hive.box('home_cache');
   final cacheKey = 'personalized_home_${userId}_$currentCategory';
+
+  if (currentCategory == 'live') {
+    try {
+      final liveEvents = await repo.getSportsEvents(live: true).timeout(const Duration(seconds: 10));
+      final upcomingEvents = await repo.getSportsEvents(live: false).timeout(const Duration(seconds: 10));
+
+      final List<HomeLayoutSection> liveSections = [];
+
+      if (liveEvents.isNotEmpty) {
+        liveSections.add(HomeLayoutSection(
+          type: HomeSectionType.editorial,
+          title: 'En Vivo',
+          data: SportsEditorialRow(
+            title: 'En Vivo',
+            subtitle: 'Eventos deportivos transmitiéndose ahora',
+            items: liveEvents,
+          ),
+          presentation: SectionPresentation.wide,
+          serverFormat: 'wide',
+        ));
+      }
+
+      if (upcomingEvents.isNotEmpty) {
+        liveSections.add(HomeLayoutSection(
+          type: HomeSectionType.editorial,
+          title: 'Próximos Eventos',
+          data: SportsEditorialRow(
+            title: 'Próximos Eventos',
+            subtitle: 'Agenda deportiva próxima',
+            items: upcomingEvents,
+          ),
+          presentation: SectionPresentation.wide,
+          serverFormat: 'wide',
+        ));
+      }
+
+      yield SectionComposer.compose(liveSections);
+      return;
+    } catch (e) {
+      debugPrint('[homeLayoutProvider] Live sports sections error: $e');
+      yield [];
+      return;
+    }
+  }
 
   // Senior Fix: Smart Polling. Consultamos una versión ligera del Home cada 15 min.
   // Solo invalidamos y descargamos megas de datos si el servidor indica cambios.
@@ -1029,6 +1110,7 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
     else if (result.id.contains('tudorama.net')) effectiveSource = 'TuDorama';
     else if (result.id.contains('doramaslatinox')) effectiveSource = 'DoramasLatinox';
     else if (result.id.contains('repelishd')) effectiveSource = 'RepelisHD';
+    else if (result.id.contains('cuevana')) effectiveSource = 'Cuevana';
   }
 
   // Senior Fix: Fallback de imagen horizontal para secciones WIDE editoriales
@@ -1117,6 +1199,7 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
     else if (result.url.contains('tudorama.net')) effectiveSource = 'TuDorama';
     else if (result.url.contains('doramaslatinox')) effectiveSource = 'DoramasLatinox';
     else if (result.url.contains('repelishd')) effectiveSource = 'RepelisHD';
+    else if (result.url.contains('cuevana')) effectiveSource = 'Cuevana';
   }
 
   // Senior Fix: Eliminamos el año como subtítulo por petición UX
@@ -1260,6 +1343,7 @@ final recentEpisodesProvider = FutureProvider<List<MediaItem>>((ref) async {
       else if (u.contains('animejara.com')) effectiveSource = 'AnimeJara';
       else if (u.contains('animeav1.com')) effectiveSource = 'AnimeAV1';
       else if (u.contains('animed23.com')) effectiveSource = 'AnimeD23';
+      else if (u.contains('cuevana')) effectiveSource = 'Cuevana';
     }
 
     final String? rawBanner = (item.banner != null && item.banner!.isNotEmpty) ? item.banner : item.coverImage;
