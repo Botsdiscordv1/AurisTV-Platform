@@ -22,6 +22,7 @@ import '../../models/server/source_info.dart';
 import '../../models/server/title_info.dart';
 import '../../models/server/gallery.dart';
 import '../../models/media_item.dart';
+import '../../models/content_sports.dart';
 import '../auris_repository.dart';
 
 class AurisRepositoryImpl implements AurisRepository {
@@ -653,9 +654,6 @@ class AurisRepositoryImpl implements AurisRepository {
             }
           }
 
-          final String? scraperUrl = m['url'] ?? m['sURL'] ?? m['detailUrl'];
-          final String itemId = m['id']?.toString() ?? scraperUrl ?? '';
-
           // Senior Fix: Clasificación precisa del MediaType para el Hero
           final String rawKind = m['kind']?.toString().toLowerCase() ?? '';
           MediaType mediaType;
@@ -671,7 +669,17 @@ class AurisRepositoryImpl implements AurisRepository {
             mediaType = MediaType.movie;
           }
 
-          final String? bannerSource = m['bannerUrl'] ?? m['banner'] ?? m['backdrop'] ?? m['backdropUrl'];
+          final channels = m['channels'] as List?;
+          final channelsList = (channels != null) 
+              ? channels.map((c) => Map<String, dynamic>.from(c as Map)).toList() 
+              : <Map<String, dynamic>>[];
+          final firstChannelUrl = channelsList.isNotEmpty ? channelsList.first['url']?.toString() : null;
+
+          final String? scraperUrl = m['url'] ?? m['sURL'] ?? m['detailUrl'] ?? firstChannelUrl;
+          final String itemId = m['id']?.toString() ?? scraperUrl ?? '';
+          final String source = m['source']?.toString() ?? (normalizedCat == 'live' ? 'ppv' : (mediaType == MediaType.anime ? 'AniList' : 'TMDB'));
+
+          final String? bannerSource = m['bannerUrl'] ?? m['banner'] ?? m['backdrop'] ?? m['backdropUrl'] ?? m['posterUrl'];
           
           // Senior Optimization: Aplicar políticas de imagen centralizadas
           final String bannerUrl = isFHD 
@@ -681,7 +689,7 @@ class AurisRepositoryImpl implements AurisRepository {
           final card = SearchResult(
             title: m['title'] ?? '',
             url: scraperUrl ?? itemId,
-            source: m['source'] ?? (mediaType == MediaType.anime ? 'AniList' : 'TMDB'),
+            source: source,
             quality: 'HD',
             thumbnail: m['posterUrl'] ?? m['poster'] ?? m['thumbnail'] ?? '',
             banner: bannerSource ?? '',
@@ -712,10 +720,11 @@ class AurisRepositoryImpl implements AurisRepository {
             available: (m['available'] as bool?) ?? true,
             detailUrl: scraperUrl,
             tmdbId: (m['tmdbId'] as num?)?.toInt() ?? (m['tmdb_id'] as num?)?.toInt(),
-            source: m['source'] ?? (mediaType == MediaType.anime ? 'AniList' : 'TMDB'),
+            source: source,
             duration: m['duration']?.toString(),
             runtime: (m['runtime'] as num?)?.toInt() ?? int.tryParse(m['runtime']?.toString() ?? ''),
             totalSeasons: (m['totalSeasons'] as num?)?.toInt() ?? int.tryParse(m['totalSeasons']?.toString() ?? ''),
+            channels: channelsList,
             card: card.copyWith(
               kind: rawKind,
               type: m['type']?.toString(),
@@ -1308,5 +1317,46 @@ class AurisRepositoryImpl implements AurisRepository {
     } catch (e) {
       debugPrint('[AurisRepo] Error unsubscribing from topic: $e');
     }
+  }
+
+  @override
+  Future<List<ContentSports>> getSportsEvents({bool live = true}) async {
+    try {
+      final response = await _client.get(
+        '/api/events',
+        queryParameters: {'live': live ? '1' : '0'},
+        baseUrl: ApiEndpoints.sportsBaseUrl,
+      );
+
+      List<dynamic> itemsList = [];
+      if (response.data is List) {
+        itemsList = response.data as List;
+      } else if (response.data is Map) {
+        final map = response.data as Map<String, dynamic>;
+        if (map['data'] is Map && (map['data'] as Map)['items'] is List) {
+          itemsList = (map['data'] as Map)['items'] as List;
+        } else if (map['items'] is List) {
+          itemsList = map['items'] as List;
+        } else if (map['data'] is List) {
+          itemsList = map['data'] as List;
+        }
+      }
+
+      if (itemsList.isNotEmpty) {
+        return itemsList
+            .whereType<Map>()
+            .map((e) => ContentSports.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('[AurisRepo] getSportsEvents error: $e');
+      return [];
+    }
+  }
+
+  @override
+  Future<List<ContentSports>> getSportsEventsUpcoming() async {
+    return getSportsEvents(live: false);
   }
 }

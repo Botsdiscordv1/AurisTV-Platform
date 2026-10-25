@@ -7,6 +7,7 @@ class ApiEndpoints {
     'anime':   'anime.auristv.dpdns.org',
     'movies_series':  'movies-series.auristv.dpdns.org',
     'kdramas': 'kdramas.auristv.dpdns.org',
+    'sports': 'localhost',
   };
 
   static final Map<String, String> _serverOverride = {};
@@ -36,9 +37,11 @@ class ApiEndpoints {
 
   static const String _animePort = '3000';
   static const String _moviesSeriesPort = '3001';
+  static const String _sportsPort = '3003';
   static const String _kdramasPort = '3002';
 
   static String _categoryForPort(String port) {
+    if (port == _sportsPort) return 'sports';
     if (port == _moviesSeriesPort) return 'movies_series';
     if (port == _kdramasPort) return 'kdramas';
     return 'anime';
@@ -78,6 +81,7 @@ class ApiEndpoints {
   static String get baseUrl => baseUrlForPort(_animePort);
   static String get animeBaseUrl => baseUrlForPort(_animePort);
   static String get moviesSeriesBaseUrl => baseUrlForPort(_moviesSeriesPort);
+  static String get sportsBaseUrl => baseUrlForPort(_sportsPort);
   static String get kdramasBaseUrl => baseUrlForPort(_kdramasPort);
 
   /// Listas canónicas de hints por servidor (un solo lugar: el discovery,
@@ -118,6 +122,7 @@ class ApiEndpoints {
   /// fuente anime desconocida NO debe caer a movies por defecto aquí.
   static String? baseUrlForSourceOrNull(String source) {
     final s = source.toLowerCase();
+    if (s.contains('ppv') || s.contains('sport') || s.contains('live')) return sportsBaseUrl;
     if (kdramaSourceHints.any(s.contains)) return kdramasBaseUrl;
     if (movieSourceHints.any(s.contains)) return moviesSeriesBaseUrl;
     if (animeSourceHints.any(s.contains)) return animeBaseUrl;
@@ -133,6 +138,8 @@ class ApiEndpoints {
         c == 'movie_anime') return animeBaseUrl;
     // Senior Fix: Mapeo explícito de tipos genéricos al servidor de películas/series
     if (c == 'movie' || c == 'series' || c == 'tv' || c == 'movie_western' || c == 'series_western') return moviesSeriesBaseUrl;
+    // Live events use the sports server
+    if (c == 'live') return sportsBaseUrl;
     return moviesSeriesBaseUrl;
   }
 
@@ -241,6 +248,10 @@ class ApiEndpoints {
 
     final String lowerUrl = workingUrl.toLowerCase();
 
+    if (lowerUrl.contains('ppvservices.st') || lowerUrl.contains('ppvservices')) {
+      return fixUrl(workingUrl);
+    }
+
     if (_isOurServer(workingUrl) || workingUrl.startsWith('/') || 
         lowerUrl.contains('localhost') || lowerUrl.contains('127.0.0.1')) {
       return fixUrl(workingUrl);
@@ -250,6 +261,7 @@ class ApiEndpoints {
     String _fallbackBase() {
       if (category != null && category.isNotEmpty) return baseUrlForCategory(category);
       if (source != null && source.isNotEmpty) return baseUrlForSource(source, category);
+      if (lowerUrl.contains('ppvservices') || lowerUrl.contains('ppv')) return sportsBaseUrl;
       // Auto-inferir desde la URL si no se pasó hint (gnulahd/onlypelis -> 3001, anime hosts -> 3000, doramas -> 3002)
       if (lowerUrl.contains('gnulahd') || lowerUrl.contains('onlypelis') || lowerUrl.contains('pelispedia') || lowerUrl.contains('lamovie') || lowerUrl.contains('repelishd') || lowerUrl.contains('nu/') ) {
         // wp.com/nu es ambiguo, pero si la URL original es gnulahd, ya se detectó vía source; fallback conservador a movies
@@ -270,7 +282,7 @@ class ApiEndpoints {
     // la app no sigue ese redirect): ir directo al proxy del VPS, que sí los
     // sirve (doramasyt responde 200 al server). Sin este bypass, esas
     // imágenes nunca cargan en la app aunque existan.
-    const weservBlockedHosts = ['doramasyt.com'];
+    const weservBlockedHosts = ['doramasyt.com', 'ppvservices.st', 'static.ppvservices.st'];
     if (weservBlockedHosts.any((k) => lowerUrl.contains(k))) {
       return '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
     }

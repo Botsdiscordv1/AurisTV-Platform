@@ -823,36 +823,75 @@ class _ExpandableTextState extends State<_ExpandableText> {
   bool _expanded = false;
   @override Widget build(BuildContext context) {
     if (widget.text.isEmpty) return const SizedBox.shrink();
-    return LayoutBuilder(builder: (context, constraints) {
-      final tp = TextPainter(
-        text: TextSpan(text: widget.text, style: widget.style), 
-        textDirection: ui.TextDirection.ltr, 
-        maxLines: widget.maxLines
-      )..layout(maxWidth: constraints.maxWidth);
-      final hasOverflow = tp.didExceedMaxLines;
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        GestureDetector(
-          onTap: hasOverflow ? () => setState(() => _expanded = !_expanded) : null,
-          child: Text(
-            widget.text, 
-            maxLines: _expanded ? null : widget.maxLines, 
-            overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis, 
-            style: widget.style
+
+    if (_expanded) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.text, style: widget.style),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () => setState(() => _expanded = false),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2C2C32),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white24, width: 0.8),
+                ),
+                child: const Text(
+                  'MENOS',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.5),
+                ),
+              ),
+            ),
           ),
-        ),
-        if (hasOverflow) 
-          Padding(
-            padding: const EdgeInsets.only(top: 4), 
-            child: InkWell(
-              onTap: () => setState(() => _expanded = !_expanded), 
+        ],
+      );
+    }
+    
+    final threshold = widget.maxLines <= 2 ? 115 : 320;
+    final hasOverflow = widget.text.length > threshold;
+
+    if (!hasOverflow) {
+      return Text(widget.text, style: widget.style);
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
               child: Text(
-                _expanded ? 'Ver menos' : 'Ver m\u00E1s...', 
-                style: const TextStyle(color: Color(0xFFEF7A1E), fontWeight: FontWeight.bold, fontSize: 14)
-              )
-            )
-          ),
-      ]);
-    });
+                widget.text,
+                maxLines: widget.maxLines,
+                overflow: TextOverflow.ellipsis,
+                style: widget.style,
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => setState(() => _expanded = true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2C2C32),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white24, width: 0.8),
+                ),
+                child: const Text(
+                  'M\u00C1S',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 0.5),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -1629,13 +1668,131 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     );
   }
 
+  Widget _buildVerticalGenresRow(dynamic detail) {
+    List<String> genres = [];
+    if (detail is AnimeDetail) genres = detail.genres;
+    else if (detail is MovieDetail) genres = detail.genres;
+    
+    final text = genres.map((g) => g.toUpperCase()).join(' · ');
+
+    return Center(
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildVerticalMetadataRow(dynamic detail, {String? certification}) {
+    final year = (detail is AnimeDetail) ? detail.year?.toString() : (detail is MovieDetail ? detail.releaseDate?.split('-').first : null);
+    final runtime = _formatRuntime(_getRuntime(detail));
+    
+    List<String> parts = [];
+    if (year != null && year.isNotEmpty) parts.add(year);
+    if (runtime != 'N/A' && runtime.isNotEmpty) parts.add(runtime);
+    
+    final text = parts.join(' · ');
+
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        if (text.isNotEmpty)
+          Text(
+            text,
+            style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        if (certification != null && certification.isNotEmpty && certification != 'NR')
+          _buildAgeBadge(context, certification.toUpperCase(), small: true),
+      ],
+    );
+  }
+
+  Widget _buildQualityBadge(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(color: Colors.white24, width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white70, fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+      ),
+    );
+  }
+
+  Widget _buildWatchlistButton(BuildContext context, dynamic detailData, SearchResult? currentSource, String? banner) {
+    final favorites = ref.watch(favoritesProvider);
+    final String favId = widget.url.isNotEmpty ? widget.url : widget.title;
+    final bool isFav = favorites.any((f) => f.id == favId);
+    return Container(
+      width: 54,
+      height: 54,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white24, width: 1.0),
+      ),
+      child: IconButton(
+        icon: Icon(isFav ? Icons.check : Icons.add, color: Colors.white, size: 24),
+        onPressed: () {
+          final user = ref.read(authProvider);
+          ref.read(favoritesProvider.notifier).toggleFavorite(
+                buildFavoriteItem(
+                  id: favId,
+                  title: widget.title,
+                  posterUrl: currentSource?.thumbnail ?? '',
+                  bannerUrl: banner ?? '',
+                  category: widget.category,
+                  source: widget.source,
+                  url: widget.url,
+                  kind: widget.kind ?? widget.result?.kind,
+                  year: widget.year,
+                  type: widget.result?.type ?? widget.type,
+                  season: widget.season ?? widget.result?.season,
+                  sources: flattenSources(ref.read(activeContentSourcesProvider)),
+                  profileId: user?.activeProfileId ?? 'guest_profile',
+                ),
+              );
+        },
+      ),
+    );
+  }
+
+  Widget _buildShareButton(BuildContext context) {
+    return Container(
+      width: 54,
+      height: 54,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white24, width: 1.0),
+      ),
+      child: IconButton(
+        icon: AurisIcon(AurisIcons.share, color: Colors.white, size: 22),
+        onPressed: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Compartiendo ${widget.title}')),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildMainActionButton(BuildContext context, {required bool isMobile, PlaybackHistory? latestHistory, VoidCallback? onPlay}) {
     final hasHistory = latestHistory != null;
     // Etiqueta expresiva con episodio (solo si es número: en pelis no aplica).
     final epNum = int.tryParse((latestHistory?.episode ?? '').trim());
     final String label = hasHistory
-        ? (epNum != null ? 'Continuar viendo Ep $epNum' : 'Continuar viendo')
-        : 'Reproducir ahora';
+        ? (epNum != null ? 'Continuar Ep $epNum' : 'Continuar viendo')
+        : 'Reproducir';
     final String icon = AurisIcons.playFilled;
 
     final double? progress = hasHistory ? latestHistory.progress : null;
@@ -1649,7 +1806,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: const StadiumBorder(),
           elevation: 0,
         ),
           // LayoutBuilder: en pantallas estrechas (p. ej. colapso al rotar)
@@ -1774,20 +1931,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       ),
       const SizedBox(width: 8),
       _DetailIconButton(
-        icon: AurisIcons.like,
-        label: 'Me gusta',
-        onPressed: () {},
-        isMobile: isMobile,
-      ),
-      const SizedBox(width: 8),
-      _DetailIconButton(
-        icon: AurisIcons.dislike,
-        label: 'No me gusta',
-        onPressed: () {},
-        isMobile: isMobile,
-      ),
-      const SizedBox(width: 8),
-      _DetailIconButton(
         icon: AurisIcons.share,
         label: 'Compartir',
         onPressed: () {},
@@ -1906,6 +2049,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final certification = detailData != null ? ((detailData is MovieDetail ? (detailData as MovieDetail).certification : (detailData is AnimeDetail ? (detailData as AnimeDetail).certification : null)) ?? 'NR') : 'NR';
 
+    final orientation = MediaQuery.orientationOf(context);
+    final bool isPortrait = orientation == Orientation.portrait;
+    final bool isDesktop = ResponsiveUtils.isDesktop(context) || width >= 1024;
+    final bool isTablet = ResponsiveUtils.isTablet(context) || (width >= 768 && width < 1024);
+    final bool isMobilePortrait = isPortrait && !isDesktop && !isTablet && width < 768;
+
     final heroBanner = ApiEndpoints.proxyImage(
       DetailBackdropResolver.resolve(
         detail: detailData,
@@ -1978,26 +2127,79 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             },
           ) : null,
           topBar: Stack(children: [
-            Positioned(top: 12, left: 15, child: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28), onPressed: () => Navigator.of(context).pop())),
+            Positioned(
+              top: 12, 
+              left: 15, 
+              child: ClipOval(
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(1),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withOpacity(0.25), width: 0.8),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 24),
+                      onPressed: () => Navigator.of(context).pop(),
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Positioned(
               top: 12, 
               right: 15, 
-              child: Consumer(
-                builder: (context, ref, _) {
-                  final remoteState = ref.watch(remoteControlProvider);
-                  final castState = ref.watch(chromecastProvider);
-                  final activeTargetId = remoteState.activeTargetDeviceId;
-                  final isCasting = activeTargetId != null || castState.isCasting;
-                  
-                  return IconButton(
-                    icon: AurisIcon(
-                      AurisIcons.cast, 
-                      color: isCasting ? const Color(0xFFEF7A1E) : Colors.white, 
-                      size: 24,
-                    ), 
-                    onPressed: _showCastPicker,
-                  );
-                },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withOpacity(0.25), width: 0.8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: AurisIcon(AurisIcons.share, color: Colors.white, size: 24),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Compartiendo ${widget.title}')),
+                            );
+                          },
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          padding: EdgeInsets.zero,
+                        ),
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final remoteState = ref.watch(remoteControlProvider);
+                            final castState = ref.watch(chromecastProvider);
+                            final activeTargetId = remoteState.activeTargetDeviceId;
+                            final isCasting = activeTargetId != null || castState.isCasting;
+                            
+                            return IconButton(
+                              icon: AurisIcon(
+                                AurisIcons.cast, 
+                                color: isCasting ? const Color(0xFFEF7A1E) : Colors.white, 
+                                size: 24,
+                              ), 
+                              onPressed: _showCastPicker,
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              padding: EdgeInsets.zero,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ]),
@@ -2011,11 +2213,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             title: widget.title,
             logo: detailData?.logo,
             logoReady: detailAsync.hasValue,
-            maxWidth: isMobile ? double.infinity : 500,
-            maxHeight: isMobile ? 80 : 120,
+            maxWidth: isMobilePortrait ? double.infinity : 500,
+            maxHeight: isMobilePortrait ? 70 : 120,
+            centerAlignment: isMobilePortrait,
             style: TextStyle(
               color: Colors.white, 
-              fontSize: isMobile ? 14 : 18, 
+              fontSize: isMobilePortrait ? 20 : (isMobile ? 14 : 18), 
               fontWeight: FontWeight.bold, 
               height: 1.1, 
               letterSpacing: 4, 
@@ -2025,14 +2228,36 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
               ],
             ),
           ),
-          meta: _buildMetaRow(detailData, isMobile: isMobile, sourceRating: currentSource?.score, kind: detailParams.kind),
-          mainAction: _buildMainActionButton(
-            context, 
-            isMobile: isMobile,
-            latestHistory: history.where((h) => h.contentId == widget.title).firstOrNull,
-            onPlay: () => _handlePlay(context, detailState, history, heroBanner, detailData),
-          ),
-          secondaryActions: _buildCircularActions(context, isMobile: isMobile, poster: currentSource?.thumbnail, banner: heroBanner),
+          meta: isMobilePortrait 
+              ? _buildVerticalGenresRow(detailData)
+              : _buildMetaRow(detailData, isMobile: isMobile, sourceRating: currentSource?.score, kind: detailParams.kind),
+          metadata: isMobilePortrait 
+              ? _buildVerticalMetadataRow(detailData, certification: certification)
+              : null,
+          mainAction: isMobilePortrait
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 195,
+                      child: _buildMainActionButton(
+                        context, 
+                        isMobile: isMobile,
+                        latestHistory: history.where((h) => h.contentId == widget.title).firstOrNull,
+                        onPlay: () => _handlePlay(context, detailState, history, heroBanner, detailData),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildWatchlistButton(context, detailData, currentSource, heroBanner),
+                  ],
+                )
+              : _buildMainActionButton(
+                  context, 
+                  isMobile: isMobile,
+                  latestHistory: history.where((h) => h.contentId == widget.title).firstOrNull,
+                  onPlay: () => _handlePlay(context, detailState, history, heroBanner, detailData),
+                ),
+          secondaryActions: isMobilePortrait ? null : _buildCircularActions(context, isMobile: isMobile, poster: currentSource?.thumbnail, banner: heroBanner),
           synopsis: _buildSynopsis(detailData),
           selectors: (displayTotalSeasons > 1 || currentSource != null) ? Row(
             children: [
@@ -2214,6 +2439,12 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   Widget _buildSynopsis(dynamic detail, {bool isCompact = false, bool revealed = true}) {
     final text = detail?.overview ?? '';
     final isMobile = ResponsiveUtils.isMobile(context);
+    final size = MediaQuery.sizeOf(context);
+    final orientation = MediaQuery.orientationOf(context);
+    final bool isPortrait = orientation == Orientation.portrait;
+    final bool isDesktop = ResponsiveUtils.isDesktop(context) || size.width >= 1024;
+    final bool isTablet = ResponsiveUtils.isTablet(context) || (size.width >= 768 && size.width < 1024);
+    final bool isMobilePortrait = isPortrait && !isDesktop && !isTablet && size.width < 768;
     
     if (!revealed && text.isEmpty) {
       return Column(
@@ -2236,24 +2467,99 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       letterSpacing: -0.1
     );
 
-    if (isMobile) {
+    if (!isMobilePortrait) {
       return Text(
         text.isNotEmpty ? text : 'Sinopsis no disponible.',
-        maxLines: 3,
+        maxLines: 4,
         overflow: TextOverflow.ellipsis,
         style: textStyle,
       );
     }
-    
+
     return _ExpandableText(
       text: text.isNotEmpty ? text : 'Sinopsis no disponible.', 
-      maxLines: 4, 
+      maxLines: 2, 
       style: textStyle,
     );
   }
 
   Widget _buildHeaderSkeleton(BuildContext context, bool isMobile) {
+    final size = MediaQuery.sizeOf(context);
+    final orientation = MediaQuery.orientationOf(context);
+    final bool isPortrait = orientation == Orientation.portrait;
+    final bool isDesktop = ResponsiveUtils.isDesktop(context) || size.width >= 1024;
+    final bool isTablet = ResponsiveUtils.isTablet(context) || (size.width >= 768 && size.width < 1024);
+    final bool isMobilePortrait = isPortrait && !isDesktop && !isTablet && size.width < 768;
+
     if (isMobile) {
+      if (isMobilePortrait) {
+        return Column(
+          children: [
+            Stack(
+              clipBehavior: Clip.hardEdge,
+              children: [
+                AspectRatio(
+                  aspectRatio: 3 / 4,
+                  child: Container(color: const Color(0xFF0B0B0D)),
+                ),
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 24,
+                  child: Center(
+                    child: _SkeletonBox(width: 220, height: 48),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const _SkeletonBox(width: 180, height: 14),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      _SkeletonBox(width: 45, height: 14),
+                      SizedBox(width: 12),
+                      _SkeletonBox(width: 55, height: 14),
+                      SizedBox(width: 12),
+                      _SkeletonBox(width: 40, height: 18),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 195,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white10,
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: const BoxDecoration(
+                          color: Colors.white10,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ],
+        );
+      }
+
       return Column(children: [
         Stack(clipBehavior: Clip.hardEdge, children: [
           AspectRatio(aspectRatio: 16 / 12, child: Container(color: const Color(0xFF000000))),
@@ -2543,12 +2849,6 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         ],
         const SizedBox(height: 20),
         if (detail.genres is List) Wrap(spacing: 8, runSpacing: 8, children: (detail.genres as List).map<Widget>((g) => _buildBadge(context, g.toString().toUpperCase())).toList()), 
-        const SizedBox(height: 20), 
-        _ExpandableText(
-          text: detail.overview ?? '', 
-          style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 15, height: 1.5),
-          maxLines: 4,
-        ),
         const SizedBox(height: 24),
         if (platforms.isNotEmpty) ...[
           const Text('Disponible en', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -2622,8 +2922,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             ],
             const SizedBox(height: 10),
             Wrap(spacing: 8, children: [ Text(detail is AnimeDetail ? 'Jap\u00F3n' : 'Internacional', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 17)), const Text('•', style: TextStyle(color: Colors.white24)), Text(detail is AnimeDetail ? 'Anime' : 'Pel\u00EDcula', style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 17)) ]), const SizedBox(height: 10),
-            Row(children: [ const Text('IMDb ', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17, fontWeight: FontWeight.w900)), if (showRatingSkeleton && rating == null) const _RatingSkeleton(width: 36, height: 18) else Text(rating ?? 'N/A', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17)), const Text('/10', style: TextStyle(color: const Color(0xFFA5A5AA))), const SizedBox(width: 16), Text((detail is MovieDetail && detail.releaseDate != null && detail.releaseDate!.isNotEmpty) ? detail.releaseDate! : year, style: const TextStyle(color: const Color(0xFFA5A5AA))), if (sInfo.isNotEmpty) ...[const SizedBox(width: 16), Text(sInfo, style: const TextStyle(color: const Color(0xFFA5A5AA)))] ]), const SizedBox(height: 16),
-            _ExpandableText(text: detail.overview ?? '', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 20), maxLines: 4)
+            Row(children: [ const Text('IMDb ', style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17, fontWeight: FontWeight.w900)), if (showRatingSkeleton && rating == null) const _RatingSkeleton(width: 36, height: 18) else Text(rating ?? 'N/A', style: const TextStyle(color: const Color(0xFFA5A5AA), fontSize: 17)), const Text('/10', style: TextStyle(color: const Color(0xFFA5A5AA))), const SizedBox(width: 16), Text((detail is MovieDetail && detail.releaseDate != null && detail.releaseDate!.isNotEmpty) ? detail.releaseDate! : year, style: const TextStyle(color: const Color(0xFFA5A5AA))), if (sInfo.isNotEmpty) ...[const SizedBox(width: 16), Text(sInfo, style: const TextStyle(color: const Color(0xFFA5A5AA)))] ]), 
+            const SizedBox(height: 16),
           ])),
           const SizedBox(height: 24), if (dir.isNotEmpty || cast.isNotEmpty || std.isNotEmpty || status != null || languages.isNotEmpty) _DetailInfoCard(child: Column(children: [ 
             if (status != null) _buildPrimeRow('Estado', status),

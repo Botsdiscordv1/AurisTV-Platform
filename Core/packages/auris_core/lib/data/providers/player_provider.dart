@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
@@ -41,6 +42,39 @@ final movieDetailProvider =
 final unifiedContentDetailProvider =
     FutureProvider.family<ContentDetailResponse?, UnifiedDetailParams>((ref, params) async {
   ref.keepAlive();
+
+  if (params.source == 'ppv' || params.category == 'live' || params.kind == 'sports' || (params.url != null && params.url!.contains('/embed/'))) {
+    Future.microtask(() {
+      final context = ref.read(navigatorKeyProvider).currentContext;
+      if (context != null && context.mounted) {
+        final initialSource = params.initialSources?.firstOrNull;
+        final channelsList = initialSource?.sources != null
+            ? initialSource!.sources.map((s) => {'name': s.quality, 'url': s.url, 'source': s.source}).toList()
+            : <Map<String, dynamic>>[];
+
+        final sportsEvent = ContentSports(
+          id: params.url ?? '',
+          title: params.title,
+          posterUrl: initialSource?.thumbnail ?? '',
+          bannerUrl: initialSource?.banner ?? initialSource?.thumbnail ?? '',
+          synopsis: initialSource?.synopsis,
+          league: initialSource?.status,
+          sportLabel: initialSource?.quality,
+          channels: channelsList,
+          source: params.source,
+        );
+
+        debugPrint('[unifiedContentDetailProvider] Intercepted sports event -> Opening ContentSportScreen for: "${sportsEvent.title}" (Channels: ${sportsEvent.channels.length})');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ContentSportScreen(event: sportsEvent),
+          ),
+        );
+      }
+    });
+    return null;
+  }
+
   final repo = ref.watch(aurisRepositoryProvider);
 
   // 1. Identificar el servidor de origen real basándose en la fuente (source)
@@ -230,7 +264,9 @@ class ExtractParams {
 
 final extractProvider =
     FutureProvider.autoDispose.family<ExtractResult, ExtractParams>((ref, params) async {
-  if (params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
+  if (params.source == 'ppv' || params.source == 'sport' || params.source == 'live' ||
+      params.url.contains('/embed/') ||
+      params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
     return ExtractResult(url: params.url, headers: const {});
   }
   final CancelToken cancelToken = CancelToken();

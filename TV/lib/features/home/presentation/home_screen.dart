@@ -111,6 +111,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     'películas': FocusNode(),
     'series': FocusNode(),
     'kdrama': FocusNode(),
+    'live': FocusNode(),
   };
 
   @override
@@ -844,6 +845,7 @@ class _PillNavBar extends StatelessWidget {
       {'id': 'películas', 'label': 'Películas'},
       {'id': 'series', 'label': 'Series'},
       {'id': 'kdrama', 'label': 'KDramas'},
+      {'id': 'live', 'label': 'Live'},
     ];
 
     final double hPadding = TVResponsiveUtils.sp(context, 18);

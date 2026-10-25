@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
 import 'package:auris_core/auris_core.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/utils/web_utils.dart';
 import 'widgets/auris_splash_logo.dart';
 
@@ -36,7 +37,10 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  void _onAnimationFinished() {
+  Future<void> _onAnimationFinished() async {
+    try {
+      await Permission.notification.request();
+    } catch (_) {}
     if (mounted) {
       context.go('/');
     }

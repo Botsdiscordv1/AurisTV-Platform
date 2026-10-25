@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:auris_core/core/utils/category_utils.dart';
 import 'package:auris_core/core/utils/content_logic.dart';
+import 'package:auris_core/core/utils/source_utils.dart';
 import 'package:auris_core/data/providers/library_providers.dart';
 import 'package:auris_core/data/models/playback_history.dart';
 import 'package:auris_core/data/models/server/search_result.dart';
@@ -177,6 +178,14 @@ void main() {
       expect(response.seasons.first.episodeCount, 9);
       expect(response.seasons.last.number, 3);
       expect(response.seasons.last.episodeCount, 6);
+    });
+  });
+
+  group('simplifySourceName para Cuevana', () {
+    test('Simplifica Cuevana a CVN', () {
+      expect(simplifySourceName('cuevana'), 'CVN');
+      expect(simplifySourceName('Cuevana'), 'CVN');
+      expect(simplifySourceName('CUEVANA'), 'CVN');
     });
   });
 }

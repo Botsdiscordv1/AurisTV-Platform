@@ -15,7 +15,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'package:collection/collection.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
@@ -3067,10 +3066,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_player == null) return; // Fail safe
     final player = _player!;
 
-    // Notificación media del sistema (control desde el shade / lock screen).
-    try {
-      await Permission.notification.request();
-    } catch (_) {}
     audioHandler.attach(
       player,
       title: widget.metadataTitle ?? widget.title ?? 'AurisTV',

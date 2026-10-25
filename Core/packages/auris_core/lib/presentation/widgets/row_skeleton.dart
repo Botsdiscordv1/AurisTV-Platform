@@ -36,7 +36,7 @@ class RowSkeleton extends StatelessWidget {
         ? ResponsiveUtils.bannerRowHeight(context)
         : ResponsiveUtils.rowHeight(context, hasInfo: isWide)) + 4.0; // Senior Fix: Buffer de seguridad de 4px
 
-    final double spacing = isMobile ? 12.0 : 18.0;
+    final double spacing = isMobile ? 8.0 : 10.0;
 
     // Senior Strategy: Cálculo dinámico de items para llenar la pantalla según el ancho disponible
     final int effectiveItemCount = itemCount ?? ((screenWidth - hPadding) / (cardWidth + spacing)).ceil() + 1;
@@ -73,10 +73,10 @@ class RowSkeleton extends StatelessWidget {
                       height: cardHeight,
                       width: cardWidth,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       clipBehavior: Clip.antiAlias,
-                      child: const SkeletonContainer(width: double.infinity, height: double.infinity, borderRadius: 4),
+                      child: const SkeletonContainer(width: double.infinity, height: double.infinity, borderRadius: 16),
                     ),
                     // Título dinámico (Solo para filas Wide / Banners)
                     if (isWide) ...[

@@ -81,6 +81,32 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     });
   }
 
+  void _handlePlay(MediaItem item) {
+    _handleDetails(item);
+  }
+
+  void _handleDetails(MediaItem item) {
+    if (item.source == 'ppv' || item.source == 'sport' || item.source == 'live' || (item.channels != null && item.channels!.isNotEmpty)) {
+      debugPrint('[HeroBanner] Intercepted sports item -> Opening ContentSportScreen for: "${item.title}"');
+      final sportsEvent = ContentSports(
+        id: item.id,
+        title: item.title,
+        posterUrl: item.posterUrl,
+        bannerUrl: item.bannerUrl ?? item.posterUrl,
+        channels: item.channels ?? [],
+        source: item.source.isNotEmpty ? item.source : 'ppv',
+        league: item.subtitle,
+      );
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ContentSportScreen(event: sportsEvent),
+        ),
+      );
+      return;
+    }
+    widget.onDetails(item);
+  }
+
   int _bgMemCacheWidth() {
     final mq = MediaQuery.of(context);
     return (mq.size.width * mq.devicePixelRatio).round().clamp(640, 1920);
@@ -444,7 +470,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             onTap: () {
               final item = _currentContentItem;
               if (item != null) {
-                SafeTap.run(() => widget.onDetails(item));
+                SafeTap.run(() => _handleDetails(item));
               }
             },
             child: _buildAdaptiveLayout(layout, screenWidth),
@@ -961,7 +987,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           Row(
             children: [
               _BannerButton(
-                onPressed: () => SafeTap.run(() => widget.onPlay(item)),
+                onPressed: () => SafeTap.run(() => _handlePlay(item)),
                 icon: AurisIcons.play,
                 label: 'Reproducir',
                 isPrimary: true,
@@ -971,7 +997,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               _BannerIconButton(
                 icon: AurisIcons.info,
                 label: 'Info',
-                onPressed: () => SafeTap.run(() => widget.onDetails(item)),
+                onPressed: () => SafeTap.run(() => _handleDetails(item)),
                 isCompact: true,
               ),
               if (item.trailerKey != null) ...[
@@ -1181,7 +1207,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         Row(
           children: [
             _BannerButton(
-              onPressed: () => SafeTap.run(() => widget.onPlay(item)), 
+              onPressed: () => SafeTap.run(() => _handlePlay(item)), 
               icon: AurisIcons.play, 
               label: 'Reproducir', 
               isPrimary: true,
@@ -1209,7 +1235,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             _BannerIconButton(
               icon: AurisIcons.info, 
               label: 'Detalles', 
-              onPressed: () => SafeTap.run(() => widget.onDetails(item)),
+              onPressed: () => SafeTap.run(() => _handleDetails(item)),
               isCompact: isIntermediate,
             ),
             if (item.trailerKey != null) ...[

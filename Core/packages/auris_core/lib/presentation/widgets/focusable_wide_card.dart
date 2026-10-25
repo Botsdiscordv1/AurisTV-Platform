@@ -26,6 +26,9 @@ class FocusableWideCard extends ConsumerStatefulWidget {
   final double width;
   final double height;
   final double aspectRatio;
+  final EdgeInsetsGeometry? margin;
+  final MediaItem? mediaItem;
+  final ContentSports? sportsEvent;
 
   const FocusableWideCard({
     super.key,
@@ -40,9 +43,12 @@ class FocusableWideCard extends ConsumerStatefulWidget {
     this.subtitle2,
     this.rating,
     this.badgeOverlay,
-    this.width = 440,
-    this.height = 248,
+    this.width = 340,
+    this.height = 191.25,
     this.aspectRatio = 16 / 9,
+    this.margin,
+    this.mediaItem,
+    this.sportsEvent,
   });
 
   @override
@@ -52,6 +58,30 @@ class FocusableWideCard extends ConsumerStatefulWidget {
 class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
   final ValueNotifier<bool> _isHovered = ValueNotifier<bool>(false);
   bool _isFocused = false;
+
+  bool get _isSportsItem => isSportsItemMetadata(
+        title: widget.title,
+        source: widget.mediaItem?.source,
+        channels: widget.mediaItem?.channels,
+      );
+
+  void _handleTap(BuildContext context) {
+    final isSports = isSportsItemMetadata(
+      title: widget.title,
+      source: widget.mediaItem?.source,
+      channels: widget.mediaItem?.channels,
+    );
+    debugPrint('[FocusableWideCard] _handleTap -> title: "${widget.title}", source: "${widget.mediaItem?.source}", isSports: $isSports');
+    handleCardTapOrSportsNavigation(
+      context,
+      title: widget.title,
+      imageUrl: widget.imageUrl,
+      onTap: widget.onTap,
+      source: widget.mediaItem?.source,
+      channels: widget.mediaItem?.channels,
+      subtitle: widget.subtitle,
+    );
+  }
 
   @override
   void dispose() {
@@ -115,7 +145,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
                       Navigator.pop(context);
-                      SafeTap.run(widget.onTap);
+                      _handleTap(context);
                     },
                   ),
                   ListTile(
@@ -262,7 +292,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
 
     if (selected != null) {
       if (selected == 'details') {
-        SafeTap.run(widget.onTap);
+        _handleTap(context);
       } else if (selected == 'download') {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Descarga no disponible')),
@@ -286,6 +316,25 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isSportsItem) {
+      final sportsEvent = widget.sportsEvent ?? ContentSports(
+        id: widget.mediaItem?.id ?? widget.title,
+        title: widget.title,
+        posterUrl: widget.imageUrl,
+        bannerUrl: widget.mediaItem?.bannerUrl ?? widget.imageUrl,
+        channels: (widget.mediaItem?.channels != null && widget.mediaItem!.channels!.isNotEmpty)
+            ? widget.mediaItem!.channels!
+            : [{'name': 'Canal Principal', 'url': widget.mediaItem?.detailUrl ?? ''}],
+        source: widget.mediaItem?.source ?? 'ppv',
+        league: widget.subtitle ?? widget.mediaItem?.subtitle,
+      );
+      return SportsCard(
+        event: sportsEvent,
+        width: null,
+        isFocused: _isFocused,
+      );
+    }
+
     final isMobile = context.useMobileLayout;
     final isDesktopOrWeb = kIsWeb || MediaQuery.of(context).size.width >= 800;
 
@@ -293,15 +342,15 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       child: MouseRegion(
         hitTestBehavior: HitTestBehavior.opaque,
-        onEnter: (_) { if (mounted) _isHovered.value = true; },
-        onExit: (_) { if (mounted) _isHovered.value = false; },
-        onHover: (_) { if (!_isHovered.value && mounted) _isHovered.value = true; },
+        onEnter: (_) { if (!isMobile && mounted) _isHovered.value = true; },
+        onExit: (_) { if (!isMobile && mounted) _isHovered.value = false; },
+        onHover: (_) { if (!isMobile && !_isHovered.value && mounted) _isHovered.value = true; },
         child: ValueListenableBuilder<bool>(
           valueListenable: _isHovered,
           builder: (context, hovered, _) {
             final isSelected = hovered || _isFocused;
             return GestureDetector(
-              onTap: () => SafeTap.run(widget.onTap),
+              onTap: () => _handleTap(context),
               onLongPressStart: (details) {
                 if (isDesktopOrWeb) {
                   _showContextMenu(context, details.globalPosition);
@@ -314,8 +363,9 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                   _showContextMenu(context, details.globalPosition);
                 }
               },
-              child: SizedBox(
+              child: Container(
                 width: widget.width,
+                margin: widget.margin ?? const EdgeInsets.only(right: 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -323,20 +373,22 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                     AspectRatio(
                       aspectRatio: widget.aspectRatio,
                       child: AnimatedScale(
-                        scale: isSelected ? 1.06 : 1.0,
+                        scale: isSelected ? 1.0 : 0.98,
                         duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
                         curve: Curves.easeOutQuint,
                         alignment: Alignment.center,
                         child: AnimatedContainer(
                           duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
                           curve: Curves.easeOutQuint,
+                          padding: EdgeInsets.zero,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
-                            boxShadow: [],
-                            border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: isSelected ? 2.5 : 0.0),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: isSelected
+                                ? [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4))]
+                                : [],
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(6),
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
@@ -457,6 +509,17 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                         alignment: Alignment.centerLeft,
                                         widthFactor: widget.progress!.clamp(0.0, 1.0),
                                         child: Container(decoration: const BoxDecoration(color: Color(0xFFEF7A1E), boxShadow: [BoxShadow(color: Color(0xFFEF7A1E), blurRadius: 4)])),
+                                      ),
+                                    ),
+                                  ),
+                                if (isSelected)
+                                  Positioned.fill(
+                                    child: IgnorePointer(
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: Colors.white, width: 4.0),
+                                        ),
                                       ),
                                     ),
                                   ),

@@ -11,6 +11,7 @@ export 'core/config/image_config.dart';
 export 'core/errors/playback_error_catalog.dart';
 export 'core/telemetry/playback_telemetry.dart';
 export 'data/models/media_item.dart';
+export 'data/models/content_sports.dart';
 export 'data/models/content_entity.dart';
 export 'data/models/unified_content_state.dart';
 export 'data/models/favorite_item.dart';
@@ -115,6 +116,8 @@ export 'presentation/widgets/adaptive_two_panel.dart';
 export 'presentation/widgets/option_list_card.dart';
 export 'presentation/widgets/app_update_dialog.dart';
 export 'presentation/widgets/update_download_banner.dart';
+export 'presentation/widgets/sports_card.dart';
+export 'presentation/widgets/content_sport_screen.dart';
 export 'presentation/widgets/tv_dialog_action.dart';
 
 export 'data/services/device_activation_service.dart';

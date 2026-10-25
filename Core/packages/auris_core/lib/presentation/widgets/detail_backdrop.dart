@@ -15,6 +15,7 @@ class DetailBackdrop extends StatelessWidget {
   final YoutubePlayerController? ytController;
   final Widget? logo;
   final double aspectRatio;
+  final double mobileAspectRatio;
 
   const DetailBackdrop({
     super.key,
@@ -25,15 +26,27 @@ class DetailBackdrop extends StatelessWidget {
     this.ytController,
     this.logo,
     this.aspectRatio = 16 / 9,
+    this.mobileAspectRatio = 3 / 4,
   });
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final isWide = width > 600;
+    final size = MediaQuery.sizeOf(context);
+    final orientation = MediaQuery.orientationOf(context);
+    final isPortrait = orientation == Orientation.portrait;
+    final isWide = size.width > 600;
+    final isDesktopOrTablet = ResponsiveUtils.isDesktop(context) || ResponsiveUtils.isTablet(context);
+
+    // 3:4 vertical solo en móvil en modo vertical (portrait).
+    // Formato anterior en horizontal (landscape) o tablets/desktops.
+    final bool isMobilePortrait = isPortrait && !isDesktopOrTablet && size.width < 768;
+    final targetAspectRatio = isMobilePortrait
+        ? mobileAspectRatio
+        : (isWide ? 21 / 9 : aspectRatio);
+    final Alignment imageAlignment = isMobilePortrait ? Alignment.center : Alignment.topCenter;
 
     return AspectRatio(
-      aspectRatio: isWide ? 21 / 9 : aspectRatio,
+      aspectRatio: targetAspectRatio,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -59,10 +72,10 @@ class DetailBackdrop extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: imageUrl!,
                   fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
+                  alignment: imageAlignment,
                   // Senior Low-RAM Guard: Limitado a 1600px en memoria para evitar
                   // que backdrops 4K (33MB de RAM c/u) causen OOM en TV Boxes de 1GB
-                  memCacheWidth: (width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 1600),
+                  memCacheWidth: (size.width * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 1600),
                   fadeInDuration: AurisImageConfig.defaultFadeInDuration,
                   fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
                   cacheManager: AurisImageCacheManager.instance,
@@ -96,10 +109,11 @@ class DetailBackdrop extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.6),
+                    Colors.black.withOpacity(0.7),
                     Colors.transparent,
+                    Colors.black.withOpacity(0.9),
                   ],
-                  stops: const [0.0, 0.35],
+                  stops: const [0.0, 0.4, 1.0],
                 ),
               ),
             ),

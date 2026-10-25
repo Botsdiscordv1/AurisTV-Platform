@@ -13,6 +13,7 @@ import '../models/server/source_info.dart';
 import '../models/server/title_info.dart';
 import '../models/server/gallery.dart';
 import '../models/media_item.dart';
+import '../models/content_sports.dart';
 
 abstract class AurisRepository {
   Future<SearchResponse> search(
@@ -88,6 +89,7 @@ abstract class AurisRepository {
   });
 
   Future<List<MediaItem>> getHomeHero({String category = 'anime', String? imgSize});
+  Future<List<ContentSports>> getSportsEvents({bool live = true});
   Future<HomeResponse> getUserHome({required String userId, String? category});
   /// Senior: Obtiene la versión actual del Home para sincronización ligera.
   Future<int> getHomeVersion({String? category});

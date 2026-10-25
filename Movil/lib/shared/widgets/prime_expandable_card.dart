@@ -89,21 +89,25 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
-                              AnimatedScale(
-                                scale: _isActive ? 1.12 : 1.0,
-                                duration: const Duration(milliseconds: 400),
-                                curve: Curves.easeOutCubic,
-                                child: CachedNetworkImage(
-                                  imageUrl: widget.media.posterUrl,
-                                  fit: BoxFit.cover,
-                                  memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
-                                  memCacheHeight: ((normalWidth * MediaQuery.of(context).devicePixelRatio) * 1.5).round().clamp(1, 600),
-                                  fadeInDuration: AurisImageConfig.defaultFadeInDuration,
-                                  fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
-                                  cacheManager: AurisImageCacheManager.instance,
-                                  filterQuality: FilterQuality.medium,
-                                ),
+                              CachedNetworkImage(
+                                imageUrl: widget.media.posterUrl,
+                                fit: BoxFit.cover,
+                                memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
+                                memCacheHeight: ((normalWidth * MediaQuery.of(context).devicePixelRatio) * 1.5).round().clamp(1, 600),
+                                fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                cacheManager: AurisImageCacheManager.instance,
+                                filterQuality: FilterQuality.medium,
                               ),
+                              if (_isActive || _isHovered || _isFocused)
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
                               Positioned.fill(
                                 child: DecoratedBox(
                                   decoration: BoxDecoration(
