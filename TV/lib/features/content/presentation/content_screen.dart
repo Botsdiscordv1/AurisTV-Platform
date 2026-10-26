@@ -2772,7 +2772,7 @@ class _ThemeRowState extends State<_ThemeRow> {
                       focusNode: _dummyNodes[index],
                       disableAutoEnsureVisible: true,
                       forceSelected: isSelected,
-                      showBorder: false,
+                      showBorder: true,
                       title: th.title,
                       imageUrl: th.imageUrl ?? '',
                       subtitle: th.artist.isNotEmpty
@@ -2787,28 +2787,9 @@ class _ThemeRowState extends State<_ThemeRow> {
                     );
                   },
                 ),
-                // Marco blanco de foco FIJO (estilo Prime Video)
-                Positioned(
-                  left: horizontalPadding,
-                  top: 0,
-                  width: 280,
-                  height: 158,
-                  child: IgnorePointer(
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 150),
-                      opacity: _focusedIndex != null ? 1.0 : 0.0,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2.0,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                // El anillo de foco lo dibuja la propia tarjeta
+                // (DisneyFocusShell): outline-4/outline-offset-4 en #FAFAFA a
+                // 300ms que viaja con el tile en vez del marco fijo Prime.
               ],
             ),
           ),

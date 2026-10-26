@@ -142,6 +142,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildSection(ComposedHomeSection section, double horizontalPadding) {
+    // Carrusel de marcas/categorías deportivas → SportsBrandCarousel
+    if (section.type == HomeSectionType.brands && section.brandItems != null) {
+      return SportsBrandCarousel(
+        title: section.title,
+        items: section.brandItems!
+            .map((b) => SportsBrandItem(id: b.id, name: b.name, logoUrl: b.logoUrl, onTap: b.onTap))
+            .toList(),
+      );
+    }
+
+    // Filas de eventos deportivos → SportsCard (directo desde sportsItems,
+    // preservando isLive/status/date/league/canales). Evita el cast `as EditorialRow`.
+    if (section.sportsItems != null && section.sportsItems!.isNotEmpty) {
+      return SportsEventRow(
+        title: section.title,
+        subtitle: section.subtitle,
+        events: section.sportsItems!,
+        horizontalPadding: horizontalPadding,
+        // SportsCard navega a ContentSportScreen por defecto (onTap null).
+      );
+    }
+
     switch (section.type) {
       case HomeSectionType.continueWatching:
         return _ContinueWatchingSection(horizontalPadding: horizontalPadding);
@@ -280,6 +302,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           );
         }
+
+      // Marcas: ya se maneja al inicio de _buildSection (defensivo).
+      case HomeSectionType.brands:
+        return const SizedBox.shrink();
     }
   }
 
@@ -371,7 +397,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // Espaciador para que el contenido empiece debajo de la barra fija
               SliverToBoxAdapter(
                 child: SizedBox(height: isMobile 
-                  ? (MediaQuery.of(context).padding.top + (_isScrolled ? 50 : 98)) 
+                  ? (MediaQuery.of(context).padding.top + 52) 
                   : 0 // Senior Fix: En Web el banner sangra hasta arriba (detrás de la barra)
                 ),
               ),
@@ -512,126 +538,86 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final isCompactDesktop = width >= 800 && width < 1100;
     final navHeight = isCompactDesktop ? 70.0 : 80.0;
     final logoHeight = isCompactDesktop ? 28.0 : 32.0;
+
+    final heroBannerItemsAsync = ref.watch(heroBannerItemsProvider(currentCategory));
+    final activeHeroIndex = ref.watch(activeHeroIndexProvider(currentCategory));
+    final String? topBannerUrl = heroBannerItemsAsync.when(
+      data: (items) {
+        if (items.isEmpty) return null;
+        final index = activeHeroIndex % items.length;
+        return items[index].bannerUrl ?? items[index].posterUrl;
+      },
+      loading: () => null,
+      error: (_, __) => null,
+    );
     
     if (!isMobile) {
       return ClipRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(
-            sigmaX: _isScrolled ? 20.0 : 0.0,
-            sigmaY: _isScrolled ? 20.0 : 0.0,
+            sigmaX: 20.0,
+            sigmaY: 20.0,
           ),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             height: navHeight,
             margin: EdgeInsets.zero,
             decoration: BoxDecoration(
-              color: _isScrolled 
-                  ? const Color(0xFF000000).withValues(alpha: 0.4) 
-                  : Colors.transparent,
+              color: const Color(0xFF000000).withValues(alpha: 0.4),
               border: Border(
                 bottom: BorderSide(
-                  color: _isScrolled ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
+                  color: Colors.white.withValues(alpha: 0.1),
                   width: 0.5,
                 ),
               ),
             ),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: Row(
-                children: [
-                  SvgPicture.asset(
-                    'assets/icons/auris-logo-web-flat.svg',
-                    height: logoHeight,
-                    fit: BoxFit.contain,
-                    colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
-                  ),
-                  SizedBox(width: isCompactDesktop ? 20 : 40),
-                  _PillNavBar(
-                    currentCategory: currentCategory,
-                    onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 24),
-                        onPressed: () => context.push('/search'),
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 24),
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            backgroundColor: Colors.transparent,
-                            isScrollControlled: true,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                            ),
-                            builder: (_) => CastPickerSheet(),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 16),
-                      GestureDetector(
-                        onTap: () => context.push('/profile-with-nav'),
-                        child: _buildUserAvatar(context, isCompactDesktop),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: _scrollToTop,
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: _isScrolled ? 15.0 : 0.0,
-            sigmaY: _isScrolled ? 15.0 : 0.0,
-          ),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            decoration: BoxDecoration(
-              color: _isScrolled 
-                  ? const Color(0xFF000000).withValues(alpha: 0.6) 
-                  : const Color(0xFF000000), 
-              border: Border(
-                bottom: BorderSide(
-                  color: _isScrolled ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
-                  width: 0.5,
-                ),
-              ),
-            ),
-            padding: EdgeInsets.fromLTRB(horizontalPadding, 10, horizontalPadding, 12),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Para $greetingName',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                if (topBannerUrl != null)
+                  Positioned.fill(
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        heightFactor: 0.2,
+                        child: Image.network(
+                          topBannerUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
                         ),
                       ),
+                    ),
+                  ),
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.4),
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: Row(
+                    children: [
+                      SvgPicture.asset(
+                        'assets/icons/auris-logo-web-flat.svg',
+                        height: logoHeight,
+                        fit: BoxFit.contain,
+                        colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                      ),
+                      SizedBox(width: isCompactDesktop ? 20 : 40),
+                      _PillNavBar(
+                        currentCategory: currentCategory,
+                        onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
+                      ),
+                      const Spacer(),
                       Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
+                            icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 24),
+                            onPressed: () => context.push('/search'),
+                          ),
+                          const SizedBox(width: 16),
+                          IconButton(
+                            icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 24),
                             onPressed: () {
                               showModalBottomSheet(
                                 context: context,
@@ -643,84 +629,124 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 builder: (_) => CastPickerSheet(),
                               );
                             },
-                            constraints: BoxConstraints(minWidth: 36, minHeight: 36),
-                            padding: EdgeInsets.zero,
                           ),
-                          const SizedBox(width: 4),
-                          IconButton(
-                            icon: const Icon(Icons.download_rounded, color: Colors.white, size: 22),
-                            onPressed: () => context.push('/settings/library'),
-                            constraints: BoxConstraints(minWidth: 36, minHeight: 36),
-                            padding: EdgeInsets.zero,
+                          const SizedBox(width: 16),
+                          GestureDetector(
+                            onTap: () => context.push('/profile-with-nav'),
+                            child: _buildUserAvatar(context, isCompactDesktop),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  if (!_isScrolled) ...[
-                    const SizedBox(height: 10),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 700),
-                      switchInCurve: Curves.easeInOutQuart,
-                      switchOutCurve: Curves.easeInOutQuart,
-                      child: (currentCategory == 'inicio')
-                          ? ShaderMask(
-                              shaderCallback: (Rect rect) {
-                                return const LinearGradient(
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                  colors: [Colors.black, Colors.transparent],
-                                  stops: [0.8, 1.0],
-                                ).createShader(rect);
-                              },
-                              blendMode: BlendMode.dstIn,
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                physics: const BouncingScrollPhysics(),
-                                padding: const EdgeInsets.only(right: 20),
-                                child: _PillNavBar(
-                                  currentCategory: currentCategory,
-                                  hideHome: true,
-                                  onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
-                                ),
-                              ),
-                            )
-                          : Row(
-                              key: const ValueKey('home_nav_filter'),
-                              children: [
-                                GestureDetector(
-                                  onTap: () => ref.read(homeCategoryProvider.notifier).state = 'inicio',
-                                  child: Container(
-                                    padding: const EdgeInsets.all(7),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.1),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    currentCategory[0].toUpperCase() + currentCategory.substring(1),
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.black,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ],
-                ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: _scrollToTop,
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: 15.0,
+            sigmaY: 15.0,
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            decoration: BoxDecoration(
+              color: const Color(0xFF000000).withValues(alpha: 0.4),
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  width: 0.5,
+                ),
               ),
+            ),
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                if (topBannerUrl != null)
+                  Positioned.fill(
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        heightFactor: 0.15,
+                        child: Image.network(
+                          topBannerUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                        ),
+                      ),
+                    ),
+                  ),
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.4),
+                  ),
+                ),
+                SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              greetingName,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            _CategoriesDropdownPill(
+                              currentCategory: currentCategory,
+                              onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
+                            ),
+                          ],
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
+                              onPressed: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  backgroundColor: Colors.transparent,
+                                  isScrollControlled: true,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                  ),
+                                  builder: (_) => CastPickerSheet(),
+                                );
+                              },
+                              constraints: BoxConstraints(minWidth: 36, minHeight: 36),
+                              padding: EdgeInsets.zero,
+                            ),
+                            const SizedBox(width: 12),
+                            IconButton(
+                              icon: const Icon(Icons.download_rounded, color: Colors.white, size: 22),
+                              onPressed: () => context.push('/settings/library'),
+                              constraints: BoxConstraints(minWidth: 36, minHeight: 36),
+                              padding: EdgeInsets.zero,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1468,5 +1494,92 @@ class _ContinueWatchingSection extends ConsumerWidget {
     }
   }
 }
+
+class _CategoriesDropdownPill extends StatelessWidget {
+  final String currentCategory;
+  final ValueChanged<String> onCategoryChanged;
+
+  const _CategoriesDropdownPill({
+    required this.currentCategory,
+    required this.onCategoryChanged,
+  });
+
+  void _showCategoriesMenu(BuildContext context, GlobalKey key) {
+    final RenderBox renderBox = key.currentContext?.findRenderObject() as RenderBox ?? context.findRenderObject() as RenderBox;
+    final position = renderBox.localToGlobal(Offset.zero);
+    
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy + 45, position.dx + 150, position.dy + 250),
+      color: const Color(0xFF18181B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      items: [
+        PopupMenuItem(
+          value: 'inicio',
+          child: Text('Inicio', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+        PopupMenuItem(
+          value: 'series',
+          child: Text('Series', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+        PopupMenuItem(
+          value: 'películas',
+          child: Text('Películas', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+        PopupMenuItem(
+          value: 'animes',
+          child: Text('Animes', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+        PopupMenuItem(
+          value: 'kdrama',
+          child: Text('KDramas', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+        PopupMenuItem(
+          value: 'live',
+          child: Text('Live', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+      ],
+    ).then((value) {
+      if (value != null) {
+        onCategoryChanged(value);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final GlobalKey key = GlobalKey();
+    final label = currentCategory == 'inicio' 
+        ? 'Categorías ⌄' 
+        : (currentCategory[0].toUpperCase() + currentCategory.substring(1) + ' ⌄');
+
+    return GestureDetector(
+      key: key,
+      onTap: () => _showCategoriesMenu(context, key),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.0),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 
 

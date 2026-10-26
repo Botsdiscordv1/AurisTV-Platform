@@ -1,5 +1,4 @@
 import '../../auris_core.dart';
-import '../../data/models/section_presentation.dart';
 
 /// Configuration preferences for the SectionComposer.
 class CompositionPreferences {
@@ -22,6 +21,8 @@ class ComposedHomeSection {
   final String? subtitle;
   final List<MediaItem> items;
   final List<ContentSports>? sportsItems;
+  /// Items del carrusel de marcas (solo `type == brands`) → `SportsBrandCarousel`.
+  final List<SportsBrandItem>? brandItems;
   final SectionPresentation presentation;
   final dynamic data;
   final EditorialBadge? badge;
@@ -33,6 +34,7 @@ class ComposedHomeSection {
     required this.presentation,
     required this.items,
     this.sportsItems,
+    this.brandItems,
     this.subtitle,
     this.data,
     this.badge,
@@ -56,6 +58,9 @@ class SectionComposer {
       if (s.data is SportsEditorialRow) {
         return (s.data as SportsEditorialRow).items.isNotEmpty;
       }
+      if (s.data is SportsBrandRow) {
+        return (s.data as SportsBrandRow).items.isNotEmpty;
+      }
       return true;
     }).toList();
 
@@ -65,6 +70,7 @@ class SectionComposer {
     final List<ComposedHomeSection> composed = filtered.map((raw) {
       List<MediaItem> items = [];
       List<ContentSports>? sportsItems;
+      List<SportsBrandItem>? brandItems;
       String title = raw.title ?? '';
       String? subtitle;
       EditorialBadge? badge;
@@ -82,6 +88,10 @@ class SectionComposer {
         items = List.unmodifiable(row.items.map((e) => e.toMediaItem()).toList());
         title = row.title;
         subtitle = row.subtitle;
+      } else if (raw.data is SportsBrandRow) {
+        final row = raw.data as SportsBrandRow;
+        brandItems = List.unmodifiable(row.items);
+        title = row.title;
       } else if (raw.data is List<MediaItem>) {
         items = List.unmodifiable(raw.data as List<MediaItem>);
       }
@@ -111,6 +121,7 @@ class SectionComposer {
         subtitle: subtitle,
         items: items,
         sportsItems: sportsItems,
+        brandItems: brandItems,
         presentation: presentation,
         data: data,
         badge: badge,

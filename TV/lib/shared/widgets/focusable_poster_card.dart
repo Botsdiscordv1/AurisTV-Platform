@@ -156,27 +156,20 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
             children: [
               AspectRatio(
                 aspectRatio: widget.aspectRatio,
-                // Pop-out: el marco ENTERO (imagen + borde + sombra) crece
-                // fuera de su ranura al enfocar, estilo Netflix. Sincronizado
-                // con el scroll ancla (250ms). Las filas usan Clip.none para
-                // que el crecimiento no se recorte.
-                child: AnimatedScale(
-                  scale: _isActive ? 1.10 : 1.0,
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutCubic,
-                  child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
-                    boxShadow: _isActive
-                        ? []
-                        : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
-                  ),
+                // Tratamiento Disney+ (clon del hub deportivo de Disney+):
+                // scale 1.0 -> 1.03, anillo outline-4/offset-4 #FAFAFA fuera de
+                // la tarjeta y sombra dual (≥768), todo 300ms cubic-bezier(0,0,.2,1).
+                // Las filas usan Clip.none para que el crecimiento no se recorte.
+                child: DisneyFocusShell(
+                  active: _isActive,
+                  activeShadow: DisneyFocusTokens.shadowFor(context),
+                  ringColor: widget.activeBorderColor ?? DisneyFocusTokens.ringColor,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
                       // 1. EL PÓSTER (Base)
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),
                         clipBehavior: Clip.antiAlias,
                         child: Builder(
                           builder: (context) {
@@ -210,7 +203,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                         child: IgnorePointer(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
@@ -224,7 +217,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
 
                       // 2. OVERLAYS (Clipeados individualmente o por el Stack)
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),
                         clipBehavior: Clip.antiAlias, // Senior Fix: Máxima calidad de recorte
                         child: Stack(
                           children: [
@@ -290,20 +283,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                         ),
                       ),
 
-                      // 3. EL BORDE (Capa Superior para sellar imperfecciones)
-                      IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: _isActive ? (widget.activeBorderColor ?? Colors.white) : Colors.transparent,
-                              width: _isActive ? 2.0 : 0.0,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
-                  ),
                   ),
                 ),
               ),

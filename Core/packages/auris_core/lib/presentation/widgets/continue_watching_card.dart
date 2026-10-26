@@ -299,26 +299,14 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                   children: [
                     AspectRatio(
                       aspectRatio: 16 / 9,
-                      child: AnimatedScale(
-                        scale: isActive ? 1.0 : 0.98,
-                        duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
-                        curve: Curves.easeOutQuint,
-                        alignment: Alignment.center,
-                        child: AnimatedContainer(
-                          duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
-                          curve: Curves.easeOutQuint,
-                          padding: EdgeInsets.zero,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: isActive
-                                ? [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4))]
-                                : [],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
+                      child: DisneyFocusShell(
+                        active: isActive,
+                        activeShadow: DisneyFocusTokens.shadowFor(context),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
                                 if (imageUrl != null)
                                   CachedNetworkImage(
                                     imageUrl: ApiEndpoints.proxyImage(
@@ -409,23 +397,11 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                                       ),
                                     ),
                                   ),
-                                if (isActive)
-                                  Positioned.fill(
-                                    child: IgnorePointer(
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: Colors.white, width: 4.0),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
                         ),
                       ),
-                    ),
                     if (remainingMs > 0)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),

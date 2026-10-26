@@ -314,6 +314,16 @@ class SportsEditorialRow {
   });
 }
 
+/// Fila de marcas/categorías deportivas (Disney+/ESPN) para pintar un
+/// `SportsBrandCarousel` en el Home. Viene del backend (`GET /api/home/sections`,
+/// sección `type: "brands"`). El `onTap` de cada item lo inyecta la pantalla.
+class SportsBrandRow {
+  final String title;
+  final List<SportsBrandItem> items;
+
+  const SportsBrandRow({required this.title, required this.items});
+}
+
 enum HomeSectionType {
   editorial,
   trendingAnime,
@@ -323,7 +333,8 @@ enum HomeSectionType {
   continueWatching,
   top10Global,
   recommendation,
-  discovery // Senior Fix: Soporte para charts y exploraciones dinámicas vía /api/filter
+  discovery, // Senior Fix: Soporte para charts y exploraciones dinámicas vía /api/filter
+  brands // Carrusel de marcas/categorías deportivas (SportsBrandCarousel)
 }
 
 class HomeLayoutSection {
@@ -412,37 +423,93 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
 
   if (currentCategory == 'live') {
     try {
-      final liveEvents = await repo.getSportsEvents(live: true).timeout(const Duration(seconds: 10));
-      final upcomingEvents = await repo.getSportsEvents(live: false).timeout(const Duration(seconds: 10));
+      // El BACKEND arma las secciones (GET /api/home/sections); aquí solo las
+      // mapeamos a HomeLayoutSection para pintarlas. Cada sección `cards` se
+      // convierte en una fila de SportsCard. Fallback a getSportsEvents si el
+      // endpoint de secciones no está disponible.
+      final sections = await repo.getHomeSections().timeout(const Duration(seconds: 10));
 
       final List<HomeLayoutSection> liveSections = [];
 
-      if (liveEvents.isNotEmpty) {
-        liveSections.add(HomeLayoutSection(
-          type: HomeSectionType.editorial,
-          title: 'En Vivo',
-          data: SportsEditorialRow(
-            title: 'En Vivo',
-            subtitle: 'Eventos deportivos transmitiéndose ahora',
-            items: liveEvents,
-          ),
-          presentation: SectionPresentation.wide,
-          serverFormat: 'wide',
-        ));
+      if (sections.isNotEmpty) {
+        for (final s in sections) {
+          final String type = s['type']?.toString() ?? '';
+          final String title = s['title']?.toString() ?? '';
+          final rawItems = s['items'];
+          if (rawItems is! List || rawItems.isEmpty) continue;
+
+          if (type == 'brands') {
+            // Carrusel de marcas/categorías → SportsBrandCarousel
+            final brandItems = rawItems.whereType<Map>().map((b) => SportsBrandItem(
+              id: b['id']?.toString() ?? '',
+              name: b['name']?.toString() ?? '',
+              logoUrl: ApiEndpoints.sportsUrl(b['logoUrl']?.toString()),
+              onTap: () {},   // la pantalla sustituye el onTap al pintar
+            )).toList();
+            if (brandItems.isEmpty) continue;
+            liveSections.add(HomeLayoutSection(
+              type: HomeSectionType.brands,
+              title: title.isEmpty ? 'Deportes' : title,
+              data: SportsBrandRow(title: title, items: brandItems),
+              presentation: SectionPresentation.wide,
+              serverFormat: 'brands',
+            ));
+            continue;
+          }
+
+          if (type != 'cards') continue;   // hero lo maneja el heroBanner
+
+          final events = rawItems
+              .whereType<Map>()
+              .map((e) => ContentSports.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
+          if (events.isEmpty) continue;
+          liveSections.add(HomeLayoutSection(
+            type: HomeSectionType.editorial,
+            title: title,
+            data: SportsEditorialRow(
+              title: title,
+              subtitle: s['meta']?['sportLabel']?.toString() ?? s['meta']?['league']?.toString(),
+              items: events,
+            ),
+            presentation: SectionPresentation.wide,
+            serverFormat: 'wide',
+          ));
+        }
       }
 
-      if (upcomingEvents.isNotEmpty) {
-        liveSections.add(HomeLayoutSection(
-          type: HomeSectionType.editorial,
-          title: 'Próximos Eventos',
-          data: SportsEditorialRow(
+      // Fallback: si el backend no devolvió secciones, usar el enfoque previo.
+      if (liveSections.isEmpty) {
+        final liveEvents = await repo.getSportsEvents(live: true).timeout(const Duration(seconds: 10));
+        final upcomingEvents = await repo.getSportsEvents(live: false).timeout(const Duration(seconds: 10));
+
+        if (liveEvents.isNotEmpty) {
+          liveSections.add(HomeLayoutSection(
+            type: HomeSectionType.editorial,
+            title: 'En Vivo',
+            data: SportsEditorialRow(
+              title: 'En Vivo',
+              subtitle: 'Eventos deportivos transmitiéndose ahora',
+              items: liveEvents,
+            ),
+            presentation: SectionPresentation.wide,
+            serverFormat: 'wide',
+          ));
+        }
+
+        if (upcomingEvents.isNotEmpty) {
+          liveSections.add(HomeLayoutSection(
+            type: HomeSectionType.editorial,
             title: 'Próximos Eventos',
-            subtitle: 'Agenda deportiva próxima',
-            items: upcomingEvents,
-          ),
-          presentation: SectionPresentation.wide,
-          serverFormat: 'wide',
-        ));
+            data: SportsEditorialRow(
+              title: 'Próximos Eventos',
+              subtitle: 'Agenda deportiva próxima',
+              items: upcomingEvents,
+            ),
+            presentation: SectionPresentation.wide,
+            serverFormat: 'wide',
+          ));
+        }
       }
 
       yield SectionComposer.compose(liveSections);
@@ -627,8 +694,6 @@ List<HomeLayoutSection> _mapResponseToLayout(HomeResponse response, String categ
     presentation: SectionPresentation.wide,
   ));
 
-  SectionPresentation? lastPresentation;
-
   for (final section in response.sections) {
     try {
       if (section.items.isEmpty) continue; // Omitir secciones vacías de forma segura
@@ -681,10 +746,6 @@ List<HomeLayoutSection> _mapResponseToLayout(HomeResponse response, String categ
     }
   }
   return layout;
-}
-
-Future<void> _processPersonalizedHome(HomeResponse response, Ref ref) async {
-  // Aquí se podrían disparar tareas de segundo plano o prefetch si fuera necesario.
 }
 
 /// Senior Helper: Intercala y aleatoriza secciones de las 4 categorías (anime, películas, series, kdramas)
@@ -845,80 +906,6 @@ List<HomeLayoutSection> _interleaveInicioSections(
   }
 
   return result;
-}
-
-Future<List<HomeLayoutSection>> _getEditorialFallback(Ref ref, String category) async {
-  final List<HomeLayoutSection> layout = [];
-  layout.add(HomeLayoutSection(
-    type: HomeSectionType.continueWatching,
-    presentation: SectionPresentation.wide,
-  ));
-  layout.add(const HomeLayoutSection(
-    type: HomeSectionType.top10Global, 
-    title: 'Top 10 de hoy',
-    presentation: SectionPresentation.top10,
-  ));
-  layout.add(const HomeLayoutSection(
-    type: HomeSectionType.recentlyAdded, 
-    title: 'Recién añadido a AurisTV',
-    presentation: SectionPresentation.poster,
-  ));
-
-  try {
-    if (category == 'inicio') {
-      final results = await Future.wait([
-        ref.watch(editorialRowsProvider('animes').future).catchError((_) => <EditorialRow>[]),
-        ref.watch(editorialRowsProvider('películas').future).catchError((_) => <EditorialRow>[]),
-        ref.watch(editorialRowsProvider('series').future).catchError((_) => <EditorialRow>[]),
-        ref.watch(editorialRowsProvider('kdrama').future).catchError((_) => <EditorialRow>[]),
-      ]);
-
-      final List<List<HomeLayoutSection>> categorySectionLists = [];
-      for (final rows in results) {
-        final List<HomeLayoutSection> secList = rows.map((row) => HomeLayoutSection(
-          type: HomeSectionType.editorial,
-          title: row.title,
-          data: row,
-          presentation: row.format,
-        )).toList();
-        categorySectionLists.add(secList);
-      }
-
-      final interleaved = _interleaveInicioSections(categorySectionLists);
-      for (final s in interleaved) {
-        if (!layout.any((existing) => existing.title == s.title)) {
-          layout.add(s);
-        }
-      }
-    } else {
-      final editorials = await ref.watch(editorialRowsProvider(category).future);
-      for (final row in editorials) {
-        layout.add(HomeLayoutSection(
-          type: HomeSectionType.editorial, 
-          data: row,
-          presentation: row.format,
-        ));
-      }
-    }
-  } catch (e) {}
-
-  layout.add(const HomeLayoutSection(
-    type: HomeSectionType.recentEpisodes, 
-    title: 'Estrenos (Hoy)',
-    presentation: SectionPresentation.wide,
-  ));
-  layout.add(const HomeLayoutSection(
-    type: HomeSectionType.trendingAnime, 
-    title: 'Animes en tendencia',
-    presentation: SectionPresentation.poster,
-  ));
-  layout.add(const HomeLayoutSection(
-    type: HomeSectionType.trendingMovies, 
-    title: 'Películas destacadas',
-    presentation: SectionPresentation.wide,
-  ));
-
-  return layout;
 }
 
 HomeSectionType _mapApiSectionType(String apiType) {

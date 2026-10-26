@@ -125,20 +125,13 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
               children: [
                 AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      boxShadow: isSelected ? [] : [],
-                      border: Border.all(
-                        color: (widget.showBorder && isSelected) ? Colors.white : Colors.transparent,
-                        width: (widget.showBorder && isSelected) ? 2.0 : 0.0,
-                      ),
-                    ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Stack(
+                  child: DisneyFocusShell(
+                    active: isSelected,
+                    showRing: widget.showBorder,
+                    activeShadow: DisneyFocusTokens.shadowFor(context),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),
+                      child: Stack(
                           fit: StackFit.expand,
                           children: [
                             Builder(builder: (context) {

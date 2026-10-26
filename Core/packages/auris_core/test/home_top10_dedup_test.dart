@@ -117,6 +117,10 @@ class Top10Repo implements AurisRepository {
   @override
   Future<List<ContentSports>> getSportsEvents({bool live = true}) async => [];
   @override
+  Future<List<ContentSports>> getSportsEventsUpcoming() async => [];
+  @override
+  Future<List<Map<String, dynamic>>> getHomeSections() async => [];
+  @override
   Future<ScheduleResponse> getSchedule() async => const ScheduleResponse(days: [], season: '1', year: 2026, total: 0);
   @override
   Future<Map<String, dynamic>?> pingSchedulePremieres(int since) async => null;

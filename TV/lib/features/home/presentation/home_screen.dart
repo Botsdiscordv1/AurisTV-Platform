@@ -180,6 +180,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     bool Function()? onArrowDownToNext,
     bool Function()? onArrowUpToPrev,
   }) {
+    // Carrusel de marcas/categorías deportivas → SportsBrandCarousel
+    if (section.type == HomeSectionType.brands && section.brandItems != null) {
+      return SportsBrandCarousel(
+        title: section.title,
+        items: section.brandItems!
+            .map((b) => SportsBrandItem(id: b.id, name: b.name, logoUrl: b.logoUrl, onTap: b.onTap))
+            .toList(),
+      );
+    }
+
+    // Filas de eventos deportivos → SportsCard (directo desde sportsItems,
+    // preservando isLive/status/date/league/canales). Evita el cast `as EditorialRow`.
+    if (section.sportsItems != null && section.sportsItems!.isNotEmpty) {
+      return SportsEventRow(
+        title: section.title,
+        subtitle: section.subtitle,
+        events: section.sportsItems!,
+        horizontalPadding: horizontalPadding,
+        // SportsCard navega a ContentSportScreen por defecto (onTap null).
+      );
+    }
+
     switch (section.type) {
       case HomeSectionType.continueWatching:
         return _ContinueWatchingSection(
@@ -346,6 +368,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             ),
           );
         }
+
+      // Marcas: ya se maneja al inicio de _buildSection (defensivo).
+      case HomeSectionType.brands:
+        return const SizedBox.shrink();
     }
   }
 

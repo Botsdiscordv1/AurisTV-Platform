@@ -34,21 +34,16 @@ class _ContentSportsCardState extends State<ContentSportsCard> {
       onShowFocusHighlight: (f) => setState(() => _localFocused = f),
       child: GestureDetector(
         onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          transform: focused ? Matrix4.diagonal3Values(1.03, 1.03, 1.0) : Matrix4.identity(),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: focused ? const Color(0xFFEF7A1E) : Colors.white24,
-              width: focused ? 2.5 : 1.0,
-            ),
-            boxShadow: focused
-                ? [const BoxShadow(color: Color(0x66EF7A1E), blurRadius: 12, spreadRadius: 2)]
-                : [],
-          ),
+        child: DisneyFocusShell(
+          active: focused,
+          // Acento propio de esta tarjeta: anillo y glow naranjas como antes,
+          // pero con la geometría/movimiento Disney+ (1.03, radio 8, 300ms).
+          ringColor: const Color(0xFFEF7A1E),
+          activeShadow: const [
+            BoxShadow(color: Color(0x66EF7A1E), blurRadius: 12, spreadRadius: 2),
+          ],
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),
             child: Stack(
               fit: StackFit.expand,
               children: [

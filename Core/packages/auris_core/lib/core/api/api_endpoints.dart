@@ -84,6 +84,19 @@ class ApiEndpoints {
   static String get sportsBaseUrl => baseUrlForPort(_sportsPort);
   static String get kdramasBaseUrl => baseUrlForPort(_kdramasPort);
 
+  /// Resuelve una URL relativa del servidor Sports contra `sportsBaseUrl`.
+  ///
+  /// ⚠️ Usar SIEMPRE para rutas relativas que vienen del backend deportivo
+  /// (`/api/channel-logos/…`, `/api/img/espn/…`, `logo`, etc.). NO usar
+  /// `fixUrl()`, que prepone `baseUrl` (anime:3000) y mandaría la petición al
+  /// servidor equivocado.
+  static String sportsUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http')) return path;   // ya absoluta
+    if (path.startsWith('/')) return '$sportsBaseUrl$path';
+    return '$sportsBaseUrl/$path';
+  }
+
   /// Listas canónicas de hints por servidor (un solo lugar: el discovery,
   /// los filtros y el routing las comparten).
   static const List<String> kdramaSourceHints = [

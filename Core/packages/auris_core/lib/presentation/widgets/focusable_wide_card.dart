@@ -372,26 +372,14 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                   children: [
                     AspectRatio(
                       aspectRatio: widget.aspectRatio,
-                      child: AnimatedScale(
-                        scale: isSelected ? 1.0 : 0.98,
-                        duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
-                        curve: Curves.easeOutQuint,
-                        alignment: Alignment.center,
-                        child: AnimatedContainer(
-                          duration: kIsWeb ? const Duration(milliseconds: 250) : const Duration(milliseconds: 400),
-                          curve: Curves.easeOutQuint,
-                          padding: EdgeInsets.zero,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: isSelected
-                                ? [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4))]
-                                : [],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
+                      child: DisneyFocusShell(
+                        active: isSelected,
+                        activeShadow: DisneyFocusTokens.shadowFor(context),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
                                 Builder(builder: (context) {
                                   final dpr = MediaQuery.of(context).devicePixelRatio;
                                   final targetW = (widget.width * dpr).round().clamp(1, 540);
@@ -512,19 +500,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                       ),
                                     ),
                                   ),
-                                if (isSelected)
-                                  Positioned.fill(
-                                    child: IgnorePointer(
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: Colors.white, width: 4.0),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                            ],
                           ),
                         ),
                       ),

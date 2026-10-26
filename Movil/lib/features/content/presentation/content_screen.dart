@@ -1790,13 +1790,30 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final hasHistory = latestHistory != null;
     // Etiqueta expresiva con episodio (solo si es número: en pelis no aplica).
     final epNum = int.tryParse((latestHistory?.episode ?? '').trim());
-    final String label = hasHistory
-        ? (epNum != null ? 'Continuar Ep $epNum' : 'Continuar viendo')
-        : 'Reproducir';
-    final String icon = AurisIcons.playFilled;
-
     final double? progress = hasHistory ? latestHistory.progress : null;
     final bool hasProgress = progress != null && progress > 0.02;
+    final bool isFinished = progress != null && progress >= 0.95;
+
+    final String label = isFinished
+        ? 'Reproducir de nuevo'
+        : (hasHistory
+            ? (epNum != null ? 'Continuar Ep $epNum' : 'Continuar viendo')
+            : 'Reproducir');
+    final String icon = AurisIcons.playFilled;
+
+    String? remainingText;
+    if (hasHistory) {
+      final sub = continueCardSubtitle(latestHistory);
+      if (sub.line2?.isNotEmpty == true) {
+        String t = sub.line2!;
+        if (t.toLowerCase().startsWith('quedan ')) {
+          t = t.substring(7).trim();
+        } else if (t.toLowerCase().startsWith('queda ')) {
+          t = t.substring(6).trim();
+        }
+        remainingText = t;
+      }
+    }
 
     return SizedBox(
       width: double.infinity,
@@ -1813,33 +1830,37 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           // se usa la etiqueta corta para que todo quepa en la línea.
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final displayLabel = (hasHistory &&
-                      epNum != null &&
-                      constraints.maxWidth < 340)
-                  ? 'Continuar Ep $epNum'
-                  : label;
               return Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   AurisIcon(icon, color: Colors.black, size: 20),
                   const SizedBox(width: 8),
-                  // Solo el texto es flexible (ellipsis): la barra conserva
-                  // su tamaño original al lado y nunca desborda.
-                  Flexible(
-                    child: Text(
-                      displayLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18
-                      )
-                    ),
-                  ),
-                  if (hasProgress) ...[
-                    const SizedBox(width: 16),
+                  if (hasProgress && !isFinished) ...[
                     _buildButtonProgressBar(progress, isMobile: isMobile),
+                    if (remainingText != null && remainingText.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Text(
+                        remainingText,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ] else ...[
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16
+                        )
+                      ),
+                    ),
                   ],
                 ],
               );
