@@ -90,6 +90,13 @@ abstract class AurisRepository {
 
   Future<List<MediaItem>> getHomeHero({String category = 'anime', String? imgSize});
   Future<List<ContentSports>> getSportsEvents({bool live = true});
+  /// Comodín: eventos próximos (`live=false`).
+  Future<List<ContentSports>> getSportsEventsUpcoming();
+
+  /// Secciones del Home ARMADAS por el backend deportivo (`GET /api/home/sections`).
+  /// Devuelve la lista cruda de secciones (cada una con `id`, `type`, `title`,
+  /// `meta` e `items`). El frontend solo pinta según `type` (hero|brands|cards).
+  Future<List<Map<String, dynamic>>> getHomeSections();
   Future<HomeResponse> getUserHome({required String userId, String? category});
   /// Senior: Obtiene la versión actual del Home para sincronización ligera.
   Future<int> getHomeVersion({String? category});

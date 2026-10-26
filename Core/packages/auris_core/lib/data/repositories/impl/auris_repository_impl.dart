@@ -1359,4 +1359,36 @@ class AurisRepositoryImpl implements AurisRepository {
   Future<List<ContentSports>> getSportsEventsUpcoming() async {
     return getSportsEvents(live: false);
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> getHomeSections() async {
+    try {
+      final response = await _client.get(
+        '/api/home/sections',
+        baseUrl: ApiEndpoints.sportsBaseUrl,
+      );
+
+      // El backend envuelve en { success, data: { sections: [...] } }.
+      List<dynamic> sectionsList = [];
+      if (response.data is Map) {
+        final map = response.data as Map;
+        final data = map['data'];
+        if (data is Map && data['sections'] is List) {
+          sectionsList = data['sections'] as List;
+        } else if (map['sections'] is List) {
+          sectionsList = map['sections'] as List;
+        }
+      } else if (response.data is List) {
+        sectionsList = response.data as List;
+      }
+
+      return sectionsList
+          .whereType<Map>()
+          .map((s) => Map<String, dynamic>.from(s))
+          .toList();
+    } catch (e) {
+      debugPrint('[AurisRepo] getHomeSections error: $e');
+      return [];
+    }
+  }
 }

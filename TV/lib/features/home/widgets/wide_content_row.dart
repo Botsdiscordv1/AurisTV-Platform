@@ -292,7 +292,9 @@ class WideContentRowState extends State<WideContentRow>
                     ],
                   ),
                 ),
-                const SizedBox(height: 4),
+                // Holgura para el anillo Disney+ (8px sobre el borde de la
+                // tarjeta): el título no debe pisarse cuando la fila gana foco.
+                const SizedBox(height: 12),
               ],
             ),
           ),
@@ -366,8 +368,10 @@ class WideContentRowState extends State<WideContentRow>
                               final item = widget.items[index];
                               final bool isSelected = _focusedIndex == index;
 
-                              // El foco real vive en _rowFocusNode. El borde blanco
-                              // lo activa forceSelected segun el indice logico.
+                              // El foco real vive en _rowFocusNode. El anillo
+                              // Disney+ lo dibuja la propia tarjeta y viaja con
+                              // ella al hacer scroll (antes era un marco fijo
+                              // estilo Prime anclado a la fila).
                               return Align(
                                 alignment: Alignment.topCenter,
                                 child: FocusableWideCard(
@@ -375,7 +379,7 @@ class WideContentRowState extends State<WideContentRow>
                                   focusNode: _dummyNodes[index],
                                   disableAutoEnsureVisible: true,
                                   forceSelected: isSelected,
-                                  showBorder: false,
+                                  showBorder: true,
                                   title: item.title,
                                   imageUrl: item.imageUrl,
                                   logoUrl: item.logoUrl,
@@ -397,30 +401,10 @@ class WideContentRowState extends State<WideContentRow>
                     );
                   },
                 ),
-                // Marco blanco de foco FIJO (estilo Prime Video)
-                // Se ancla exactamente en el padding izquierdo de la fila y
-                // NUNCA se desplaza: las tarjetas se deslizan por debajo.
-                Positioned(
-                  left: horizontalPadding,
-                  top: 0,
-                  width: cardWidth,
-                  height: cardHeight,
-                  child: IgnorePointer(
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 150),
-                      opacity: _focusedIndex != null ? 1.0 : 0.0,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2.0,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                // El marco de foco lo dibuja ahora la propia tarjeta
+                // (DisneyFocusShell): anillo outline-4/outline-offset-4 en
+                // #FAFAFA a 300ms que viaja con el tile al hacer scroll,
+                // en lugar del marco fijo estilo Prime Video.
                 if (!isMobile) ...[
                   Positioned(
                     left: horizontalPadding - 25,

@@ -18,6 +18,8 @@ import '../../core/utils/youtube_resolver.dart';
 import '../../auris_core.dart';
 import 'nav_arrow.dart';
 
+final activeHeroIndexProvider = StateProvider.family<int, String>((ref, category) => 0);
+
 enum HeroBannerLayout { mobile, cinematic }
 
 class HeroBanner extends ConsumerStatefulWidget {
@@ -75,6 +77,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     _startAutoPlay();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        ref.read(activeHeroIndexProvider(widget.currentCategory).notifier).state = 0;
         _startCycle(delay: const Duration(milliseconds: 800));
         _precacheNextImage();
       }
@@ -117,7 +120,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     final nextIndex = (_backgroundIndex + 1) % widget.items.length;
     final nextItem = widget.items[nextIndex];
 
-    final imageUrl = nextItem.bannerUrl ?? nextItem.posterUrl;
+    // Precachea la MISMA imagen que luego pintará _buildBackgroundLayer
+    // (posterUrl en vertical, bannerUrl en horizontal).
+    final imageUrl = _heroBackgroundUrl(nextItem);
     if (imageUrl != null && imageUrl.isNotEmpty) {
       precacheImage(
         ResizeImage(
@@ -199,7 +204,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     // 2. CAMBIAR FONDO (Tras 400ms de desvanecimiento)
     _delayTimer = Timer(const Duration(milliseconds: 400), () {
       if (!mounted || !_isAppActive) return;
-      if (mounted) setState(() => _backgroundIndex = nextIndex);
+      if (mounted) {
+        setState(() => _backgroundIndex = nextIndex);
+        ref.read(activeHeroIndexProvider(widget.currentCategory).notifier).state = nextIndex % widget.items.length;
+      }
       
       // Senior Fix: Precargar el siguiente incluso antes de que llegue su turno
       _precacheNextImage();
@@ -416,17 +424,40 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
   void _stopAutoPlay() => _autoPlayTimer?.cancel();
 
+  /// Layout efectivo del hero. `mobile` = hero **vertical** (3:4 en portrait),
+  /// `cinematic` = hero **horizontal**. Única fuente de decisión: la usan
+  /// build(), la imagen de fondo y el precache para que nunca diverjan.
+  HeroBannerLayout get _resolvedLayout {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    // Senior Strategy: Dispositivos con ancho > 600 (como Z Fold desplegado)
+    // usan el Layout "Cápsula" (cinematic) para optimizar el espacio vertical.
+    final bool useMobileLayout = context.breakpoint < Breakpoint.sm ||
+        (context.breakpoint < Breakpoint.lg && screenWidth < 600);
+    return widget.layout ??
+        (useMobileLayout ? HeroBannerLayout.mobile : HeroBannerLayout.cinematic);
+  }
+
+  /// Imagen de fondo según la orientación del hero:
+  ///
+  /// * **Vertical** (`mobile`, 3:4): usa `posterUrl` del endpoint hero —
+  ///   es el formato adecuado para un marco vertical.
+  /// * **Horizontal** (`cinematic`): mantiene `bannerUrl` (backdrop 16:9),
+  ///   con fallback a `posterUrl` si el backdrop viene vacío.
+  String _heroBackgroundUrl(MediaItem item) {
+    final String poster = item.posterUrl;
+    final String banner = item.bannerUrl ?? '';
+    if (_resolvedLayout == HeroBannerLayout.mobile) {
+      return poster.isNotEmpty ? poster : banner;
+    }
+    return banner.isNotEmpty ? banner : poster;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) return const SizedBox.shrink();
     final double screenWidth = MediaQuery.of(context).size.width;
-    
-    // Senior Strategy: Dispositivos con ancho > 600 (como Z Fold desplegado) 
-    // usan el Layout "Cápsula" (cinematic) para optimizar el espacio vertical.
-    final bool useMobileLayout = context.breakpoint < Breakpoint.sm || 
-                                (context.breakpoint < Breakpoint.lg && screenWidth < 600);
-    
-    final HeroBannerLayout layout = widget.layout ?? (useMobileLayout ? HeroBannerLayout.mobile : HeroBannerLayout.cinematic);
+
+    final HeroBannerLayout layout = _resolvedLayout;
 
     return VisibilityDetector(
       key: ValueKey('hero_visibility_${widget.currentCategory}'),
@@ -588,6 +619,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   }
 
   Widget _buildBackgroundLayer(MediaItem item) {
+    final bool isMobile = context.isMobile;
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 800),
       transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
@@ -602,11 +634,11 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       },
       child: CachedNetworkImage(
         key: ValueKey('bg_${item.id}'),
-        imageUrl: item.bannerUrl ?? item.posterUrl,
+        imageUrl: _heroBackgroundUrl(item),
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        alignment: Alignment.topCenter,
+        alignment: isMobile ? const Alignment(0.0, -0.2) : Alignment.topCenter,
         memCacheWidth: _bgMemCacheWidth(),
         fadeInDuration: AurisImageConfig.defaultFadeInDuration,
         fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
@@ -839,6 +871,35 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
 
   Widget _buildMobileContent(MediaItem item) {
+    final history = ref.watch(playbackHistoryStateProvider).valueOrNull ?? [];
+    final latestHistory = history.where((h) => h.contentId == item.title || h.contentId == item.id).firstOrNull;
+    
+    final hasHistory = latestHistory != null;
+    final epNum = int.tryParse((latestHistory?.episode ?? '').trim());
+    final double? progress = hasHistory ? latestHistory.progress : null;
+    final bool hasProgress = progress != null && progress > 0.02;
+    final bool isFinished = progress != null && progress >= 0.95;
+
+    final String label = isFinished
+        ? 'Reproducir de nuevo'
+        : (hasHistory
+            ? (epNum != null ? 'Continuar Ep $epNum' : 'Continuar viendo')
+            : 'Reproducir');
+
+    String? remainingText;
+    if (hasHistory) {
+      final sub = continueCardSubtitle(latestHistory);
+      if (sub.line2?.isNotEmpty == true) {
+        String t = sub.line2!;
+        if (t.toLowerCase().startsWith('quedan ')) {
+          t = t.substring(7).trim();
+        } else if (t.toLowerCase().startsWith('queda ')) {
+          t = t.substring(6).trim();
+        }
+        remainingText = t;
+      }
+    }
+
     return Column(
       key: ValueKey('content_mob_${item.id}'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -982,46 +1043,77 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           ],
         ),
         
-        if (!context.isMobile) ...[
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              _BannerButton(
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _BannerButton(
                 onPressed: () => SafeTap.run(() => _handlePlay(item)),
-                icon: AurisIcons.play,
-                label: 'Reproducir',
+                icon: AurisIcons.playFilled,
+                label: label,
                 isPrimary: true,
-                isCompact: true,
+                isCompact: false,
+                progress: (hasProgress && !isFinished) ? progress : null,
+                subLabel: (hasProgress && !isFinished) ? remainingText : null,
               ),
+            ),
+            const SizedBox(width: 10),
+            Builder(
+              builder: (context) {
+                final favorites = ref.watch(favoritesProvider);
+                final String favId = item.id.isNotEmpty ? item.id : item.title;
+                final bool isFav = favorites.any((f) => f.id == favId);
+                return _BannerIconButton(
+                  icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.addCircleOutline,
+                  label: isFav ? 'En mi lista' : 'Mi lista',
+                  onPressed: () {
+                    final user = ref.read(authProvider);
+                    final favItem = FavoriteItem(
+                      id: favId,
+                      title: item.title,
+                      posterUrl: item.posterUrl,
+                      bannerUrl: item.bannerUrl ?? item.posterUrl,
+                      category: widget.currentCategory,
+                      source: item.source,
+                      url: item.detailUrl ?? '',
+                      addedAt: DateTime.now(),
+                      kind: item.kind,
+                      year: item.year,
+                      // FavoriteItem.type es String?; MediaItem.type es MediaType.
+                      // Se usa el mismo mapeo que favoriteFromMedia().
+                      type: item.card?.type ?? item.type.name,
+                      profileId: user?.activeProfileId ?? 'guest_profile',
+                    );
+                    ref.read(favoritesProvider.notifier).toggleFavorite(favItem);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(isFav ? 'Quitado de Mi lista' : 'Añadido a Mi lista')),
+                    );
+                  },
+                  isCompact: false,
+                );
+              },
+            ),
+            if (item.trailerKey != null) ...[
               const SizedBox(width: 10),
               _BannerIconButton(
-                icon: AurisIcons.info,
-                label: 'Info',
-                onPressed: () => SafeTap.run(() => _handleDetails(item)),
-                isCompact: true,
+                icon: AurisIcons.trailer,
+                label: 'Tráiler',
+                onPressed: () async {
+                  if (_isTrailerLoading) return;
+                  setState(() => _isTrailerLoading = true);
+                  try {
+                    final result = widget.onTrailer?.call(item);
+                    if (result is Future) await result;
+                  } finally {
+                    if (mounted) setState(() => _isTrailerLoading = false);
+                  }
+                },
+                isLoading: _isTrailerLoading,
+                isCompact: false,
               ),
-              if (item.trailerKey != null) ...[
-                const SizedBox(width: 10),
-                _BannerIconButton(
-                  icon: AurisIcons.trailer,
-                  label: 'Tráiler',
-                  onPressed: () async {
-                    if (_isTrailerLoading) return;
-                    setState(() => _isTrailerLoading = true);
-                    try {
-                      final result = widget.onTrailer?.call(item);
-                      if (result is Future) await result;
-                    } finally {
-                      if (mounted) setState(() => _isTrailerLoading = false);
-                    }
-                  },
-                  isLoading: _isTrailerLoading,
-                  isCompact: true,
-                ),
-              ],
             ],
-          ),
-        ],
+          ],
+        ),
       ],
     );
   }
@@ -1319,28 +1411,26 @@ class _BannerButton extends StatelessWidget {
   final String label;
   final bool isPrimary;
   final bool isCompact;
+  final double? progress;
+  final String? subLabel;
+
   const _BannerButton({
     required this.onPressed, 
     required this.icon, 
     required this.label, 
     this.isPrimary = false,
     this.isCompact = false,
+    this.progress,
+    this.subLabel,
   });
 
   @override
   Widget build(BuildContext context) {
     final double height = isCompact ? 44 : 54;
-    return ElevatedButton.icon(
+    final bool hasProgress = progress != null && progress! > 0.02;
+
+    return ElevatedButton(
       onPressed: onPressed,
-      icon: AurisIcon(icon, size: isCompact ? 24 : 32, color: isPrimary ? Colors.black : Colors.white),
-      label: Text(
-        label, 
-        style: TextStyle(
-          fontWeight: FontWeight.w800, 
-          fontSize: isCompact ? 16 : 20,
-          letterSpacing: -0.5,
-        )
-      ),
       style: ElevatedButton.styleFrom(
         backgroundColor: isPrimary ? Colors.white : Colors.white.withValues(alpha: 0.1),
         foregroundColor: isPrimary ? Colors.black : Colors.white,
@@ -1350,6 +1440,61 @@ class _BannerButton extends StatelessWidget {
           horizontal: isCompact ? 20 : 28, 
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(height)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AurisIcon(icon, size: isCompact ? 20 : 24, color: isPrimary ? Colors.black : Colors.white),
+          const SizedBox(width: 8),
+          if (hasProgress) ...[
+            Container(
+              width: 85,
+              height: 6,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.30),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Stack(
+                children: [
+                  FractionallySizedBox(
+                    widthFactor: progress!.clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF7A1E),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (subLabel != null && subLabel!.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              Text(
+                subLabel!,
+                style: TextStyle(
+                  color: isPrimary ? Colors.black : Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: isCompact ? 14 : 15,
+                ),
+              ),
+            ],
+          ] else ...[
+            Flexible(
+              child: Text(
+                label, 
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800, 
+                  fontSize: isCompact ? 16 : 18,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

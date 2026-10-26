@@ -95,8 +95,6 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
   bool _focused = false;
   final ValueNotifier<bool> _hovered = ValueNotifier<bool>(false);
 
-  bool get _isActive => _focused || _hovered.value;
-
   bool get _isSportsItem => isSportsItemMetadata(
         title: widget.title,
         source: widget.mediaItem?.source,
@@ -424,25 +422,14 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                   children: [
                     AspectRatio(
                       aspectRatio: 2 / 3,
-                      child: AnimatedScale(
-                        scale: isActive ? 1.0 : 0.98,
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOutCubic,
-                          padding: EdgeInsets.zero,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: isActive
-                                ? [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4))]
-                                : [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
+                      child: DisneyFocusShell(
+                        active: isActive,
+                        activeShadow: DisneyFocusTokens.shadowFor(context),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
                                 Builder(
                                   builder: (context) {
                                     final dpr = MediaQuery.of(context).devicePixelRatio;
@@ -466,7 +453,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                                 ),
 
                                 ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),
                                   clipBehavior: Clip.antiAliasWithSaveLayer,
                                   child: Stack(
                                     children: [
@@ -547,23 +534,11 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                                     ],
                                   ),
                                 ),
-                                if (isActive)
-                                  Positioned.fill(
-                                    child: IgnorePointer(
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: Colors.white, width: 4.0),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
                         ),
                       ),
-                    ),
                     if (widget.showInfo) ...[
                       SizedBox(height: isMobile ? ResponsiveUtils.sp(context, 8) : 8),
                       SizedBox(

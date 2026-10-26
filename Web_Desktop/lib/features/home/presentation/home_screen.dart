@@ -184,6 +184,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return _ContinueWatchingSection(horizontalPadding: horizontalPadding);
     }
 
+    // Carrusel de marcas/categorías deportivas → SportsBrandCarousel
+    if (section.type == HomeSectionType.brands && section.brandItems != null) {
+      return SportsBrandCarousel(
+        title: section.title,
+        items: section.brandItems!
+            .map((b) => SportsBrandItem(id: b.id, name: b.name, logoUrl: b.logoUrl, onTap: b.onTap))
+            .toList(),
+      );
+    }
+
+    // Filas de eventos deportivos → SportsCard (directo desde sportsItems,
+    // preservando isLive/status/date/league/canales).
+    if (section.sportsItems != null && section.sportsItems!.isNotEmpty) {
+      return SportsEventRow(
+        title: section.title,
+        subtitle: section.subtitle,
+        events: section.sportsItems!,
+        horizontalPadding: horizontalPadding,
+        // SportsCard navega a ContentSportScreen por defecto (onTap null).
+      );
+    }
+
     final SectionSeeMore? verMas = section.data is EditorialRow ? (section.data as EditorialRow).verMas : null;
 
     return UnifiedSection(

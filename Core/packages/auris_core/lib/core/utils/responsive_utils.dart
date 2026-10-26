@@ -241,7 +241,7 @@ class ResponsiveUtils {
     final b = getBreakpoint(context);
     final double width = MediaQuery.of(context).size.width;
 
-    if (b == Breakpoint.base) return 16 / 11;
+    if (b == Breakpoint.base) return 3 / 4; // Vertical 3:4 para móviles en portrait
     
     // Senior Fix: Para plegables y móviles anchos (sm/md), aumentamos el ratio 
     // para evitar que el banner vertical asfixie el contenido inferior.

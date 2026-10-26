@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../auris_core.dart';
-import 'cured_network_image.dart';
 
 /// Pantalla dedicada `content_sport` para eventos deportivos en vivo y próximos.
 /// Muestra los detalles completos del evento (liga, equipos, sinopsis, estado en vivo)
@@ -20,7 +19,9 @@ class ContentSportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     debugPrint('[ContentSportScreen] OPENED successfully -> Title: "${event.title}", ID: ${event.id}, League: ${event.league}, Channels count: ${event.channels.length}');
-    final isLive = event.viewers > 0 || event.channels.isNotEmpty;
+    // El BACKEND calcula el estado real: usar event.isLive/status, no recalcular.
+    final isLive = event.effectiveIsLive;
+    final statusLabel = event.statusLabel;
 
     return Scaffold(
       backgroundColor: const Color(0xFF121216),
@@ -50,7 +51,7 @@ class ContentSportScreen extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          const Color(0xFF121216).withOpacity(0.9),
+                          const Color(0xFF121216).withValues(alpha: 0.9),
                           const Color(0xFF121216),
                         ],
                       ),
@@ -87,6 +88,18 @@ class ContentSportScreen extends StatelessWidget {
                                 style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                               ),
                             ],
+                          ),
+                        )
+                      else if (statusLabel == 'FINALIZADO')
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'FINALIZADO',
+                            style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ),
                       if (event.sportLabel != null) ...[
