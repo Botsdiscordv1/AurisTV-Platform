@@ -29,6 +29,7 @@ class FocusableWideCard extends ConsumerStatefulWidget {
   final EdgeInsetsGeometry? margin;
   final MediaItem? mediaItem;
   final ContentSports? sportsEvent;
+  final bool isBannerFallback;
 
   const FocusableWideCard({
     super.key,
@@ -49,6 +50,7 @@ class FocusableWideCard extends ConsumerStatefulWidget {
     this.margin,
     this.mediaItem,
     this.sportsEvent,
+    this.isBannerFallback = false,
   });
 
   @override
@@ -406,86 +408,89 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                     ),
                                   ),
                                 ),
-                                if (widget.logoUrl != null && widget.logoUrl!.isNotEmpty)
-                                  Positioned(
-                                    bottom: 16, left: 12,
-                                    // Caja + imagen con geometría idéntica antes y
-                                    // después de cargar (sin esto el logo aparece
-                                    // centrado y salta a bottomLeft al resolver).
-                                    child: SizedBox(
-                                      height: widget.height * 0.35,
-                                      width: widget.width * 0.65,
-                                      child: Builder(builder: (context) {
-                                        final dpr = MediaQuery.of(context).devicePixelRatio;
-                                        final logoUrl = ApiEndpoints.proxyImage(widget.logoUrl);
-                                        return LogoToneFilter(
-                                          imageUrl: logoUrl,
-                                          child: CachedNetworkImage(
+                                if (widget.isBannerFallback) ...[
+                                  if (widget.logoUrl != null &&
+                                      widget.logoUrl!.isNotEmpty)
+                                    Positioned(
+                                      bottom: 16, left: 12,
+                                      // Caja + imagen con geometría idéntica antes y
+                                      // después de cargar (sin esto el logo aparece
+                                      // centrado y salta a bottomLeft al resolver).
+                                      child: SizedBox(
+                                        height: widget.height * 0.35,
+                                        width: widget.width * 0.65,
+                                        child: Builder(builder: (context) {
+                                          final dpr = MediaQuery.of(context).devicePixelRatio;
+                                          final logoUrl = ApiEndpoints.proxyImage(widget.logoUrl);
+                                          return LogoToneFilter(
                                             imageUrl: logoUrl,
-                                            width: widget.width * 0.65,
-                                            height: widget.height * 0.35,
-                                            fit: BoxFit.contain,
-                                            alignment: Alignment.bottomLeft,
-                                            filterQuality: FilterQuality.medium,
-                                            memCacheWidth: (widget.width * 0.65 * dpr)
-                                                .round()
-                                                .clamp(120, 480),
-                                            fadeInDuration:
-                                                AurisImageConfig.defaultFadeInDuration,
-                                            fadeOutDuration:
-                                                AurisImageConfig.defaultFadeOutDuration,
-                                            cacheManager: AurisImageCacheManager.instance,
-                                            placeholder: (context, url) => Container(
+                                            child: CachedNetworkImage(
+                                              imageUrl: logoUrl,
                                               width: widget.width * 0.65,
                                               height: widget.height * 0.35,
-                                              color: Colors.white.withOpacity(0.04),
-                                            ),
-                                            // Sin logo (404/red): usar el título
-                                            // como fallback de texto en vez de
-                                            // dejar el hueco vacío.
-                                            errorWidget: (_, __, ___) => Align(
+                                              fit: BoxFit.contain,
                                               alignment: Alignment.bottomLeft,
-                                              child: Text(
-                                                widget.title,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: GoogleFonts.poppins(
-                                                  color: Colors.white,
-                                                  fontSize: ResponsiveUtils
-                                                      .bannerTitleFontSize(context),
-                                                  fontWeight: FontWeight.w700,
-                                                  shadows: [
-                                                    Shadow(
-                                                      color: Colors.black.withValues(alpha: 0.8),
-                                                      blurRadius: 10,
-                                                      offset: const Offset(0, 2),
-                                                    ),
-                                                  ],
+                                              filterQuality: FilterQuality.medium,
+                                              memCacheWidth: (widget.width * 0.65 * dpr)
+                                                  .round()
+                                                  .clamp(120, 480),
+                                              fadeInDuration:
+                                                  AurisImageConfig.defaultFadeInDuration,
+                                              fadeOutDuration:
+                                                  AurisImageConfig.defaultFadeOutDuration,
+                                              cacheManager: AurisImageCacheManager.instance,
+                                              placeholder: (context, url) => Container(
+                                                width: widget.width * 0.65,
+                                                height: widget.height * 0.35,
+                                                color: Colors.white.withOpacity(0.04),
+                                              ),
+                                              // Sin logo (404/red): usar el título
+                                              // como fallback de texto en vez de
+                                              // dejar el hueco vacío.
+                                              errorWidget: (_, __, ___) => Align(
+                                                alignment: Alignment.bottomLeft,
+                                                child: Text(
+                                                  widget.title,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: GoogleFonts.poppins(
+                                                    color: Colors.white,
+                                                    fontSize: ResponsiveUtils
+                                                        .bannerTitleFontSize(context),
+                                                    fontWeight: FontWeight.w700,
+                                                    shadows: [
+                                                      Shadow(
+                                                        color: Colors.black.withValues(alpha: 0.8),
+                                                        blurRadius: 10,
+                                                        offset: const Offset(0, 2),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        );
-                                      }),
-                                    ),
-                                  )
-                                else
-                                  Positioned(
-                                    bottom: 12, left: 12, right: 12,
-                                    child: Text(
-                                      widget.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.white,
-                                        fontSize: ResponsiveUtils.bannerTitleFontSize(context),
-                                        fontWeight: FontWeight.w700,
-                                        shadows: [
-                                          Shadow(color: Colors.black.withOpacity(0.8), blurRadius: 10, offset: const Offset(0, 2)),
-                                        ],
+                                          );
+                                        }),
+                                      ),
+                                    )
+                                  else
+                                    Positioned(
+                                      bottom: 12, left: 12, right: 12,
+                                      child: Text(
+                                        widget.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.white,
+                                          fontSize: ResponsiveUtils.bannerTitleFontSize(context),
+                                          fontWeight: FontWeight.w700,
+                                          shadows: [
+                                            Shadow(color: Colors.black.withOpacity(0.8), blurRadius: 10, offset: const Offset(0, 2)),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                ],
                                 if (widget.badgeOverlay != null) Positioned(top: 10, left: 10, child: widget.badgeOverlay!),
 
                                 if (widget.progress != null && widget.progress! > 0)

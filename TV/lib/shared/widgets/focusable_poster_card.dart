@@ -72,6 +72,8 @@ class FocusablePosterCard extends StatefulWidget {
   final FocusOnKeyEventCallback? onKeyEvent;
   /// Tamaño de fuente del título. Si es null usa el valor por defecto.
   final double? titleFontSize;
+  final bool isLarge;
+  final double? width;
 
   const FocusablePosterCard({
     super.key,
@@ -92,6 +94,8 @@ class FocusablePosterCard extends StatefulWidget {
     this.focusNode,
     this.onKeyEvent,
     this.titleFontSize,
+    this.isLarge = false,
+    this.width,
   });
 
   @override
@@ -107,7 +111,10 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
   @override
   Widget build(BuildContext context) {
     final isMobile = ResponsiveUtils.isMobile(context);
-    final double normalWidth = isMobile ? ResponsiveUtils.sp(context, 125) : 200;
+    final double normalWidth = widget.width ??
+        (widget.isLarge
+            ? TVResponsiveUtils.largePosterWidth(context)
+            : (isMobile ? ResponsiveUtils.sp(context, 125) : TVResponsiveUtils.posterWidth(context)));
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -160,7 +167,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                 // scale 1.0 -> 1.03, anillo outline-4/offset-4 #FAFAFA fuera de
                 // la tarjeta y sombra dual (≥768), todo 300ms cubic-bezier(0,0,.2,1).
                 // Las filas usan Clip.none para que el crecimiento no se recorte.
-                child: DisneyFocusShell(
+                child: _NoScaleFocusShell(
                   active: _isActive,
                   activeShadow: DisneyFocusTokens.shadowFor(context),
                   ringColor: widget.activeBorderColor ?? DisneyFocusTokens.ringColor,
@@ -312,6 +319,62 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _NoScaleFocusShell extends StatelessWidget {
+  final bool active;
+  final Widget child;
+  final double radius;
+  final Color ringColor;
+  final List<BoxShadow>? activeShadow;
+
+  const _NoScaleFocusShell({
+    required this.active,
+    required this.child,
+    this.radius = DisneyFocusTokens.radius,
+    this.ringColor = DisneyFocusTokens.ringColor,
+    this.activeShadow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedContainer(
+          duration: DisneyFocusTokens.duration,
+          curve: DisneyFocusTokens.curve,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            boxShadow: active ? (activeShadow ?? DisneyFocusTokens.shadowFor(context)) : null,
+          ),
+          child: child,
+        ),
+        Positioned(
+          left: -DisneyFocusTokens.ringInset,
+          top: -DisneyFocusTokens.ringInset,
+          right: -DisneyFocusTokens.ringInset,
+          bottom: -DisneyFocusTokens.ringInset,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: active ? 1.0 : 0.0,
+              duration: DisneyFocusTokens.duration,
+              curve: DisneyFocusTokens.curve,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: ringColor,
+                    width: DisneyFocusTokens.ringWidth,
+                  ),
+                  borderRadius: BorderRadius.circular(DisneyFocusTokens.ringRadius(radius)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

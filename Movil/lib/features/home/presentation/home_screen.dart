@@ -195,6 +195,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             subtitle: row.subtitle,
             items: row.items,
             badge: row.badge,
+            format: row.format,
             verMas: row.verMas,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           );
@@ -344,6 +345,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: m.logoUrl,
+      isBannerFallback: m.isBannerFallback,
       subtitle: isHomeInicio ? null : m.subtitle,
       rating: formatRating(m.rating),
       badgeOverlay: badgeOverlay,

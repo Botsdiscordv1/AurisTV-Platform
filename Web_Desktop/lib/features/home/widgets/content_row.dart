@@ -10,6 +10,7 @@ class ContentRow extends StatefulWidget {
   final List<MediaItem> items;
   final SectionSeeMore? verMas;
   final double horizontalPadding;
+  final bool isLarge;
   final void Function(MediaItem item) onItemTap;
 
   const ContentRow({
@@ -20,6 +21,7 @@ class ContentRow extends StatefulWidget {
     this.verMas,
     required this.onItemTap,
     this.horizontalPadding = 48.0,
+    this.isLarge = false,
   });
 
   @override
@@ -97,9 +99,12 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final isCompactDesktop = width >= 800 && width < 1100;
     
-    final double cardWidth = context.useMobileLayout
-        ? ResponsiveUtils.posterWidth(context)
-        : webPosterGridCellWidth(context);
+    final bool isLarge = widget.isLarge;
+    final double cardWidth = isLarge
+        ? ResponsiveUtils.largePosterWidth(context)
+        : (context.useMobileLayout
+            ? ResponsiveUtils.posterWidth(context)
+            : webPosterGridCellWidth(context));
     final double posterHeight = (cardWidth * 1.5).roundToDouble();
     const double posterFocusZoom = 1.10;
     final double rowHeight = posterHeight * posterFocusZoom + 12;
@@ -215,6 +220,8 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                                 rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
                                 subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : null, // Senior: Ocultar año
                                 showInfo: false,
+                                isLarge: isLarge,
+                                width: cardWidth,
                                 onTap: () => widget.onItemTap(item),
                               ),
                             ),

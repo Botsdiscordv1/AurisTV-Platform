@@ -58,19 +58,39 @@ class TVResponsiveUtils {
     return (posterWidth(context) * 1.5).roundToDouble();
   }
 
+  /// Ancho de póster grande (Large Poster Card) para TV (~6 por fila)
+  static double largePosterWidth(BuildContext context) {
+    final double width = MediaQuery.of(context).size.width;
+    if (width <= 1280) return 190.0; // 720p
+    if (width <= 1920) return 270.0; // 1080p
+    return 310.0;                    // 4K
+  }
+
+  /// Altura proporcional de póster grande (2:3) para TV
+  static double largePosterHeight(BuildContext context) {
+    return (largePosterWidth(context) * 1.5).roundToDouble();
+  }
+
+  /// Altura de fila de póster grande para TV
+  static double largePosterRowHeight(BuildContext context, {bool hasInfo = false}) {
+    final double posterH = largePosterHeight(context);
+    if (!hasInfo) return posterH + 32.0; // Generous buffer for focus zoom and glow
+    return posterH + 70.0;
+  }
+
   /// Altura de la fila de posters incluyendo títulos
   static double rowHeight(BuildContext context, {bool hasInfo = false}) {
     final double posterH = posterHeight(context);
-    if (!hasInfo) return posterH + 12.0;
-    return posterH + 55.0;
+    if (!hasInfo) return posterH + 28.0; // Generous buffer for focus zoom and glow
+    return posterH + 65.0;
   }
 
   /// Ancho de banners (16:9) optimizado y adaptativo para TV
   static double bannerWidth(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
-    if (width <= 1280) return 280.0;
-    if (width <= 1920) return 330.0;
-    return 380.0;
+    if (width <= 1280) return 250.0;
+    if (width <= 1920) return 360.0; // 4 full + 1 half visible on 1080p TV
+    return 480.0;
   }
 
   /// Altura de banner

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../auris_core.dart';
 
 /// Configuration preferences for the SectionComposer.
@@ -97,11 +98,38 @@ class SectionComposer {
       }
 
       // 2.1 Resolution based on Intent
-      SectionPresentation presentation = SectionPresentationResolver.resolve(
-        _getSectionIdentifier(raw),
-        id: title,
-        serverFormat: raw.serverFormat,
-      );
+      SectionPresentation presentation = raw.presentation;
+      if (presentation == SectionPresentation.posterLarge) {
+        // Preservar la promoción a POSTER_LARGE realizada por el orquestador
+        if (raw.serverFormat != null && raw.serverFormat!.isNotEmpty) {
+          final fmt = SectionPresentationResolver.resolve(
+            _getSectionIdentifier(raw),
+            id: title,
+            serverFormat: raw.serverFormat,
+          );
+          if (fmt == SectionPresentation.posterLarge || fmt == SectionPresentation.top10) {
+            presentation = fmt;
+          }
+        }
+      } else if (raw.serverFormat != null && raw.serverFormat!.isNotEmpty) {
+        presentation = SectionPresentationResolver.resolve(
+          _getSectionIdentifier(raw),
+          id: title,
+          serverFormat: raw.serverFormat,
+        );
+      } else {
+        presentation = SectionPresentationResolver.resolve(
+          _getSectionIdentifier(raw),
+          id: title,
+          serverFormat: raw.serverFormat,
+        );
+      }
+
+      if (presentation == SectionPresentation.posterLarge) {
+        debugPrint('🌟 [SectionComposer] Section "$title" (${raw.type.name}) resolved to POSTER_LARGE!');
+      } else {
+        debugPrint('🎨 [SectionComposer] Section "$title" -> ${presentation.name}');
+      }
 
       // 2.2 CONTENT INTEGRITY CHECK (Senior Logic)
       // If we intended WIDE but items don't have banners, we must use POSTER.

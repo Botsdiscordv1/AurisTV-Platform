@@ -66,6 +66,8 @@ class FocusablePosterCard extends ConsumerStatefulWidget {
   final ContentSports? sportsEvent;
   final VoidCallback? onDelete;
   final FavoriteItem? favoriteItem;
+  final double? width;
+  final bool isLarge;
 
   const FocusablePosterCard({
     super.key,
@@ -85,7 +87,30 @@ class FocusablePosterCard extends ConsumerStatefulWidget {
     this.sportsEvent,
     this.onDelete,
     this.favoriteItem,
+    this.width,
+    this.isLarge = false,
   });
+
+  const FocusablePosterCard.large({
+    super.key,
+    required this.title,
+    required this.posterUrl,
+    required this.onTap,
+    this.badge,
+    this.badgeOverlay,
+    this.subtitle,
+    this.subtitleColor,
+    this.rating,
+    this.badgeColor,
+    this.airingOverlay,
+    this.showInfo = true,
+    this.progress,
+    this.mediaItem,
+    this.sportsEvent,
+    this.onDelete,
+    this.favoriteItem,
+    this.width,
+  }) : isLarge = true;
 
   @override
   ConsumerState<FocusablePosterCard> createState() => _FocusablePosterCardState();
@@ -366,7 +391,10 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
 
     final isMobile = context.useMobileLayout;
     final isDesktopOrWeb = kIsWeb || MediaQuery.of(context).size.width >= 800;
-    final double normalWidth = ResponsiveUtils.posterWidth(context);
+    final double cardWidth = widget.width ??
+        (widget.isLarge
+            ? ResponsiveUtils.largePosterWidth(context)
+            : ResponsiveUtils.posterWidth(context));
 
     return MouseRegion(
       hitTestBehavior: HitTestBehavior.opaque,
@@ -414,7 +442,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                 }
               },
               child: Container(
-                width: normalWidth,
+                width: cardWidth,
                 margin: const EdgeInsets.only(right: 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -433,10 +461,9 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                                 Builder(
                                   builder: (context) {
                                     final dpr = MediaQuery.of(context).devicePixelRatio;
-                                    // Senior TV/Low-RAM Tuning: Pósters con tope de 400px en memoria
-                                    // para no desbordar RAM en TV Boxes de 1GB ni provocar descarte en cache
-                                    final targetWidth = (normalWidth * dpr).round().clamp(1, 400);
-                                    final targetHeight = (targetWidth * 1.5).round().clamp(1, 600);
+                                    // Senior TV/Low-RAM Tuning: Memoria adaptativa según tamaño
+                                    final targetWidth = (cardWidth * dpr).round().clamp(1, 600);
+                                    final targetHeight = (targetWidth * 1.5).round().clamp(1, 900);
                                     return CuredNetworkImage(
                                       imageUrl: ApiEndpoints.proxyImage(
                                         widget.posterUrl,
@@ -542,7 +569,9 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                     if (widget.showInfo) ...[
                       SizedBox(height: isMobile ? ResponsiveUtils.sp(context, 8) : 8),
                       SizedBox(
-                        height: isMobile ? ResponsiveUtils.sp(context, 22) : 28,
+                        height: isMobile
+                            ? ResponsiveUtils.sp(context, widget.isLarge ? 26 : 22)
+                            : (widget.isLarge ? 32 : 28),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           child: MarqueeText(
@@ -550,7 +579,9 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                             animate: isMobile ? true : isActive,
                             style: GoogleFonts.poppins(
                               color: isActive ? Colors.white : Colors.white.withOpacity(0.95),
-                              fontSize: ResponsiveUtils.posterTitleFontSize(context),
+                              fontSize: widget.isLarge
+                                  ? ResponsiveUtils.largePosterTitleFontSize(context)
+                                  : ResponsiveUtils.posterTitleFontSize(context),
                               fontWeight: FontWeight.w700,
                               height: 1.2,
                               letterSpacing: 0.2,
@@ -566,6 +597,72 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
           },
         ),
       ),
+    );
+  }
+}
+
+/// Variante de tarjeta de póster de mayor tamaño (Large Poster Card).
+/// Diseñada para secciones destacadas o carruseles principales donde se requiere mayor visibilidad.
+class FocusableLargePosterCard extends StatelessWidget {
+  final String title;
+  final String posterUrl;
+  final VoidCallback onTap;
+  final String? badge;
+  final Widget? badgeOverlay;
+  final String? subtitle;
+  final Color? subtitleColor;
+  final String? rating;
+  final Color? badgeColor;
+  final Widget? airingOverlay;
+  final bool showInfo;
+  final double? progress;
+  final MediaItem? mediaItem;
+  final ContentSports? sportsEvent;
+  final VoidCallback? onDelete;
+  final FavoriteItem? favoriteItem;
+  final double? width;
+
+  const FocusableLargePosterCard({
+    super.key,
+    required this.title,
+    required this.posterUrl,
+    required this.onTap,
+    this.badge,
+    this.badgeOverlay,
+    this.subtitle,
+    this.subtitleColor,
+    this.rating,
+    this.badgeColor,
+    this.airingOverlay,
+    this.showInfo = true,
+    this.progress,
+    this.mediaItem,
+    this.sportsEvent,
+    this.onDelete,
+    this.favoriteItem,
+    this.width,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FocusablePosterCard.large(
+      title: title,
+      posterUrl: posterUrl,
+      onTap: onTap,
+      badge: badge,
+      badgeOverlay: badgeOverlay,
+      subtitle: subtitle,
+      subtitleColor: subtitleColor,
+      rating: rating,
+      badgeColor: badgeColor,
+      airingOverlay: airingOverlay,
+      showInfo: showInfo,
+      progress: progress,
+      mediaItem: mediaItem,
+      sportsEvent: sportsEvent,
+      onDelete: onDelete,
+      favoriteItem: favoriteItem,
+      width: width,
     );
   }
 }

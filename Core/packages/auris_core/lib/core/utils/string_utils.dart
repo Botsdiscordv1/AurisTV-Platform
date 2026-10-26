@@ -18,25 +18,24 @@ class AurisStringUtils {
     return text;
   }
 
-  /// Formatea una duración en milisegundos a un string legible de tiempo restante.
+  /// Formatea una duración en milisegundos a un string compacto de tiempo restante.
   /// 
-  /// Ejemplo: 109 min -> "1 hora y 49 minutos"
-  /// 45 min -> "45 minutos"
+  /// Ejemplo: 77 min -> "1h 17 min"
+  /// 45 min -> "45 min"
   static String formatRemainingTime(int milliseconds) {
     if (milliseconds <= 0) return '';
     
     final minutes = (milliseconds / 60000).ceil();
     if (minutes < 60) {
-      return '$minutes ${minutes == 1 ? 'minuto' : 'minutos'}';
+      return '$minutes min';
     }
     
     final hours = minutes ~/ 60;
     final remainingMinutes = minutes % 60;
     
-    final hoursText = '$hours ${hours == 1 ? 'hora' : 'horas'}';
-    if (remainingMinutes == 0) return hoursText;
+    if (remainingMinutes == 0) return '${hours}h';
     
-    return '$hoursText y $remainingMinutes ${remainingMinutes == 1 ? 'minuto' : 'minutos'}';
+    return '${hours}h $remainingMinutes min';
   }
 }
 

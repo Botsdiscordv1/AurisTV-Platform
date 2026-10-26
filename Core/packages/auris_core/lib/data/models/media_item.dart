@@ -47,6 +47,7 @@ class MediaItem {
   final List<Map<String, dynamic>>? channels;
 
   final SearchResult? card;
+  final bool isBannerFallback;
 
   const MediaItem({
     required this.id,
@@ -84,6 +85,7 @@ class MediaItem {
     this.totalSeasons,
     this.channels,
     this.card,
+    this.isBannerFallback = false,
   });
 
   MediaItem copyWith({

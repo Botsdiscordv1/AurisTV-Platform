@@ -96,6 +96,7 @@ export 'presentation/widgets/row_skeleton.dart';
 export 'presentation/widgets/season_badge.dart';
 export 'presentation/widgets/mini_player_bar.dart';
 export 'presentation/widgets/focusable_poster_card.dart';
+export 'presentation/widgets/focusable_expandable_poster_card.dart';
 export 'presentation/widgets/focusable_wide_card.dart';
 export 'presentation/widgets/disney_focus.dart';
 export 'presentation/widgets/logo_tone.dart';

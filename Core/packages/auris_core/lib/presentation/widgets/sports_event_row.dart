@@ -2,19 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import '../../auris_core.dart';
 
-/// Fila horizontal de eventos deportivos (`ContentSports`) para el Home.
-///
-/// Pinta directamente los `ContentSports` originales (con `isLive`, `status`,
-/// `date`, `league`, `colors`, canales decorados…) SIN pasar por `MediaItem`,
-/// para no perder la metadata que envía el backend.
-///
-/// Se usa desde `_buildSection` cuando `section.sportsItems != null`.
+/// Fila horizontal de eventos deportivos (`ContentSports`) para el Home,
+/// utilizando exactamente los mismos valores de padding exterior (`vw * 0.035 + 24`)
+/// y separación entre tarjetas (`20px` de hueco visual) que `SportsBrandCarousel`.
 class SportsEventRow extends StatelessWidget {
   final String title;
   final String? subtitle;
   final List<ContentSports> events;
   final void Function(ContentSports event)? onEventTap;
-  final double horizontalPadding;
+  final double? horizontalPadding;
 
   const SportsEventRow({
     super.key,
@@ -22,15 +18,30 @@ class SportsEventRow extends StatelessWidget {
     required this.events,
     this.subtitle,
     this.onEventTap,
-    this.horizontalPadding = 16,
+    this.horizontalPadding,
   });
+
+  double _cardWidth(double vw) {
+    double frac;
+    if (vw >= 1280) {
+      frac = 0.1825; // xl
+    } else if (vw >= 1024) {
+      frac = 0.2275; // lg
+    } else if (vw >= 768) {
+      frac = 0.2975; // md
+    } else {
+      frac = 0.4375; // base
+    }
+    return vw * frac - 5.0;
+  }
 
   @override
   Widget build(BuildContext context) {
     if (events.isEmpty) return const SizedBox.shrink();
 
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final double cardWidth = (screenWidth / 5.5).clamp(170.0, 220.0);
+    final double vw = MediaQuery.sizeOf(context).width;
+    final double edgePad = horizontalPadding ?? (vw * 0.035 + 24);
+    final double cardWidth = _cardWidth(vw);
 
     return Padding(
       padding: EdgeInsets.only(bottom: context.useMobileLayout ? 12 : 24),
@@ -38,7 +49,7 @@ class SportsEventRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            padding: EdgeInsets.symmetric(horizontal: edgePad),
             child: Text(
               title,
               style: TextStyle(
@@ -52,7 +63,7 @@ class SportsEventRow extends StatelessWidget {
           if (subtitle != null && subtitle!.isNotEmpty) ...[
             const SizedBox(height: 2),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              padding: EdgeInsets.symmetric(horizontal: edgePad),
               child: Text(
                 subtitle!,
                 style: TextStyle(
@@ -65,14 +76,15 @@ class SportsEventRow extends StatelessWidget {
           ],
           const SizedBox(height: 8),
           SizedBox(
-            height: cardWidth / (16 / 9) + 90, // thumbnail 16:9 + 3 líneas de texto
+            height: cardWidth / (1.78) + 160, // Holgura ampliada para las fuentes de 14px y 16px
             child: ListView.separated(
+              clipBehavior: Clip.none,
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              padding: EdgeInsets.symmetric(horizontal: edgePad, vertical: 12),
               physics: const ClampingScrollPhysics(),
               scrollCacheExtent: ScrollCacheExtent.pixels(600),
               itemCount: events.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              separatorBuilder: (_, __) => const SizedBox(width: 10), // 10px de separación visual
               itemBuilder: (context, index) {
                 final ev = events[index];
                 return SportsCard(

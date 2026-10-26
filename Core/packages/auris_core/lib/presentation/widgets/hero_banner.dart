@@ -887,16 +887,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             : 'Reproducir');
 
     String? remainingText;
-    if (hasHistory) {
-      final sub = continueCardSubtitle(latestHistory);
-      if (sub.line2?.isNotEmpty == true) {
-        String t = sub.line2!;
-        if (t.toLowerCase().startsWith('quedan ')) {
-          t = t.substring(7).trim();
-        } else if (t.toLowerCase().startsWith('queda ')) {
-          t = t.substring(6).trim();
-        }
-        remainingText = t;
+    if (hasHistory && latestHistory.durationInMilliseconds > 0) {
+      final remainingMs = latestHistory.durationInMilliseconds - latestHistory.positionInMilliseconds;
+      if (remainingMs > 0) {
+        remainingText = AurisStringUtils.formatRemainingTime(remainingMs);
       }
     }
 
@@ -1426,7 +1420,7 @@ class _BannerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double height = isCompact ? 44 : 54;
+    final double height = 54;
     final bool hasProgress = progress != null && progress! > 0.02;
 
     return ElevatedButton(
@@ -1445,11 +1439,11 @@ class _BannerButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          AurisIcon(icon, size: isCompact ? 20 : 24, color: isPrimary ? Colors.black : Colors.white),
+          AurisIcon(icon, size: 20, color: isPrimary ? Colors.black : Colors.white),
           const SizedBox(width: 8),
           if (hasProgress) ...[
             Container(
-              width: 85,
+              width: 45,
               height: 6,
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.30),
@@ -1476,7 +1470,7 @@ class _BannerButton extends StatelessWidget {
                 style: TextStyle(
                   color: isPrimary ? Colors.black : Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: isCompact ? 14 : 15,
+                  fontSize: 15,
                 ),
               ),
             ],
@@ -1486,9 +1480,9 @@ class _BannerButton extends StatelessWidget {
                 label, 
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w800, 
-                  fontSize: isCompact ? 16 : 18,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold, 
+                  fontSize: 16,
                   letterSpacing: -0.5,
                 ),
               ),

@@ -32,6 +32,7 @@ class FocusableWideCard extends StatefulWidget {
   final FocusOnKeyEventCallback? onKeyEvent;
   final bool disableAutoEnsureVisible;
   final bool showBorder;
+  final bool isBannerFallback;
 
   const FocusableWideCard({
     super.key,
@@ -54,6 +55,7 @@ class FocusableWideCard extends StatefulWidget {
     this.onKeyEvent,
     this.disableAutoEnsureVisible = false,
     this.showBorder = true,
+    this.isBannerFallback = false,
   });
 
   @override
@@ -125,7 +127,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
               children: [
                 AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: DisneyFocusShell(
+                  child: _NoScaleFocusShell(
                     active: isSelected,
                     showRing: widget.showBorder,
                     activeShadow: DisneyFocusTokens.shadowFor(context),
@@ -164,73 +166,75 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                 ),
                               ),
                             ),
-                            if (widget.logoUrl != null && widget.logoUrl!.isNotEmpty)
-                              Positioned(
-                                bottom: 16, left: 12,
-                                // Caja + imagen con geometría idéntica antes y
-                                // después de cargar (sin esto el logo aparece
-                                // centrado y salta a bottomLeft al resolver).
-                                child: SizedBox(
-                                  height: widget.height * 0.35,
-                                  width: widget.width * 0.65,
-                                  child: LogoToneFilter(
-                                    imageUrl: _logoUrl,
-                                    child: CachedNetworkImage(
+                            if (widget.isBannerFallback) ...[
+                              if (widget.logoUrl != null && widget.logoUrl!.isNotEmpty)
+                                Positioned(
+                                  bottom: 16, left: 12,
+                                  // Caja + imagen con geometría idéntica antes y
+                                  // después de cargar (sin esto el logo aparece
+                                  // centrado y salta a bottomLeft al resolver).
+                                  child: SizedBox(
+                                    height: widget.height * 0.35,
+                                    width: widget.width * 0.65,
+                                    child: LogoToneFilter(
                                       imageUrl: _logoUrl,
-                                      width: widget.width * 0.65,
-                                      height: widget.height * 0.35,
-                                      fit: BoxFit.contain,
-                                      alignment: Alignment.bottomLeft,
-                                      filterQuality: FilterQuality.medium,
-                                      memCacheWidth: (widget.width * 0.65 * MediaQuery.of(context).devicePixelRatio).round().clamp(120, 480),
-                                      fadeInDuration: AurisImageConfig.defaultFadeInDuration,
-                                      fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
-                                      cacheManager: AurisImageCacheManager.instance,
-                                      placeholder: (context, url) => Container(
+                                      child: CachedNetworkImage(
+                                        imageUrl: _logoUrl,
                                         width: widget.width * 0.65,
                                         height: widget.height * 0.35,
-                                        color: Colors.white.withOpacity(0.04),
-                                      ),
-                                      // Sin logo (404/red): usar el título como
-                                      // fallback de texto en vez de dejar el
-                                      // hueco vacío.
-                                      errorWidget: (context, __, ___) => Align(
+                                        fit: BoxFit.contain,
                                         alignment: Alignment.bottomLeft,
-                                        child: Text(
-                                          widget.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.white,
-                                            fontSize: TVResponsiveUtils.sp(context, 15),
-                                            fontWeight: FontWeight.w700,
-                                            shadows: [
-                                              Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 10, offset: const Offset(0, 2)),
-                                            ],
+                                        filterQuality: FilterQuality.medium,
+                                        memCacheWidth: (widget.width * 0.65 * MediaQuery.of(context).devicePixelRatio).round().clamp(120, 480),
+                                        fadeInDuration: AurisImageConfig.defaultFadeInDuration,
+                                        fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
+                                        cacheManager: AurisImageCacheManager.instance,
+                                        placeholder: (context, url) => Container(
+                                          width: widget.width * 0.65,
+                                          height: widget.height * 0.35,
+                                          color: Colors.white.withOpacity(0.04),
+                                        ),
+                                        // Sin logo (404/red): usar el título como
+                                        // fallback de texto en vez de dejar el
+                                        // hueco vacío.
+                                        errorWidget: (context, __, ___) => Align(
+                                          alignment: Alignment.bottomLeft,
+                                          child: Text(
+                                            widget.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontSize: TVResponsiveUtils.sp(context, 15),
+                                              fontWeight: FontWeight.w700,
+                                              shadows: [
+                                                Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 10, offset: const Offset(0, 2)),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              )
-                            else
-                              Positioned(
-                                bottom: 12, left: 12, right: 12,
-                                child: Text(
-                                  widget.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontSize: TVResponsiveUtils.sp(context, 15),
-                                    fontWeight: FontWeight.w700,
-                                    shadows: [
-                                      Shadow(color: Colors.black.withOpacity(0.8), blurRadius: 10, offset: const Offset(0, 2)),
-                                    ],
+                                )
+                              else
+                                Positioned(
+                                  bottom: 12, left: 12, right: 12,
+                                  child: Text(
+                                    widget.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: TVResponsiveUtils.sp(context, 15),
+                                      fontWeight: FontWeight.w700,
+                                      shadows: [
+                                        Shadow(color: Colors.black.withOpacity(0.8), blurRadius: 10, offset: const Offset(0, 2)),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
+                            ],
                             if (widget.onDelete != null && isSelected)
                               Positioned(
                                 top: 8, left: 8,
@@ -329,5 +333,64 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
       ),
     ),
   );
+  }
+}
+
+class _NoScaleFocusShell extends StatelessWidget {
+  final bool active;
+  final Widget child;
+  final double radius;
+  final bool showRing;
+  final Color ringColor;
+  final List<BoxShadow>? activeShadow;
+
+  const _NoScaleFocusShell({
+    required this.active,
+    required this.child,
+    this.radius = DisneyFocusTokens.radius,
+    this.showRing = true,
+    this.ringColor = DisneyFocusTokens.ringColor,
+    this.activeShadow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedContainer(
+          duration: DisneyFocusTokens.duration,
+          curve: DisneyFocusTokens.curve,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            boxShadow: active ? (activeShadow ?? DisneyFocusTokens.shadowFor(context)) : null,
+          ),
+          child: child,
+        ),
+        if (showRing)
+          Positioned(
+            left: -DisneyFocusTokens.ringInset,
+            top: -DisneyFocusTokens.ringInset,
+            right: -DisneyFocusTokens.ringInset,
+            bottom: -DisneyFocusTokens.ringInset,
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: active ? 1.0 : 0.0,
+                duration: DisneyFocusTokens.duration,
+                curve: DisneyFocusTokens.curve,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: ringColor,
+                      width: DisneyFocusTokens.ringWidth,
+                    ),
+                    borderRadius: BorderRadius.circular(DisneyFocusTokens.ringRadius(radius)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }

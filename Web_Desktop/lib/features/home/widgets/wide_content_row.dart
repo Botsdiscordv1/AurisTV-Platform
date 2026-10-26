@@ -18,6 +18,7 @@ class WideContentItem {
   final Widget? badgeOverlay;
   final VoidCallback? onDelete;
   final dynamic originalItem;
+  final bool isBannerFallback;
 
   WideContentItem({
     required this.id,
@@ -32,6 +33,7 @@ class WideContentItem {
     this.badgeOverlay,
     this.onDelete,
     this.originalItem,
+    this.isBannerFallback = false,
   });
 }
 
@@ -221,6 +223,7 @@ class _WideContentRowState extends State<WideContentRow> with AutomaticKeepAlive
                               title: item.title,
                               imageUrl: item.imageUrl,
                               logoUrl: item.logoUrl,
+                              isBannerFallback: item.isBannerFallback,
                               progress: item.progress,
                               subtitle: item.subtitle,
                               subtitle2: item.subtitle2,

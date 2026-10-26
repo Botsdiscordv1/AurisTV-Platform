@@ -164,6 +164,48 @@ class ResponsiveUtils {
     return posterH + gap + textHeight + shadowMargin;
   }
 
+  /// Ancho adaptativo para la variante de póster grande (Large Poster Card).
+  /// Ajustado para que entren ~6 tarjetas visualmente en escritorio.
+  static double largePosterWidth(BuildContext context) {
+    final double width = MediaQuery.of(context).size.width;
+    final Orientation orientation = MediaQuery.of(context).orientation;
+    final b = getBreakpoint(context);
+    
+    if (b < Breakpoint.md) {
+      if (width > 550 || orientation == Orientation.landscape) {
+        return (width / 3.2).clamp(160.0, 200.0);
+      }
+      return (width / 2.2).clamp(160.0, 200.0);
+    }
+    
+    if (b == Breakpoint.md) {
+      return (width / 3.8).clamp(200.0, 250.0);
+    }
+    
+    if (b == Breakpoint.lg) return 270.0;
+    if (b == Breakpoint.xl) return 295.0;
+    return 300.0;
+  }
+
+  /// Altura proporcional para póster grande (AspectRatio 2:3).
+  static double largePosterHeight(BuildContext context) {
+    return (largePosterWidth(context) * 1.5).roundToDouble();
+  }
+
+  /// Altura del contenedor para filas de póster grande.
+  static double largePosterRowHeight(BuildContext context, {bool hasInfo = false}) {
+    final b = getBreakpoint(context);
+    final double posterH = largePosterHeight(context);
+    if (!hasInfo) {
+      return posterH + (b < Breakpoint.md ? 12.0 : 16.0);
+    }
+    final double gap = b < Breakpoint.md ? sp(context, 8) : 8;
+    final double textHeight = b < Breakpoint.md ? sp(context, 26) : 32;
+    final double shadowMargin = b < Breakpoint.md ? 16.0 : 20.0;
+    
+    return posterH + gap + textHeight + shadowMargin;
+  }
+
   static double bannerWidth(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final Orientation orientation = MediaQuery.of(context).orientation;
@@ -233,6 +275,16 @@ class ResponsiveUtils {
     if (b == Breakpoint.md) return 14.0;
     if (b == Breakpoint.lg) return 15.0;
     return 16.0;
+  }
+
+  /// Senior UI Strategy: Tamaños de fuente adaptativos para póster grande.
+  static double largePosterTitleFontSize(BuildContext context) {
+    final b = getBreakpoint(context);
+    if (b == Breakpoint.base) return 13.0;
+    if (b == Breakpoint.sm) return 14.0;
+    if (b == Breakpoint.md) return 15.0;
+    if (b == Breakpoint.lg) return 16.5;
+    return 18.0;
   }
 
   /// Senior UI Strategy: AspectRatio dinámico para el HeroBanner.

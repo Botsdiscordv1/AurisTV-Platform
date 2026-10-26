@@ -178,7 +178,7 @@ void main() {
     final wideSection = layout.firstWhere((s) => s.title == 'Section Forced Wide');
     final top10Section = layout.firstWhere((s) => s.title == 'Section Forced Top10');
 
-    expect(wideSection.presentation, SectionPresentation.wide);
+    expect(wideSection.presentation, SectionPresentation.posterLarge);
     expect(top10Section.presentation, SectionPresentation.top10);
   });
 
@@ -221,6 +221,9 @@ void main() {
       }
       if (current == SectionPresentation.wide) {
         expect(next, isNot(SectionPresentation.wide), reason: 'Contiguous wide at $i and ${i + 1}');
+      }
+      if (current == SectionPresentation.posterLarge) {
+        expect(next, isNot(SectionPresentation.posterLarge), reason: 'Contiguous posterLarge at $i and ${i + 1}');
       }
     }
   });

@@ -1,6 +1,7 @@
 enum SectionPresentation {
   wide,
   poster,
+  posterLarge,
   top10,
 }
 
@@ -13,6 +14,9 @@ class SectionPresentationResolver {
       final fmt = serverFormat.toLowerCase();
       if (fmt.contains('top10')) return SectionPresentation.top10;
       if (fmt.contains('wide') || fmt.contains('backdrop')) return SectionPresentation.wide;
+      if (fmt.contains('poster_large') || fmt.contains('posterlarge') || fmt.contains('large_poster') || fmt.contains('largeposter')) {
+        return SectionPresentation.posterLarge;
+      }
       if (fmt.contains('poster')) return SectionPresentation.poster;
     }
 
