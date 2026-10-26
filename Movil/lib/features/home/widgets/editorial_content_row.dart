@@ -11,6 +11,7 @@ class EditorialContentRow extends StatefulWidget {
   final List<MediaItem> items;
   final EditorialBadge badge;
   final bool forceTopDesign;
+  final SectionPresentation format;
   final SectionSeeMore? verMas;
   final void Function(MediaItem item) onItemTap;
 
@@ -22,6 +23,7 @@ class EditorialContentRow extends StatefulWidget {
     required this.badge,
     required this.onItemTap,
     this.forceTopDesign = false,
+    this.format = SectionPresentation.poster,
     this.verMas,
   });
 
@@ -169,13 +171,21 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   Widget _buildStandardRow(bool isMobile, double horizontalPadding) {
+    final bool isLarge = widget.format == SectionPresentation.posterLarge;
+    final double cardWidth = isLarge
+        ? ResponsiveUtils.largePosterWidth(context)
+        : ResponsiveUtils.posterWidth(context);
+    final double rowHeight = isLarge
+        ? ResponsiveUtils.largePosterRowHeight(context, hasInfo: false)
+        : ResponsiveUtils.rowHeight(context, hasInfo: false);
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: Stack(
         children: [
           SizedBox(
-            height: ResponsiveUtils.rowHeight(context, hasInfo: false),
+            height: rowHeight,
             child: _buildFadedWrapper(
               horizontalPadding: horizontalPadding,
               child: ListView.separated(
@@ -189,7 +199,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                 itemBuilder: (context, index) {
                   final item = widget.items[index];
                   return SizedBox(
-                    width: ResponsiveUtils.posterWidth(context),
+                    width: cardWidth,
                     child: FocusablePosterCard(
                       key: ValueKey(item.id),
                       title: item.title,
@@ -197,6 +207,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                       rating: formatRating(item.rating),
                       subtitle: null, // Senior Fix: Ocultar año en editorial
                       showInfo: false,
+                      isLarge: isLarge,
                       onTap: () => widget.onItemTap(item),
                     ),
                   );

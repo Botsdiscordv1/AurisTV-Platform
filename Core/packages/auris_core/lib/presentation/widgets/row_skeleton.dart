@@ -5,12 +5,14 @@ import 'skeleton_container.dart';
 
 class RowSkeleton extends StatelessWidget {
   final bool isWide;
+  final bool isLarge;
   final int? itemCount;
   final double? horizontalPadding;
 
   const RowSkeleton({
     super.key,
     this.isWide = false,
+    this.isLarge = false,
     this.itemCount,
     this.horizontalPadding,
   });
@@ -26,15 +28,21 @@ class RowSkeleton extends StatelessWidget {
     // Dimensiones dinámicas centralizadas en ResponsiveUtils
     final double cardWidth = isWide
         ? ResponsiveUtils.bannerWidth(context)
-        : ResponsiveUtils.posterWidth(context);
+        : (isLarge
+            ? ResponsiveUtils.largePosterWidth(context)
+            : ResponsiveUtils.posterWidth(context));
         
     final double cardHeight = isWide 
         ? ResponsiveUtils.bannerHeight(context)
-        : ResponsiveUtils.posterHeight(context);
+        : (isLarge
+            ? ResponsiveUtils.largePosterHeight(context)
+            : ResponsiveUtils.posterHeight(context));
     
     final double totalHeight = (isWide 
         ? ResponsiveUtils.bannerRowHeight(context)
-        : ResponsiveUtils.rowHeight(context, hasInfo: isWide)) + 4.0; // Senior Fix: Buffer de seguridad de 4px
+        : (isLarge
+            ? ResponsiveUtils.largePosterRowHeight(context, hasInfo: isWide)
+            : ResponsiveUtils.rowHeight(context, hasInfo: isWide))) + 4.0; // Senior Fix: Buffer de seguridad de 4px
 
     final double spacing = isMobile ? 8.0 : 10.0;
 

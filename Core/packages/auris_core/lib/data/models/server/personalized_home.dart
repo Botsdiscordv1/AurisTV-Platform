@@ -122,6 +122,7 @@ class HomeItem {
   final String? posterUrl;
   final String? backdropUrl;
   final String? logoUrl; // Senior Fix: Soporte para logos en filas WIDE / Hero
+  final bool isBannerFallback;
   final dynamic progress;
   final String? detailUrl;
   final String? url;
@@ -141,6 +142,7 @@ class HomeItem {
     this.posterUrl,
     this.backdropUrl,
     this.logoUrl,
+    this.isBannerFallback = false,
     this.progress,
     this.detailUrl,
     this.url,
@@ -166,17 +168,18 @@ class HomeItem {
       id: resolvedId,
       animeId: json['animeId'] as String? ?? json['anime_id'] as String?,
       title: json['title'] as String? ?? '',
-      posterUrl: json['posterUrl'] as String? ??
-          json['poster'] as String? ??
+      posterUrl: json['poster'] as String? ??
+          json['posterUrl'] as String? ??
           json['thumbnail'] as String? ??
           json['poster_url'] as String? ??
           json['image'] as String?,
-      backdropUrl: json['backdropUrl'] as String? ??
-          json['backdrop'] as String? ??
+      backdropUrl: json['banner'] as String? ??
           json['bannerUrl'] as String? ??
-          json['banner'] as String? ??
+          json['backdrop'] as String? ??
+          json['backdropUrl'] as String? ??
           json['backdrop_url'] as String?,
       logoUrl: json['logoUrl'] as String? ?? json['logo'] as String?,
+      isBannerFallback: json['isBannerFallback'] as bool? ?? json['bannerFallback'] as bool? ?? false,
       progress: json['progress'],
       detailUrl: json['detailUrl'] as String? ?? json['url'] as String? ?? json['playUrl'] as String?,
       url: json['url'] as String? ?? json['detailUrl'] as String? ?? json['playUrl'] as String?,

@@ -33,6 +33,7 @@ class HeroBanner extends ConsumerStatefulWidget {
   /// D-pad abajo desde el hero: enfoca la PRIMERA tarjeta de la primera sección
   /// (determinista vía las GlobalKey del home). Si es null, usa el salto genérico.
   final bool Function()? onArrowDown;
+  final bool isCompact;
 
   const HeroBanner({
     super.key,
@@ -44,6 +45,7 @@ class HeroBanner extends ConsumerStatefulWidget {
     this.onFocused,
     this.pillFocusNode,
     this.onArrowDown,
+    this.isCompact = false,
     dynamic layout,
   });
 
@@ -455,7 +457,27 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) return const SizedBox.shrink();
     final double screenWidth = MediaQuery.of(context).size.width;
-    
+
+    if (widget.isCompact) {
+      final item = _currentContentItem ?? widget.items[_contentIndex % widget.items.length];
+      return Container(
+        height: 205,
+        width: screenWidth,
+        color: Colors.black,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _buildBackgroundLayer(item),
+            _buildCinematicGradients(),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: TVResponsiveUtils.horizontalPadding(context), vertical: 8),
+              child: _buildCompactContent(item, screenWidth),
+            ),
+          ],
+        ),
+      );
+    }
+
     return VisibilityDetector(
       key: ValueKey('hero_visibility_tv_${widget.currentCategory}'),
       onVisibilityChanged: (info) {
@@ -834,6 +856,119 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompactContent(MediaItem item, double screenWidth) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
+          Builder(builder: (context) {
+            final dpr = MediaQuery.of(context).devicePixelRatio;
+            final logoWidth = screenWidth * 0.32;
+            final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
+            return SizedBox(
+              height: TVResponsiveUtils.heroLogoHeight(context) * 0.75,
+              width: logoWidth,
+              child: LogoToneFilter(
+                imageUrl: logoUrl,
+                child: CachedNetworkImage(
+                  imageUrl: logoUrl,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomLeft,
+                  fadeInDuration: const Duration(milliseconds: 100),
+                  memCacheWidth: (logoWidth * dpr).round().clamp(200, 800),
+                  errorWidget: (_, __, ___) => Text(
+                    item.title,
+                    style: const TextStyle(
+                      fontFamily: 'NetflixSans',
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          })
+        else
+          Text(
+            item.title,
+            style: const TextStyle(
+              fontFamily: 'NetflixSans',
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              _formatMediaType(item).replaceAll('  ', ' ').replaceAll('A N I M E', 'Anime').replaceAll('S E R I E', 'Serie').replaceAll('P E L Í C U L A', 'Película'),
+              style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(width: 10),
+            if (item.totalSeasons != null && item.totalSeasons! > 0) ...[
+              Text(
+                item.totalSeasons == 1 ? '1 temporada' : '${item.totalSeasons} temporadas',
+                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 10),
+            ] else if (item.duration != null && item.duration!.isNotEmpty) ...[
+              Text(
+                item.duration!,
+                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(width: 10),
+            ],
+            Text(
+              item.year != null ? '${item.year}' : '2024',
+              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white60, width: 1.0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: Text(
+                item.certification ?? '13+',
+                style: const TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: screenWidth * 0.50,
+          child: Text(
+            item.synopsis ?? '',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'NetflixSans',
+              color: const Color(0xFFE5E5E5),
+              fontSize: 12.5,
+              height: 1.35,
+              fontWeight: FontWeight.w400,
+              shadows: [
+                Shadow(color: Colors.black.withOpacity(0.6), offset: const Offset(0, 1), blurRadius: 4),
+              ],
+            ),
           ),
         ),
       ],

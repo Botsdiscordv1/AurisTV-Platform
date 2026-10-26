@@ -12,6 +12,7 @@ class EditorialContentRow extends StatefulWidget {
   final List<MediaItem> items;
   final EditorialBadge badge;
   final bool forceTopDesign;
+  final SectionPresentation format;
   final SectionSeeMore? verMas;
   final void Function(MediaItem item) onItemTap;
 
@@ -23,6 +24,7 @@ class EditorialContentRow extends StatefulWidget {
     required this.badge,
     required this.onItemTap,
     this.forceTopDesign = false,
+    this.format = SectionPresentation.poster,
     this.verMas,
   });
 
@@ -171,9 +173,12 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   Widget _buildStandardRow(bool isMobile, double horizontalPadding) {
-    final double cardWidth = context.useMobileLayout
-        ? ResponsiveUtils.posterWidth(context)
-        : webPosterGridCellWidth(context);
+    final bool isLarge = widget.format == SectionPresentation.posterLarge;
+    final double cardWidth = isLarge
+        ? ResponsiveUtils.largePosterWidth(context)
+        : (context.useMobileLayout
+            ? ResponsiveUtils.posterWidth(context)
+            : webPosterGridCellWidth(context));
     final double posterHeight = (cardWidth * 1.5).roundToDouble();
     const double posterFocusZoom = 1.10;
     final double rowHeight = posterHeight * posterFocusZoom + 12;
@@ -207,6 +212,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                         rating: formatRating(item.rating),
                         subtitle: null, // Senior Fix: Ocultar año en editorial
                         showInfo: false,
+                        isLarge: isLarge,
+                        width: cardWidth,
                         onTap: () => widget.onItemTap(item),
                       ),
                     ),

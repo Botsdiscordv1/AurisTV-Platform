@@ -105,10 +105,10 @@ class TvScroll {
     final ScrollPosition position = scrollable.position;
     if (!position.hasContentDimensions) return false;
 
-    // Objetivo: el borde superior de la sección a la altura del topbar
-    // (barra fija en top:0 de la pantalla en TV, sin insets).
+    // Objetivo: el borde superior de la sección a la altura del topbar + sticky hero si está activo
     final double sectionTop = object.localToGlobal(Offset.zero).dy;
-    final double desiredTop = TVResponsiveUtils.topBarHeight(context);
+    final double stickyHeroHeight = position.pixels > 250 ? 205.0 : 0.0;
+    final double desiredTop = TVResponsiveUtils.topBarHeight(context) + stickyHeroHeight;
     final double delta = sectionTop - desiredTop;
     if (delta.abs() < 1.0) return false;
 

@@ -1802,16 +1802,10 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final String icon = AurisIcons.playFilled;
 
     String? remainingText;
-    if (hasHistory) {
-      final sub = continueCardSubtitle(latestHistory);
-      if (sub.line2?.isNotEmpty == true) {
-        String t = sub.line2!;
-        if (t.toLowerCase().startsWith('quedan ')) {
-          t = t.substring(7).trim();
-        } else if (t.toLowerCase().startsWith('queda ')) {
-          t = t.substring(6).trim();
-        }
-        remainingText = t;
+    if (hasHistory && latestHistory.durationInMilliseconds > 0) {
+      final remainingMs = latestHistory.durationInMilliseconds - latestHistory.positionInMilliseconds;
+      if (remainingMs > 0) {
+        remainingText = AurisStringUtils.formatRemainingTime(remainingMs);
       }
     }
 
@@ -1875,7 +1869,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     return Container(
       // flexible=true: ocupa lo disponible (hasta el maxWidth del padre) para
       // no desbordar en anchos colapsados (transición de rotación).
-      width: flexible ? double.infinity : (isMobile ? 85 : 140),
+      width: flexible ? double.infinity : (isMobile ? 45 : 100),
       height: 6,
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.30),

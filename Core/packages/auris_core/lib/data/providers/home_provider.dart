@@ -300,6 +300,26 @@ class EditorialRow {
     this.format = SectionPresentation.poster,
     this.verMas,
   });
+
+  EditorialRow copyWith({
+    EditorialBadge? badge,
+    String? title,
+    String? subtitle,
+    List<MediaItem>? items,
+    bool? isMovie,
+    SectionPresentation? format,
+    SectionSeeMore? verMas,
+  }) {
+    return EditorialRow(
+      badge: badge ?? this.badge,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      items: items ?? this.items,
+      isMovie: isMovie ?? this.isMovie,
+      format: format ?? this.format,
+      verMas: verMas ?? this.verMas,
+    );
+  }
 }
 
 class SportsEditorialRow {
@@ -351,6 +371,22 @@ class HomeLayoutSection {
     this.presentation = SectionPresentation.poster,
     this.serverFormat,
   });
+
+  HomeLayoutSection copyWith({
+    HomeSectionType? type,
+    String? title,
+    dynamic data,
+    SectionPresentation? presentation,
+    String? serverFormat,
+  }) {
+    return HomeLayoutSection(
+      type: type ?? this.type,
+      title: title ?? this.title,
+      data: data ?? this.data,
+      presentation: presentation ?? this.presentation,
+      serverFormat: serverFormat ?? this.serverFormat,
+    );
+  }
 }
 
 /// Senior: Orchestrator for the Home Screen layout.
@@ -547,14 +583,13 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
       final String key = _normalizeSectionTitle(s.title);
       if (s.title != null && sectionTitles.add(key)) {
         rawSections.add(s);
-      } else if (s.presentation == SectionPresentation.top10) {
-        // La TOP10 del editorial (viene del endpoint /api/home/top10/personalized)
-        // es la fuente canónica: pisa a la copia de user/home que pudo haber
-        // llegado desde caché en la ETAPA 1, manteniendo su posición.
-        final idx = rawSections.indexWhere((x) =>
-            x.presentation == SectionPresentation.top10 &&
-            _normalizeSectionTitle(x.title) == key);
-        if (idx != -1) rawSections[idx] = s;
+      } else if (s.title != null) {
+        final idx = rawSections.indexWhere((x) => _normalizeSectionTitle(x.title) == key);
+        if (idx != -1) {
+          if (s.presentation != SectionPresentation.poster || rawSections[idx].presentation == SectionPresentation.poster) {
+            rawSections[idx] = s;
+          }
+        }
       } else if (s.type == HomeSectionType.continueWatching) {
         if (!rawSections.any((x) => x.type == HomeSectionType.continueWatching)) {
           rawSections.add(s);
@@ -601,12 +636,15 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
       }
     }
     final interleaved = _interleaveInicioSections(catSections);
+    rawSections.clear();
+    sectionTitles.clear();
     addUniqueSections(interleaved);
   } else {
     for (final ed in editorialResponses) {
       if (ed.sections.isNotEmpty) {
         final mapped = _mapEditorialResponseToLayout(ed, currentCategory);
-        addUniqueSections(mapped);
+        final interleavedCat = _interleaveCategorySections(mapped);
+        addUniqueSections(interleavedCat);
       }
     }
   }
@@ -631,11 +669,16 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
         personalizedSections,
         rawSections,
       ]);
-      yield SectionComposer.compose(combinedInterleaved);
+      rawSections.clear();
+      sectionTitles.clear();
+      addUniqueSections(combinedInterleaved);
+      yield SectionComposer.compose(rawSections);
     } else {
       final List<HomeLayoutSection> finalSections = [];
       final Set<String> finalTitles = {};
-      for (final s in personalizedSections) {
+      final personalizedMapped = _mapResponseToLayout(homeResponse, currentCategory);
+      final interleavedPersonalized = _interleaveCategorySections(personalizedMapped);
+      for (final s in interleavedPersonalized) {
         if (s.title != null && finalTitles.add(_normalizeSectionTitle(s.title))) finalSections.add(s);
         else if (s.type == HomeSectionType.continueWatching) finalSections.add(s);
       }
@@ -748,9 +791,32 @@ List<HomeLayoutSection> _mapResponseToLayout(HomeResponse response, String categ
   return layout;
 }
 
+HomeLayoutSection _promoteSectionToWide(HomeLayoutSection sec) {
+  dynamic newData = sec.data;
+  if (sec.data is EditorialRow) {
+    newData = (sec.data as EditorialRow).copyWith(format: SectionPresentation.wide);
+  }
+  return sec.copyWith(
+    presentation: SectionPresentation.wide,
+    serverFormat: 'wide',
+    data: newData,
+  );
+}
+
+HomeLayoutSection _promoteSectionToPosterLarge(HomeLayoutSection sec) {
+  dynamic newData = sec.data;
+  if (sec.data is EditorialRow) {
+    newData = (sec.data as EditorialRow).copyWith(format: SectionPresentation.posterLarge);
+  }
+  return sec.copyWith(
+    presentation: SectionPresentation.posterLarge,
+    serverFormat: 'poster_large',
+    data: newData,
+  );
+}
+
 /// Senior Helper: Intercala y aleatoriza secciones de las 4 categorías (anime, películas, series, kdramas)
-/// para la pestaña 'Inicio', respetando estrictamente la jerarquía visual de la pantalla
-/// y la armonía de formatos (evita wide-wide o top10-top10 contiguos, y rompe la monotonía de posters).
+/// para la pestaña 'Inicio' con el ritmo estándar (Poster -> Poster -> Wide / PosterLarge para romper monotonía).
 List<HomeLayoutSection> _interleaveInicioSections(
   List<List<HomeLayoutSection>> categoryLists, {
   int? seed,
@@ -761,6 +827,7 @@ List<HomeLayoutSection> _interleaveInicioSections(
   // 1. Clasificar jerárquicamente secciones estructurales fijas
   HomeLayoutSection? continueWatchingSec;
   HomeLayoutSection? primaryTop10Sec;
+  HomeLayoutSection? primaryPosterLargeSec;
 
   final Set<String> seenTitles = {};
   final List<List<HomeLayoutSection>> availablePools = [];
@@ -772,6 +839,11 @@ List<HomeLayoutSection> _interleaveInicioSections(
         continueWatchingSec ??= sec;
       } else if (sec.presentation == SectionPresentation.top10 && primaryTop10Sec == null) {
         primaryTop10Sec = sec;
+      } else if ((sec.presentation == SectionPresentation.posterLarge ||
+                  sec.type == HomeSectionType.editorial ||
+                  sec.type == HomeSectionType.recommendation) &&
+                 primaryPosterLargeSec == null) {
+        primaryPosterLargeSec = _promoteSectionToPosterLarge(sec);
       } else {
         pool.add(sec);
       }
@@ -795,13 +867,20 @@ List<HomeLayoutSection> _interleaveInicioSections(
     }
   }
 
+  // Jerarquía posición 2: Sección Destacada Principal (POSTER_LARGE)
+  if (primaryPosterLargeSec != null) {
+    if (primaryPosterLargeSec.title != null && seenTitles.add(primaryPosterLargeSec.title!)) {
+      result.add(primaryPosterLargeSec);
+    }
+  }
+
   // Orden inicial de categorías para intercalado
   final List<int> categoryOrder = List.generate(availablePools.length, (i) => i);
   categoryOrder.shuffle(rnd);
 
   int categoryPointer = 0;
 
-  // 2. Loop de armonía visual para intercalar las secciones restantes
+  // 2. Loop de armonía visual estándar (Poster -> Poster -> Wide / PosterLarge)
   while (availablePools.any((pool) => pool.isNotEmpty)) {
     SectionPresentation? forbiddenFormat;
     SectionPresentation? preferredFormat;
@@ -812,10 +891,17 @@ List<HomeLayoutSection> _interleaveInicioSections(
         forbiddenFormat = SectionPresentation.wide; // Evita wide contiguo
       } else if (lastFormat == SectionPresentation.top10) {
         forbiddenFormat = SectionPresentation.top10; // Evita top10 contiguo
+      } else if (lastFormat == SectionPresentation.posterLarge) {
+        forbiddenFormat = SectionPresentation.posterLarge; // Evita posterLarge contiguo
       } else if (result.length >= 2 &&
           result[result.length - 1].presentation == SectionPresentation.poster &&
           result[result.length - 2].presentation == SectionPresentation.poster) {
-        preferredFormat = SectionPresentation.wide; // Rompe monotonía de 2 posters
+        // Rompe monotonía de 2 posters alternando entre WIDE y POSTER_LARGE
+        final wideCount = result.where((s) => s.presentation == SectionPresentation.wide).length;
+        final largeCount = result.where((s) => s.presentation == SectionPresentation.posterLarge).length;
+        preferredFormat = (largeCount <= wideCount)
+            ? SectionPresentation.posterLarge
+            : SectionPresentation.wide;
       }
     }
 
@@ -845,6 +931,21 @@ List<HomeLayoutSection> _interleaveInicioSections(
         }
 
         if (preferredFormat != null && fmt != preferredFormat) {
+          if (preferredFormat == SectionPresentation.posterLarge &&
+              fmt == SectionPresentation.poster &&
+              (candidate.type == HomeSectionType.editorial || candidate.type == HomeSectionType.recommendation)) {
+            bestCandidate = _promoteSectionToPosterLarge(candidate);
+            chosenCategoryIndex = catIdx;
+            chosenItemIndex = i;
+            break;
+          }
+          if (preferredFormat == SectionPresentation.wide &&
+              fmt == SectionPresentation.poster) {
+            bestCandidate = _promoteSectionToWide(candidate);
+            chosenCategoryIndex = catIdx;
+            chosenItemIndex = i;
+            break;
+          }
           if (bestCandidate == null) {
             bestCandidate = candidate;
             chosenCategoryIndex = catIdx;
@@ -900,6 +1001,118 @@ List<HomeLayoutSection> _interleaveInicioSections(
       if (bestCandidate.title != null) seenTitles.add(bestCandidate.title!);
       availablePools[chosenCategoryIndex].removeAt(chosenItemIndex);
       categoryPointer = (chosenCategoryIndex + 1) % availablePools.length;
+    } else {
+      break;
+    }
+  }
+
+  debugPrint('✨ [_interleaveInicioSections] Order (${result.length} sections):');
+  for (int i = 0; i < result.length; i++) {
+    final s = result[i];
+    final isLarge = s.presentation == SectionPresentation.posterLarge;
+    debugPrint('   [$i] ${isLarge ? "🌟 [POSTER_LARGE ACTIVATED]" : "   [${s.presentation.name}]"} "${s.title}" (${s.type.name})');
+  }
+
+  return result;
+}
+
+List<HomeLayoutSection> _interleaveCategorySections(List<HomeLayoutSection> sections) {
+  if (sections.isEmpty) return sections;
+
+  HomeLayoutSection? continueWatchingSec;
+  HomeLayoutSection? primaryTop10Sec;
+  HomeLayoutSection? primaryPosterLargeSec;
+
+  final List<HomeLayoutSection> pool = [];
+  for (final sec in sections) {
+    if (sec.type == HomeSectionType.continueWatching) {
+      continueWatchingSec ??= sec;
+    } else if (sec.presentation == SectionPresentation.top10 && primaryTop10Sec == null) {
+      primaryTop10Sec = sec;
+    } else if ((sec.presentation == SectionPresentation.posterLarge ||
+                sec.type == HomeSectionType.editorial ||
+                sec.type == HomeSectionType.recommendation) &&
+               primaryPosterLargeSec == null) {
+      primaryPosterLargeSec = _promoteSectionToPosterLarge(sec);
+    } else {
+      pool.add(sec);
+    }
+  }
+
+  final List<HomeLayoutSection> result = [];
+
+  if (continueWatchingSec != null) result.add(continueWatchingSec);
+  if (primaryTop10Sec != null) result.add(primaryTop10Sec);
+  if (primaryPosterLargeSec != null) result.add(primaryPosterLargeSec);
+
+  while (pool.isNotEmpty) {
+    SectionPresentation? forbiddenFormat;
+    SectionPresentation? preferredFormat;
+
+    if (result.isNotEmpty) {
+      final lastFormat = result.last.presentation;
+      if (lastFormat == SectionPresentation.wide) {
+        forbiddenFormat = SectionPresentation.wide;
+      } else if (lastFormat == SectionPresentation.top10) {
+        forbiddenFormat = SectionPresentation.top10;
+      } else if (lastFormat == SectionPresentation.posterLarge) {
+        forbiddenFormat = SectionPresentation.posterLarge;
+      } else if (result.length >= 2 &&
+          result[result.length - 1].presentation == SectionPresentation.poster &&
+          result[result.length - 2].presentation == SectionPresentation.poster) {
+        final wideCount = result.where((s) => s.presentation == SectionPresentation.wide).length;
+        final largeCount = result.where((s) => s.presentation == SectionPresentation.posterLarge).length;
+        preferredFormat = (largeCount <= wideCount)
+            ? SectionPresentation.posterLarge
+            : SectionPresentation.wide;
+      }
+    }
+
+    HomeLayoutSection? bestCandidate;
+    int? chosenIndex;
+
+    for (int i = 0; i < pool.length; i++) {
+      final candidate = pool[i];
+      final fmt = candidate.presentation;
+
+      if (forbiddenFormat != null && fmt == forbiddenFormat) {
+        continue;
+      }
+
+      if (preferredFormat != null && fmt != preferredFormat) {
+        if (preferredFormat == SectionPresentation.posterLarge &&
+            fmt == SectionPresentation.poster &&
+            (candidate.type == HomeSectionType.editorial || candidate.type == HomeSectionType.recommendation)) {
+          bestCandidate = _promoteSectionToPosterLarge(candidate);
+          chosenIndex = i;
+          break;
+        }
+        if (preferredFormat == SectionPresentation.wide &&
+            fmt == SectionPresentation.poster) {
+          bestCandidate = _promoteSectionToWide(candidate);
+          chosenIndex = i;
+          break;
+        }
+        if (bestCandidate == null) {
+          bestCandidate = candidate;
+          chosenIndex = i;
+        }
+        continue;
+      }
+
+      bestCandidate = candidate;
+      chosenIndex = i;
+      break;
+    }
+
+    if (bestCandidate == null && pool.isNotEmpty) {
+      chosenIndex = 0;
+      bestCandidate = pool[0];
+    }
+
+    if (bestCandidate != null && chosenIndex != null) {
+      result.add(bestCandidate);
+      pool.removeAt(chosenIndex);
     } else {
       break;
     }
@@ -997,6 +1210,7 @@ MediaItem _mapHomeItemToMediaItem(HomeItem item, String sectionId) {
     posterUrl: ApiEndpoints.proxyImage(item.posterUrl, category: rawKind, source: effectiveSource),
     bannerUrl: ApiEndpoints.proxyImage(effectiveBanner, highQuality: true, category: rawKind, source: effectiveSource),
     logoUrl: item.logoUrl,
+    isBannerFallback: item.isBannerFallback,
     type: mediaType,
     rating: item.rating ?? item.score,
     subtitle: resolvedSubtitle,
@@ -1113,6 +1327,7 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
     posterUrl: ApiEndpoints.proxyImage(result.posterUrl, source: effectiveSource, category: result.kind),
     bannerUrl: ApiEndpoints.proxyImage(effectiveBanner, source: effectiveSource, category: result.kind),
     logoUrl: result.logoUrl,
+    isBannerFallback: result.isBannerFallback,
     type: type,
     rating: result.rating,
     source: effectiveSource,

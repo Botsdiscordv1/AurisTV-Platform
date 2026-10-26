@@ -13,6 +13,7 @@ class EditorialContentRow extends StatefulWidget {
   final List<MediaItem> items;
   final EditorialBadge badge;
   final bool forceTopDesign;
+  final SectionPresentation format;
   final void Function(MediaItem item) onItemTap;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
@@ -29,6 +30,7 @@ class EditorialContentRow extends StatefulWidget {
     required this.badge,
     required this.onItemTap,
     this.forceTopDesign = false,
+    this.format = SectionPresentation.poster,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
@@ -63,10 +65,26 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     _itemFocusNodes = List.generate(widget.items.length, (index) {
       final node = FocusNode();
       node.addListener(() {
-        if (node.hasFocus) _lastFocusedIndex = index;
+        if (node.hasFocus) {
+          _lastFocusedIndex = index;
+          final bool isLarge = widget.format == SectionPresentation.posterLarge;
+          final double cWidth = isLarge ? TVResponsiveUtils.largePosterWidth(context) : TVResponsiveUtils.posterWidth(context);
+          _scrollToCard(index, cWidth);
+        }
       });
       return node;
     });
+  }
+
+  void _scrollToCard(int index, double cardWidth) {
+    if (!_scrollController.hasClients) return;
+    final double spacing = 14.0;
+    final double targetOffset = (index * (cardWidth + spacing)).clamp(0.0, _scrollController.position.maxScrollExtent);
+    _scrollController.animateTo(
+      targetOffset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -158,8 +176,13 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     final isMobile = false;
     final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
     
-    final double cardWidth = TVResponsiveUtils.posterWidth(context);
-    final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: false);
+    final bool isLarge = widget.format == SectionPresentation.posterLarge;
+    final double cardWidth = isLarge
+        ? TVResponsiveUtils.largePosterWidth(context)
+        : TVResponsiveUtils.posterWidth(context);
+    final double rowHeight = isLarge
+        ? TVResponsiveUtils.largePosterRowHeight(context, hasInfo: false)
+        : TVResponsiveUtils.rowHeight(context, hasInfo: false);
 
     final bool isMythical = widget.badge == EditorialBadge.mythical || widget.forceTopDesign;
 
@@ -212,6 +235,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   Widget _buildStandardRow(bool isMobile, double horizontalPadding, double cardWidth, double rowHeight) {
+    final bool isLarge = widget.format == SectionPresentation.posterLarge;
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -239,16 +263,45 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                   clipBehavior: Clip.none,
                   scrollDirection: Axis.horizontal,
                   primary: false, 
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 5),
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 10),
                   itemCount: widget.items.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 14),
                   itemBuilder: (context, index) {
                     final item = widget.items[index];
+                    if (isLarge) {
+                      return FocusableExpandablePosterCard(
+                        key: ValueKey(item.id),
+                        focusNode: _itemFocusNodes[index],
+                        title: item.title,
+                        posterUrl: item.posterUrl,
+                        bannerUrl: item.bannerUrl,
+                        badge: item.editorialBadge?.name,
+                        rating: formatRating(item.rating),
+                        baseWidth: cardWidth,
+                        onTap: () => widget.onItemTap(item),
+                        onKeyEvent: (node, event) {
+                          if (event is KeyDownEvent) {
+                            if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                              if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
+                            } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                              if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
+                            } else if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
+                              if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
+                            } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
+                              if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
+                            }
+                          }
+                          return KeyEventResult.ignored;
+                        },
+                      );
+                    }
                     return SizedBox(
                       width: cardWidth,
                       child: FocusablePosterCard(
                         key: ValueKey(item.id),
                         focusNode: _itemFocusNodes[index],
+                        isLarge: isLarge,
+                        width: cardWidth,
                         onKeyEvent: (node, event) {
                           if (event is KeyDownEvent) {
                             if (event.logicalKey == LogicalKeyboardKey.arrowDown) {

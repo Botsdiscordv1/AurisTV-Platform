@@ -56,6 +56,18 @@ class UnifiedSection extends StatelessWidget {
             onItemTap: onItemTap,
           ),
         );
+      case SectionPresentation.posterLarge:
+        return RepaintBoundary(
+          child: EditorialContentRow(
+            title: title,
+            subtitle: subtitle,
+            items: items,
+            badge: badge ?? EditorialBadge.mythical,
+            format: SectionPresentation.posterLarge,
+            verMas: verMas,
+            onItemTap: onItemTap,
+          ),
+        );
       case SectionPresentation.poster:
       default:
         return RepaintBoundary(
@@ -98,6 +110,7 @@ class UnifiedSection extends StatelessWidget {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: m.logoUrl,
+      isBannerFallback: m.isBannerFallback,
       subtitle: hideWideSubtitle ? null : m.subtitle,
       rating: _formatRating(m.rating),
       badgeOverlay: badgeOverlay,

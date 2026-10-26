@@ -114,10 +114,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     'live': FocusNode(),
   };
 
+  double _scrollOffset = 0.0;
+
   @override
   void initState() {
     super.initState();
     _checkForUpdate();
+    _scrollController.addListener(() {
+      if (mounted) {
+        setState(() => _scrollOffset = _scrollController.offset);
+      }
+    });
   }
 
   void _checkForUpdate() {
@@ -169,6 +176,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     if (scrolled != _isScrolled) {
       setState(() => _isScrolled = scrolled);
     }
+  }
+
+  List<ComposedHomeSection> _applyTVRhythm(List<ComposedHomeSection> rawSections) {
+    final List<ComposedHomeSection> tvSections = [];
+    int consecutiveWide = 0;
+
+    for (final sec in rawSections) {
+      if (sec.type == HomeSectionType.continueWatching || 
+          sec.presentation == SectionPresentation.top10 || 
+          sec.presentation == SectionPresentation.wide || 
+          sec.presentation == SectionPresentation.posterLarge) {
+        tvSections.add(sec);
+        if (sec.presentation == SectionPresentation.wide) {
+          consecutiveWide++;
+          if (consecutiveWide >= 2) consecutiveWide = 0;
+        } else if (sec.presentation == SectionPresentation.posterLarge) {
+          consecutiveWide = 0;
+        }
+      } else {
+        if (consecutiveWide >= 2) {
+          tvSections.add(ComposedHomeSection(
+            id: '${sec.id}_large',
+            type: sec.type,
+            title: sec.title,
+            subtitle: sec.subtitle,
+            items: sec.items,
+            sportsItems: sec.sportsItems,
+            brandItems: sec.brandItems,
+            presentation: SectionPresentation.posterLarge,
+            data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.posterLarge) : sec.data,
+            badge: sec.badge,
+          ));
+          consecutiveWide = 0;
+        } else {
+          tvSections.add(ComposedHomeSection(
+            id: '${sec.id}_wide',
+            type: sec.type,
+            title: sec.title,
+            subtitle: sec.subtitle,
+            items: sec.items,
+            sportsItems: sec.sportsItems,
+            brandItems: sec.brandItems,
+            presentation: SectionPresentation.wide,
+            data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.wide) : sec.data,
+            badge: sec.badge,
+          ));
+          consecutiveWide++;
+        }
+      }
+    }
+    return tvSections;
   }
 
   Widget _buildSection(
@@ -246,6 +304,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onArrowUpToPrev: onArrowUpToPrev,
             ),
           );
+        } else if (row.format == SectionPresentation.posterLarge) {
+          return RepaintBoundary(
+            child: EditorialContentRow(
+              key: key,
+              title: row.title,
+              subtitle: row.subtitle,
+              items: row.items,
+              badge: row.badge,
+              format: SectionPresentation.posterLarge,
+              onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+              onArrowRightOnLast: onArrowRightOnLast,
+              onArrowLeftOnFirst: onArrowLeftOnFirst,
+              onArrowDownToNext: onArrowDownToNext,
+              onArrowUpToPrev: onArrowUpToPrev,
+            ),
+          );
         } else {
           return RepaintBoundary(
             child: EditorialContentRow(
@@ -254,6 +328,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               subtitle: row.subtitle,
               items: row.items,
               badge: row.badge,
+              format: row.format,
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
@@ -390,6 +465,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: m.logoUrl,
+      isBannerFallback: m.isBannerFallback,
       subtitle: effectiveSubtitle,
       rating: formatRating(m.rating),
       badgeOverlay: badgeOverlay,
@@ -428,9 +504,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             controller: _scrollController,
             cacheExtent: 700,
             slivers: [
-              // Espaciador para el Navbar
+              // Espaciador para el Navbar y Sticky Compact Hero si está activo
               SliverToBoxAdapter(
-                child: SizedBox(height: navHeight), // Eliminado el +4 extra
+                child: SizedBox(height: navHeight + (_scrollOffset > 250 ? 205.0 : 0.0)),
               ),
 
               // 1. Banner Principal
@@ -507,7 +583,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               // 2. Contenido dinámico
               if (currentCategory == 'inicio') 
                 layoutAsync.when(
-                  data: (sections) {
+                  data: (rawSections) {
+                    final sections = _applyTVRhythm(rawSections);
                     while (_sectionRowKeys.length < sections.length) {
                       _sectionRowKeys.add(GlobalKey());
                     }
@@ -655,11 +732,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                   ),
                   error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
                 ),
-              
+
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
             ],
           ),
-          
+
+          // Sticky Compact Hero Header when scrolled down past full hero (~250px)
+          if (_scrollOffset > 250)
+            Positioned(
+              top: navHeight,
+              left: 0,
+              right: 0,
+              child: heroBannerItemsAsync.when(
+                data: (displayItems) {
+                  if (displayItems.isEmpty) return const SizedBox.shrink();
+                  return Material(
+                    color: Colors.black,
+                    elevation: 8,
+                    child: HeroBanner(
+                      isCompact: true,
+                      items: displayItems,
+                      currentCategory: currentCategory,
+                      onDetails: (item) => openTVDetails(context, item, currentCategory),
+                    ),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+            ),
+
           // Overlay de busqueda (se muestra encima del contenido, debajo de la topbar)
           if (_showSearch)
             Positioned(

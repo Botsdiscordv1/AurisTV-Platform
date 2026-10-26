@@ -82,6 +82,7 @@ class EditorialItem {
   final List<String> genres;
   final List<SourceItem> sources;
   final String? logoUrl;
+  final bool isBannerFallback;
   final int? tmdbId;
   final int? episode;
   final int? airingAt;
@@ -110,6 +111,7 @@ class EditorialItem {
     this.genres = const [],
     this.sources = const [],
     this.logoUrl,
+    this.isBannerFallback = false,
     this.tmdbId,
     this.episode,
     this.airingAt,
@@ -119,8 +121,8 @@ class EditorialItem {
   });
 
   factory EditorialItem.fromJson(Map<String, dynamic> json) {
-    final String? rawPoster = json['posterUrl'] as String? ?? json['poster'] as String? ?? json['thumbnail'] as String?;
-    final String? rawBanner = json['bannerUrl'] as String? ?? json['banner'] as String? ?? json['backdropUrl'] as String? ?? json['backdrop_url'] as String?;
+    final String? rawPoster = json['poster'] as String? ?? json['posterUrl'] as String? ?? json['thumbnail'] as String?;
+    final String? rawBanner = json['banner'] as String? ?? json['bannerUrl'] as String? ?? json['backdrop'] as String? ?? json['backdropUrl'] as String? ?? json['backdrop_url'] as String?;
     final String sourceHint = json['source'] as String? ?? json['url'] as String? ?? '';
 
     return EditorialItem(
@@ -134,6 +136,7 @@ class EditorialItem {
       english: json['english'] as String?,
       posterUrl: ApiEndpoints.proxyImage(rawPoster, source: sourceHint, category: json['kind'] as String?),
       bannerUrl: ApiEndpoints.proxyImage(rawBanner, highQuality: true, source: sourceHint, category: json['kind'] as String?),
+      isBannerFallback: json['isBannerFallback'] as bool? ?? json['bannerFallback'] as bool? ?? false,
       trailerKey: json['trailerKey'] as String?,
       synopsis: json['synopsis'] as String?,
       rating: switch (json['rating']) {
