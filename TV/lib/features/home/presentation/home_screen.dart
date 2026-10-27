@@ -504,9 +504,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             controller: _scrollController,
             cacheExtent: 700,
             slivers: [
-              // Espaciador para el Navbar y Sticky Compact Hero si está activo
+              // Espaciador para el Navbar y Sticky Compact Hero si está activo (con solapamiento de ~40px estilo Prime Video)
               SliverToBoxAdapter(
-                child: SizedBox(height: navHeight + (_scrollOffset > 250 ? 205.0 : 0.0)),
+                child: SizedBox(height: navHeight + (_scrollOffset > 250 ? 235.0 : 0.0)),
               ),
 
               // 1. Banner Principal
@@ -578,7 +578,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                 error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err'))),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 0)), // Reducido de 8 a 0 para pegar mÃ¡s las filas al Hero
+              const SliverToBoxAdapter(child: SizedBox(height: 0)),
 
               // 2. Contenido dinámico
               if (currentCategory == 'inicio') 
@@ -791,18 +791,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
     return Container(
       height: navHeight,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xEE000000), // ~93% negro en el borde superior
-            Color(0x88000000), // ~53% negro intermedio
-            Color(0x00000000), // Difuminado transparente hacia el contenido
-          ],
-          stops: [0.0, 0.65, 1.0],
-        ),
-      ),
+      color: Colors.black, // Solid black background - nothing bleeds through!
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
         child: Row(

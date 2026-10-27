@@ -34,6 +34,9 @@ class HeroBanner extends ConsumerStatefulWidget {
   /// (determinista vía las GlobalKey del home). Si es null, usa el salto genérico.
   final bool Function()? onArrowDown;
   final bool isCompact;
+  final double? compactHeight;
+  final double? compactLogoHeight;
+  final double? compactTitleFontSize;
 
   const HeroBanner({
     super.key,
@@ -46,6 +49,9 @@ class HeroBanner extends ConsumerStatefulWidget {
     this.pillFocusNode,
     this.onArrowDown,
     this.isCompact = false,
+    this.compactHeight,
+    this.compactLogoHeight,
+    this.compactTitleFontSize,
     dynamic layout,
   });
 
@@ -461,7 +467,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
     if (widget.isCompact) {
       final item = _currentContentItem ?? widget.items[_contentIndex % widget.items.length];
       return Container(
-        height: 205,
+        height: widget.compactHeight ?? TVResponsiveUtils.compactHeroHeight(context),
         width: screenWidth,
         color: Colors.black,
         child: Stack(
@@ -798,7 +804,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                   ),
                 ),
               ),
-              // Viñeta vertical de abajo hacia arriba (fusión al 100% con el fondo de la pantalla)
+              // Viñeta vertical inferior (comienza en la parte baja del hero)
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -806,12 +812,10 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                     end: Alignment.topCenter,
                     colors: [
                       Color(0xFF000000),
-                      Color(0xEB000000),
-                      Color(0x80000000),
-                      Color(0x26000000),
+                      Color(0x99000000),
                       Colors.transparent,
                     ],
-                    stops: [0.0, 0.12, 0.32, 0.58, 0.85],
+                    stops: [0.0, 0.15, 0.35],
                   ),
                 ),
               ),
@@ -851,7 +855,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                       Color(0x99000000),
                       Colors.transparent,
                     ],
-                    stops: [0.0, 0.18, 0.55],
+                    stops: [0.0, 0.15, 0.35],
                   ),
                 ),
               ),
@@ -863,6 +867,8 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
   }
 
   Widget _buildCompactContent(MediaItem item, double screenWidth) {
+    final logoHeight = widget.compactLogoHeight ?? TVResponsiveUtils.compactHeroLogoHeight(context);
+    final titleFontSize = widget.compactTitleFontSize ?? TVResponsiveUtils.compactHeroTitleFontSize(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -874,7 +880,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
             final logoWidth = screenWidth * 0.32;
             final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
             return SizedBox(
-              height: TVResponsiveUtils.heroLogoHeight(context) * 0.75,
+              height: logoHeight,
               width: logoWidth,
               child: LogoToneFilter(
                 imageUrl: logoUrl,
@@ -886,10 +892,10 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
                   memCacheWidth: (logoWidth * dpr).round().clamp(200, 800),
                   errorWidget: (_, __, ___) => Text(
                     item.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'NetflixSans',
                       color: Colors.white,
-                      fontSize: 24,
+                      fontSize: titleFontSize,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -900,15 +906,15 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
         else
           Text(
             item.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'NetflixSans',
-              fontSize: 24,
+              fontSize: titleFontSize,
               fontWeight: FontWeight.w900,
               color: Colors.white,
               letterSpacing: -0.5,
             ),
           ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Row(
           children: [
             Text(
@@ -952,12 +958,12 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         SizedBox(
           width: screenWidth * 0.50,
           child: Text(
             item.synopsis ?? '',
-            maxLines: 3,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontFamily: 'NetflixSans',

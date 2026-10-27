@@ -88,9 +88,9 @@ class TVResponsiveUtils {
   /// Ancho de banners (16:9) optimizado y adaptativo para TV
   static double bannerWidth(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
-    if (width <= 1280) return 250.0;
-    if (width <= 1920) return 360.0; // 4 full + 1 half visible on 1080p TV
-    return 480.0;
+    if (width <= 1280) return 200.0;
+    if (width <= 1920) return 300.0; // 5 complete + half visible on 1080p TV
+    return 380.0;
   }
 
   /// Altura de banner
@@ -137,6 +137,21 @@ class TVResponsiveUtils {
   /// Título en el Hero cuando no hay logo (42sp)
   static double heroTitleFontSize(BuildContext context) {
     return sp(context, 42.0);
+  }
+
+  /// Altura por defecto del contenedor del Hero compacto
+  static double compactHeroHeight(BuildContext context) {
+    return sp(context, 275.0);
+  }
+
+  /// Altura por defecto del logo en el Hero compacto
+  static double compactHeroLogoHeight(BuildContext context) {
+    return heroLogoHeight(context) * 0.75;
+  }
+
+  /// Tamaño de fuente por defecto del título en el Hero compacto (cuando no hay logo)
+  static double compactHeroTitleFontSize(BuildContext context) {
+    return sp(context, 24.0);
   }
 
   /// Ancho máximo de seguridad (4K)

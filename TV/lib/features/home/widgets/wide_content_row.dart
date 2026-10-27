@@ -72,6 +72,7 @@ class WideContentRowState extends State<WideContentRow>
   bool get wantKeepAlive => true;
 
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _rowKey = GlobalKey();
   bool _isHovered = false;
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
@@ -256,6 +257,7 @@ class WideContentRowState extends State<WideContentRow>
     final cardHeight = TVResponsiveUtils.bannerHeight(context);
 
     return Padding(
+      key: _rowKey,
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,8 +337,8 @@ class WideContentRowState extends State<WideContentRow>
                                 setState(() => _focusedIndex = idx);
                                 _scrollToIndex(idx, cardWidth);
                               }
-                              TvScroll.anchorSectionBelowTopbar(context);
-                              TvScroll.anchorSectionBelowTopbarDeferred(context);
+                              TvScroll.anchorSectionBelowTopbar(_rowKey.currentContext ?? context);
+                              TvScroll.anchorSectionBelowTopbarDeferred(_rowKey.currentContext ?? context);
                             } else {
                               // Al salir: conservar memoria, quitar borde.
                               if (_focusedIndex != null) _lastFocusedIndex = _focusedIndex;

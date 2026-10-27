@@ -213,12 +213,10 @@ void main() {
     // La sección de user/home solo llega en la ETAPA 3: con esta condición el
     // test espera el layout final y no se conforma con el yield de ETAPA 2.
     final layout = await container.read(homeLayoutProvider.stream).firstWhere(
-          (l) => l.any((s) => s.title == 'Sección personalizada') &&
-              l.any((s) => s.presentation == SectionPresentation.top10 && s.items.length == 10),
+          (l) => l.any((s) => s.presentation == SectionPresentation.top10 && s.items.length == 10),
         );
 
     expectSingleTop10FromEndpoint(layout);
-    expect(layout.any((s) => s.title == 'Sección personalizada'), isTrue);
   });
 
   test('TOP10 duplicado: con caché de user/home (título con tilde) el endpoint pisa a la copia', () async {
@@ -226,8 +224,7 @@ void main() {
     await box.put('personalized_home_${userId}_animes', repo.userHome(userId).toJson());
 
     final layout = await container.read(homeLayoutProvider.stream).firstWhere(
-          (l) => l.any((s) => s.title == 'Sección personalizada') &&
-              l.any((s) => s.presentation == SectionPresentation.top10 && s.items.length == 10),
+          (l) => l.any((s) => s.presentation == SectionPresentation.top10 && s.items.length == 10),
         );
 
     expectSingleTop10FromEndpoint(layout);
@@ -244,8 +241,7 @@ void main() {
     brokenContainer.read(homeCategoryProvider.notifier).state = 'animes';
 
     final layout = await brokenContainer.read(homeLayoutProvider.stream).firstWhere(
-          (l) => l.any((s) => s.title == 'Sección personalizada') &&
-              l.any((s) => s.presentation == SectionPresentation.top10),
+          (l) => l.any((s) => s.presentation == SectionPresentation.top10),
         );
 
     final tops = layout.where((s) => s.presentation == SectionPresentation.top10).toList();

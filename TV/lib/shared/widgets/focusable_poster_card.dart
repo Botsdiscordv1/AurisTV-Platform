@@ -340,6 +340,10 @@ class _NoScaleFocusShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const double customWidth = 1.5;
+    const double customOffset = 1.5;
+    const double customInset = customOffset + customWidth;
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -353,10 +357,10 @@ class _NoScaleFocusShell extends StatelessWidget {
           child: child,
         ),
         Positioned(
-          left: -DisneyFocusTokens.ringInset,
-          top: -DisneyFocusTokens.ringInset,
-          right: -DisneyFocusTokens.ringInset,
-          bottom: -DisneyFocusTokens.ringInset,
+          left: -customInset,
+          top: -customInset,
+          right: -customInset,
+          bottom: -customInset,
           child: IgnorePointer(
             child: AnimatedOpacity(
               opacity: active ? 1.0 : 0.0,
@@ -366,9 +370,9 @@ class _NoScaleFocusShell extends StatelessWidget {
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: ringColor,
-                    width: DisneyFocusTokens.ringWidth,
+                    width: customWidth,
                   ),
-                  borderRadius: BorderRadius.circular(DisneyFocusTokens.ringRadius(radius)),
+                  borderRadius: BorderRadius.circular(radius + customOffset + customWidth),
                 ),
               ),
             ),
