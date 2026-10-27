@@ -275,6 +275,10 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                   onTap: widget.onTap,
                   source: widget.history.source,
                   subtitle: widget.history.category,
+                  // Señal explícita: el historial de un evento deportivo guarda
+                  // category 'live' → mantiene la navegación a ContentSportScreen
+                  // sin depender del título.
+                  category: widget.history.category,
                   id: widget.history.contentId,
                 );
               },

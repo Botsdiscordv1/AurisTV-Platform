@@ -61,15 +61,19 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
   final ValueNotifier<bool> _isHovered = ValueNotifier<bool>(false);
   bool _isFocused = false;
 
-  bool get _isSportsItem => isSportsItemMetadata(
-        title: widget.title,
+  /// SportsCard solo si hay señal explícita: `sportsEvent` pasado por la fila,
+  /// o un `mediaItem` con metadata deportiva real. El título NO decide ya
+  /// (antes: 'vs'/'cup'/... en cualquier título → tarjeta deportiva invadiendo
+  /// otros carruseles).
+  bool get _isSportsItem =>
+      widget.sportsEvent != null ||
+      isSportsItemMetadata(
         source: widget.mediaItem?.source,
         channels: widget.mediaItem?.channels,
       );
 
   void _handleTap(BuildContext context) {
     final isSports = isSportsItemMetadata(
-      title: widget.title,
       source: widget.mediaItem?.source,
       channels: widget.mediaItem?.channels,
     );

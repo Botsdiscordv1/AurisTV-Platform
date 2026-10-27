@@ -120,8 +120,11 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
   bool _focused = false;
   final ValueNotifier<bool> _hovered = ValueNotifier<bool>(false);
 
-  bool get _isSportsItem => isSportsItemMetadata(
-        title: widget.title,
+  /// Igual que `FocusableWideCard`: solo señal explícita (`sportsEvent` o
+  /// `mediaItem` con metadata deportiva real); nunca por coincidencia de título.
+  bool get _isSportsItem =>
+      widget.sportsEvent != null ||
+      isSportsItemMetadata(
         source: widget.mediaItem?.source,
         channels: widget.mediaItem?.channels,
       );

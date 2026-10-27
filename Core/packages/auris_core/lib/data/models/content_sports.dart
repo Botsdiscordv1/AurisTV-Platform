@@ -190,18 +190,26 @@ extension ContentSportsToMediaItem on ContentSports {
   }
 }
 
+/// Señales **explícitas** de que un ítem es un evento deportivo.
+///
+/// Solo cuenta metadata real: `source` deportivo (`ppv`/`sport`/`live`),
+/// categoría `live` o canales adjuntos. El **título ya no participa**: antes se
+/// comprobaban subcadenas ('vs', 'championship', 'cup', 'league') y cualquier
+/// título normal que las contuviera convertía la tarjeta genérica en
+/// `SportsCard`, invadiendo carruseles de schedule/home/content (Web y Móvil;
+/// TV no lo padece porque usa sus propios forks sin esta lógica).
+///
+/// Las filas deportivas legítimas no dependen de esta heurística: el home las
+/// rutea por `sportsItems` → `SportsEventRow`, que construye `SportsCard` directo.
 bool isSportsItemMetadata({
-  required String title,
   String? source,
   List<Map<String, dynamic>>? channels,
   String? category,
 }) {
   final s = (source ?? '').toLowerCase();
   final c = (category ?? '').toLowerCase();
-  final t = title.toLowerCase();
   return s == 'ppv' || s == 'sport' || s == 'live' || c == 'live' ||
-      (channels != null && channels.isNotEmpty) ||
-      t.contains('vs') || t.contains('championship') || t.contains('cup') || t.contains('league');
+      (channels != null && channels.isNotEmpty);
 }
 
 void handleCardTapOrSportsNavigation(BuildContext context, {
@@ -211,9 +219,10 @@ void handleCardTapOrSportsNavigation(BuildContext context, {
   String? source,
   List<Map<String, dynamic>>? channels,
   String? subtitle,
+  String? category,
   String? id,
 }) {
-  if (isSportsItemMetadata(title: title, source: source, channels: channels)) {
+  if (isSportsItemMetadata(source: source, channels: channels, category: category)) {
     debugPrint('[AurisCore] Intercepted sports card tap -> Opening ContentSportScreen directly for: "$title"');
     final sportsEvent = ContentSports(
       id: id ?? title,

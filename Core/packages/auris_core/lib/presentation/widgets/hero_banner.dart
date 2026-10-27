@@ -4,13 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart' as yt; // Senior Fix: Alias para evitar colisión de PlayerState
+import 'package:youtube_player_iframe/youtube_player_iframe.dart' as yt;
 import 'package:flutter/foundation.dart'; 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
-// Senior Fix: Importaciones para el reproductor nativo (Mobile/TV)
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../core/utils/youtube_resolver.dart';
@@ -24,9 +23,9 @@ enum HeroBannerLayout { mobile, cinematic }
 
 class HeroBanner extends ConsumerStatefulWidget {
   final List<MediaItem> items;
-  final void Function(MediaItem item) onPlay;
+  final void Function(MediaItem item)? onPlay;
   final void Function(MediaItem item) onDetails;
-  final dynamic Function(MediaItem item)? onTrailer; // Senior Fix: dynamic para soportar callbacks async
+  final dynamic Function(MediaItem item)? onTrailer;
   final bool autofocus;
   final String currentCategory;
   final HeroBannerLayout? layout;
@@ -34,7 +33,7 @@ class HeroBanner extends ConsumerStatefulWidget {
   const HeroBanner({
     super.key,
     required this.items,
-    required this.onPlay,
+    this.onPlay,
     required this.onDetails,
     this.onTrailer,
     this.autofocus = false,
@@ -55,11 +54,19 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   bool _videoReady = false;
   bool _isAppActive = true;
   bool _isVisible = true;
+  bool _wasEverVisible = false;
+  int _lastRenderedBgIndex = -1;
+
+  final FocusNode _playButtonFocusNode = FocusNode(); 
+  final FocusNode _favButtonFocusNode = FocusNode();
+  final FocusNode _trailerButtonFocusNode = FocusNode();
+  final FocusNode _muteButtonFocusNode = FocusNode();
+  final FocusNode _prevButtonFocusNode = FocusNode();
+  final FocusNode _nextButtonFocusNode = FocusNode();
 
   yt.YoutubePlayerController? _ytController;
   StreamSubscription? _ytSubscription;
 
-  // Senior Fix: Estado para el reproductor nativo (media_kit)
   Player? _nativePlayer;
   VideoController? _nativeVideoController;
   StreamSubscription? _nativeSubscription;
@@ -85,7 +92,11 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   }
 
   void _handlePlay(MediaItem item) {
-    _handleDetails(item);
+    if (widget.onPlay != null) {
+      widget.onPlay!(item);
+    } else {
+      _handleDetails(item);
+    }
   }
 
   void _handleDetails(MediaItem item) {
@@ -120,8 +131,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     final nextIndex = (_backgroundIndex + 1) % widget.items.length;
     final nextItem = widget.items[nextIndex];
 
-    // Precachea la MISMA imagen que luego pintará _buildBackgroundLayer
-    // (posterUrl en vertical, bannerUrl en horizontal).
     final imageUrl = _heroBackgroundUrl(nextItem);
     if (imageUrl != null && imageUrl.isNotEmpty) {
       precacheImage(
@@ -151,6 +160,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   void dispose() {
     _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
+    _playButtonFocusNode.dispose();
+    _favButtonFocusNode.dispose();
+    _trailerButtonFocusNode.dispose();
+    _muteButtonFocusNode.dispose();
+    _prevButtonFocusNode.dispose();
+    _nextButtonFocusNode.dispose();
     _stopAutoPlay();
     _stopCycle();
     super.dispose();
@@ -187,12 +202,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   void _runCinematicSequence(int nextIndex) {
     if (widget.items.isEmpty || !_isAppActive) return;
 
-    // Senior Strategy: Aseguramos la limpieza total y cancelación de hilos previos
     _delayTimer?.cancel();
     _fadeTimer?.cancel();
     _disposeController();
 
-    // 1. OCULTAR TODO EL CONTENIDO
     if (mounted) {
       setState(() {
         _contentIndex = -1;
@@ -201,7 +214,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       });
     }
 
-    // 2. CAMBIAR FONDO (Tras 400ms de desvanecimiento)
     _delayTimer = Timer(const Duration(milliseconds: 400), () {
       if (!mounted || !_isAppActive) return;
       if (mounted) {
@@ -209,15 +221,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         ref.read(activeHeroIndexProvider(widget.currentCategory).notifier).state = nextIndex % widget.items.length;
       }
       
-      // Senior Fix: Precargar el siguiente incluso antes de que llegue su turno
       _precacheNextImage();
       
-      // 3. MOSTRAR NUEVO CONTENIDO (Damos 350ms para que la imagen cargue)
       _delayTimer = Timer(const Duration(milliseconds: 350), () {
         if (!mounted || !_isAppActive) return;
         if (mounted) setState(() => _contentIndex = nextIndex);
 
-        // 4. REINICIAR TRAILER
         _delayTimer = Timer(const Duration(seconds: 1), () {
           if (!mounted || !_isAppActive) return;
           _startCycle();
@@ -232,11 +241,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       setState(() { _showTrailerLayer = false; _videoReady = false; });
     }
     
-    // Senior Fix: Respetar la preferencia de Autoplay de Trailers del usuario
     final settings = ref.read(settingsProvider);
     if (!settings.autoPlayTrailers) { _disposeController(); return; }
 
-    // Senior Fix: Restauramos la restricción en móvil para evitar autoplay de trailers.
     final bool isMobile = context.isMobile;
     if (isMobile) { _disposeController(); return; }
 
@@ -254,7 +261,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   void _stopCycle() {
     _delayTimer?.cancel();
     _disposeController();
-    // Senior Fix: Evitar setState durante dispose/finalizeTree (lifecycle defunct)
     if (_isDisposing) {
       _showTrailerLayer = false;
       _videoReady = false;
@@ -272,7 +278,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     _disposeController();
 
     if (kIsWeb) {
-      // MANTENEMOS IFRAME PARA WEB (Mejor compatibilidad con browsers)
       final ctrl = yt.YoutubePlayerController(
         params: yt.YoutubePlayerParams(
           showControls: false, showFullscreenButton: false, mute: ref.read(heroBannerMutedProvider),
@@ -321,18 +326,16 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         });
       }
     } else {
-      // SENIOR FIX: REPRODUCTOR NATIVO PARA MOBILE/TV (Evita errores 150/152)
       final directUrl = await YoutubeResolver.getDirectStreamUrl(key);
       if (directUrl == null || !mounted) return;
 
       final player = Player();
       final controller = VideoController(player);
 
-      // Senior Tuning: Optimizamos el motor para carga estable de trailers
       try {
         final platform = player.platform as dynamic;
         platform.setProperty('hwdec', 'auto-safe');
-        platform.setProperty('audio-buffer', '0.5'); // Buffer mínimo de seguridad para evitar jitter
+        platform.setProperty('audio-buffer', '0.5'); 
       } catch (_) {}
 
       await player.setVolume(ref.read(heroBannerMutedProvider) ? 0 : 100);
@@ -344,13 +347,11 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         }
       });
 
-      // Monitoreo de posición para fade out al final (suscripción guardada para evitar fugas)
       _nativePositionSubscription = player.stream.position.listen((pos) {
         if (!mounted) return;
         final duration = player.state.duration.inSeconds;
         final position = pos.inSeconds;
         
-        // Cuando el video realmente ha comenzado a emitir frames, mostramos la capa
         if (pos.inMilliseconds > 400 && !_videoReady) {
            if (mounted) setState(() => _videoReady = true);
         }
@@ -405,7 +406,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     _ytController?.close();
     _ytController = null;
 
-    // Limpieza de reproductor nativo y sus suscripciones a streams
     _nativeSubscription?.cancel();
     _nativeSubscription = null;
     _nativePositionSubscription?.cancel();
@@ -424,25 +424,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
   void _stopAutoPlay() => _autoPlayTimer?.cancel();
 
-  /// Layout efectivo del hero. `mobile` = hero **vertical** (3:4 en portrait),
-  /// `cinematic` = hero **horizontal**. Única fuente de decisión: la usan
-  /// build(), la imagen de fondo y el precache para que nunca diverjan.
   HeroBannerLayout get _resolvedLayout {
     final double screenWidth = MediaQuery.of(context).size.width;
-    // Senior Strategy: Dispositivos con ancho > 600 (como Z Fold desplegado)
-    // usan el Layout "Cápsula" (cinematic) para optimizar el espacio vertical.
     final bool useMobileLayout = context.breakpoint < Breakpoint.sm ||
         (context.breakpoint < Breakpoint.lg && screenWidth < 600);
     return widget.layout ??
         (useMobileLayout ? HeroBannerLayout.mobile : HeroBannerLayout.cinematic);
   }
 
-  /// Imagen de fondo según la orientación del hero:
-  ///
-  /// * **Vertical** (`mobile`, 3:4): usa `posterUrl` del endpoint hero —
-  ///   es el formato adecuado para un marco vertical.
-  /// * **Horizontal** (`cinematic`): mantiene `bannerUrl` (backdrop 16:9),
-  ///   con fallback a `posterUrl` si el backdrop viene vacío.
   String _heroBackgroundUrl(MediaItem item) {
     final String poster = item.posterUrl;
     final String banner = item.bannerUrl ?? '';
@@ -456,14 +445,13 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) return const SizedBox.shrink();
     final double screenWidth = MediaQuery.of(context).size.width;
-
     final HeroBannerLayout layout = _resolvedLayout;
 
     return VisibilityDetector(
       key: ValueKey('hero_visibility_${widget.currentCategory}'),
       onVisibilityChanged: (info) {
         if (!mounted) return;
-        final visible = info.visibleFraction > 0.1; // Senior Fix: 10% de visibilidad para considerar activo
+        final visible = info.visibleFraction > 0.1;
         if (visible != _isVisible && mounted) {
           setState(() => _isVisible = visible);
           if (!_isVisible) {
@@ -471,7 +459,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             _stopCycle();
           } else if (_isAppActive) {
             _startAutoPlay();
-            _startCycle(delay: const Duration(seconds: 1));
+            if (!_wasEverVisible) {
+              _wasEverVisible = true;
+              _startCycle(delay: const Duration(seconds: 1));
+            }
           }
         }
       },
@@ -493,9 +484,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           child: GestureDetector(
             onHorizontalDragEnd: (details) {
               if (details.primaryVelocity! > 0) {
-                _previousPage(); // Swipe Derecha -> Anterior
+                _previousPage();
               } else if (details.primaryVelocity! < 0) {
-                _nextPage(); // Swipe Izquierda -> Siguiente
+                _nextPage();
               }
             },
             onTap: () {
@@ -528,18 +519,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Background
           _buildBackgroundLayer(bgItem),
-          // Gradient Scrim (Senior Strategy: Unificamos protección superior e inferior)
           _buildMobileGradients(), 
-          // Content Overlay
           Positioned(
             left: 20, right: 20, bottom: 35,
             child: contentItem != null 
                 ? _buildMobileContent(contentItem)
                 : const SizedBox.shrink(),
           ),
-          // Dots
           _buildDotsIndicator(15),
         ],
       ),
@@ -566,27 +553,22 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Background
                 _buildBackgroundLayer(bgItem),
-                // Trailer
                 if (_ytController != null && _showTrailerLayer)
                   _buildTrailerLayer(screenWidth),
-                // Gradient Scrim
+                if (_nativeVideoController != null && _showTrailerLayer)
+                  _buildTrailerLayer(screenWidth),
                 _buildCinematicGradients(),
                 Positioned(
-                  left: 0, bottom: 0, top: 0, // Senior Fix: Anclamos el Positioned a los bordes izquierdos
-                  child: Container(
-                    width: screenWidth * 0.6,
-                    padding: EdgeInsets.only(
-                      left: context.breakpoint <= Breakpoint.xl ? 30 : 40, 
-                      bottom: context.breakpoint <= Breakpoint.xl ? 25 : 45
-                    ),
+                  left: 40, bottom: 32, top: 0,
+                  right: 40,
+                  child: Align(
                     alignment: Alignment.bottomLeft,
                     child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 400),
+                      duration: const Duration(milliseconds: 350),
                       layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
                         return Stack(
-                          alignment: Alignment.bottomLeft, // Senior Fix: Alineación interna inamovible
+                          alignment: Alignment.bottomLeft,
                           children: <Widget>[
                             ...previousChildren,
                             if (currentChild != null) currentChild,
@@ -596,7 +578,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                       transitionBuilder: (child, anim) => FadeTransition(
                         opacity: anim,
                         child: SlideTransition(
-                          position: anim.drive(Tween<Offset>(begin: const Offset(0.02, 0), end: Offset.zero)),
+                          position: anim.drive(
+                            Tween<Offset>(begin: const Offset(0.015, 0), end: Offset.zero)
+                                .chain(CurveTween(curve: Curves.easeOutCubic)),
+                          ),
                           child: child,
                         ),
                       ),
@@ -606,10 +591,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                     ),
                   ),
                 ),
-                // Nav Arrows
-                _buildNavArrows(),
-                // Dots
-                _buildDotsIndicator(25),
+                _buildDotsIndicator(20),
               ],
             ),
           ),
@@ -619,13 +601,15 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   }
 
   Widget _buildBackgroundLayer(MediaItem item) {
-    final bool isMobile = context.isMobile;
+    if (_backgroundIndex != _lastRenderedBgIndex) {
+      _lastRenderedBgIndex = _backgroundIndex;
+    }
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 800),
       transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
       layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
         return Stack(
-          fit: StackFit.expand, // Senior Fix: Forzar a que las capas de transición ocupen todo el espacio
+          fit: StackFit.expand,
           children: <Widget>[
             ...previousChildren,
             if (currentChild != null) currentChild,
@@ -633,27 +617,25 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         );
       },
       child: CachedNetworkImage(
-        key: ValueKey('bg_${item.id}'),
+        key: ValueKey('bg_${item.id}_$_lastRenderedBgIndex'),
         imageUrl: _heroBackgroundUrl(item),
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        alignment: isMobile ? const Alignment(0.0, -0.2) : Alignment.topCenter,
+        alignment: Alignment.topCenter,
         memCacheWidth: _bgMemCacheWidth(),
         fadeInDuration: AurisImageConfig.defaultFadeInDuration,
         fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
         cacheManager: AurisImageCacheManager.instance,
         filterQuality: MediaQuery.of(context).size.width < 1600
             ? FilterQuality.medium
-            : FilterQuality.high, // Senior Fix: Alta fidelidad solo en 4K/Desktop
+            : FilterQuality.high,
       ),
     );
   }
 
   Widget _buildTrailerLayer(double screenWidth) {
-    // Senior UI Strategy: Super-Zoom al 165% para garantizar que los controles centrales 
-    // de YouTube (Play/Pause icons) queden fuera del área visible del banner.
-    final double height = MediaQuery.of(context).size.width / (2.8);
+    final double height = MediaQuery.of(context).size.width / 2.1;
     final double playerHeight = height * 1.65; 
     final double playerWidth = playerHeight * (16 / 9);
 
@@ -669,20 +651,19 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         key: ValueKey('native_${_currentBackgroundItem.trailerKey}'),
         controller: _nativeVideoController!,
         fill: Colors.transparent,
-        controls: NoVideoControls, // Sin controles para el banner
+        controls: NoVideoControls,
       );
     }
 
     return Positioned(
       top: 0, bottom: 0, right: 0,
-      width: screenWidth * 0.8, // Ocupamos el 80% derecho para el video
+      width: screenWidth * 0.8,
       child: AnimatedOpacity(
         opacity: _videoReady ? 1.0 : 0.0,
         duration: const Duration(milliseconds: 800),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // El Video (Blindado)
             IgnorePointer(
               ignoring: true,
               child: ClipRect(
@@ -696,11 +677,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                 ),
               ),
             ),
-            // Senior Fix Web: Escudo transparente con PointerInterceptor para "matar"
-            // los clics antes de que lleguen al iframe de YouTube.
-            // Solo se monta cuando el video ya es visible: un PointerInterceptor
-            // crea un DIV HTML que bloquea mouse/scroll aunque el AnimatedOpacity
-            // este en 0 o haya un IgnorePointer encima.
             if (kIsWeb && _videoReady && _showTrailerLayer)
               Positioned.fill(
                 child: PointerInterceptor(
@@ -715,40 +691,34 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   }
 
   Widget _buildMobileGradients() {
+    const darkBg = Color(0xFF0B0B0D);
     return Stack(
       fit: StackFit.expand,
       children: [
-        // 1. DIMMING: Opacado general para quitar el brillo (Senior Strategy)
-        Container(color: Colors.black.withOpacity(0.2)),
-
-        // 2. PROTECCIÓN SUPERIOR (Para la TopBar)
+        Container(color: darkBg.withOpacity(0.15)),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withOpacity(0.5),
-                Colors.transparent,
-              ],
+              colors: [darkBg.withOpacity(0.5), Colors.transparent],
               stops: const [0.0, 0.3],
             ),
           ),
         ),
-
-        // 3. PROTECCIÓN INFERIOR (Para el contenido y botones)
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
               colors: [
-                const Color(0xFF0B0B0D),
-                const Color(0xFF0B0B0D).withOpacity(0.9),
-                const Color(0xFF0B0B0D).withOpacity(0.4),
+                darkBg,
+                darkBg.withOpacity(0.95),
+                darkBg.withOpacity(0.6),
+                darkBg.withOpacity(0.2),
                 Colors.transparent,
               ],
-              stops: const [0.0, 0.15, 0.4, 0.8],
+              stops: const [0.0, 0.2, 0.5, 0.75, 1.0],
             ),
           ),
         ),
@@ -762,103 +732,87 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     return Stack(
       fit: StackFit.expand,
       children: [
-        // 1. PROTECCIÓN DE INTERFAZ SUPERIOR (Top Scrim)
-        // Siempre activa para asegurar legibilidad de la TopBar en fondos claros.
-        DecoratedBox(
+        const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                const Color(0xFF0B0B0D).withOpacity(0.5),
-                Colors.transparent,
-              ],
-              stops: const [0.0, 0.25],
+              colors: [Color(0x99000000), Colors.transparent],
+              stops: [0.0, 0.22],
             ),
           ),
         ),
-
-        // 2. MÁSCARA BASE (Backdrop Strategy con Dimming y Fusión Inferior)
         AnimatedOpacity(
           duration: const Duration(milliseconds: 500),
           opacity: showTrailer ? 0.0 : 1.0,
-          child: Stack(
+          child: const Stack(
             fit: StackFit.expand,
             children: [
-              // DIMMING: Opacado general de la imagen para evitar brillos blancos
-              Container(color: Colors.black.withOpacity(0.15)),
-
-              // Fusión Lateral Original
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      const Color(0xFF0B0B0D).withOpacity(0.85), 
-                      const Color(0xFF0B0B0D).withOpacity(0.4),
-                      const Color(0xFF0B0B0D).withOpacity(0.1),
+                      Color(0xFF000000),
+                      Color(0xF2000000),
+                      Color(0xB3000000),
+                      Color(0x33000000),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.3, 0.5, 0.8],
+                    stops: [0.0, 0.28, 0.48, 0.70, 0.95],
                   ),
                 ),
               ),
-
-              // Fusión Inferior Original (Backdrop)
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      const Color(0xFF0B0B0D).withOpacity(0.8),
-                      const Color(0xFF0B0B0D).withOpacity(0.2),
+                      Color(0xFF000000),
+                      Color(0x99000000),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.15, 0.5],
+                    stops: [0.0, 0.15, 0.35],
                   ),
                 ),
               ),
             ],
           ),
         ),
-
-        // 3. MÁSCARA DE TRAILER (Original Trailer Strategy)
         AnimatedOpacity(
           duration: const Duration(milliseconds: 500),
           opacity: showTrailer ? 1.0 : 0.0,
-          child: Stack(
+          child: const Stack(
             fit: StackFit.expand,
             children: [
-              // Fusión Lateral Pro (Trailer)
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      const Color(0xFF0B0B0D),
-                      const Color(0xFF0B0B0D),
-                      const Color(0xFF0B0B0D).withOpacity(0.9),
+                      Color(0xFF000000),
+                      Color(0xFF000000),
+                      Color(0xCC000000),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.38, 0.45, 1.0],
+                    stops: [0.0, 0.35, 0.52, 1.0],
                   ),
                 ),
               ),
-              // Fundido inferior (Trailer)
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      const Color(0xFF0B0B0D),
-                      const Color(0xFF0B0B0D).withOpacity(0.3),
+                      Color(0xFF000000),
+                      Color(0x99000000),
                       Colors.transparent,
                     ],
-                    stops: const [0.0, 0.15, 0.4],
+                    stops: [0.0, 0.15, 0.35],
                   ),
                 ),
               ),
@@ -869,196 +823,297 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     );
   }
 
-
   Widget _buildMobileContent(MediaItem item) {
-    final history = ref.watch(playbackHistoryStateProvider).valueOrNull ?? [];
-    final latestHistory = history.where((h) => h.contentId == item.title || h.contentId == item.id).firstOrNull;
-    
-    final hasHistory = latestHistory != null;
-    final epNum = int.tryParse((latestHistory?.episode ?? '').trim());
-    final double? progress = hasHistory ? latestHistory.progress : null;
-    final bool hasProgress = progress != null && progress > 0.02;
-    final bool isFinished = progress != null && progress >= 0.95;
+    return _buildCinematicContent(item, MediaQuery.of(context).size.width);
+  }
 
-    final String label = isFinished
-        ? 'Reproducir de nuevo'
-        : (hasHistory
-            ? (epNum != null ? 'Continuar Ep $epNum' : 'Continuar viendo')
-            : 'Reproducir');
-
-    String? remainingText;
-    if (hasHistory && latestHistory.durationInMilliseconds > 0) {
-      final remainingMs = latestHistory.durationInMilliseconds - latestHistory.positionInMilliseconds;
-      if (remainingMs > 0) {
-        remainingText = AurisStringUtils.formatRemainingTime(remainingMs);
-      }
+  String _formatMediaType(MediaItem item) {
+    final kind = item.kind?.toLowerCase();
+    if (kind == 'anime' || item.type == MediaType.anime) {
+      return 'A N I M E';
+    } else if (kind == 'kdrama' || item.type == MediaType.kdrama) {
+      return 'K D R A M A';
+    } else if (kind == 'movie' || item.type == MediaType.movie) {
+      return 'P E L Í C U L A';
+    } else {
+      return 'S E R I E';
     }
+  }
 
+  String _formatMediaTypePlural(MediaItem item) {
+    final kind = item.kind?.toLowerCase();
+    if (kind == 'anime' || item.type == MediaType.anime) {
+      return 'animes';
+    } else if (kind == 'kdrama' || item.type == MediaType.kdrama) {
+      return 'k-dramas';
+    } else if (kind == 'movie' || item.type == MediaType.movie) {
+      return 'películas';
+    } else {
+      return 'series';
+    }
+  }
+
+  Widget _buildCinematicContent(MediaItem item, double screenWidth) {
+    final titleFontSize = ResponsiveUtils.heroTitleFontSize(context);
+    
     return Column(
-      key: ValueKey('content_mob_${item.id}'),
+      key: ValueKey('content_col_tv_${item.id}'),
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 1. Bloque Superior: Logo y Metadata Primaria (Año/Rating)
         Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            // Logo o Título (Lado Izquierdo)
-            Expanded(
-              // Altura reservada siempre: sin esto la caja colapsa a 0 hasta
-              // que carga la imagen y todo el hero salta (logos cortos o
-              // bajos). El ancho lo da el Expanded (constante).
-              child: item.logoUrl != null && item.logoUrl!.isNotEmpty
-                  ? SizedBox(
-                      height: ResponsiveUtils.heroLogoHeight(context),
-                      child: Container(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.7,
-                          maxHeight: ResponsiveUtils.heroLogoHeight(context),
-                        ),
-                        child: Builder(builder: (context) {
-                          final mq = MediaQuery.of(context);
-                          final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
-                          return LogoToneFilter(
-                            imageUrl: logoUrl,
-                            child: CachedNetworkImage(
-                              key: ValueKey('logo_mob_${item.id}'),
-                              imageUrl: logoUrl,
-                              fit: BoxFit.contain,
-                              alignment: Alignment.bottomLeft,
-                              fadeInDuration: const Duration(milliseconds: 200),
-                              memCacheWidth: (mq.size.width * 0.7 * mq.devicePixelRatio)
-                                  .round()
-                                  .clamp(320, 1280),
-                            ),
-                          );
-                        }),
-                      ),
-                    )
-                  : Text(
-                      item.title.toUpperCase(), 
-                      style: TextStyle(
-                        fontSize: ResponsiveUtils.sp(context, context.breakpoint < Breakpoint.sm ? 18 : 22), 
-                        fontWeight: FontWeight.w900, 
-                        color: Colors.white, 
-                        height: 1.1
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-            ),
-            const SizedBox(width: 12),
-            // Metadata Primaria (Lado Derecho - Alineada a la base del logo)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (item.certification != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.white54, width: 1),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        child: Text(item.certification!, style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 10), fontWeight: FontWeight.w900)),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    if (item.rating != null && item.rating! > 0) ...[
-                      AurisIcon(AurisIcons.star, color: Color(0xFFEF7A1E), size: 14),
-                      const SizedBox(width: 2),
-                      Text(item.rating!.toStringAsFixed(1), style: TextStyle(color: Colors.white, fontSize: ResponsiveUtils.sp(context, 12), fontWeight: FontWeight.bold)),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2), // Senior Fix: Metadata bajada al máximo hacia la base
-              ],
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: 6), // Senior Fix: Reducido gap entre bloques para compactar la UI
-
-        // 2. Bloque Inferior: Línea de Base Unificada (Estado y Géneros)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Estado dinámico (Alineado a la izquierda)
-            if (!item.available)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)),
-                  child: Text('PRÓXIMAMENTE', style: TextStyle(color: Colors.white60, fontSize: ResponsiveUtils.sp(context, 10), fontWeight: FontWeight.w900, letterSpacing: 1)),
+            SvgPicture.asset(
+              'assets/icons/auris-tv-icon.svg',
+              height: 16,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _formatMediaType(item),
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                color: Colors.white.withOpacity(0.92),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 3.2,
+              ),
+            ),
+            if (item.rating != null && item.rating! >= 7.0) ...[
+              const SizedBox(width: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE50914),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-              )
-            else if ((item.duration != null && item.duration!.isNotEmpty) || (item.runtime != null && item.runtime! > 0))
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Text(
-                  _formatMovieDuration(item.duration, item.runtime) ?? '', 
-                  style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w900, letterSpacing: 0.5)
-                ),
-              )
-            else if (item.totalSeasons != null && item.totalSeasons! > 0)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Text(
-                  item.totalSeasons == 1 ? '1 TEMPORADA' : '${item.totalSeasons} TEMPORADAS', 
-                  style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w900, letterSpacing: 0.5)
-                ),
-              )
-            else if (item.episode != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Text(
-                  'NUEVO EPISODIO ${item.episode}', 
-                  style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w900, letterSpacing: 0.5)
-                ),
-              )
-            else
-              const SizedBox.shrink(),
-
-            // Géneros en MAYÚSCULAS (Lista completa alineada al estado)
-            if (item.genres.isNotEmpty)
-              Flexible(
-                child: Text(
-                  item.genres.join(' • ').toUpperCase(), 
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: ResponsiveUtils.sp(context, 11), fontWeight: FontWeight.w500)
+                child: const Text(
+                  'TOP 10',
+                  style: TextStyle(
+                    fontFamily: 'NetflixSans',
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
+              const SizedBox(width: 6),
+              Text(
+                'N.º 1 en ${_formatMediaTypePlural(item)} hoy',
+                style: const TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ],
         ),
+        const SizedBox(height: 10),
+
+        if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
+          Builder(builder: (context) {
+            final dpr = MediaQuery.of(context).devicePixelRatio;
+            final logoWidth = MediaQuery.of(context).size.width * 0.40;
+            final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
+            return SizedBox(
+              height: ResponsiveUtils.heroLogoHeight(context),
+              width: logoWidth,
+              child: LogoToneFilter(
+                imageUrl: logoUrl,
+                child: CachedNetworkImage(
+                  key: ValueKey('logo_tv_${item.id}'),
+                  imageUrl: logoUrl,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomLeft,
+                  fadeInDuration: const Duration(milliseconds: 100),
+                  memCacheWidth: (logoWidth * dpr).round().clamp(320, 1280),
+                  placeholder: (context, url) => SizedBox(
+                    height: ResponsiveUtils.heroLogoHeight(context),
+                    width: logoWidth,
+                  ),
+                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            );
+          })
+        else
+          Text(
+            item.title.toUpperCase(), 
+            style: TextStyle(
+              fontFamily: 'NetflixSans',
+              fontSize: titleFontSize, 
+              fontWeight: FontWeight.w900, 
+              color: Colors.white, 
+              height: 0.95,
+              letterSpacing: -0.8,
+              shadows: [
+                Shadow(color: Colors.black.withOpacity(0.6), offset: const Offset(0, 4), blurRadius: 10)
+              ]
+            )
+          ),
         
         const SizedBox(height: 12),
+
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(
-              child: _BannerButton(
-                onPressed: () => SafeTap.run(() => _handlePlay(item)),
-                icon: AurisIcons.playFilled,
-                label: label,
-                isPrimary: true,
-                isCompact: false,
-                progress: (hasProgress && !isFinished) ? progress : null,
-                subLabel: (hasProgress && !isFinished) ? remainingText : null,
+            const Text(
+              '98% para ti',
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                color: Color(0xFF46D369),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(width: 10),
-            Builder(
-              builder: (context) {
+            Text(
+              item.year != null ? '${item.year}' : '2024',
+              style: TextStyle(
+                fontFamily: 'NetflixSans',
+                color: Colors.white.withOpacity(0.85),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white38, width: 1.0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: Text(
+                item.certification ?? '16+',
+                style: const TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white,
+                  fontSize: 11.0,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            if ((item.duration != null && item.duration!.isNotEmpty) || (item.runtime != null && item.runtime! > 0)) ...[
+              Text(
+                _formatMovieDuration(item.duration, item.runtime) ?? '',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 10),
+            ] else if (item.totalSeasons != null && item.totalSeasons! > 0) ...[
+              Text(
+                item.totalSeasons == 1 ? '1 temporada' : '${item.totalSeasons} temporadas',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 10),
+            ] else if (item.episode != null && item.episode! > 0) ...[
+              Text(
+                'Episodio ${item.episode}',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white38, width: 1.0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: const Text(
+                'Ultra HD',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white70,
+                  fontSize: 10.0,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white38, width: 1.0),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: const Text(
+                'HDR',
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white70,
+                  fontSize: 10.0,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        SizedBox(
+          width: context.useMobileLayout ? (screenWidth - 48) : (screenWidth * 0.46),
+          child: Text(
+            item.synopsis ?? '', 
+            maxLines: context.useMobileLayout ? 4 : 3, 
+            overflow: TextOverflow.ellipsis, 
+            style: TextStyle(
+              fontFamily: 'NetflixSans',
+              color: const Color(0xFFE5E5E5), 
+              fontSize: context.useMobileLayout ? 12.5 : ResponsiveUtils.heroSynopsisFontSize(context), 
+              height: 1.38, 
+              fontWeight: FontWeight.w400,
+              letterSpacing: 0.1,
+              shadows: [
+                Shadow(color: Colors.black.withOpacity(0.5), offset: const Offset(0, 1), blurRadius: 4),
+              ],
+            )
+          ),
+        ),
+
+        const SizedBox(height: 18),
+        
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _NetflixHeroButton(
+                focusNode: _playButtonFocusNode,
+                onPressed: () => SafeTap.run(() => _handlePlay(item)),
+                icon: AurisIcons.play,
+                label: 'Reproducir',
+                isPrimary: true,
+                autofocus: widget.autofocus,
+              ),
+              const SizedBox(width: 10),
+              Builder(builder: (context) {
                 final favorites = ref.watch(favoritesProvider);
                 final String favId = item.id.isNotEmpty ? item.id : item.title;
-                final bool isFav = favorites.any((f) => f.id == favId);
-                return _BannerIconButton(
-                  icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.addCircleOutline,
+                final isFav = favorites.any((f) => f.id == favId);
+                return _NetflixHeroButton(
+                  focusNode: _favButtonFocusNode,
+                  icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.add,
                   label: isFav ? 'En mi lista' : 'Mi lista',
                   onPressed: () {
                     final user = ref.read(authProvider);
@@ -1073,8 +1128,6 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                       addedAt: DateTime.now(),
                       kind: item.kind,
                       year: item.year,
-                      // FavoriteItem.type es String?; MediaItem.type es MediaType.
-                      // Se usa el mismo mapeo que favoriteFromMedia().
                       type: item.card?.type ?? item.type.name,
                       profileId: user?.activeProfileId ?? 'guest_profile',
                     );
@@ -1083,315 +1136,97 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                       SnackBar(content: Text(isFav ? 'Quitado de Mi lista' : 'Añadido a Mi lista')),
                     );
                   },
-                  isCompact: false,
-                );
-              },
-            ),
-            if (item.trailerKey != null) ...[
-              const SizedBox(width: 10),
-              _BannerIconButton(
-                icon: AurisIcons.trailer,
-                label: 'Tráiler',
-                onPressed: () async {
-                  if (_isTrailerLoading) return;
-                  setState(() => _isTrailerLoading = true);
-                  try {
-                    final result = widget.onTrailer?.call(item);
-                    if (result is Future) await result;
-                  } finally {
-                    if (mounted) setState(() => _isTrailerLoading = false);
-                  }
-                },
-                isLoading: _isTrailerLoading,
-                isCompact: false,
-              ),
-            ],
-          ],
-        ),
-      ],
-    );
-  }
-
-
-
-  Widget _buildCinematicContent(MediaItem item, double screenWidth) {
-    final b = context.breakpoint;
-    final bool isIntermediate = b <= Breakpoint.xl; 
-    final bool isTablet = b == Breakpoint.md || b == Breakpoint.lg;
-    final bool isCompactHeight = MediaQuery.sizeOf(context).height < 900;
-    // Senior Fix: Si la pantalla es estrecha (< 1200px) y baja (< 900px), ocultamos sinopsis
-    final bool showSynopsis = !isCompactHeight || b > Breakpoint.lg; 
-
-    final titleFontSize = ResponsiveUtils.heroTitleFontSize(context);
-    
-    return Column(
-      key: ValueKey('content_col_${item.id}'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // 1. ICONO + CATEGORÍA
-        Row(
-          children: [
-            SvgPicture.asset(
-              'assets/icons/auris-tv-icon.svg', 
-              height: isIntermediate ? 14 : 18, 
-              colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn)
-            ),
-            const SizedBox(width: 10),
-            Text(
-              item.type.name.toUpperCase(), 
-              style: TextStyle(
-                color: Colors.white, 
-                fontSize: ResponsiveUtils.sp(context, isIntermediate ? 10 : 13), 
-                fontWeight: FontWeight.w900, 
-                letterSpacing: 1.5
-              )
-            ),
-          ],
-        ),
-        SizedBox(height: isIntermediate ? 8 : 16),
-
-        // 2. EL LOGO / TÍTULO (altura y ancho reservados siempre: sin esto la
-        // caja colapsa al ancho natural del logo y el hero salta al cargar;
-        // el ancho fijo + placeholder igual que en TV evita el salto y mantiene
-        // la caja anclada a la izquierda durante todo el crossfade).
-        if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
-          Builder(builder: (context) {
-            final dpr = MediaQuery.of(context).devicePixelRatio;
-            // Senior Fix: En tablets reducimos el ancho para dejar aire a los lados
-            final logoWidth = screenWidth * (isTablet ? 0.30 : (isIntermediate ? 0.35 : 0.38));
-            final logoUrl = ApiEndpoints.proxyImage(item.logoUrl);
-            return SizedBox(
-              height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
-              width: logoWidth,
-              child: LogoToneFilter(
-                imageUrl: logoUrl,
-                child: CachedNetworkImage(
-                  key: ValueKey('logo_${item.id}'),
-                  imageUrl: logoUrl,
-                  fit: BoxFit.contain,
-                  alignment: Alignment.bottomLeft,
-                  fadeInDuration: const Duration(milliseconds: 100),
-                  memCacheWidth: (logoWidth * dpr).round().clamp(320, 1280),
-                  placeholder: (context, url) => SizedBox(
-                    height: ResponsiveUtils.heroLogoHeight(context) * (isIntermediate ? 1.0 : 1.35),
-                    width: logoWidth,
-                  ),
-                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                ),
-              ),
-            );
-          })
-        else
-          Text(
-            item.title.toUpperCase(), 
-            style: TextStyle(
-              fontSize: titleFontSize * (isIntermediate ? 0.65 : 0.85), 
-              fontWeight: FontWeight.w900, 
-              color: Colors.white, 
-              height: 1.0,
-              letterSpacing: -0.5,
-              shadows: [
-                Shadow(color: Colors.black.withOpacity(0.5), offset: const Offset(0, 4), blurRadius: 10)
-              ]
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        
-        SizedBox(height: isIntermediate ? 10 : 16),
-
-        // 3. METADATA
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (item.type == MediaType.anime && item.episode != null) ...[
-              Text(
-                'NUEVO EPISODIO ${item.episode}', 
-                style: TextStyle(
-                  color: const Color(0xFFEF7A1E), 
-                  fontSize: ResponsiveUtils.sp(context, isIntermediate ? 11 : 13), 
-                  fontWeight: FontWeight.w900, 
-                  letterSpacing: 0.5
-                )
-              ),
-              const SizedBox(width: 12),
-              Container(width: 1.2, height: 12, color: Colors.white30),
-              const SizedBox(width: 12),
-            ],
-            
-            if (item.rating != null && item.rating! > 0) ...[
-              AurisIcon(AurisIcons.star, color: const Color(0xFFEF7A1E), size: isIntermediate ? 14 : 18),
-              const SizedBox(width: 4),
-              Text(
-                item.rating!.toStringAsFixed(1), 
-                style: TextStyle(
-                  color: Colors.white, 
-                  fontSize: ResponsiveUtils.sp(context, isIntermediate ? 12 : 14), 
-                  fontWeight: FontWeight.w900
-                )
-              ),
-              const SizedBox(width: 12),
-              Container(width: 1.2, height: 12, color: Colors.white30),
-              const SizedBox(width: 12),
-            ],
-
-            if (item.certification != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(border: Border.all(color: Colors.white38), borderRadius: BorderRadius.circular(2)),
-                child: Text(
-                  item.certification!, 
-                  style: TextStyle(color: Colors.white70, fontSize: ResponsiveUtils.sp(context, 9), fontWeight: FontWeight.bold)
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(width: 1.2, height: 12, color: Colors.white30),
-              const SizedBox(width: 12),
-            ],
-
-            if (item.genres.isNotEmpty) ...[
-              Flexible(
-                child: Text(
-                  item.genres.join('  •  '), 
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6), 
-                    fontSize: ResponsiveUtils.sp(context, isIntermediate ? 11 : 13), 
-                    fontWeight: FontWeight.w600
-                  )
-                ),
-              ),
-            ],
-          ],
-        ),
-        
-        SizedBox(height: isIntermediate ? 10 : 16),
-
-        // 4. SINOPSIS
-        if (showSynopsis) ...[
-          SizedBox(
-            width: screenWidth * (isIntermediate ? 0.55 : 0.44),
-            child: Text(
-              item.synopsis ?? '', 
-              maxLines: isIntermediate ? 2 : 3, 
-              overflow: TextOverflow.ellipsis, 
-              style: TextStyle(
-                color: Colors.white, 
-                fontSize: ResponsiveUtils.heroSynopsisFontSize(context), 
-                height: 1.4, 
-                fontWeight: FontWeight.w400
-              )
-            ),
-          ),
-          SizedBox(height: isIntermediate ? 14 : 32),
-        ] else
-          const SizedBox(height: 14),
-        
-        // 5. ACCIONES
-        Row(
-          children: [
-            _BannerButton(
-              onPressed: () => SafeTap.run(() => _handlePlay(item)), 
-              icon: AurisIcons.play, 
-              label: 'Reproducir', 
-              isPrimary: true,
-              isCompact: isIntermediate,
-            ),
-            const SizedBox(width: 12),
-            Builder(builder: (context) {
-              final isFav = ref
-                  .watch(favoritesProvider)
-                  .any((f) => f.id == item.id);
-              return _BannerIconButton(
-                icon: isFav ? AurisIcons.bookmarkFilled : AurisIcons.add,
-                label: isFav ? 'En mi lista' : 'Mi lista',
-                onPressed: () {
-                  final user = ref.read(authProvider);
-                  ref.read(favoritesProvider.notifier).toggleFavorite(
-                        favoriteFromMedia(item,
-                            user?.activeProfileId ?? 'guest_profile'),
-                      );
-                },
-                isCompact: isIntermediate,
-              );
-            }),
-            const SizedBox(width: 12),
-            _BannerIconButton(
-              icon: AurisIcons.info, 
-              label: 'Detalles', 
-              onPressed: () => SafeTap.run(() => _handleDetails(item)),
-              isCompact: isIntermediate,
-            ),
-            if (item.trailerKey != null) ...[
-              const SizedBox(width: 12),
-              _BannerIconButton(
-                icon: (kIsWeb && _showTrailerLayer) ? AurisIcons.close : AurisIcons.trailer,
-                label: 'Tráiler',
-                isLoading: _isTrailerLoading,
-                isCompact: isIntermediate,
-                onPressed: () async {
-                  if (_isTrailerLoading) return;
-                  if (kIsWeb && _showTrailerLayer) {
-                    _stopCycle();
-                    return;
-                  }
-                  
-                  if (kIsWeb) {
-                    _initController();
-                  } else {
-                    setState(() => _isTrailerLoading = true);
-                    try {
-                      final result = widget.onTrailer?.call(item);
-                      if (result is Future) await result;
-                    } finally {
-                      if (mounted) setState(() => _isTrailerLoading = false);
-                    }
-                  }
-                },
-              ),
-            ],
-            if (_showTrailerLayer && _videoReady) ...[
-              const SizedBox(width: 12),
-              Consumer(builder: (context, ref, _) {
-                final isMuted = ref.watch(heroBannerMutedProvider);
-                return _BannerIconButton(
-                  icon: isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp,
-                  label: isMuted ? 'Activar audio' : 'Silenciar',
-                  isCompact: isIntermediate,
-                  onPressed: () => ref.read(heroBannerMutedProvider.notifier).state = !isMuted,
                 );
               }),
+              if (item.trailerKey != null) ...[
+                const SizedBox(width: 10),
+                _NetflixHeroButton(
+                  focusNode: _trailerButtonFocusNode,
+                  icon: (kIsWeb && _showTrailerLayer) ? AurisIcons.close : AurisIcons.trailer,
+                  label: 'Tráiler',
+                  isLoading: _isTrailerLoading,
+                  onPressed: () async {
+                    if (_isTrailerLoading) return;
+                    if (kIsWeb && _showTrailerLayer) {
+                      _stopCycle();
+                      return;
+                    }
+                    if (kIsWeb) {
+                      _initController();
+                    } else {
+                      setState(() => _isTrailerLoading = true);
+                      try {
+                        final result = widget.onTrailer?.call(item);
+                        if (result is Future) await result;
+                      } finally {
+                        if (mounted) setState(() => _isTrailerLoading = false);
+                      }
+                    }
+                  },
+                ),
+              ],
+              if (_showTrailerLayer && _videoReady) ...[
+                const SizedBox(width: 10),
+                Consumer(builder: (context, ref, _) {
+                  final isMuted = ref.watch(heroBannerMutedProvider);
+                  return _NetflixHeroIconButton(
+                    focusNode: _muteButtonFocusNode,
+                    icon: isMuted ? AurisIcons.volumeMute : AurisIcons.volumeUp,
+                    label: isMuted ? 'Activar audio' : 'Silenciar',
+                    onPressed: () => ref.read(heroBannerMutedProvider.notifier).state = !isMuted,
+                  );
+                }),
+              ],
+              if (widget.items.length > 1) ...[
+                const SizedBox(width: 10),
+                _NetflixHeroIconButton(
+                  focusNode: _prevButtonFocusNode,
+                  icon: AurisIcons.arrowLeft2,
+                  label: 'Anterior',
+                  onPressed: () {
+                    _previousPage();
+                    _startAutoPlay();
+                  },
+                ),
+                const SizedBox(width: 8),
+                _NetflixHeroIconButton(
+                  focusNode: _nextButtonFocusNode,
+                  icon: AurisIcons.arrowRight2,
+                  label: 'Siguiente',
+                  onPressed: () {
+                    _nextPage();
+                    _startAutoPlay();
+                  },
+                ),
+              ],
             ],
-            const Spacer(),
-          ],
+          ),
         ),
       ],
     );
   }
 
   Widget _buildNavArrows() {
-    return Stack(
-      children: [
-        Positioned(left: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: AurisIcons.arrowLeft2, useBackground: false, onTap: _previousPage))),
-        Positioned(right: 10, top: 0, bottom: 0, child: AnimatedOpacity(opacity: _isHovered ? 1.0 : 0.0, duration: const Duration(milliseconds: 300), child: NavArrow(icon: AurisIcons.arrowRight2, useBackground: false, onTap: _nextPage))),
-      ],
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildDotsIndicator(double bottom) {
     return Positioned(
-      bottom: bottom, left: 0, right: 0,
+      bottom: bottom, left: 0, right: 32,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: List.generate(widget.items.length, (index) {
           final isCurrent = (_backgroundIndex % widget.items.length) == index;
           return AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            width: isCurrent ? 12 : 7, height: 7,
-            decoration: BoxDecoration(color: isCurrent ? Colors.white : Colors.white38, borderRadius: BorderRadius.circular(4)),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(horizontal: 2.5),
+            width: isCurrent ? 14 : 6, 
+            height: 3.5,
+            decoration: BoxDecoration(
+              color: isCurrent ? Colors.white : Colors.white24, 
+              borderRadius: BorderRadius.circular(2),
+            ),
           );
         }),
       ),
@@ -1399,137 +1234,204 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   }
 }
 
-class _BannerButton extends StatelessWidget {
+class _NetflixHeroButton extends StatefulWidget {
   final VoidCallback onPressed;
   final String icon;
   final String label;
   final bool isPrimary;
-  final bool isCompact;
-  final double? progress;
-  final String? subLabel;
+  final bool autofocus;
+  final FocusNode? focusNode;
+  final bool isLoading;
 
-  const _BannerButton({
-    required this.onPressed, 
-    required this.icon, 
-    required this.label, 
+  const _NetflixHeroButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
     this.isPrimary = false,
-    this.isCompact = false,
-    this.progress,
-    this.subLabel,
+    this.autofocus = false,
+    this.focusNode,
+    this.isLoading = false,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final double height = 54;
-    final bool hasProgress = progress != null && progress! > 0.02;
+  State<_NetflixHeroButton> createState() => _NetflixHeroButtonState();
+}
 
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? Colors.white : Colors.white.withValues(alpha: 0.1),
-        foregroundColor: isPrimary ? Colors.black : Colors.white,
-        elevation: 0,
-        fixedSize: Size.fromHeight(height), 
-        padding: EdgeInsets.symmetric(
-          horizontal: isCompact ? 20 : 28, 
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(height)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AurisIcon(icon, size: 20, color: isPrimary ? Colors.black : Colors.white),
-          const SizedBox(width: 8),
-          if (hasProgress) ...[
-            Container(
-              width: 45,
-              height: 6,
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.30),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Stack(
-                children: [
-                  FractionallySizedBox(
-                    widthFactor: progress!.clamp(0.0, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF7A1E),
-                        borderRadius: BorderRadius.circular(10),
+class _NetflixHeroButtonState extends State<_NetflixHeroButton> {
+  bool _isHovered = false;
+  bool _isFocused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool activeWhite = widget.isPrimary || _isHovered || _isFocused;
+    final Color bgColor = activeWhite ? Colors.white : const Color(0x80545454);
+    final Color textColor = activeWhite ? Colors.black : Colors.white;
+
+    final String effectiveIcon = ((_isHovered || _isFocused) && (widget.icon == AurisIcons.play || widget.icon == AurisIcons.playFilled))
+        ? AurisIcons.playFilled
+        : widget.icon;
+
+    return Focus(
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
+      onFocusChange: (f) => setState(() => _isFocused = f),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: (_isHovered || _isFocused) ? Colors.white : Colors.transparent,
+              width: 2.5,
+            ),
+            boxShadow: (_isHovered || _isFocused)
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.isLoading ? null : widget.onPressed,
+              borderRadius: BorderRadius.circular(4),
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              overlayColor: WidgetStateProperty.all(Colors.transparent),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8.5),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.isLoading)
+                      SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: textColor,
+                        ),
+                      )
+                    else
+                      AurisIcon(
+                        effectiveIcon,
+                        size: 20,
+                        color: textColor,
+                      ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        fontFamily: 'NetflixSans',
+                        color: textColor,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15.5,
+                        letterSpacing: -0.2,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            if (subLabel != null && subLabel!.isNotEmpty) ...[
-              const SizedBox(width: 10),
-              Text(
-                subLabel!,
-                style: TextStyle(
-                  color: isPrimary ? Colors.black : Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
-              ),
-            ],
-          ] else ...[
-            Flexible(
-              child: Text(
-                label, 
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold, 
-                  fontSize: 16,
-                  letterSpacing: -0.5,
+                  ],
                 ),
               ),
             ),
-          ],
-        ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _BannerIconButton extends StatelessWidget {
+class _NetflixHeroIconButton extends StatefulWidget {
   final String icon;
   final String label;
   final VoidCallback onPressed;
-  final bool isCompact;
   final bool isLoading;
-  const _BannerIconButton({
-    required this.icon, 
-    required this.label, 
+  final FocusNode? focusNode;
+
+  const _NetflixHeroIconButton({
+    required this.icon,
+    required this.label,
     required this.onPressed,
-    this.isCompact = false,
     this.isLoading = false,
+    this.focusNode,
   });
 
   @override
+  State<_NetflixHeroIconButton> createState() => _NetflixHeroIconButtonState();
+}
+
+class _NetflixHeroIconButtonState extends State<_NetflixHeroIconButton> {
+  bool _hovered = false;
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
-    final double size = isCompact ? 44 : 54;
-    return Tooltip(
-      message: label,
-      child: Material(
-        color: Colors.white.withValues(alpha: 0.15),
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: isLoading ? null : onPressed,
-          child: Container(
-            width: size,
-            height: size,
-            alignment: Alignment.center,
-            child: isLoading 
-              ? SizedBox(
-                  width: isCompact ? 20 : 24, 
-                  height: isCompact ? 20 : 24, 
-                  child: const CircularProgressIndicator(strokeWidth: 3, color: Colors.white)
-                )
-              : AurisIcon(icon, size: isCompact ? 22 : 26, color: Colors.white),
+    final bool active = _hovered || _focused;
+    final Color bgColor = active ? Colors.white : const Color(0x66000000);
+    final Color fgColor = active ? Colors.black : Colors.white;
+
+    return Focus(
+      focusNode: widget.focusNode,
+      onFocusChange: (f) => setState(() => _focused = f),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Tooltip(
+          message: widget.label,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            decoration: BoxDecoration(
+              color: bgColor,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: active ? Colors.white : Colors.white54,
+                width: 1.5,
+              ),
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.isLoading ? null : widget.onPressed,
+                customBorder: const CircleBorder(),
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                overlayColor: WidgetStateProperty.all(Colors.transparent),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: widget.isLoading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: fgColor,
+                          ),
+                        )
+                      : AurisIcon(
+                          widget.icon,
+                          size: 20,
+                          color: fgColor,
+                        ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
