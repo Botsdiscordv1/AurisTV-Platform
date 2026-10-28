@@ -8,6 +8,10 @@ void main() {
         SectionPresentationResolver.resolve('Top 10 Global'),
         SectionPresentation.top10,
       );
+      expect(
+        SectionPresentationResolver.resolve('top10_wide'),
+        SectionPresentation.top10Wide,
+      );
     });
 
     test('resolve maps trending strings to wide', () {
@@ -24,10 +28,10 @@ void main() {
         SectionPresentation.wide,
       );
 
-      // 'Unknown' normally maps to poster, but we force 'top10'
+      // 'Unknown' normally maps to poster, but we force 'top10_wide'
       expect(
-        SectionPresentationResolver.resolve('Unknown', serverFormat: 'top10'),
-        SectionPresentation.top10,
+        SectionPresentationResolver.resolve('Unknown', serverFormat: 'top10_wide'),
+        SectionPresentation.top10Wide,
       );
     });
   });
@@ -142,6 +146,75 @@ void main() {
 
       final composed = SectionComposer.compose(raw);
       expect(composed[0].presentation, SectionPresentation.top10);
+    });
+
+    test('frontend platform decision: top10 becomes top10Wide on TV platform', () {
+      ResponsiveUtils.isTVDevice = true;
+      try {
+        final raw = [
+          const HomeLayoutSection(type: HomeSectionType.top10Global, title: 'Ranking TV'),
+        ];
+        final composed = SectionComposer.compose(raw);
+        expect(composed[0].presentation, SectionPresentation.top10Wide);
+      } finally {
+        ResponsiveUtils.isTVDevice = false;
+      }
+    });
+
+    test('frontend platform decision: top10 remains top10 on non-TV platform', () {
+      ResponsiveUtils.isTVDevice = false;
+      final raw = [
+        const HomeLayoutSection(type: HomeSectionType.top10Global, title: 'Ranking Mobile'),
+      ];
+      final composed = SectionComposer.compose(raw);
+      expect(composed[0].presentation, SectionPresentation.top10);
+    });
+
+    test('frontend platform decision: poster becomes expandablePoster (Expandable Poster) on TV platform', () {
+      ResponsiveUtils.isTVDevice = true;
+      try {
+        final raw = [
+          const HomeLayoutSection(
+            type: HomeSectionType.editorial,
+            title: 'Catalog Section',
+            data: EditorialRow(badge: EditorialBadge.essential, title: 'Catalog', items: [
+              MediaItem(id: '1', title: 'T', posterUrl: '', type: MediaType.anime),
+            ]),
+          ),
+        ];
+        final composed = SectionComposer.compose(raw);
+        expect(composed[0].presentation, SectionPresentation.expandablePoster);
+      } finally {
+        ResponsiveUtils.isTVDevice = false;
+      }
+    });
+
+    test('TV platform rule: expandablePoster is limited to maximum 3 in Home', () {
+      ResponsiveUtils.isTVDevice = true;
+      try {
+        final raw = List.generate(
+          5,
+          (i) => HomeLayoutSection(
+            type: HomeSectionType.editorial,
+            title: 'Catalog $i',
+            data: EditorialRow(badge: EditorialBadge.essential, title: 'Cat $i', items: [
+              MediaItem(id: '$i', title: 'T', posterUrl: '', type: MediaType.anime),
+            ]),
+          ),
+        );
+        final composed = SectionComposer.compose(raw);
+        
+        // Primeras 3 deben ser expandablePoster
+        expect(composed[0].presentation, SectionPresentation.expandablePoster);
+        expect(composed[1].presentation, SectionPresentation.expandablePoster);
+        expect(composed[2].presentation, SectionPresentation.expandablePoster);
+        
+        // Las siguientes (4 y 5) deben ser degradadas a wide
+        expect(composed[3].presentation, SectionPresentation.wide);
+        expect(composed[4].presentation, SectionPresentation.wide);
+      } finally {
+        ResponsiveUtils.isTVDevice = false;
+      }
     });
 
     test('respects serverFormat from HomeLayoutSection', () {

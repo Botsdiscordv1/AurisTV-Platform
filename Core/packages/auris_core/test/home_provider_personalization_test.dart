@@ -222,8 +222,8 @@ void main() {
       if (current == SectionPresentation.wide) {
         expect(next, isNot(SectionPresentation.wide), reason: 'Contiguous wide at $i and ${i + 1}');
       }
-      if (current == SectionPresentation.posterLarge) {
-        expect(next, isNot(SectionPresentation.posterLarge), reason: 'Contiguous posterLarge at $i and ${i + 1}');
+      if (current == SectionPresentation.expandablePoster) {
+        expect(next, isNot(SectionPresentation.expandablePoster), reason: 'Contiguous expandablePoster at $i and ${i + 1}');
       }
     }
   });

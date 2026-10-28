@@ -803,14 +803,14 @@ HomeLayoutSection _promoteSectionToWide(HomeLayoutSection sec) {
   );
 }
 
-HomeLayoutSection _promoteSectionToPosterLarge(HomeLayoutSection sec) {
+HomeLayoutSection _promoteSectionToExpandablePoster(HomeLayoutSection sec) {
   dynamic newData = sec.data;
   if (sec.data is EditorialRow) {
-    newData = (sec.data as EditorialRow).copyWith(format: SectionPresentation.posterLarge);
+    newData = (sec.data as EditorialRow).copyWith(format: SectionPresentation.expandablePoster);
   }
   return sec.copyWith(
-    presentation: SectionPresentation.posterLarge,
-    serverFormat: 'poster_large',
+    presentation: SectionPresentation.expandablePoster,
+    serverFormat: 'expandable_poster',
     data: newData,
   );
 }
@@ -839,11 +839,11 @@ List<HomeLayoutSection> _interleaveInicioSections(
         continueWatchingSec ??= sec;
       } else if (sec.presentation == SectionPresentation.top10 && primaryTop10Sec == null) {
         primaryTop10Sec = sec;
-      } else if ((sec.presentation == SectionPresentation.posterLarge ||
+      } else if ((sec.presentation == SectionPresentation.expandablePoster ||
                   sec.type == HomeSectionType.editorial ||
                   sec.type == HomeSectionType.recommendation) &&
                  primaryPosterLargeSec == null) {
-        primaryPosterLargeSec = _promoteSectionToPosterLarge(sec);
+        primaryPosterLargeSec = _promoteSectionToExpandablePoster(sec);
       } else {
         pool.add(sec);
       }
@@ -891,16 +891,16 @@ List<HomeLayoutSection> _interleaveInicioSections(
         forbiddenFormat = SectionPresentation.wide; // Evita wide contiguo
       } else if (lastFormat == SectionPresentation.top10) {
         forbiddenFormat = SectionPresentation.top10; // Evita top10 contiguo
-      } else if (lastFormat == SectionPresentation.posterLarge) {
-        forbiddenFormat = SectionPresentation.posterLarge; // Evita posterLarge contiguo
+      } else if (lastFormat == SectionPresentation.expandablePoster) {
+        forbiddenFormat = SectionPresentation.expandablePoster; // Evita expandablePoster contiguo
       } else if (result.length >= 2 &&
           result[result.length - 1].presentation == SectionPresentation.poster &&
           result[result.length - 2].presentation == SectionPresentation.poster) {
         // Rompe monotonía de 2 posters alternando entre WIDE y POSTER_LARGE
         final wideCount = result.where((s) => s.presentation == SectionPresentation.wide).length;
-        final largeCount = result.where((s) => s.presentation == SectionPresentation.posterLarge).length;
+        final largeCount = result.where((s) => s.presentation == SectionPresentation.expandablePoster).length;
         preferredFormat = (largeCount <= wideCount)
-            ? SectionPresentation.posterLarge
+            ? SectionPresentation.expandablePoster
             : SectionPresentation.wide;
       }
     }
@@ -931,10 +931,10 @@ List<HomeLayoutSection> _interleaveInicioSections(
         }
 
         if (preferredFormat != null && fmt != preferredFormat) {
-          if (preferredFormat == SectionPresentation.posterLarge &&
+          if (preferredFormat == SectionPresentation.expandablePoster &&
               fmt == SectionPresentation.poster &&
               (candidate.type == HomeSectionType.editorial || candidate.type == HomeSectionType.recommendation)) {
-            bestCandidate = _promoteSectionToPosterLarge(candidate);
+            bestCandidate = _promoteSectionToExpandablePoster(candidate);
             chosenCategoryIndex = catIdx;
             chosenItemIndex = i;
             break;
@@ -1009,7 +1009,7 @@ List<HomeLayoutSection> _interleaveInicioSections(
   debugPrint('✨ [_interleaveInicioSections] Order (${result.length} sections):');
   for (int i = 0; i < result.length; i++) {
     final s = result[i];
-    final isLarge = s.presentation == SectionPresentation.posterLarge;
+    final isLarge = s.presentation == SectionPresentation.expandablePoster;
     debugPrint('   [$i] ${isLarge ? "🌟 [POSTER_LARGE ACTIVATED]" : "   [${s.presentation.name}]"} "${s.title}" (${s.type.name})');
   }
 
@@ -1029,11 +1029,11 @@ List<HomeLayoutSection> _interleaveCategorySections(List<HomeLayoutSection> sect
       continueWatchingSec ??= sec;
     } else if (sec.presentation == SectionPresentation.top10 && primaryTop10Sec == null) {
       primaryTop10Sec = sec;
-    } else if ((sec.presentation == SectionPresentation.posterLarge ||
+    } else if ((sec.presentation == SectionPresentation.expandablePoster ||
                 sec.type == HomeSectionType.editorial ||
                 sec.type == HomeSectionType.recommendation) &&
                primaryPosterLargeSec == null) {
-      primaryPosterLargeSec = _promoteSectionToPosterLarge(sec);
+      primaryPosterLargeSec = _promoteSectionToExpandablePoster(sec);
     } else {
       pool.add(sec);
     }
@@ -1055,15 +1055,15 @@ List<HomeLayoutSection> _interleaveCategorySections(List<HomeLayoutSection> sect
         forbiddenFormat = SectionPresentation.wide;
       } else if (lastFormat == SectionPresentation.top10) {
         forbiddenFormat = SectionPresentation.top10;
-      } else if (lastFormat == SectionPresentation.posterLarge) {
-        forbiddenFormat = SectionPresentation.posterLarge;
+      } else if (lastFormat == SectionPresentation.expandablePoster) {
+        forbiddenFormat = SectionPresentation.expandablePoster;
       } else if (result.length >= 2 &&
           result[result.length - 1].presentation == SectionPresentation.poster &&
           result[result.length - 2].presentation == SectionPresentation.poster) {
         final wideCount = result.where((s) => s.presentation == SectionPresentation.wide).length;
-        final largeCount = result.where((s) => s.presentation == SectionPresentation.posterLarge).length;
+        final largeCount = result.where((s) => s.presentation == SectionPresentation.expandablePoster).length;
         preferredFormat = (largeCount <= wideCount)
-            ? SectionPresentation.posterLarge
+            ? SectionPresentation.expandablePoster
             : SectionPresentation.wide;
       }
     }
@@ -1080,10 +1080,10 @@ List<HomeLayoutSection> _interleaveCategorySections(List<HomeLayoutSection> sect
       }
 
       if (preferredFormat != null && fmt != preferredFormat) {
-        if (preferredFormat == SectionPresentation.posterLarge &&
+        if (preferredFormat == SectionPresentation.expandablePoster &&
             fmt == SectionPresentation.poster &&
             (candidate.type == HomeSectionType.editorial || candidate.type == HomeSectionType.recommendation)) {
-          bestCandidate = _promoteSectionToPosterLarge(candidate);
+          bestCandidate = _promoteSectionToExpandablePoster(candidate);
           chosenIndex = i;
           break;
         }
@@ -1308,10 +1308,11 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
   if (effectiveSource.isEmpty) {
     if (result.id.contains('jkanime.net')) effectiveSource = 'JKAnime';
     else if (result.id.contains('animejara.com')) effectiveSource = 'AnimeJara';
-    else if (result.id.contains('tudorama.net')) effectiveSource = 'TuDorama';
+    else if (result.id.contains('tudorama')) effectiveSource = 'TuDorama';
     else if (result.id.contains('doramaslatinox')) effectiveSource = 'DoramasLatinox';
     else if (result.id.contains('repelishd')) effectiveSource = 'RepelisHD';
     else if (result.id.contains('cuevana')) effectiveSource = 'Cuevana';
+    else if (result.id.contains('doramasmp4')) effectiveSource = 'DoramasMP4';
   }
 
   // Senior Fix: Fallback de imagen horizontal para secciones WIDE editoriales
@@ -1398,10 +1399,11 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
   if (effectiveSource.isEmpty) {
     if (result.url.contains('jkanime.net')) effectiveSource = 'JKAnime';
     else if (result.url.contains('animejara.com')) effectiveSource = 'AnimeJara';
-    else if (result.url.contains('tudorama.net')) effectiveSource = 'TuDorama';
+    else if (result.url.contains('tudorama')) effectiveSource = 'TuDorama';
     else if (result.url.contains('doramaslatinox')) effectiveSource = 'DoramasLatinox';
     else if (result.url.contains('repelishd')) effectiveSource = 'RepelisHD';
     else if (result.url.contains('cuevana')) effectiveSource = 'Cuevana';
+    else if (result.url.contains('doramasmp4')) effectiveSource = 'DoramasMP4';
   }
 
   // Senior Fix: Eliminamos el año como subtítulo por petición UX
@@ -1546,6 +1548,8 @@ final recentEpisodesProvider = FutureProvider<List<MediaItem>>((ref) async {
       else if (u.contains('animeav1.com')) effectiveSource = 'AnimeAV1';
       else if (u.contains('animed23.com')) effectiveSource = 'AnimeD23';
       else if (u.contains('cuevana')) effectiveSource = 'Cuevana';
+      else if (u.contains('doramasmp4')) effectiveSource = 'DoramasMP4';
+      else if (u.contains('tudorama')) effectiveSource = 'TuDorama';
     }
 
     final String? rawBanner = (item.banner != null && item.banner!.isNotEmpty) ? item.banner : item.coverImage;

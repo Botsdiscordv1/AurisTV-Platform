@@ -83,7 +83,7 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
 
     if (!isTactic) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0B0B0D),
+        backgroundColor: const Color(0xFF000000),
         body: Stack(
           children: [
             widget.navigationShell,
@@ -104,6 +104,7 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
         _handleBackGesture();
       },
       child: Scaffold(
+        backgroundColor: const Color(0xFF000000),
         body: Stack(
           children: [
             widget.navigationShell,

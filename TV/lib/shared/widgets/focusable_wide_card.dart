@@ -205,7 +205,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                             overflow: TextOverflow.ellipsis,
                                             style: GoogleFonts.poppins(
                                               color: Colors.white,
-                                              fontSize: TVResponsiveUtils.sp(context, 15),
+                                              fontSize: TVResponsiveUtils.grid(context, 24),
                                               fontWeight: FontWeight.w700,
                                               shadows: [
                                                 Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 10, offset: const Offset(0, 2)),
@@ -226,7 +226,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                     overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.poppins(
                                       color: Colors.white,
-                                      fontSize: TVResponsiveUtils.sp(context, 15),
+                                      fontSize: TVResponsiveUtils.grid(context, 24),
                                       fontWeight: FontWeight.w700,
                                       shadows: [
                                         Shadow(color: Colors.black.withOpacity(0.8), blurRadius: 10, offset: const Offset(0, 2)),
@@ -282,7 +282,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(
-                          height: TVResponsiveUtils.sp(context, 20),
+                          height: TVResponsiveUtils.grid(context, 32),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Text.rich(
@@ -290,7 +290,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                 widget.subtitle!,
                                 TextStyle(
                                   color: Colors.white.withOpacity(0.6),
-                                  fontSize: TVResponsiveUtils.sp(context, 13),
+                                  fontSize: TVResponsiveUtils.grid(context, 20),
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: 0.2,
                                 ),
@@ -304,7 +304,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                             widget.subtitle2!.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           SizedBox(
-                            height: TVResponsiveUtils.sp(context, 20),
+                            height: TVResponsiveUtils.grid(context, 32),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 4),
                               child: Text.rich(
@@ -312,7 +312,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                   widget.subtitle2!,
                                   TextStyle(
                                     color: Colors.white,
-                                    fontSize: TVResponsiveUtils.sp(context, 13),
+                                    fontSize: TVResponsiveUtils.grid(context, 20),
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 0.2,
                                   ),

@@ -98,6 +98,8 @@ String simplifySourceName(String name) {  final l = name.toLowerCase();
   if (l.contains('repelishd')) return 'RHD';
   if (l.contains('doramaslatinox')) return 'DLX';
   if (l.contains('cuevana')) return 'CVN';
+  if (l.contains('doramasmp4')) return 'DM4';
+  if (l.contains('tudorama')) return 'TDM';
   return name.toUpperCase();
 }
 
@@ -113,7 +115,9 @@ const Map<String, int> _sourceDisplayOrder = {
   'OPS': 9,
   'PPA': 10,
   'CVN': 11,
-  'GHD': 12,
+  'DM4': 12,
+  'TDM': 13,
+  'GHD': 14,
 };
 
 int sourceDisplayRank(String source) {

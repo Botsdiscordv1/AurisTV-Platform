@@ -98,6 +98,8 @@ export 'presentation/widgets/mini_player_bar.dart';
 export 'presentation/widgets/focusable_poster_card.dart';
 export 'presentation/widgets/focusable_expandable_poster_card.dart';
 export 'presentation/widgets/focusable_wide_card.dart';
+export 'presentation/widgets/focusable_top10_wide_card.dart';
+export 'presentation/widgets/composed_section_row.dart';
 export 'presentation/widgets/disney_focus.dart';
 export 'presentation/widgets/logo_tone.dart';
 export 'presentation/widgets/cured_network_image.dart';

@@ -2,7 +2,9 @@ enum SectionPresentation {
   wide,
   poster,
   posterLarge,
+  expandablePoster,
   top10,
+  top10Wide,
 }
 
 /// Resolver responsible for determining the visual presentation of a content section.
@@ -12,8 +14,14 @@ class SectionPresentationResolver {
     // 0. SERVER OVERRIDE (Explicit format from backend)
     if (serverFormat != null && serverFormat.isNotEmpty) {
       final fmt = serverFormat.toLowerCase();
+      if (fmt.contains('top10_wide') || fmt.contains('top10wide') || fmt.contains('top10_backdrop')) {
+        return SectionPresentation.top10Wide;
+      }
       if (fmt.contains('top10')) return SectionPresentation.top10;
       if (fmt.contains('wide') || fmt.contains('backdrop')) return SectionPresentation.wide;
+      if (fmt.contains('expandable_poster') || fmt.contains('expandableposter')) {
+        return SectionPresentation.expandablePoster;
+      }
       if (fmt.contains('poster_large') || fmt.contains('posterlarge') || fmt.contains('large_poster') || fmt.contains('largeposter')) {
         return SectionPresentation.posterLarge;
       }
@@ -24,7 +32,9 @@ class SectionPresentationResolver {
     final idLower = id?.toLowerCase() ?? '';
     
     // 1. BASE ASSIGNMENT (Structural Intent)
-    if (typeLower == 'editorial_for_you' || 
+    if (typeLower.contains('top10_wide') || typeLower.contains('top10wide') || idLower.contains('top10_wide') || idLower.contains('top10wide')) {
+      return SectionPresentation.top10Wide;
+    } else if (typeLower == 'editorial_for_you' || 
         typeLower.contains('top10') || 
         typeLower.contains('top 10') || 
         typeLower.contains('ranking') ||

@@ -18,6 +18,9 @@ import 'features/remote_control/data/models/remote_device.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ¡Esto le dice a auris_core que estamos en plataforma TV!
+  ResponsiveUtils.isTVDevice = true;
+
   // Senior 1GB TV Box Tuning: Configuración de caché optimizada que previene
   // el cierre por OOM en TV Boxes chinas de 1GB de RAM al tiempo que retiene
   // cientos de pósters con memCacheWidth acotado sin forzar re-descargas.
