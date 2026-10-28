@@ -188,4 +188,20 @@ void main() {
       expect(simplifySourceName('CUEVANA'), 'CVN');
     });
   });
+
+  group('simplifySourceName para DoramasMP4', () {
+    test('Simplifica DoramasMP4 a DM4', () {
+      expect(simplifySourceName('doramasmp4'), 'DM4');
+      expect(simplifySourceName('DoramasMP4'), 'DM4');
+      expect(simplifySourceName('DORAMASMP4'), 'DM4');
+    });
+  });
+
+  group('simplifySourceName para Tudorama', () {
+    test('Simplifica Tudorama a TDM', () {
+      expect(simplifySourceName('tudorama'), 'TDM');
+      expect(simplifySourceName('TuDorama'), 'TDM');
+      expect(simplifySourceName('TUDORAMA'), 'TDM');
+    });
+  });
 }

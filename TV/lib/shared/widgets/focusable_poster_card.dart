@@ -298,7 +298,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                 SizedBox(height: isMobile ? ResponsiveUtils.sp(context, 8) : 8),
                 // Senior Fix: Solo mostramos el título debajo. Altura fija para una sola línea.
                 SizedBox(
-                  height: isMobile ? ResponsiveUtils.sp(context, 22) : TVResponsiveUtils.sp(context, 28),
+                  height: isMobile ? ResponsiveUtils.sp(context, 22) : TVResponsiveUtils.grid(context, 40),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: MarqueeText(
@@ -306,7 +306,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                       animate: isMobile ? true : _isActive,
                       style: GoogleFonts.poppins(
                         color: _isActive ? Colors.white : Colors.white.withOpacity(0.95),
-                        fontSize: widget.titleFontSize ?? (isMobile ? ResponsiveUtils.sp(context, 13) : TVResponsiveUtils.sp(context, 13)),
+                        fontSize: widget.titleFontSize ?? (isMobile ? ResponsiveUtils.sp(context, 13) : TVResponsiveUtils.grid(context, 20)),
                         fontWeight: FontWeight.w700,
                         height: 1.2,
                         letterSpacing: 0.2,

@@ -171,6 +171,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     super.dispose();
   }
 
+  String _heroBackgroundUrl(MediaItem item) {
+    if (_resolvedLayout == HeroBannerLayout.mobile) {
+      return item.posterUrl;
+    } else {
+      return item.bannerUrl ?? item.posterUrl;
+    }
+  }
+
   String? _formatMovieDuration(String? durationStr, int? runtimeMin) {
     int? totalMins = runtimeMin;
     if ((totalMins == null || totalMins <= 0) && durationStr != null && durationStr.isNotEmpty) {
@@ -425,20 +433,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   void _stopAutoPlay() => _autoPlayTimer?.cancel();
 
   HeroBannerLayout get _resolvedLayout {
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final bool useMobileLayout = context.breakpoint < Breakpoint.sm ||
-        (context.breakpoint < Breakpoint.lg && screenWidth < 600);
-    return widget.layout ??
-        (useMobileLayout ? HeroBannerLayout.mobile : HeroBannerLayout.cinematic);
-  }
-
-  String _heroBackgroundUrl(MediaItem item) {
-    final String poster = item.posterUrl;
-    final String banner = item.bannerUrl ?? '';
-    if (_resolvedLayout == HeroBannerLayout.mobile) {
-      return poster.isNotEmpty ? poster : banner;
+    if (context.useMobileLayout) {
+      return widget.layout ?? HeroBannerLayout.mobile;
     }
-    return banner.isNotEmpty ? banner : poster;
+    return widget.layout ?? HeroBannerLayout.cinematic;
   }
 
   @override
@@ -518,11 +516,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       aspectRatio: ResponsiveUtils.heroAspectRatio(context),
       child: Stack(
         fit: StackFit.expand,
+        clipBehavior: Clip.none,
         children: [
           _buildBackgroundLayer(bgItem),
           _buildMobileGradients(), 
           Positioned(
-            left: 20, right: 20, bottom: 35,
+            left: 16, right: 0, bottom: 35,
             child: contentItem != null 
                 ? _buildMobileContent(contentItem)
                 : const SizedBox.shrink(),
@@ -552,6 +551,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
             aspectRatio: ResponsiveUtils.heroAspectRatio(context),
             child: Stack(
               fit: StackFit.expand,
+              clipBehavior: Clip.none,
               children: [
                 _buildBackgroundLayer(bgItem),
                 if (_ytController != null && _showTrailerLayer)
@@ -561,7 +561,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                 _buildCinematicGradients(),
                 Positioned(
                   left: 40, bottom: 32, top: 0,
-                  right: 40,
+                  right: 20,
                   child: Align(
                     alignment: Alignment.bottomLeft,
                     child: AnimatedSwitcher(
@@ -691,7 +691,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   }
 
   Widget _buildMobileGradients() {
-    const darkBg = Color(0xFF0B0B0D);
+    const darkBg = Color(0xFF000000);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -855,64 +855,67 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
   Widget _buildCinematicContent(MediaItem item, double screenWidth) {
     final titleFontSize = ResponsiveUtils.heroTitleFontSize(context);
+    final bool isInicio = widget.currentCategory.toLowerCase() == 'inicio';
     
     return Column(
       key: ValueKey('content_col_tv_${item.id}'),
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SvgPicture.asset(
-              'assets/icons/auris-tv-icon.svg',
-              height: 16,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _formatMediaType(item),
-              style: TextStyle(
-                fontFamily: 'NetflixSans',
-                color: Colors.white.withOpacity(0.92),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 3.2,
+        if (isInicio) ...[
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SvgPicture.asset(
+                'assets/icons/auris-tv-icon.svg',
+                height: 16,
               ),
-            ),
-            if (item.rating != null && item.rating! >= 7.0) ...[
-              const SizedBox(width: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE50914),
-                  borderRadius: BorderRadius.circular(2),
+              const SizedBox(width: 8),
+              Text(
+                _formatMediaType(item),
+                style: TextStyle(
+                  fontFamily: 'NetflixSans',
+                  color: Colors.white.withOpacity(0.92),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 3.2,
                 ),
-                child: const Text(
-                  'TOP 10',
-                  style: TextStyle(
-                    fontFamily: 'NetflixSans',
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
+              ),
+              if (item.rating != null && item.rating! >= 7.0) ...[
+                const SizedBox(width: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE50914),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: const Text(
+                    'TOP 10',
+                    style: TextStyle(
+                      fontFamily: 'NetflixSans',
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'N.º 1 en ${_formatMediaTypePlural(item)} hoy',
-                style: const TextStyle(
-                  fontFamily: 'NetflixSans',
-                  color: Colors.white,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
+                const SizedBox(width: 6),
+                Text(
+                  'N.º 1 en ${_formatMediaTypePlural(item)} hoy',
+                  style: const TextStyle(
+                    fontFamily: 'NetflixSans',
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
-        ),
-        const SizedBox(height: 10),
+          ),
+          const SizedBox(height: 10),
+        ],
 
         if (item.logoUrl != null && item.logoUrl!.isNotEmpty)
           Builder(builder: (context) {
@@ -943,9 +946,11 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         else
           Text(
             item.title.toUpperCase(), 
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontFamily: 'NetflixSans',
-              fontSize: titleFontSize, 
+              fontSize: context.useMobileLayout ? 24.0 : titleFontSize, 
               fontWeight: FontWeight.w900, 
               color: Colors.white, 
               height: 0.95,
@@ -1074,7 +1079,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
           width: context.useMobileLayout ? (screenWidth - 48) : (screenWidth * 0.46),
           child: Text(
             item.synopsis ?? '', 
-            maxLines: context.useMobileLayout ? 4 : 3, 
+            maxLines: 3, 
             overflow: TextOverflow.ellipsis, 
             style: TextStyle(
               fontFamily: 'NetflixSans',
@@ -1095,6 +1100,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
+          clipBehavior: Clip.none,
+          padding: const EdgeInsets.only(right: 80),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1177,7 +1184,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                   );
                 }),
               ],
-              if (widget.items.length > 1) ...[
+              if (!context.useMobileLayout && widget.items.length > 1) ...[
                 const SizedBox(width: 10),
                 _NetflixHeroIconButton(
                   focusNode: _prevButtonFocusNode,
@@ -1199,6 +1206,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
                   },
                 ),
               ],
+              const SizedBox(width: 32),
             ],
           ),
         ),

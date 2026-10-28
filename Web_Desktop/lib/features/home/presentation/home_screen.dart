@@ -254,7 +254,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0D),
+      backgroundColor: const Color(0xFF000000),
       body: Stack(
         children: [
           CustomScrollView(
@@ -372,16 +372,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return ClipRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(
-            sigmaX: _isScrolled ? 15.0 : 0.0,
-            sigmaY: _isScrolled ? 15.0 : 0.0,
+            sigmaX: 15.0,
+            sigmaY: 15.0,
           ),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
+          child: Container(
             decoration: BoxDecoration(
-              color: _isScrolled ? const Color(0xFF0B0B0D).withOpacity(0.6) : const Color(0xFF0B0B0D), 
+              color: const Color(0xFF000000).withOpacity(0.6), 
               border: Border(
                 bottom: BorderSide(
-                  color: _isScrolled ? Colors.white.withOpacity(0.08) : Colors.transparent,
+                  color: Colors.white.withOpacity(0.08),
                   width: 0.5,
                 ),
               ),
@@ -490,7 +489,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           duration: const Duration(milliseconds: 300),
           height: navHeight,
           decoration: BoxDecoration(
-            color: _isScrolled ? const Color(0xFF0B0B0D).withOpacity(0.4) : Colors.transparent,
+            color: _isScrolled ? const Color(0xFF000000).withOpacity(0.4) : Colors.transparent,
             border: Border(
               bottom: BorderSide(
                 color: _isScrolled ? Colors.white.withOpacity(0.1) : Colors.transparent,
@@ -836,7 +835,7 @@ class _LanguageSelector extends StatelessWidget {
       ),
       child: PopupMenuButton<String>(
         offset: const Offset(0, 48),
-        color: const Color(0xFF1A222B).withOpacity(0.9),
+        color: const Color(0xFF121214).withOpacity(0.95),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: Colors.white.withOpacity(0.12)),

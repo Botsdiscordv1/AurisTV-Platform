@@ -162,7 +162,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
     final double rowHeight = TVResponsiveUtils.rowHeight(context, hasInfo: false);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12), // Senior Fix: Reducido para TV
+      padding: EdgeInsets.only(bottom: TVResponsiveUtils.sectionBottomGap(context)), // Medido en Prime: 32
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -192,7 +192,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                           widget.subtitle!,
                           style: TextStyle(
                             fontFamily: 'NetflixSans',
-                            fontSize: TVResponsiveUtils.sp(context, 12),
+                            fontSize: TVResponsiveUtils.grid(context, 20),
                             fontWeight: FontWeight.w500,
                             color: Colors.white.withOpacity(0.6),
                           ),
@@ -201,7 +201,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                     ],
                   ),
                 ),
-                const SizedBox(height: 16), // Gap ampliado: deja respirar el pop-out del póster enfocado
+                SizedBox(height: TVResponsiveUtils.sectionTitleGap(context)), // Medido en Prime: 16
               ],
             ),
           ),
@@ -238,7 +238,8 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                             primary: false, 
                             padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), 
                             itemCount: widget.items.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 14),
+                            separatorBuilder: (_, __) =>
+                                SizedBox(width: TVResponsiveUtils.cardGap(context)),
                             itemBuilder: (context, index) {
                               final item = widget.items[index];
                               return SizedBox(

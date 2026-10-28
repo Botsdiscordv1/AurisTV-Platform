@@ -258,7 +258,7 @@ class WideContentRowState extends State<WideContentRow>
 
     return Padding(
       key: _rowKey,
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: TVResponsiveUtils.sectionBottomGap(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -287,7 +287,7 @@ class WideContentRowState extends State<WideContentRow>
                           widget.subtitle!,
                           style: TextStyle(
                             fontFamily: 'NetflixSans',
-                            fontSize: TVResponsiveUtils.sp(context, 12),
+                            fontSize: TVResponsiveUtils.grid(context, 20),
                             fontWeight: FontWeight.w500,
                             color: Colors.white.withValues(alpha: 0.6),
                           ),
@@ -298,7 +298,8 @@ class WideContentRowState extends State<WideContentRow>
                 ),
                 // Holgura para el anillo Disney+ (8px sobre el borde de la
                 // tarjeta): el título no debe pisarse cuando la fila gana foco.
-                const SizedBox(height: 12),
+                // Prime mide 16 px entre título y tarjetas.
+                SizedBox(height: TVResponsiveUtils.sectionTitleGap(context)),
               ],
             ),
           ),
@@ -367,7 +368,8 @@ class WideContentRowState extends State<WideContentRow>
                               bottom: 0,
                             ),
                             itemCount: widget.items.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 14),
+                            separatorBuilder: (_, __) =>
+                                SizedBox(width: TVResponsiveUtils.cardGap(context)),
                             itemBuilder: (context, index) {
                               final item = widget.items[index];
                               final bool isSelected = _focusedIndex == index;

@@ -191,7 +191,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12), // Senior Fix: Reducido drásticamente para TV
+      padding: EdgeInsets.only(bottom: TVResponsiveUtils.sectionBottomGap(context)), // Medido en Prime: 32
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -217,7 +217,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                       widget.subtitle!,
                       style: TextStyle(
                         fontFamily: 'NetflixSans',
-                        fontSize: TVResponsiveUtils.sp(context, 12),
+                        fontSize: TVResponsiveUtils.grid(context, 20),
                         fontWeight: FontWeight.w500,
                         color: Colors.white.withOpacity(0.6),
                       ),
@@ -227,7 +227,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               ),
             ),
           ),
-          const SizedBox(height: 16), // Gap ampliado: deja respirar el pop-out del póster enfocado
+          SizedBox(height: TVResponsiveUtils.sectionTitleGap(context)), // Medido en Prime: 16
           _buildStandardRow(isMobile, horizontalPadding, cardWidth, rowHeight),
         ],
       ),
@@ -265,7 +265,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                   primary: false, 
                   padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 10),
                   itemCount: widget.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 14),
+                  separatorBuilder: (_, __) =>
+                      SizedBox(width: TVResponsiveUtils.cardGap(context)),
                   itemBuilder: (context, index) {
                     final item = widget.items[index];
                     if (isLarge) {
@@ -368,7 +369,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                       widget.subtitle!,
                       style: TextStyle(
                         fontFamily: 'NetflixSans',
-                        fontSize: TVResponsiveUtils.sp(context, 12),
+                        fontSize: TVResponsiveUtils.grid(context, 20),
                         fontWeight: FontWeight.w500,
                         color: Colors.white.withOpacity(0.6),
                       ),
@@ -378,7 +379,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               ),
             ),
           ),
-          const SizedBox(height: 16), // Gap ampliado: deja respirar el pop-out del póster enfocado
+          SizedBox(height: TVResponsiveUtils.sectionTitleGap(context)), // Medido en Prime: 16
           MouseRegion(
             onEnter: (_) => setState(() => _isHovered = true),
             onExit: (_) => setState(() => _isHovered = false),

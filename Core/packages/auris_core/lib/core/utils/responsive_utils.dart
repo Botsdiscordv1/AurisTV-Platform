@@ -50,6 +50,16 @@ extension BreakpointExtension on BuildContext {
 }
 
 class ResponsiveUtils {
+  /// Configuración o indicador explícito de si se está ejecutando en plataforma TV (Android TV / 10-foot UI).
+  static bool isTVDevice = false;
+
+  /// Devuelve true si la aplicación corre en TV.
+  static bool get isTV {
+    if (isTVDevice) return true;
+    if (kIsWeb) return false;
+    return false;
+  }
+
   /// Devuelve true si la aplicación es nativa (Android/iOS).
   static bool get isNative => !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
 

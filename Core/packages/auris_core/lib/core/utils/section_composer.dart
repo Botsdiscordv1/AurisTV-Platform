@@ -99,15 +99,15 @@ class SectionComposer {
 
       // 2.1 Resolution based on Intent
       SectionPresentation presentation = raw.presentation;
-      if (presentation == SectionPresentation.posterLarge) {
-        // Preservar la promoción a POSTER_LARGE realizada por el orquestador
+      if (presentation == SectionPresentation.expandablePoster || presentation == SectionPresentation.top10Wide) {
+        // Preservar la promoción realizada por el orquestador
         if (raw.serverFormat != null && raw.serverFormat!.isNotEmpty) {
           final fmt = SectionPresentationResolver.resolve(
             _getSectionIdentifier(raw),
             id: title,
             serverFormat: raw.serverFormat,
           );
-          if (fmt == SectionPresentation.posterLarge || fmt == SectionPresentation.top10) {
+          if (fmt == SectionPresentation.expandablePoster || fmt == SectionPresentation.top10 || fmt == SectionPresentation.top10Wide) {
             presentation = fmt;
           }
         }
@@ -125,10 +125,25 @@ class SectionComposer {
         );
       }
 
-      if (presentation == SectionPresentation.posterLarge) {
-        debugPrint('🌟 [SectionComposer] Section "$title" (${raw.type.name}) resolved to POSTER_LARGE!');
+      if (presentation == SectionPresentation.expandablePoster) {
+        debugPrint('🌟 [SectionComposer] Section "$title" (${raw.type.name}) resolved to EXPANDABLE_POSTER!');
       } else {
         debugPrint('🎨 [SectionComposer] Section "$title" -> ${presentation.name}');
+      }
+
+      // Frontend Platform Decision for TV vs Mobile/Web
+      if (ResponsiveUtils.isTV) {
+        if (presentation == SectionPresentation.top10) {
+          presentation = SectionPresentation.top10Wide;
+          debugPrint('📺 [SectionComposer] TV Rule: Section "$title" (top10) promoted to TOP10_WIDE');
+        } else if (presentation == SectionPresentation.poster || presentation == SectionPresentation.posterLarge) {
+          presentation = SectionPresentation.expandablePoster;
+          debugPrint('📺 [SectionComposer] TV Rule: Section "$title" promoted to EXPANDABLE_POSTER');
+        }
+      } else {
+        if (presentation == SectionPresentation.expandablePoster) {
+          presentation = SectionPresentation.posterLarge;
+        }
       }
 
       // 2.2 CONTENT INTEGRITY CHECK (Senior Logic)
@@ -159,6 +174,32 @@ class SectionComposer {
     // 3. Apply preferences/limits
     if (preferences?.maximumSections != null && composed.length > preferences!.maximumSections!) {
       return composed.take(preferences.maximumSections!).toList();
+    }
+
+    // TV Rule: Limit expandable posters (expandablePoster) to a maximum of 3 in Home
+    if (ResponsiveUtils.isTV) {
+      int expandableCount = 0;
+      for (int i = 0; i < composed.length; i++) {
+        final sec = composed[i];
+        if (sec.presentation == SectionPresentation.expandablePoster) {
+          expandableCount++;
+          if (expandableCount > 3) {
+            composed[i] = ComposedHomeSection(
+              id: sec.id,
+              type: sec.type,
+              title: sec.title,
+              subtitle: sec.subtitle,
+              items: sec.items,
+              sportsItems: sec.sportsItems,
+              brandItems: sec.brandItems,
+              presentation: SectionPresentation.wide,
+              data: sec.data,
+              badge: sec.badge,
+            );
+            debugPrint('📺 [SectionComposer] TV Rule: Excess expandablePoster (#$expandableCount) downgraded to WIDE (Max 3 allowed on TV)');
+          }
+        }
+      }
     }
 
     return composed;

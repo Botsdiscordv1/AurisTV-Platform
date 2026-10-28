@@ -108,7 +108,7 @@ class _ScheduleBody extends StatelessWidget {
                         displayTitle.toUpperCase(),
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: TVResponsiveUtils.sp(context, 26),
+                          fontSize: TVResponsiveUtils.grid(context, 34),
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.5,
                         ),

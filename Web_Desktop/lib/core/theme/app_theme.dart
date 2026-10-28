@@ -10,7 +10,7 @@ class AppTheme {
   static const Color brandDark = Color(0xFFC85F0D);
 
   // Backgrounds & Surfaces
-  static const Color background = Color(0xFF0B0B0D);
+  static const Color background = Color(0xFF000000);
   static const Color surface = Color(0xFF121214);
   static const Color surfaceCard = Color(0xFF19191C);
   static const Color surfaceElevated = Color(0xFF222226);

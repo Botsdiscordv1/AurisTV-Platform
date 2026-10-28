@@ -105,9 +105,13 @@ class TvScroll {
     final ScrollPosition position = scrollable.position;
     if (!position.hasContentDimensions) return false;
 
-    // Objetivo: el borde superior de la sección a la altura del topbar + sticky hero si está activo
+    // Objetivo: el borde superior de la sección a la altura del topbar + hero
+    // compacto sticky si está activo. Un único token (compactHeroHeight),
+    // compartido con la reserva de home_screen y el pintado de hero_banner.
     final double sectionTop = object.localToGlobal(Offset.zero).dy;
-    final double stickyHeroHeight = position.pixels > 250 ? 205.0 : 0.0;
+    final double stickyHeroHeight = position.pixels > 250
+        ? TVResponsiveUtils.compactHeroHeight(context)
+        : 0.0;
     final double desiredTop = TVResponsiveUtils.topBarHeight(context) + stickyHeroHeight;
     final double delta = sectionTop - desiredTop;
     if (delta.abs() < 1.0) return false;
