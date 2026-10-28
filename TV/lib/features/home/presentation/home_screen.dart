@@ -23,6 +23,7 @@ import '../../player/presentation/player_screen.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/focus/global_focus_nodes.dart';
+import '../../../shared/widgets/tv_scroll.dart';
 
 /// Senior TV Logic: Helpers de navegaciÃ³n globales para TV
 void openTVDetails(BuildContext context, MediaItem item, String uiCategory) {
@@ -125,12 +126,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
   double _scrollOffset = 0.0;
 
+  bool _isHeroCompact = false;
+
   @override
   void initState() {
     super.initState();
+    TvScroll.isCompactCallback = () => _isHeroCompact;
     _checkForUpdate();
+    for (final entry in _pillFocusNodes.entries) {
+      entry.value.addListener(() {
+        if (entry.value.hasFocus && mounted && _isHeroCompact) {
+          setState(() {
+            _isHeroCompact = false;
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+              );
+            }
+          });
+        }
+      });
+    }
     _scrollController.addListener(() {
       if (mounted) {
+        if (_scrollController.hasClients && _scrollController.offset < 0) {
+          _scrollController.jumpTo(0);
+        }
         setState(() => _scrollOffset = _scrollController.offset);
       }
     });
@@ -200,7 +223,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   void _exitRail() {
     final FocusNode? back = _railReturnNode;
     _railReturnNode = null;
-    if (back != null && back.context != null) {
+    if (back != null && back.context != null && back.canRequestFocus) {
       back.requestFocus();
       return;
     }
@@ -214,13 +237,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     for (final sec in rawSections) {
       if (sec.type == HomeSectionType.continueWatching || 
           sec.presentation == SectionPresentation.top10 || 
+          sec.presentation == SectionPresentation.top10Wide || 
           sec.presentation == SectionPresentation.wide || 
+          sec.presentation == SectionPresentation.expandablePoster || 
           sec.presentation == SectionPresentation.posterLarge) {
         tvSections.add(sec);
         if (sec.presentation == SectionPresentation.wide) {
           consecutiveWide++;
           if (consecutiveWide >= 2) consecutiveWide = 0;
-        } else if (sec.presentation == SectionPresentation.posterLarge) {
+        } else if (sec.presentation == SectionPresentation.posterLarge || 
+                   sec.presentation == SectionPresentation.expandablePoster || 
+                   sec.presentation == SectionPresentation.top10Wide || 
+                   sec.presentation == SectionPresentation.top10) {
           consecutiveWide = 0;
         }
       } else {
@@ -229,12 +257,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             id: '${sec.id}_large',
             type: sec.type,
             title: sec.title,
-            subtitle: sec.subtitle,
+            subtitle: null,
             items: sec.items,
             sportsItems: sec.sportsItems,
             brandItems: sec.brandItems,
-            presentation: SectionPresentation.posterLarge,
-            data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.posterLarge) : sec.data,
+            presentation: SectionPresentation.expandablePoster,
+            data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.expandablePoster) : sec.data,
             badge: sec.badge,
           ));
           consecutiveWide = 0;
@@ -243,7 +271,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             id: '${sec.id}_wide',
             type: sec.type,
             title: sec.title,
-            subtitle: sec.subtitle,
+            subtitle: null,
             items: sec.items,
             sportsItems: sec.sportsItems,
             brandItems: sec.brandItems,
@@ -282,7 +310,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     if (section.sportsItems != null && section.sportsItems!.isNotEmpty) {
       return SportsEventRow(
         title: section.title,
-        subtitle: section.subtitle,
+        subtitle: null,
         events: section.sportsItems!,
         horizontalPadding: horizontalPadding,
         // SportsCard navega a ContentSportScreen por defecto (onTap null).
@@ -303,28 +331,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
       case HomeSectionType.editorial:
       case HomeSectionType.discovery:
         final row = section.data as EditorialRow;
-        if (row.format == SectionPresentation.top10) {
-          return RepaintBoundary(
-            child: EditorialContentRow(
-              key: key,
-              title: row.title,
-              subtitle: row.subtitle,
-              items: row.items,
-              badge: row.badge,
-              forceTopDesign: true,
-              onItemTap: (item) => openTVDetails(context, item, 'inicio'),
-              onArrowRightOnLast: onArrowRightOnLast,
-              onArrowLeftOnFirst: onArrowLeftOnFirst,
-              onArrowDownToNext: onArrowDownToNext,
-              onArrowUpToPrev: onArrowUpToPrev,
-            ),
-          );
-        } else if (row.format == SectionPresentation.wide) {
+        if (row.format == SectionPresentation.top10 || 
+            row.format == SectionPresentation.top10Wide || 
+            section.presentation == SectionPresentation.top10 || 
+            section.presentation == SectionPresentation.top10Wide) {
           return RepaintBoundary(
             child: WideContentRow(
               key: key,
               title: row.title,
-              subtitle: row.subtitle,
+              subtitle: null,
+              isTop10Wide: true,
               items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
               onItemTap: (wideItem) => openTVDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
@@ -333,16 +349,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onArrowUpToPrev: onArrowUpToPrev,
             ),
           );
-        } else if (row.format == SectionPresentation.posterLarge) {
+        } else if (row.format == SectionPresentation.wide || section.presentation == SectionPresentation.wide) {
           return RepaintBoundary(
-            child: EditorialContentRow(
+            child: WideContentRow(
               key: key,
               title: row.title,
-              subtitle: row.subtitle,
-              items: row.items,
-              badge: row.badge,
-              format: SectionPresentation.posterLarge,
-              onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+              subtitle: null,
+              items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
+              onItemTap: (wideItem) => openTVDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
               onArrowDownToNext: onArrowDownToNext,
@@ -354,10 +368,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             child: EditorialContentRow(
               key: key,
               title: row.title,
-              subtitle: row.subtitle,
+              subtitle: null,
               items: row.items,
               badge: row.badge,
-              format: row.format,
+              format: SectionPresentation.expandablePoster,
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
@@ -427,28 +441,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
       case HomeSectionType.recommendation:
         final row = section.data as EditorialRow;
-        if (row.format == SectionPresentation.top10) {
+        if (row.format == SectionPresentation.top10 || 
+            row.format == SectionPresentation.top10Wide || 
+            section.presentation == SectionPresentation.top10 || 
+            section.presentation == SectionPresentation.top10Wide) {
           return RepaintBoundary(
-            child: EditorialContentRow(
+            child: WideContentRow(
               key: key,
               title: row.title,
-              subtitle: row.subtitle,
-              items: row.items,
-              badge: row.badge,
-              forceTopDesign: true,
-              onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+              subtitle: null,
+              isTop10Wide: true,
+              items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
+              onItemTap: (wideItem) => openTVDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
               onArrowDownToNext: onArrowDownToNext,
               onArrowUpToPrev: onArrowUpToPrev,
             ),
           );
-        } else if (row.format == SectionPresentation.wide) {
+        } else if (row.format == SectionPresentation.wide || section.presentation == SectionPresentation.wide) {
           return RepaintBoundary(
             child: WideContentRow(
               key: key,
               title: row.title,
-              subtitle: row.subtitle,
+              subtitle: null,
               items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
               onItemTap: (wideItem) => openTVDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
@@ -459,11 +475,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           );
         } else {
           return RepaintBoundary(
-            child: ContentRow(
+            child: EditorialContentRow(
               key: key,
               title: row.title,
-              subtitle: row.subtitle,
+              subtitle: null,
               items: row.items,
+              badge: row.badge,
+              format: SectionPresentation.expandablePoster,
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
@@ -529,93 +547,137 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
       backgroundColor: const Color(0xFF000000),
       body: Stack(
         children: [
-          CustomScrollView(
-            controller: _scrollController,
-            cacheExtent: 700,
-            slivers: [
-              // Espaciador superior. El hero es a sangre (arranca en y=0, como
-              // Prime Video) y el topbar se superpone con un degradado, así que
-              // aquí ya no se reserva su altura. SÃ³lo se reserva el hero
-              // compacto sticky cuando hay scroll: un Ãºnico token
-              // (compactHeroHeight) para pintado, reserva y anclaje.
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: _scrollOffset > 250
-                      ? TVResponsiveUtils.compactHeroHeight(context)
-                      : 0.0,
-                ),
+          // 1. Fondo fijo del Hero (backdrops inmersivos) siempre visible
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).size.height * 0.80,
+            child: heroBannerItemsAsync.when(
+              data: (displayItems) {
+                if (displayItems.isEmpty) return const HeroBannerSkeleton();
+
+                final bool shouldAutofocus = _isAppStartup && currentCategory == 'inicio';
+                if (shouldAutofocus) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) setState(() => _isAppStartup = false);
+                  });
+                }
+
+                return RepaintBoundary(
+                  child: HeroBanner(
+                    key: _heroKey,
+                    autofocus: shouldAutofocus,
+                    items: displayItems,
+                    currentCategory: currentCategory,
+                    isCompact: _isHeroCompact,
+                    // D-pad arriba desde el hero -> cápsula activa del topbar.
+                    pillFocusNode: _pillFocusNodes[currentCategory] ?? _pillFocusNodes['inicio'],
+                    // D-pad izquierda desde el hero (en Reproducir) -> left bar.
+                    onArrowLeft: _enterRail,
+                    // D-pad abajo desde el hero -> primera tarjeta de la 1ª sección.
+                    onArrowDown: () {
+                      setState(() {
+                        _isHeroCompact = true;
+                        if (_scrollController.hasClients) {
+                          _scrollController.animateTo(
+                            0,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutCubic,
+                          );
+                        }
+                      });
+                      if (_sectionRowKeys.isEmpty) return false;
+                      final state = _sectionRowKeys.first.currentState;
+                      if (state != null) {
+                        try {
+                          return (state as dynamic).focusFirstCard() == true;
+                        } catch (_) {}
+                      }
+                      return false;
+                    },
+                    onFocused: () {
+                      setState(() {
+                        _isHeroCompact = false;
+                        if (_scrollController.hasClients) {
+                          _scrollController.animateTo(
+                            0,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutCubic,
+                          );
+                        }
+                      });
+                    },
+                    onDetails: (item) => openTVDetails(context, item, currentCategory),
+                    onTrailer: (item) {
+                      if (item.trailerKey == null || item.trailerKey!.isEmpty) return;
+                      final youtubeUrl = item.trailerKey!.startsWith('http')
+                          ? item.trailerKey!
+                          : 'https://www.youtube.com/watch?v=${item.trailerKey}';
+                      if (context.mounted) {
+                        final uri = '/player/${Uri.encodeComponent(item.id)}'
+                            '?url=${Uri.encodeComponent(youtubeUrl)}'
+                            '&source=YouTube'
+                            '&episode=Trailer'
+                            '&category=${item.type.name}'
+                            '&title=${Uri.encodeComponent(item.title)}'
+                            '&posterUrl=${Uri.encodeComponent(item.posterUrl)}'
+                            '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}';
+                        context.push(uri);
+                      }
+                    },
+                  ),
+                );
+              },
+                loading: () => const HeroBannerSkeleton(),
+                error: (err, _) => Center(child: Text('Error: $err')),
               ),
+          ),
 
-              // 1. Banner Principal
-              heroBannerItemsAsync.when(
-                data: (displayItems) {
-                  if (displayItems.isEmpty) return const SliverToBoxAdapter(child: HeroBannerSkeleton());
-
-                  final bool shouldAutofocus = _isAppStartup && currentCategory == 'inicio';
-                  if (shouldAutofocus) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) setState(() => _isAppStartup = false);
-                    });
-                  }
-
-                  return SliverToBoxAdapter(
-                    child: RepaintBoundary(
-                      child: HeroBanner(
-                        key: _heroKey,
-                        autofocus: shouldAutofocus,
-                        items: displayItems,
-                        currentCategory: currentCategory,
-                        // D-pad arriba desde el hero -> cÃ¡psula activa del topbar.
-                        pillFocusNode: _pillFocusNodes[currentCategory] ?? _pillFocusNodes['inicio'],
-                        // D-pad abajo desde el hero -> primera tarjeta de la 1ª sección.
-                        onArrowDown: () {
-                          if (_sectionRowKeys.isEmpty) return false;
-                          final state = _sectionRowKeys.first.currentState;
-                          if (state != null) {
-                            try {
-                              return (state as dynamic).focusFirstCard() == true;
-                            } catch (_) {}
-                          }
-                          return false;
-                        },
-                        onFocused: () {
-                          // Centrar el hero al enfocarlo, con la misma cadencia que
-                          // las filas (300ms) para que la navegación sea uniforme.
-                          if (_scrollController.hasClients && _scrollController.offset > 1) {
-                            _scrollController.animateTo(
-                              0,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeOutQuart,
-                            );
-                          }
-                        },
-                        onDetails: (item) => openTVDetails(context, item, currentCategory),
-                        onTrailer: (item) {
-                          if (item.trailerKey == null || item.trailerKey!.isEmpty) return;
-                          final youtubeUrl = item.trailerKey!.startsWith('http')
-                              ? item.trailerKey!
-                              : 'https://www.youtube.com/watch?v=${item.trailerKey}';
-                          if (context.mounted) {
-                            final uri = '/player/${Uri.encodeComponent(item.id)}'
-                                '?url=${Uri.encodeComponent(youtubeUrl)}'
-                                '&source=YouTube'
-                                '&episode=Trailer'
-                                '&category=${item.type.name}'
-                                '&title=${Uri.encodeComponent(item.title)}'
-                                '&posterUrl=${Uri.encodeComponent(item.posterUrl)}'
-                                '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}';
-                            context.push(uri);
-                          }
-                        },
-                      ),
-                    ),
-                  );
+          // 2. CustomScrollView con ShaderMask vertical dinámico:
+          // En modo compacto, desvanece suavemente las tarjetas que se scrollean
+          // hacia arriba antes de invadir el texto y metadata del hero compacto.
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0.0, end: _isHeroCompact ? 1.0 : 0.0),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            builder: (context, compactAnim, child) {
+              final double fadeStart = 0.0 + (0.475 * compactAnim);
+              final double fadeEnd = 0.08 + (0.415 * compactAnim);
+              return ShaderMask(
+                shaderCallback: (Rect rect) {
+                  return LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: const [
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black,
+                      Colors.black,
+                    ],
+                    stops: [
+                      0.0,
+                      fadeStart,
+                      fadeEnd,
+                      1.0,
+                    ],
+                  ).createShader(rect);
                 },
-                loading: () => const SliverToBoxAdapter(child: HeroBannerSkeleton()),
-                error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err'))),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 0)),
+                blendMode: BlendMode.dstIn,
+                child: child!,
+              );
+            },
+            child: CustomScrollView(
+              controller: _scrollController,
+              cacheExtent: 700,
+              slivers: [
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: _isHeroCompact
+                        ? MediaQuery.of(context).size.height * 0.50
+                        : MediaQuery.of(context).size.height * 0.65,
+                  ),
+                ),
 
               // 2. Contenido dinámico
               if (currentCategory == 'inicio') 
@@ -684,7 +746,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                                       }
                                       return false;
                                     }
-                                  : null,
+                                  : () {
+                                      setState(() => _isHeroCompact = false);
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        if (mounted) {
+                                          _heroKey.currentState?.focusPlayButton();
+                                        }
+                                      });
+                                      return true;
+                                    },
                             ),
                           );
                         },
@@ -764,7 +834,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                                       }
                                       return false;
                                     }
-                                  : null,
+                                  : () {
+                                      setState(() => _isHeroCompact = false);
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        if (mounted) {
+                                          _heroKey.currentState?.focusPlayButton();
+                                        }
+                                      });
+                                      return true;
+                                    },
                             ),
                           );
                         },
@@ -783,31 +861,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
             ],
           ),
+          ),
 
-          // Sticky Compact Hero Header when scrolled down past full hero (~250px)
-          if (_scrollOffset > 250)
-            Positioned(
-              top: navHeight,
-              left: 0,
-              right: 0,
-              child: heroBannerItemsAsync.when(
-                data: (displayItems) {
-                  if (displayItems.isEmpty) return const SizedBox.shrink();
-                  return Material(
-                    color: Colors.black,
-                    elevation: 8,
-                    child: HeroBanner(
-                      isCompact: true,
-                      items: displayItems,
-                      currentCategory: currentCategory,
-                      onDetails: (item) => openTVDetails(context, item, currentCategory),
-                    ),
-                  );
-                },
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
-            ),
+
 
           // Overlay de busqueda (se muestra encima del contenido, debajo de la topbar)
           if (_showSearch)
@@ -851,159 +907,139 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     // Prime (§1.2): el nav va en y 54..101 encima del hero (que es a sangre
     // desde y=0). Dentro del bloque de 108 px se baja 48 px para que el
     // centrado de la fila deje el pill en esa banda exacta.
-    return Container(
-      height: navHeight,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          // Scrim para que el nav se lea sobre el arte del hero. Con el
-          // buscador abierto el bloque pasa a negro sólido (Prime cubre
-          // todo el hero con negro).
-          colors: _showSearch
-              ? const [Color(0xFF000000), Color(0xFF000000)]
-              : const [Color(0xD9000000), Color(0x00000000)],
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.only(top: TVResponsiveUtils.grid(context, 48)),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Categorías alineadas a la izquierda (Prime arranca en x=144).
-              _PillNavBar(
-                currentCategory: currentCategory,
-                isSearchActive: _showSearch,
-                onCategoryChanged: (cat) {
-                  if (_showSearch) setState(() => _showSearch = false);
-                  ref.read(homeCategoryProvider.notifier).state = cat;
-                },
-                focusNodes: _pillFocusNodes,
-                // D-pad IZQUIERDA desde la primera categoría -> left bar.
-                onLeftOnFirst: _enterRail,
-              ),
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 300),
+      opacity: _isHeroCompact ? 0.0 : 1.0,
+      curve: Curves.easeOutCubic,
+      child: IgnorePointer(
+        ignoring: _isHeroCompact,
+        child: Container(
+          height: navHeight,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              // Scrim para que el nav se lea sobre el arte del hero. Con el
+              // buscador abierto el bloque pasa a negro sólido (Prime cubre
+              // todo el hero con negro).
+              colors: _showSearch
+                  ? const [Color(0xFF000000), Color(0xFF000000)]
+                  : const [Color(0xD9000000), Color(0x00000000)],
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(top: TVResponsiveUtils.grid(context, 48)),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Categorías alineadas a la izquierda (Prime arranca en x=144).
+                  _PillNavBar(
+                    currentCategory: currentCategory,
+                    isSearchActive: _showSearch,
+                    onCategoryChanged: (cat) {
+                      if (_showSearch) setState(() => _showSearch = false);
+                      ref.read(homeCategoryProvider.notifier).state = cat;
+                    },
+                    focusNodes: _pillFocusNodes,
+                    // D-pad IZQUIERDA desde la primera categoría -> left bar.
+                    onLeftOnFirst: _enterRail,
+                  ),
 
-              const Spacer(),
+                  const Spacer(),
 
-              // Horarios + marca: Prime no tiene nada a la derecha, Auris
-              // conserva estos dos elementos hasta decidir si pasan al left bar.
-              _FocusIconButton(
-                icon: AurisIcons.grid,
-                size: TVResponsiveUtils.grid(context, 26),
-                onPressed: () => context.push('/schedule'),
-              ),
-              SizedBox(width: TVResponsiveUtils.grid(context, 24)),
+                  // Horarios + marca: Prime no tiene nada a la derecha, Auris
+                  // conserva estos dos elementos hasta decidir si pasan al left bar.
+                  _FocusIconButton(
+                    icon: AurisIcons.grid,
+                    size: TVResponsiveUtils.grid(context, 26),
+                    onPressed: () => context.push('/schedule'),
+                  ),
+                  SizedBox(width: TVResponsiveUtils.grid(context, 24)),
 
-              // Logo AurisTV en el extremo derecho
-              SvgPicture.asset(
-                'assets/icons/auris-tv-icon.svg',
-                height: logoHeight,
-                colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                  // Logo AurisTV en el extremo derecho
+                  SvgPicture.asset(
+                    'assets/icons/auris-tv-icon.svg',
+                    height: logoHeight,
+                    colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildUserAvatar(BuildContext context, double size) {
+  Widget _buildUserAvatar(BuildContext context, double size, bool focused) {
     return Consumer(
       builder: (context, ref, _) {
         final user = ref.watch(authProvider);
         return _UserAvatarFocusable(
-          focusNode: homeProfileIconFocusNode,
           user: user,
           size: size,
-          onPressed: () => context.go('/profile'),
+          focused: focused,
         );
       },
     );
   }
 }
 
-class _UserAvatarFocusable extends StatefulWidget {
-  final FocusNode? focusNode;
+class _UserAvatarFocusable extends StatelessWidget {
   final dynamic user;
   final double? size;
-  final VoidCallback onPressed;
+  final bool focused;
 
   const _UserAvatarFocusable({
-    this.focusNode,
     required this.user,
     this.size,
-    required this.onPressed,
+    required this.focused,
   });
 
   @override
-  State<_UserAvatarFocusable> createState() => _UserAvatarFocusableState();
-}
-
-class _UserAvatarFocusableState extends State<_UserAvatarFocusable> {
-  bool _focused = false;
-
-  @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: widget.focusNode,
-      onFocusChange: (f) => setState(() => _focused = f),
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.enter ||
-              event.logicalKey == LogicalKeyboardKey.select ||
-              event.logicalKey == LogicalKeyboardKey.space) {
-            widget.onPressed();
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          width: widget.size ?? TVResponsiveUtils.navPillHeight(context),
-          height: widget.size ?? TVResponsiveUtils.navPillHeight(context),
-          decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(TVResponsiveUtils.grid(context, 8.0)), // Avatar cuadrado redondeado clásico de Netflix
-            border: Border.all(
-              color: _focused ? Colors.white : Colors.white24,
-              width: _focused ? 2.5 : 1.5,
-            ),
-            boxShadow: _focused
-                ? const [
-                    BoxShadow(
-                      color: Color(0x44FFFFFF),
-                      blurRadius: 10.0,
-                      spreadRadius: 1.0,
-                    ),
-                  ]
-                : null,
-            image: widget.user?.photoUrl != null
-                ? DecorationImage(
-                    image: widget.user.photoUrl!.startsWith('assets/')
-                        ? AssetImage(widget.user.photoUrl!) as ImageProvider
-                        : NetworkImage(widget.user.photoUrl!),
-                    fit: BoxFit.cover,
-                  )
-                : null,
-          ),
-          child: widget.user?.photoUrl == null
-              ? Center(
-                  child: AurisIcon(
-                    AurisIcons.user,
-                    // 42 % del cuerpo del avatar (grid(20) cuando mide 48).
-                    size: (widget.size ?? TVResponsiveUtils.navPillHeight(context)) * 0.42,
-                    color: _focused ? Colors.white : Colors.white70,
-                  ),
-                )
-              : null,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      width: size ?? TVResponsiveUtils.navPillHeight(context),
+      height: size ?? TVResponsiveUtils.navPillHeight(context),
+      decoration: BoxDecoration(
+        borderRadius:
+            BorderRadius.circular(TVResponsiveUtils.grid(context, 8.0)), // Avatar cuadrado redondeado clásico de Netflix
+        border: Border.all(
+          color: focused ? Colors.white : Colors.white24,
+          width: focused ? 2.5 : 1.5,
         ),
+        boxShadow: focused
+            ? const [
+                BoxShadow(
+                  color: Color(0x44FFFFFF),
+                  blurRadius: 10.0,
+                  spreadRadius: 1.0,
+                ),
+              ]
+            : null,
+        image: user?.photoUrl != null
+            ? DecorationImage(
+                image: user.photoUrl!.startsWith('assets/')
+                    ? AssetImage(user.photoUrl!) as ImageProvider
+                    : NetworkImage(user.photoUrl!),
+                fit: BoxFit.cover,
+              )
+            : null,
       ),
+      child: user?.photoUrl == null
+          ? Center(
+              child: AurisIcon(
+                AurisIcons.user,
+                // 42 % del cuerpo del avatar (grid(20) cuando mide 48).
+                size: (size ?? TVResponsiveUtils.navPillHeight(context)) * 0.42,
+                color: focused ? Colors.white : Colors.white70,
+              ),
+            )
+          : null,
     );
   }
 }
@@ -1260,7 +1296,7 @@ class _LeftRail extends StatefulWidget {
   final VoidCallback onSearch;
   final VoidCallback onLibrary;
   final VoidCallback onExitRight;
-  final Widget Function(BuildContext context, double size) avatarBuilder;
+  final Widget Function(BuildContext context, double size, bool focused) avatarBuilder;
 
   const _LeftRail({
     required this.profileNode,
@@ -1298,12 +1334,13 @@ class _LeftRailState extends State<_LeftRail> {
   }
 
   void _activate(int i) {
-    if (i == 1) {
+    if (i == 0) {
+      context.go('/profile');
+    } else if (i == 1) {
       widget.onSearch();
     } else if (i == 2) {
       widget.onLibrary();
     }
-    // i == 0 lo gestiona el propio avatar (_UserAvatarFocusable).
   }
 
   @override
@@ -1372,7 +1409,7 @@ class _LeftRailState extends State<_LeftRail> {
     final bool focused = _rowFocus[i];
 
     final Widget icon = i == 0
-        ? widget.avatarBuilder(context, box)
+        ? widget.avatarBuilder(context, box, focused)
         : Container(
             width: box,
             height: box,
@@ -1391,9 +1428,7 @@ class _LeftRailState extends State<_LeftRail> {
     return SizedBox(
       height: box,
       child: Focus(
-        // La fila 0 deja el nodo interno al avatar; este Focus sólo amplía
-        // el área de foco y recoge las teclas que el avatar no maneja.
-        focusNode: i == 0 ? null : _nodes[i],
+        focusNode: _nodes[i],
         onFocusChange: (f) => _setRowFocus(i, f),
         onKeyEvent: (node, event) {
           if (event is! KeyDownEvent) return KeyEventResult.ignored;
@@ -1410,10 +1445,9 @@ class _LeftRailState extends State<_LeftRail> {
             widget.onExitRight();
             return KeyEventResult.handled;
           }
-          if (i > 0 &&
-              (key == LogicalKeyboardKey.enter ||
-                  key == LogicalKeyboardKey.select ||
-                  key == LogicalKeyboardKey.space)) {
+          if (key == LogicalKeyboardKey.enter ||
+              key == LogicalKeyboardKey.select ||
+              key == LogicalKeyboardKey.space) {
             _activate(i);
             return KeyEventResult.handled;
           }
@@ -1559,19 +1593,29 @@ class _Top10Section extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncData = ref.watch(top10GlobalProvider);
     return asyncData.when(
-      data: (items) => EditorialContentRow(
+      data: (items) => WideContentRow(
         key: rowKey,
         title: title,
-        items: items,
-        badge: EditorialBadge.mythical,
-        forceTopDesign: true,
-        onItemTap: (item) => openTVDetails(context, item, 'inicio'),
+        isTop10Wide: true,
+        items: items.map((m) => WideContentItem(
+          id: m.id,
+          title: m.title,
+          imageUrl: ApiEndpoints.proxyImage(
+            m.bannerUrl ?? m.posterUrl,
+            width: 1280,
+          ),
+          logoUrl: m.logoUrl,
+          rating: formatRating(m.rating),
+          originalItem: m,
+          isBannerFallback: m.isBannerFallback,
+        )).toList(),
+        onItemTap: (wide) => openTVDetails(context, wide.originalItem as MediaItem, 'inicio'),
         onArrowRightOnLast: onArrowRightOnLast,
         onArrowLeftOnFirst: onArrowLeftOnFirst,
         onArrowDownToNext: onArrowDownToNext,
         onArrowUpToPrev: onArrowUpToPrev,
       ),
-      loading: () => const RowSkeleton(),
+      loading: () => const RowSkeleton(isWide: true),
       error: (_, __) => const SizedBox.shrink(),
     );
   }

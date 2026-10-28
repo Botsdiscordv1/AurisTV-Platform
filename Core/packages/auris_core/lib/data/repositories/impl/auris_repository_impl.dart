@@ -955,11 +955,13 @@ class AurisRepositoryImpl implements AurisRepository {
     final items = (response.data['data']?['items'] as List?) ?? [];
     return items.map((e) {
       final m = e as Map<String, dynamic>;
+      final String? rawBanner = m['bannerUrl'] as String? ?? m['banner'] as String? ?? m['backdrop'] as String? ?? m['backdropUrl'] as String? ?? m['backdrop_url'] as String?;
+      final String? rawPoster = m['posterUrl'] as String? ?? m['poster'] as String? ?? m['thumbnail'] as String? ?? m['poster_url'] as String?;
       return MediaItem(
         id: m['url'] ?? m['id'] ?? '',
         title: m['title'] ?? '',
-        posterUrl: m['posterUrl'] as String? ?? '',
-        bannerUrl: m['bannerUrl'] as String?,
+        posterUrl: rawPoster ?? '',
+        bannerUrl: rawBanner,
         type: MediaType.anime,
         source: m['source'] ?? '',
         year: m['year'],

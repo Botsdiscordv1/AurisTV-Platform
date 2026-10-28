@@ -1496,19 +1496,31 @@ class TrendingListNotifier extends FamilyAsyncNotifier<List<MediaItem>, String> 
     return MediaType.anime;
   }
 
-  MediaItem _mapJsonToMediaItem(Map<String, dynamic> json) => MediaItem(
-    id: json['id'], title: json['title'], posterUrl: json['posterUrl'], bannerUrl: json['bannerUrl'],
-    logoUrl: json['logoUrl'], type: _mediaTypeFromJson(json['type']), rating: json['rating'],
-    year: json['year'], synopsis: json['synopsis'], romaji: json['romaji'], english: json['english'],
-    genres: (json['genres'] as List?)?.map((e) => e.toString()).toList() ?? const [],
-    certification: json['certification'] as String?,
-    available: (json['available'] as bool?) ?? true,
-    detailUrl: json['detailUrl'] as String?,
-    tmdbId: (json['tmdbId'] as num?)?.toInt(),
-    episode: (json['episode'] as num?)?.toInt(),
-    airingAt: (json['airingAt'] as num?)?.toInt(),
-    trailerKey: json['trailerKey'] as String?, // Senior Fix: Restaurar trailer en cache
-  );
+  MediaItem _mapJsonToMediaItem(Map<String, dynamic> json) {
+    final String? rawBanner = json['bannerUrl'] as String? ?? json['banner'] as String? ?? json['backdrop'] as String? ?? json['backdropUrl'] as String? ?? json['backdrop_url'] as String?;
+    final String? rawPoster = json['posterUrl'] as String? ?? json['poster'] as String? ?? json['thumbnail'] as String? ?? json['poster_url'] as String?;
+    return MediaItem(
+      id: json['id'],
+      title: json['title'],
+      posterUrl: rawPoster ?? '',
+      bannerUrl: rawBanner,
+      logoUrl: json['logoUrl'] as String? ?? json['logo'] as String?,
+      type: _mediaTypeFromJson(json['type']),
+      rating: json['rating'],
+      year: json['year'],
+      synopsis: json['synopsis'],
+      romaji: json['romaji'],
+      english: json['english'],
+      genres: (json['genres'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      certification: json['certification'] as String?,
+      available: (json['available'] as bool?) ?? true,
+      detailUrl: json['detailUrl'] as String?,
+      tmdbId: (json['tmdbId'] as num?)?.toInt(),
+      episode: (json['episode'] as num?)?.toInt(),
+      airingAt: (json['airingAt'] as num?)?.toInt(),
+      trailerKey: json['trailerKey'] as String?, // Senior Fix: Restaurar trailer en cache
+    );
+  }
 }
 
 final homePrefetchProvider = FutureProvider<void>((ref) async {

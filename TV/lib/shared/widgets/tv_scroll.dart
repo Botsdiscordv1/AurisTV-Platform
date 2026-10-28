@@ -6,6 +6,7 @@ import '../../core/utils/tv_responsive_utils.dart';
 
 /// Scroll de carruseles de TV.
 class TvScroll {
+  static bool Function()? isCompactCallback;
   /// Ancla en la ranura inicial del carrusel: la tarjeta enfocada queda en la
   /// MISMA posición de pantalla que ocupa la primera tarjeta al inicio de la
   /// fila (borde izquierdo en el margen horizontal de la fila). La fila avanza
@@ -105,19 +106,32 @@ class TvScroll {
     final ScrollPosition position = scrollable.position;
     if (!position.hasContentDimensions) return false;
 
-    // Objetivo: el borde superior de la sección a la altura del topbar + hero
-    // compacto sticky si está activo. Un único token (compactHeroHeight),
-    // compartido con la reserva de home_screen y el pintado de hero_banner.
-    final double sectionTop = object.localToGlobal(Offset.zero).dy;
-    final double stickyHeroHeight = position.pixels > 250
-        ? TVResponsiveUtils.compactHeroHeight(context)
-        : 0.0;
-    final double desiredTop = TVResponsiveUtils.topBarHeight(context) + stickyHeroHeight;
-    final double delta = sectionTop - desiredTop;
-    if (delta.abs() < 1.0) return false;
+    // Objetivo: el borde superior de la sección a la altura del topbar o bajo el hero compacto.
+    final RenderAbstractViewport? viewport =
+        RenderAbstractViewport.maybeOf(object);
 
-    final double target = (position.pixels + delta)
-        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    final double desiredTop = (isCompactCallback?.call() == true)
+        ? MediaQuery.of(context).size.height * 0.50
+        : TVResponsiveUtils.topBarHeight(context);
+
+    double target;
+    if (viewport != null) {
+      final double contentTop = viewport.getOffsetToReveal(object, 0.0).offset;
+      // La primera sección del Home está precedida únicamente por el spacer del Hero.
+      // Su destino ideal bajo el hero compacto es siempre el origen del scroll (offset 0.0).
+      final double heroThreshold = MediaQuery.of(context).size.height * 0.66;
+      if (contentTop <= heroThreshold && (isCompactCallback?.call() == true)) {
+        target = 0.0;
+      } else {
+        target = (contentTop - desiredTop)
+            .clamp(position.minScrollExtent, position.maxScrollExtent);
+      }
+    } else {
+      final double sectionTop = object.localToGlobal(Offset.zero).dy;
+      final double delta = sectionTop - desiredTop;
+      target = (position.pixels + delta)
+          .clamp(position.minScrollExtent, position.maxScrollExtent);
+    }
     final double travel = (target - position.pixels).abs();
     if (travel < 1.0) return false;
     // Duración proporcional al recorrido (estilo Leanback/Netflix

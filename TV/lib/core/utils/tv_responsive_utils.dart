@@ -243,26 +243,7 @@ class TVResponsiveUtils {
     return grid(context, 42.0 * heroHeightRatio); // ≈ 33
   }
 
-  /// Altura por defecto del contenedor del Hero compacto.
-  ///
-  /// **Prime Video no tiene equivalente**: al hacer scroll el hero simplemente
-  /// se va con la página (ver §1.3 de PRIMEVIDEO_UI_MEDIDAS.md). Auris conserva
-  /// su sticky compacto propio, pero con **un único token** — antes se usaban
-  /// 235 (reserva en home_screen), 205 (anclaje en tv_scroll) y 275 (pintado
-  /// en hero_banner) para lo mismo.
-  static double compactHeroHeight(BuildContext context) {
-    return grid(context, 275.0);
-  }
 
-  /// Altura por defecto del logo en el Hero compacto
-  static double compactHeroLogoHeight(BuildContext context) {
-    return heroLogoHeight(context) * 0.75;
-  }
-
-  /// Tamaño de fuente por defecto del título en el Hero compacto (cuando no hay logo)
-  static double compactHeroTitleFontSize(BuildContext context) {
-    return grid(context, 34.0);
-  }
 
   /// Ancho máximo de seguridad (4K)
   static const double maxContentWidth = 3840.0;

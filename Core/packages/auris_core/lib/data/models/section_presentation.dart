@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 enum SectionPresentation {
   wide,
   poster,
@@ -33,6 +35,7 @@ class SectionPresentationResolver {
     
     // 1. BASE ASSIGNMENT (Structural Intent)
     if (typeLower.contains('top10_wide') || typeLower.contains('top10wide') || idLower.contains('top10_wide') || idLower.contains('top10wide')) {
+      debugPrint('📺 [SectionPresentationResolver] Resolved to TOP10_WIDE for type="$type", id="$id"');
       return SectionPresentation.top10Wide;
     } else if (typeLower == 'editorial_for_you' || 
         typeLower.contains('top10') || 
@@ -40,6 +43,7 @@ class SectionPresentationResolver {
         typeLower.contains('ranking') ||
         idLower.contains('top 10') ||
         idLower.contains('ranking')) {
+      debugPrint('📱 [SectionPresentationResolver] Resolved to standard TOP10 (Poster) for type="$type", id="$id"');
       return SectionPresentation.top10;
     } else if (typeLower.contains('watching') || 
                typeLower.contains('continue') ||
