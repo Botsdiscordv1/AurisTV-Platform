@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:auris_core/auris_core.dart' hide FocusableWideCard;
+import 'package:auris_core/auris_core.dart' hide FocusableWideCard, FocusableTop10WideCard;
+import '../../../shared/widgets/focusable_top10_wide_card.dart';
 import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/focusable_wide_card.dart';
 import '../../../shared/widgets/tv_scroll.dart';
@@ -42,6 +43,7 @@ class WideContentRow extends StatefulWidget {
   final List<WideContentItem> items;
   final void Function(WideContentItem item) onItemTap;
   final bool? hasSubtitle;
+  final bool isTop10Wide;
   final bool Function()? onArrowRightOnLast;
   final bool Function()? onArrowLeftOnFirst;
   /// D-pad abajo: enfoca la ultima tarjeta con foco en la seccion siguiente.
@@ -56,6 +58,7 @@ class WideContentRow extends StatefulWidget {
     required this.items,
     required this.onItemTap,
     this.hasSubtitle,
+    this.isTop10Wide = false,
     this.onArrowRightOnLast,
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
@@ -182,14 +185,35 @@ class WideContentRowState extends State<WideContentRow>
 
   /// Ancla la tarjeta [index] en la posicion visual fija (padding izquierdo).
   /// El borde blanco permanece fijo; las tarjetas se desplazan debajo.
+  ///
+  /// Para filas top10Wide, el ancho visual de cada item incluye la parte
+  /// visible del numero gigante que sobresale a la izquierda de la tarjeta:
+  ///   - Rank 1   -> cardWidth * 0.18
+  ///   - Rank 2-9 -> cardWidth * 0.28
+  ///   - Rank 10  -> cardWidth * 0.36
   void _scrollToIndex(int index, double cardWidth) {
     if (!_scrollController.hasClients) return;
-    const double spacing = 14.0;
-    final double targetOffset = index * (cardWidth + spacing);
+    final double gap = TVResponsiveUtils.cardGap(context);
+    double targetOffset;
+    if (widget.isTop10Wide) {
+      // Acumulamos el offset real sumando el ancho de cada item anterior
+      double offset = 0.0;
+      for (int i = 0; i < index; i++) {
+        final int rank = i + 1;
+        final double numberVisiblePart = rank == 1
+            ? cardWidth * 0.18
+            : rank >= 10
+                ? cardWidth * 0.36
+                : cardWidth * 0.28;
+        offset += numberVisiblePart + cardWidth + gap;
+      }
+      targetOffset = offset;
+    } else {
+      targetOffset = index * (cardWidth + gap);
+    }
     final double maxScroll = _scrollController.position.maxScrollExtent;
-    final double clampedOffset = targetOffset.clamp(0.0, maxScroll);
     _scrollController.animateTo(
-      clampedOffset,
+      targetOffset.clamp(0.0, maxScroll),
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
     );
@@ -315,18 +339,35 @@ class WideContentRowState extends State<WideContentRow>
                         widget.items.any(
                             (i) => i.subtitle != null && i.subtitle!.isNotEmpty);
                     return SizedBox(
-                      height: TVResponsiveUtils.bannerRowHeight(
-                        context,
-                        hasSubtitle: hasSubtitle,
-                        subtitleLines: 2,
-                      ),
-                      child: NotificationListener<ScrollNotification>(
-                        onNotification: (notification) {
-                          _updateScrollIndicators();
-                          return false;
+                      height: widget.isTop10Wide
+                          ? cardHeight + 20
+                          : TVResponsiveUtils.bannerRowHeight(
+                              context,
+                              hasSubtitle: hasSubtitle,
+                              subtitleLines: 2,
+                            ),
+                      child: ShaderMask(
+                        shaderCallback: (Rect rect) {
+                          return LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: const [
+                              Colors.transparent,
+                              Colors.black,
+                              Colors.black,
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.03, 0.97, 1.0],
+                          ).createShader(rect);
                         },
-                        // Nodo unico que captura todo el D-PAD de la fila
-                        child: Focus(
+                        blendMode: BlendMode.dstIn,
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: (notification) {
+                            _updateScrollIndicators();
+                            return false;
+                          },
+                          // Nodo unico que captura todo el D-PAD de la fila
+                          child: Focus(
                           focusNode: _rowFocusNode,
                           onFocusChange: (focused) {
                             if (!mounted) return;
@@ -374,13 +415,28 @@ class WideContentRowState extends State<WideContentRow>
                               final item = widget.items[index];
                               final bool isSelected = _focusedIndex == index;
 
-                              // El foco real vive en _rowFocusNode. El anillo
-                              // Disney+ lo dibuja la propia tarjeta y viaja con
-                              // ella al hacer scroll (antes era un marco fijo
-                              // estilo Prime anclado a la fila).
-                              return Align(
-                                alignment: Alignment.topCenter,
-                                child: FocusableWideCard(
+                              Widget cardWidget;
+                              if (widget.isTop10Wide) {
+                                cardWidget = FocusableTop10WideCard(
+                                  key: ValueKey(item.id),
+                                  rank: index + 1,
+                                  title: item.title,
+                                  imageUrl: item.imageUrl,
+                                  logoUrl: item.logoUrl,
+                                  onTap: () => widget.onItemTap(item),
+                                  subtitle: item.subtitle,
+                                  rating: item.rating,
+                                  progress: item.progress,
+                                  badgeOverlay: item.badgeOverlay,
+                                  isBannerFallback: item.isBannerFallback,
+                                  forceSelected: isSelected,
+                                  showBorder: true,
+                                  focusNode: _dummyNodes[index],
+                                  width: cardWidth,
+                                  height: cardHeight,
+                                );
+                              } else {
+                                cardWidget = FocusableWideCard(
                                   key: ValueKey(item.id),
                                   focusNode: _dummyNodes[index],
                                   disableAutoEnsureVisible: true,
@@ -399,9 +455,15 @@ class WideContentRowState extends State<WideContentRow>
                                   height: cardHeight,
                                   onTap: () => widget.onItemTap(item),
                                   onDelete: item.onDelete,
-                                ),
+                                );
+                              }
+
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: cardWidget,
                               );
                             },
+                          ),
                           ),
                         ),
                       ),

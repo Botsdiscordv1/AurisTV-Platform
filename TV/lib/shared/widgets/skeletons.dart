@@ -142,10 +142,10 @@ class HeroBannerSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
     final double horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
-    final double aspectRatio = TVResponsiveUtils.heroAspectRatio(context);
 
-    return AspectRatio(
-      aspectRatio: aspectRatio,
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.80,
+      width: screenWidth,
       child: Container(
         color: const Color(0xFF000000),
         child: Stack(

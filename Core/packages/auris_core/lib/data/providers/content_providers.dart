@@ -663,12 +663,49 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
   final List<SearchResult> searchSources = [];
   final targetSeason = params.season ?? extractSeason(params.title);
 
-  void addResult(SearchResult r) {
+  final bool targetIsMovie = params.category.toLowerCase().contains('movie') ||
+      params.category.toLowerCase().contains('pelicula') ||
+      params.kind?.toLowerCase().contains('movie') == true ||
+      params.kind?.toLowerCase().contains('pelicula') == true ||
+      params.type?.toLowerCase().contains('movie') == true;
+
+  bool isCandidateMovie(SearchResult r) {
+    if (isMovieResult(r)) return true;
+    final k = (r.kind ?? '').toLowerCase();
+    if (k == 'movie') return true;
+    final q = (r.quality ?? '').toLowerCase();
+    if (q.contains('película') || q.contains('pelicula')) return true;
+    return false;
+  }
+
+  void addResult(SearchResult r, {bool isDiscovered = false}) {
+    if (isDiscovered) {
+      // 1. Filtro estricto de tipo (película vs serie)
+      final rMovie = isCandidateMovie(r);
+      if (targetIsMovie && !rMovie && ((r.kind ?? '').toLowerCase() == 'series' || (r.quality ?? '').toLowerCase().contains('serie'))) {
+        return;
+      }
+      if (!targetIsMovie && rMovie) {
+        return;
+      }
+
+      // 2. Filtro de URLs de catálogo/listado y títulos de navegación web
+      if (isListingUrl(r.url) || isNavTitle(r.title)) {
+        return;
+      }
+
+      // 3. Coherencia de título con la obra de la tarjeta
+      if (!isTitleCompatible(params.title, r.title, metadataTitle: params.metadataTitle)) {
+        return;
+      }
+    }
+
     final itemSources = r.sources.isNotEmpty ? r.sources : [SourceItem(source: r.source, url: r.url, quality: r.quality)];
     for (final s in itemSources) {
       if (s.source.isEmpty || s.source.toUpperCase() == 'TMDB' || s.source.toUpperCase() == 'ANILIST' || s.source.toUpperCase() == 'TRAKT') continue;
       // URL numérica (ej. "9" de HomeItem TMDB sin url real) no es fuente válida
       if (s.url.isEmpty || RegExp(r'^\d+$').hasMatch(s.url.trim())) continue;
+      if (isDiscovered && isListingUrl(s.url)) continue;
       // Variantes descubiertas (mini/spin-off) no pisan la lista curada.
       if (isRogueVariant(s, params.initialSources)) continue;
       final rSeason = r.season ?? extractSeason(r.title) ?? extractSeason(r.url);
@@ -677,9 +714,9 @@ final discoveredSourcesProvider = Provider.family<List<SearchResult>, Discovered
     }
   }
 
-  if (params.initialSources != null) { for (final r in params.initialSources!) { addResult(r); } }
+  if (params.initialSources != null) { for (final r in params.initialSources!) { addResult(r, isDiscovered: false); } }
   final searchData = searchAsync.valueOrNull;
-  if (searchData != null) { for (final r in searchData.results) { addResult(r); } }
+  if (searchData != null) { for (final r in searchData.results) { addResult(r, isDiscovered: true); } }
   return searchSources;
 });
 

@@ -216,65 +216,81 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                   builder: (context, constraints) {
                     return SizedBox(
                       height: rowHeight,
-                      child: NotificationListener<ScrollNotification>(
-                        onNotification: (notification) {
-                          _updateScrollIndicators();
-                          return false;
+                      child: ShaderMask(
+                        shaderCallback: (Rect rect) {
+                          return LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: const [
+                              Colors.transparent,
+                              Colors.black,
+                              Colors.black,
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.03, 0.97, 1.0],
+                          ).createShader(rect);
                         },
-                        child: Focus(
-                          canRequestFocus: false, // La lista no atrapa el foco
-                          onFocusChange: (focused) {
-                            if (focused && mounted) {
-                              TvScroll.anchorSectionBelowTopbar(this.context);
-                              TvScroll.anchorSectionBelowTopbarDeferred(this.context);
-                            }
+                        blendMode: BlendMode.dstIn,
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: (notification) {
+                            _updateScrollIndicators();
+                            return false;
                           },
-                          child: ListView.separated(
-                            controller: _scrollController,
-                            physics: const ClampingScrollPhysics(),
-                            cacheExtent: 1000,
-                            clipBehavior: Clip.none,
-                            scrollDirection: Axis.horizontal,
-                            primary: false, 
-                            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), 
-                            itemCount: widget.items.length,
-                            separatorBuilder: (_, __) =>
-                                SizedBox(width: TVResponsiveUtils.cardGap(context)),
-                            itemBuilder: (context, index) {
-                              final item = widget.items[index];
-                              return SizedBox(
-                                width: cardWidth,
-                                child: FocusablePosterCard(
-                                  key: ValueKey(item.id),
-                                  focusNode: _itemFocusNodes[index],
-                                  onKeyEvent: (node, event) {
-                                    if (event is KeyDownEvent) {
-                                      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                                        if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
-                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                                        if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
-                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
-                                        if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
-                                      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
-                                        if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
-                                      }
-                                    }
-                                    return KeyEventResult.ignored;
-                                  },
-                                  title: item.title,
-                                  posterUrl: item.posterUrl,
-                                  rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
-                                  subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : null, // Senior: Ocultar año
-                                  showInfo: false,
-                                  onTap: () => widget.onItemTap(item),
-                                ),
-                              );
+                          child: Focus(
+                            canRequestFocus: false, // La lista no atrapa el foco
+                            onFocusChange: (focused) {
+                              if (focused && mounted) {
+                                TvScroll.anchorSectionBelowTopbar(this.context);
+                                TvScroll.anchorSectionBelowTopbarDeferred(this.context);
+                              }
                             },
+                            child: ListView.separated(
+                              controller: _scrollController,
+                              physics: const ClampingScrollPhysics(),
+                              cacheExtent: 1000,
+                              clipBehavior: Clip.none,
+                              scrollDirection: Axis.horizontal,
+                              primary: false, 
+                              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 0), 
+                              itemCount: widget.items.length,
+                              separatorBuilder: (_, __) =>
+                                  SizedBox(width: TVResponsiveUtils.cardGap(context)),
+                              itemBuilder: (context, index) {
+                                final item = widget.items[index];
+                                return SizedBox(
+                                  width: cardWidth,
+                                  child: FocusablePosterCard(
+                                    key: ValueKey(item.id),
+                                    focusNode: _itemFocusNodes[index],
+                                    onKeyEvent: (node, event) {
+                                      if (event is KeyDownEvent) {
+                                        if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                          if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
+                                        } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                                          if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
+                                        } else if (event.logicalKey == LogicalKeyboardKey.arrowRight && index == widget.items.length - 1) {
+                                          if (widget.onArrowRightOnLast?.call() == true) return KeyEventResult.handled;
+                                        } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft && index == 0) {
+                                          if (widget.onArrowLeftOnFirst?.call() == true) return KeyEventResult.handled;
+                                        }
+                                      }
+                                      return KeyEventResult.ignored;
+                                    },
+                                    title: item.title,
+                                    posterUrl: item.posterUrl,
+                                    rating: (item.episode == null || item.episode == 0) ? formatRating(item.rating) : null,
+                                    subtitle: (item.episode != null && item.episode! > 0) ? 'Episodio ${item.episode}' : null, // Senior: Ocultar año
+                                    showInfo: false,
+                                    onTap: () => widget.onItemTap(item),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
                     );
-                  }
+                  },
                 ),
                 
                 // Flecha Izquierda

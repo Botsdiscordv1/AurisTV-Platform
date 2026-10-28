@@ -67,7 +67,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
       node.addListener(() {
         if (node.hasFocus) {
           _lastFocusedIndex = index;
-          final bool isLarge = widget.format == SectionPresentation.posterLarge;
+          final bool isLarge = widget.format == SectionPresentation.posterLarge || widget.format == SectionPresentation.expandablePoster;
           final double cWidth = isLarge ? TVResponsiveUtils.largePosterWidth(context) : TVResponsiveUtils.posterWidth(context);
           _scrollToCard(index, cWidth);
         }
@@ -176,7 +176,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     final isMobile = false;
     final horizontalPadding = TVResponsiveUtils.horizontalPadding(context);
     
-    final bool isLarge = widget.format == SectionPresentation.posterLarge;
+    final bool isLarge = widget.format == SectionPresentation.posterLarge || widget.format == SectionPresentation.expandablePoster;
     final double cardWidth = isLarge
         ? TVResponsiveUtils.largePosterWidth(context)
         : TVResponsiveUtils.posterWidth(context);
@@ -235,7 +235,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   Widget _buildStandardRow(bool isMobile, double horizontalPadding, double cardWidth, double rowHeight) {
-    final bool isLarge = widget.format == SectionPresentation.posterLarge;
+    final bool isLarge = widget.format == SectionPresentation.posterLarge || widget.format == SectionPresentation.expandablePoster;
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -447,14 +447,30 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     );
   }
 
-  // WRAPPER DE DIFUMINADO (Eliminado según requerimiento)
+  // WRAPPER DE DIFUMINADO (ShaderMask para desvanecer tarjetas en los bordes)
   Widget _buildFadedWrapper({required double horizontalPadding, required Widget child}) {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (_) {
-        _updateScrollIndicators();
-        return false;
+    return ShaderMask(
+      shaderCallback: (Rect rect) {
+        return LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: const [
+            Colors.transparent,
+            Colors.black,
+            Colors.black,
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.03, 0.97, 1.0],
+        ).createShader(rect);
       },
-      child: child,
+      blendMode: BlendMode.dstIn,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (_) {
+          _updateScrollIndicators();
+          return false;
+        },
+        child: child,
+      ),
     );
   }
 

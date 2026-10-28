@@ -135,12 +135,19 @@ class SectionComposer {
       if (ResponsiveUtils.isTV) {
         if (presentation == SectionPresentation.top10) {
           presentation = SectionPresentation.top10Wide;
-          debugPrint('📺 [SectionComposer] TV Rule: Section "$title" (top10) promoted to TOP10_WIDE');
+          debugPrint('📺 [SectionComposer] 🟢 TV MODE ACTIVE: Section "$title" (top10) successfully promoted to TOP10_WIDE (Wide cards + giant ranking numbers)');
+        } else if (presentation == SectionPresentation.top10Wide) {
+          debugPrint('📺 [SectionComposer] 🟢 TV MODE ACTIVE: Section "$title" using explicit TOP10_WIDE');
         } else if (presentation == SectionPresentation.poster || presentation == SectionPresentation.posterLarge) {
           presentation = SectionPresentation.expandablePoster;
-          debugPrint('📺 [SectionComposer] TV Rule: Section "$title" promoted to EXPANDABLE_POSTER');
+          debugPrint('📺 [SectionComposer] 🟢 TV MODE ACTIVE: Section "$title" promoted to EXPANDABLE_POSTER');
         }
       } else {
+        if (presentation == SectionPresentation.top10Wide) {
+          debugPrint('📱 [SectionComposer] 🔵 MOBILE/WEB MODE ACTIVE: Section "$title" using TOP10_WIDE');
+        } else if (presentation == SectionPresentation.top10) {
+          debugPrint('📱 [SectionComposer] 🔵 MOBILE/WEB MODE ACTIVE: Section "$title" rendering standard TOP10 (Vertical posters + giant ranking numbers)');
+        }
         if (presentation == SectionPresentation.expandablePoster) {
           presentation = SectionPresentation.posterLarge;
         }

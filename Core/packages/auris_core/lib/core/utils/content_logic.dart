@@ -280,3 +280,84 @@ String getWarningText(String? certification) {
   if (cert == 'G' || cert == 'ALL' || cert.contains('U')) return 'Apto para todos los públicos. Sin advertencias específicas.';
   return 'Se recomienda discreción del espectador.';
 }
+
+/// Detecta URLs de catálogo, listado o filtros que no representan fichas individuales.
+bool isListingUrl(String? rawUrl) {
+  if (rawUrl == null || rawUrl.isEmpty) return true;
+  final u = Uri.tryParse(rawUrl.trim());
+  if (u == null) return true;
+  if (u.queryParameters.containsKey('orden') ||
+      u.queryParameters.containsKey('genre') ||
+      u.queryParameters.containsKey('genero') ||
+      u.queryParameters.containsKey('page') ||
+      u.queryParameters.containsKey('tipo') ||
+      u.queryParameters.containsKey('categoria') ||
+      u.queryParameters.containsKey('ano') ||
+      u.queryParameters.containsKey('year')) {
+    return true;
+  }
+  final path = u.path.toLowerCase().replaceAll(RegExp(r'/+$'), '');
+  if (RegExp(r'^/(?:pelicula|serie|peliculas|series|genero|categoria)$', caseSensitive: false).hasMatch(path) ||
+      RegExp(r'^/(?:genero|categoria|tag|animes|filter)/', caseSensitive: false).hasMatch(path) ||
+      path.contains('/page/')) {
+    return true;
+  }
+  return false;
+}
+
+const Set<String> _kNavTitles = {
+  'mas vistas', 'más vistas', 'mas vistos', 'más vistos',
+  'mas valoradas', 'más valoradas', 'lo mas visto', 'lo más visto',
+  'peliculas', 'películas', 'series', 'estrenos', 'populares',
+  'inicio', 'home', 'ver mas', 'ver más', 'tendencias',
+  'nuevas peliculas', 'nuevas películas',
+};
+
+/// Detecta títulos que corresponden a enlaces de navegación o categorías web.
+bool isNavTitle(String? title) {
+  if (title == null) return true;
+  final t = title.toLowerCase().trim();
+  if (t.length < 3) return true;
+  return _kNavTitles.contains(t);
+}
+
+/// Normaliza un título para comparaciones libres de acentos y caracteres especiales.
+String normalizeTitleForMatch(String s) {
+  return s
+      .toLowerCase()
+      .replaceAll('á', 'a').replaceAll('é', 'e').replaceAll('í', 'i').replaceAll('ó', 'o').replaceAll('ú', 'u')
+      .replaceAll('à', 'a').replaceAll('è', 'e').replaceAll('ì', 'i').replaceAll('ò', 'o').replaceAll('ù', 'u')
+      .replaceAll('ä', 'a').replaceAll('ë', 'e').replaceAll('ï', 'i').replaceAll('ö', 'o').replaceAll('ü', 'u')
+      .replaceAll('ñ', 'n')
+      .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+/// Determina si el título de un resultado descubierto es compatible con la obra consultada.
+bool isTitleCompatible(String mainTitle, String candidateTitle, {String? metadataTitle}) {
+  final cNorm = normalizeTitleForMatch(candidateTitle);
+  if (cNorm.isEmpty || isNavTitle(candidateTitle)) return false;
+
+  final targets = [
+    mainTitle,
+    if (metadataTitle != null && metadataTitle.isNotEmpty) metadataTitle,
+  ];
+
+  for (final target in targets) {
+    final tNorm = normalizeTitleForMatch(stripSeasonSuffix(target));
+    if (tNorm.isEmpty) continue;
+    if (tNorm == cNorm || tNorm.contains(cNorm) || cNorm.contains(tNorm)) return true;
+
+    const stopWords = {'the', 'and', 'los', 'las', 'del', 'con', 'para', 'por', 'una', 'uno', 'unos', 'unas', 'season', 'temporada'};
+    final tWords = tNorm.split(' ').where((w) => w.length >= 3 && !stopWords.contains(w)).toSet();
+    final cWords = cNorm.split(' ').where((w) => w.length >= 3 && !stopWords.contains(w)).toSet();
+    if (tWords.isEmpty || cWords.isEmpty) continue;
+
+    final intersection = tWords.intersection(cWords);
+    if (intersection.length >= 2 || (intersection.length / tWords.length) >= 0.5) {
+      return true;
+    }
+  }
+  return false;
+}
