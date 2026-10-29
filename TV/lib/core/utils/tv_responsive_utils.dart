@@ -150,7 +150,7 @@ class TVResponsiveUtils {
 
   /// Altura proporcional de póster grande (2:3) para TV
   static double largePosterHeight(BuildContext context) {
-    return (largePosterWidth(context) * 1.5).roundToDouble();
+    return (largePosterWidth(context) * 1.32).roundToDouble();
   }
 
   /// Altura de fila de póster grande para TV

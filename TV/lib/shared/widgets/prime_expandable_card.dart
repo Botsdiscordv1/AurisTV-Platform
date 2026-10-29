@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart' hide MarqueeText;
 import '../../core/theme/editorial_themes.dart';
 import 'marquee_text.dart';
+import 'tv_scroll.dart';
 
 const String _mythicCornerSvg = r'''
 <svg width="74" height="74" viewBox="0 0 74 74" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -53,13 +54,21 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
   Widget build(BuildContext context) {
     final theme = EditorialBadgeTheme.getTheme(widget.badge);
     final bool isMobileDevice = ResponsiveUtils.isMobile(context);
-    final double normalWidth = isMobileDevice ? ResponsiveUtils.sp(context, 105) : 145;
+    final double baseW = isMobileDevice ? ResponsiveUtils.sp(context, 105) : 145;
+    final double constantHeight = isMobileDevice ? ResponsiveUtils.sp(context, 170) : 230;
+
+    final String rawBanner = widget.media.bannerUrl ?? '';
+    final String effectiveBanner = rawBanner.isNotEmpty ? rawBanner : widget.media.posterUrl;
+    final String displayImage = _isActive ? effectiveBanner : widget.media.posterUrl;
 
     return Focus(
       onFocusChange: (focused) {
         setState(() => _isFocused = focused);
         if (focused) {
-          Scrollable.ensureVisible(context, alignment: 0.5, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+          TvScroll.centerCardVertically(context);
+          TvScroll.onExpandableCardFocused?.call(true);
+        } else {
+          TvScroll.onExpandableCardFocused?.call(false);
         }
       },
       child: MouseRegion(
@@ -67,121 +76,90 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
         onExit: (_) => setState(() => _isHovered = false),
         child: GestureDetector(
           onTap: widget.onTap,
-          child: SizedBox(
-            width: normalWidth,
-            height: isMobileDevice ? ResponsiveUtils.sp(context, 210) : 290,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AspectRatio(
-                  aspectRatio: 2 / 3,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      boxShadow: _isActive ? [BoxShadow(color: const Color(0xFF6C32FF).withOpacity(0.3), blurRadius: 15, spreadRadius: 1)] : [],
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 2 / 3, end: _isActive ? (16 / 9) : (2 / 3)),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            builder: (context, currentAspectRatio, child) {
+              final currentWidth = (constantHeight * currentAspectRatio).roundToDouble();
+              return Container(
+                width: currentWidth,
+                height: constantHeight,
+                margin: EdgeInsets.only(right: _isActive ? 16 : 0),
+                child: child,
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: _isActive ? [BoxShadow(color: const Color(0xFF6C32FF).withOpacity(0.3), blurRadius: 15, spreadRadius: 1)] : [],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: displayImage,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.medium,
                     ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      clipBehavior: Clip.none,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              AnimatedScale(
-                                scale: _isActive ? 1.12 : 1.0,
-                                duration: const Duration(milliseconds: 400),
-                                curve: Curves.easeOutCubic,
-                                child: CachedNetworkImage(
-                                  imageUrl: widget.media.posterUrl,
-                                  fit: BoxFit.cover,
-                                  memCacheWidth: (normalWidth * MediaQuery.of(context).devicePixelRatio).round().clamp(1, 400),
-                                  memCacheHeight: ((normalWidth * MediaQuery.of(context).devicePixelRatio) * 1.5).round().clamp(1, 600),
-                                  fadeInDuration: AurisImageConfig.defaultFadeInDuration,
-                                  fadeOutDuration: AurisImageConfig.defaultFadeOutDuration,
-                                  cacheManager: AurisImageCacheManager.instance,
-                                  filterQuality: FilterQuality.medium,
-                                ),
-                              ),
-                              Positioned.fill(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                                      colors: [Colors.black.withOpacity(0.6), Colors.transparent],
-                                      stops: const [0.0, 0.4],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (widget.media.rating != null)
-                                Positioned(
-                                  top: 8, right: 8,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        AurisIcon(AurisIcons.star, color: const Color(0xFFFFC107), size: 10),
-                                        const SizedBox(width: 4),
-                                        Text(formatRating(widget.media.rating) ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
+                    if (_isActive)
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                              colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                              stops: const [0.5, 1.0],
+                            ),
                           ),
                         ),
-                        Positioned.fill(child: _MythicBorder(animation: _mythicController, primaryColor: theme.primary)),
-                        _MythicCorner(alignment: Alignment.topLeft, animation: _mythicController, primaryColor: theme.primary),
-                        _MythicCorner(alignment: Alignment.topRight, animation: _mythicController, primaryColor: theme.primary),
-                        _MythicCorner(alignment: Alignment.bottomLeft, animation: _mythicController, primaryColor: theme.primary),
-                        _MythicCorner(alignment: Alignment.bottomRight, animation: _mythicController, primaryColor: theme.primary),
-                      ],
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.only(top: 12, left: 4),
-                  width: normalWidth,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      MarqueeText(
-                        text: widget.media.title,
-                        animate: isMobileDevice ? true : _isActive,
-                          style: GoogleFonts.poppins(
-                            color: Colors.white.withOpacity(0.95), 
-                            fontSize: isMobileDevice ? ResponsiveUtils.sp(context, 13) : 16, 
-                            fontWeight: FontWeight.w700, 
-                            height: 1.2, 
-                            letterSpacing: 0.2
-                          ),
                       ),
-                      const SizedBox(height: 6),
-                      DefaultTextStyle(
-                        style: TextStyle(
-                          color: Colors.white54, 
-                          fontSize: isMobileDevice ? ResponsiveUtils.sp(context, 13) : 15, 
-                          fontWeight: FontWeight.w600
-                        ),
-                        child: Row(
+                    if (_isActive)
+                      Positioned(
+                        bottom: 12, left: 12, right: 12,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (widget.media.year != null && (widget.media.subtitle == null || !widget.media.subtitle!.contains(widget.media.year.toString()))) ...[
-                              Text('${widget.media.year}'),
-                              _buildMetaDot(),
-                            ],
-                            Expanded(child: Text(widget.media.subtitle ?? (widget.media.aired ? 'Finalizado' : 'En emisión'), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                            Text(
+                              widget.media.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    if (widget.media.rating != null)
+                      Positioned(
+                        top: 8, right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.white10)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AurisIcon(AurisIcons.star, color: const Color(0xFFFFC107), size: 10),
+                              const SizedBox(width: 4),
+                              Text(formatRating(widget.media.rating) ?? 'N/A', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    Positioned.fill(child: _MythicBorder(animation: _mythicController, primaryColor: theme.primary)),
+                    _MythicCorner(alignment: Alignment.topLeft, animation: _mythicController, primaryColor: theme.primary),
+                    _MythicCorner(alignment: Alignment.topRight, animation: _mythicController, primaryColor: theme.primary),
+                    _MythicCorner(alignment: Alignment.bottomLeft, animation: _mythicController, primaryColor: theme.primary),
+                    _MythicCorner(alignment: Alignment.bottomRight, animation: _mythicController, primaryColor: theme.primary),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

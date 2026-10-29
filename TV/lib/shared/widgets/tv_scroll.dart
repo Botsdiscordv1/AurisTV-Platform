@@ -179,6 +179,76 @@ class TvScroll {
     return Duration(milliseconds: ms.clamp(minMs, maxMs));
   }
 
+  static void Function(bool focused)? onExpandableCardFocused;
+
+  /// Centra verticalmente la tarjeta enfocada en la pantalla (alignment 0.5)
+  /// y activa el callback para elevar/colapsar el hero.
+  static bool centerCardVertically(
+    BuildContext context, {
+    Duration? duration,
+    Curve curve = Curves.easeOutCubic,
+  }) {
+    return anchorExpandableSection(context, duration: duration, curve: curve);
+  }
+
+  static bool anchorExpandableSection(
+    BuildContext context, {
+    Duration? duration,
+    Curve curve = Curves.easeOutCubic,
+  }) {
+    final RenderObject? object = context.findRenderObject();
+    if (object is! RenderBox || !object.attached || !object.hasSize) {
+      return false;
+    }
+
+    ScrollableState? scrollable = Scrollable.maybeOf(context);
+    while (scrollable != null &&
+        scrollable.position.axis == Axis.horizontal) {
+      scrollable = scrollable.context
+          .findAncestorStateOfType<ScrollableState>();
+    }
+    if (scrollable == null) return false;
+    final ScrollPosition position = scrollable.position;
+    if (!position.hasContentDimensions) return false;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      final RenderObject? updatedObject = context.findRenderObject();
+      if (updatedObject is! RenderBox || !updatedObject.attached || !updatedObject.hasSize) {
+        return;
+      }
+
+      ScrollableState? scrollableState = Scrollable.maybeOf(context);
+      while (scrollableState != null &&
+          scrollableState.position.axis == Axis.horizontal) {
+        scrollableState = scrollableState.context
+            .findAncestorStateOfType<ScrollableState>();
+      }
+      if (scrollableState == null) return;
+      final ScrollPosition pos = scrollableState.position;
+      if (!pos.hasContentDimensions) return;
+
+      final RenderBox box = updatedObject;
+      final Offset globalPos = box.localToGlobal(Offset.zero);
+      final double cardCenterY = globalPos.dy + (box.size.height / 2);
+      final double screenHeight = MediaQuery.of(context).size.height;
+      final double screenCenterY = screenHeight / 2;
+
+      final double delta = cardCenterY - screenCenterY;
+      final double target = (pos.pixels + delta)
+          .clamp(pos.minScrollExtent, pos.maxScrollExtent);
+
+      final double travel = (target - pos.pixels).abs();
+      if (travel < 1.0) return;
+      pos.animateTo(
+        target,
+        duration: duration ?? _distanceDuration(travel),
+        curve: curve,
+      );
+    });
+    return true;
+  }
+
   /// Repite el ancla de [anchorSectionBelowTopbar] al cierre del frame.
   /// El traversal direccional de Flutter llama a `Scrollable.ensureVisible`
   /// DESPUÉS del `onFocusChange` de la fila, así que en el salto con D-pad

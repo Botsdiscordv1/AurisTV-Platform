@@ -127,11 +127,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   double _scrollOffset = 0.0;
 
   bool _isHeroCompact = false;
+  bool _isHeroHidden = false;
 
   @override
   void initState() {
     super.initState();
-    TvScroll.isCompactCallback = () => _isHeroCompact;
+    TvScroll.isCompactCallback = () => _isHeroCompact || _isHeroHidden;
+    TvScroll.onExpandableCardFocused = (focused) {
+      if (mounted && _isHeroHidden != focused) {
+        setState(() => _isHeroHidden = focused);
+      }
+    };
     _checkForUpdate();
     for (final entry in _pillFocusNodes.entries) {
       entry.value.addListener(() {
@@ -182,6 +188,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   @override
   void dispose() {
     routeObserver.unsubscribe(this);
+    TvScroll.onExpandableCardFocused = null;
     _scrollController.removeListener(_onScroll);
     _searchIconFocusNode.dispose();
     _overlaySearchFocusNode.dispose();
@@ -231,58 +238,73 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   }
 
   List<ComposedHomeSection> _applyTVRhythm(List<ComposedHomeSection> rawSections) {
-    final List<ComposedHomeSection> tvSections = [];
-    int consecutiveWide = 0;
+    if (rawSections.isEmpty) return [];
 
-    for (final sec in rawSections) {
+    // En TV ignoramos el layout de póster del servidor y usamos widgets WIDE,
+    // añadiendo las tarjetas expandibles en las 3 posiciones indicadas.
+    final List<ComposedHomeSection> sections = rawSections.map((sec) {
       if (sec.type == HomeSectionType.continueWatching || 
           sec.presentation == SectionPresentation.top10 || 
-          sec.presentation == SectionPresentation.top10Wide || 
-          sec.presentation == SectionPresentation.wide || 
-          sec.presentation == SectionPresentation.expandablePoster || 
-          sec.presentation == SectionPresentation.posterLarge) {
-        tvSections.add(sec);
-        if (sec.presentation == SectionPresentation.wide) {
-          consecutiveWide++;
-          if (consecutiveWide >= 2) consecutiveWide = 0;
-        } else if (sec.presentation == SectionPresentation.posterLarge || 
-                   sec.presentation == SectionPresentation.expandablePoster || 
-                   sec.presentation == SectionPresentation.top10Wide || 
-                   sec.presentation == SectionPresentation.top10) {
-          consecutiveWide = 0;
-        }
-      } else {
-        if (consecutiveWide >= 2) {
-          tvSections.add(ComposedHomeSection(
-            id: '${sec.id}_large',
-            type: sec.type,
-            title: sec.title,
-            subtitle: null,
-            items: sec.items,
-            sportsItems: sec.sportsItems,
-            brandItems: sec.brandItems,
-            presentation: SectionPresentation.expandablePoster,
-            data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.expandablePoster) : sec.data,
-            badge: sec.badge,
-          ));
-          consecutiveWide = 0;
-        } else {
-          tvSections.add(ComposedHomeSection(
-            id: '${sec.id}_wide',
-            type: sec.type,
-            title: sec.title,
-            subtitle: null,
-            items: sec.items,
-            sportsItems: sec.sportsItems,
-            brandItems: sec.brandItems,
-            presentation: SectionPresentation.wide,
-            data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.wide) : sec.data,
-            badge: sec.badge,
-          ));
-          consecutiveWide++;
-        }
+          sec.presentation == SectionPresentation.top10Wide) {
+        return sec;
       }
+      return ComposedHomeSection(
+        id: sec.id,
+        type: sec.type,
+        title: sec.title,
+        subtitle: sec.subtitle,
+        items: sec.items,
+        sportsItems: sec.sportsItems,
+        brandItems: sec.brandItems,
+        presentation: SectionPresentation.wide,
+        data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.wide) : sec.data,
+        badge: sec.badge,
+      );
+    }).toList();
+
+    int continueWatchingIndex = sections.indexWhere((s) => s.type == HomeSectionType.continueWatching);
+    int section1Index = continueWatchingIndex != -1 ? continueWatchingIndex + 1 : 0;
+    int firstExpandableIndex = section1Index + 1;
+
+    int lastIndex = sections.length - 1;
+    int beforeLastIndex = lastIndex - 1;
+
+    int middleIndex = (sections.length ~/ 2);
+    if (middleIndex <= firstExpandableIndex) {
+      middleIndex = firstExpandableIndex + 1;
     }
+    if (middleIndex >= beforeLastIndex) {
+      middleIndex = beforeLastIndex - 1;
+    }
+
+    final Set<int> expandableIndices = {};
+    if (firstExpandableIndex < sections.length) expandableIndices.add(firstExpandableIndex);
+    if (middleIndex > 0 && middleIndex < sections.length) expandableIndices.add(middleIndex);
+    if (beforeLastIndex >= 0 && beforeLastIndex < sections.length) expandableIndices.add(beforeLastIndex);
+
+    final List<ComposedHomeSection> tvSections = [];
+    for (int i = 0; i < sections.length; i++) {
+      var sec = sections[i];
+      if (expandableIndices.contains(i) && 
+          sec.type != HomeSectionType.continueWatching && 
+          sec.presentation != SectionPresentation.top10 && 
+          sec.presentation != SectionPresentation.top10Wide) {
+        sec = ComposedHomeSection(
+          id: '${sec.id}_expandable',
+          type: sec.type,
+          title: sec.title,
+          subtitle: sec.subtitle,
+          items: sec.items,
+          sportsItems: sec.sportsItems,
+          brandItems: sec.brandItems,
+          presentation: SectionPresentation.expandablePoster,
+          data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.expandablePoster) : sec.data,
+          badge: sec.badge,
+        );
+      }
+      tvSections.add(sec);
+    }
+
     return tvSections;
   }
 
@@ -552,93 +574,103 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             top: 0,
             left: 0,
             right: 0,
-            height: MediaQuery.of(context).size.height * 0.80,
-            child: heroBannerItemsAsync.when(
-              data: (displayItems) {
-                if (displayItems.isEmpty) return const HeroBannerSkeleton();
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+              height: _isHeroHidden ? 0.0 : MediaQuery.of(context).size.height * 0.80,
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: Alignment.topCenter,
+                  maxHeight: MediaQuery.of(context).size.height * 0.80,
+                  child: heroBannerItemsAsync.when(
+                    data: (displayItems) {
+                      if (displayItems.isEmpty) return const HeroBannerSkeleton();
 
-                final bool shouldAutofocus = _isAppStartup && currentCategory == 'inicio';
-                if (shouldAutofocus) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) setState(() => _isAppStartup = false);
-                  });
-                }
+                      final bool shouldAutofocus = _isAppStartup && currentCategory == 'inicio';
+                      if (shouldAutofocus) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) setState(() => _isAppStartup = false);
+                        });
+                      }
 
-                return RepaintBoundary(
-                  child: HeroBanner(
-                    key: _heroKey,
-                    autofocus: shouldAutofocus,
-                    items: displayItems,
-                    currentCategory: currentCategory,
-                    isCompact: _isHeroCompact,
-                    // D-pad arriba desde el hero -> cápsula activa del topbar.
-                    pillFocusNode: _pillFocusNodes[currentCategory] ?? _pillFocusNodes['inicio'],
-                    // D-pad izquierda desde el hero (en Reproducir) -> left bar.
-                    onArrowLeft: _enterRail,
-                    // D-pad abajo desde el hero -> primera tarjeta de la 1ª sección.
-                    onArrowDown: () {
-                      setState(() {
-                        _isHeroCompact = true;
-                        if (_scrollController.hasClients) {
-                          _scrollController.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOutCubic,
-                          );
-                        }
-                      });
-                      if (_sectionRowKeys.isEmpty) return false;
-                      final state = _sectionRowKeys.first.currentState;
-                      if (state != null) {
-                        try {
-                          return (state as dynamic).focusFirstCard() == true;
-                        } catch (_) {}
-                      }
-                      return false;
+                      return RepaintBoundary(
+                        child: HeroBanner(
+                          key: _heroKey,
+                          autofocus: shouldAutofocus,
+                          items: displayItems,
+                          currentCategory: currentCategory,
+                          isCompact: _isHeroCompact,
+                          // D-pad arriba desde el hero -> cápsula activa del topbar.
+                          pillFocusNode: _pillFocusNodes[currentCategory] ?? _pillFocusNodes['inicio'],
+                          // D-pad izquierda desde el hero (en Reproducir) -> left bar.
+                          onArrowLeft: _enterRail,
+                          // D-pad abajo desde el hero -> primera tarjeta de la 1ª sección.
+                          onArrowDown: () {
+                            setState(() {
+                              _isHeroCompact = true;
+                              if (_scrollController.hasClients) {
+                                _scrollController.animateTo(
+                                  0,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              }
+                            });
+                            if (_sectionRowKeys.isEmpty) return false;
+                            final state = _sectionRowKeys.first.currentState;
+                            if (state != null) {
+                              try {
+                                return (state as dynamic).focusFirstCard() == true;
+                              } catch (_) {}
+                            }
+                            return false;
+                          },
+                          onFocused: () {
+                            setState(() {
+                              _isHeroCompact = false;
+                              if (_scrollController.hasClients) {
+                                _scrollController.animateTo(
+                                  0,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              }
+                            });
+                          },
+                          onDetails: (item) => openTVDetails(context, item, currentCategory),
+                          onTrailer: (item) {
+                            if (item.trailerKey == null || item.trailerKey!.isEmpty) return;
+                            final youtubeUrl = item.trailerKey!.startsWith('http')
+                                ? item.trailerKey!
+                                : 'https://www.youtube.com/watch?v=${item.trailerKey}';
+                            if (context.mounted) {
+                              final uri = '/player/${Uri.encodeComponent(item.id)}'
+                                  '?url=${Uri.encodeComponent(youtubeUrl)}'
+                                  '&source=YouTube'
+                                  '&episode=Trailer'
+                                  '&category=${item.type.name}'
+                                  '&title=${Uri.encodeComponent(item.title)}'
+                                  '&posterUrl=${Uri.encodeComponent(item.posterUrl)}'
+                                  '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}';
+                              context.push(uri);
+                            }
+                          },
+                        ),
+                      );
                     },
-                    onFocused: () {
-                      setState(() {
-                        _isHeroCompact = false;
-                        if (_scrollController.hasClients) {
-                          _scrollController.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOutCubic,
-                          );
-                        }
-                      });
-                    },
-                    onDetails: (item) => openTVDetails(context, item, currentCategory),
-                    onTrailer: (item) {
-                      if (item.trailerKey == null || item.trailerKey!.isEmpty) return;
-                      final youtubeUrl = item.trailerKey!.startsWith('http')
-                          ? item.trailerKey!
-                          : 'https://www.youtube.com/watch?v=${item.trailerKey}';
-                      if (context.mounted) {
-                        final uri = '/player/${Uri.encodeComponent(item.id)}'
-                            '?url=${Uri.encodeComponent(youtubeUrl)}'
-                            '&source=YouTube'
-                            '&episode=Trailer'
-                            '&category=${item.type.name}'
-                            '&title=${Uri.encodeComponent(item.title)}'
-                            '&posterUrl=${Uri.encodeComponent(item.posterUrl)}'
-                            '&bannerUrl=${Uri.encodeComponent(item.bannerUrl ?? "")}';
-                        context.push(uri);
-                      }
-                    },
+                    loading: () => const HeroBannerSkeleton(),
+                    error: (err, _) => Center(child: Text('Error: $err')),
                   ),
-                );
-              },
-                loading: () => const HeroBannerSkeleton(),
-                error: (err, _) => Center(child: Text('Error: $err')),
+                ),
               ),
+            ),
           ),
 
           // 2. CustomScrollView con ShaderMask vertical dinámico:
           // En modo compacto, desvanece suavemente las tarjetas que se scrollean
           // hacia arriba antes de invadir el texto y metadata del hero compacto.
           TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0.0, end: _isHeroCompact ? 1.0 : 0.0),
+            tween: Tween<double>(begin: 0.0, end: _isHeroHidden ? 0.0 : (_isHeroCompact ? 1.0 : 0.0)),
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOutCubic,
             builder: (context, compactAnim, child) {
@@ -673,190 +705,106 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               slivers: [
                 SliverToBoxAdapter(
                   child: SizedBox(
-                    height: _isHeroCompact
-                        ? MediaQuery.of(context).size.height * 0.50
-                        : MediaQuery.of(context).size.height * 0.65,
+                    height: _isHeroHidden
+                        ? MediaQuery.of(context).size.height * 0.25
+                        : (_isHeroCompact
+                            ? MediaQuery.of(context).size.height * 0.50
+                            : MediaQuery.of(context).size.height * 0.65),
                   ),
                 ),
 
               // 2. Contenido dinámico
-              if (currentCategory == 'inicio') 
-                layoutAsync.when(
-                  data: (rawSections) {
-                    final sections = _applyTVRhythm(rawSections);
-                    while (_sectionRowKeys.length < sections.length) {
-                      _sectionRowKeys.add(GlobalKey());
-                    }
-                    if (_sectionRowKeys.length > sections.length) {
-                      _sectionRowKeys.length = sections.length;
-                    }
-                    return SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          return RepaintBoundary(
-                            child: _buildSection(
-                              sections[index], 
-                              horizontalPadding,
-                              key: _sectionRowKeys[index],
-                              onArrowRightOnLast: index + 1 < sections.length
-                                  ? () {
-                                      final state = _sectionRowKeys[index + 1].currentState;
-                                      if (state != null) {
-                                        try {
-                                          return (state as dynamic).focusFirstCard() == true;
-                                        } catch (_) {}
-                                      }
-                                      return false;
+              layoutAsync.when(
+                data: (rawSections) {
+                  const tvHomeCategories = {'inicio', 'animes', 'películas', 'series', 'kdrama', 'kdramas'};
+                  final sections = tvHomeCategories.contains(currentCategory.toLowerCase())
+                      ? _applyTVRhythm(rawSections)
+                      : rawSections;
+                  while (_sectionRowKeys.length < sections.length) {
+                    _sectionRowKeys.add(GlobalKey());
+                  }
+                  if (_sectionRowKeys.length > sections.length) {
+                    _sectionRowKeys.length = sections.length;
+                  }
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        return RepaintBoundary(
+                          child: _buildSection(
+                            sections[index], 
+                            horizontalPadding,
+                            key: _sectionRowKeys[index],
+                            onArrowRightOnLast: index + 1 < sections.length
+                                ? () {
+                                    final state = _sectionRowKeys[index + 1].currentState;
+                                    if (state != null) {
+                                      try {
+                                        return (state as dynamic).focusFirstCard() == true;
+                                      } catch (_) {}
                                     }
-                                  : null,
-                              onArrowLeftOnFirst: index > 0
-                                  ? () {
-                                      final state = _sectionRowKeys[index - 1].currentState;
-                                      if (state != null) {
-                                        try {
-                                          return (state as dynamic).focusLastCard() == true;
-                                        } catch (_) {}
-                                      }
-                                      return false;
+                                    return false;
+                                  }
+                                : null,
+                            onArrowLeftOnFirst: index > 0
+                                ? () {
+                                    final state = _sectionRowKeys[index - 1].currentState;
+                                    if (state != null) {
+                                      try {
+                                        return (state as dynamic).focusLastCard() == true;
+                                      } catch (_) {}
                                     }
-                                  // Primera fila: IZQUIERDA abre el left bar
-                                  // (en Prime el rail vive a la izquierda).
-                                  : () {
-                                      _enterRail();
-                                      return true;
-                                    },
-                              onArrowDownToNext: index + 1 < sections.length
-                                  ? () {
-                                      final state = _sectionRowKeys[index + 1].currentState;
-                                      if (state != null) {
-                                        try {
-                                          return (state as dynamic).focusRememberedCard() == true;
-                                        } catch (_) {}
-                                      }
-                                      return false;
+                                    return false;
+                                  }
+                                // Primera fila: IZQUIERDA abre el left bar
+                                // (en Prime el rail vive a la izquierda).
+                                : () {
+                                    _enterRail();
+                                    return true;
+                                  },
+                            onArrowDownToNext: index + 1 < sections.length
+                                ? () {
+                                    final state = _sectionRowKeys[index + 1].currentState;
+                                    if (state != null) {
+                                      try {
+                                        return (state as dynamic).focusRememberedCard() == true;
+                                      } catch (_) {}
                                     }
-                                  : null,
-                              onArrowUpToPrev: index > 0
-                                  ? () {
-                                      final state = _sectionRowKeys[index - 1].currentState;
-                                      if (state != null) {
-                                        try {
-                                          return (state as dynamic).focusRememberedCard() == true;
-                                        } catch (_) {}
-                                      }
-                                      return false;
+                                    return false;
+                                  }
+                                : null,
+                            onArrowUpToPrev: index > 0
+                                ? () {
+                                    final state = _sectionRowKeys[index - 1].currentState;
+                                    if (state != null) {
+                                      try {
+                                        return (state as dynamic).focusRememberedCard() == true;
+                                      } catch (_) {}
                                     }
-                                  : () {
-                                      setState(() => _isHeroCompact = false);
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                        if (mounted) {
-                                          _heroKey.currentState?.focusPlayButton();
-                                        }
-                                      });
-                                      return true;
-                                    },
-                            ),
-                          );
-                        },
-                        childCount: sections.length,
-                      ),
-                    );
-                  },
-                  loading: () => SliverToBoxAdapter(
-                    child: Column(
-                      children: List.generate(3, (index) => const RowSkeleton()),
+                                    return false;
+                                  }
+                                : () {
+                                    setState(() => _isHeroCompact = false);
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      if (mounted) {
+                                        _heroKey.currentState?.focusPlayButton();
+                                      }
+                                    });
+                                    return true;
+                                  },
+                          ),
+                        );
+                      },
+                      childCount: sections.length,
                     ),
+                  );
+                },
+                loading: () => SliverToBoxAdapter(
+                  child: Column(
+                    children: List.generate(3, (index) => const RowSkeleton()),
                   ),
-                  error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
-                )
-              else
-                layoutAsync.when(
-                  data: (sections) {
-                    while (_sectionRowKeys.length < sections.length) {
-                      _sectionRowKeys.add(GlobalKey());
-                    }
-                    if (_sectionRowKeys.length > sections.length) {
-                      _sectionRowKeys.length = sections.length;
-                    }
-                    return SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          return RepaintBoundary(
-                            child: _buildSection(
-                              sections[index], 
-                              horizontalPadding,
-                              key: _sectionRowKeys[index],
-                              onArrowRightOnLast: index + 1 < sections.length
-                                  ? () {
-                                      final state = _sectionRowKeys[index + 1].currentState;
-                                      if (state != null) {
-                                        try {
-                                          return (state as dynamic).focusFirstCard() == true;
-                                        } catch (_) {}
-                                      }
-                                      return false;
-                                    }
-                                  : null,
-                              onArrowLeftOnFirst: index > 0
-                                  ? () {
-                                      final state = _sectionRowKeys[index - 1].currentState;
-                                      if (state != null) {
-                                        try {
-                                          return (state as dynamic).focusLastCard() == true;
-                                        } catch (_) {}
-                                      }
-                                      return false;
-                                    }
-                                  // Primera fila: IZQUIERDA abre el left bar
-                                  // (en Prime el rail vive a la izquierda).
-                                  : () {
-                                      _enterRail();
-                                      return true;
-                                    },
-                              onArrowDownToNext: index + 1 < sections.length
-                                  ? () {
-                                      final state = _sectionRowKeys[index + 1].currentState;
-                                      if (state != null) {
-                                        try {
-                                          return (state as dynamic).focusRememberedCard() == true;
-                                        } catch (_) {}
-                                      }
-                                      return false;
-                                    }
-                                  : null,
-                              onArrowUpToPrev: index > 0
-                                  ? () {
-                                      final state = _sectionRowKeys[index - 1].currentState;
-                                      if (state != null) {
-                                        try {
-                                          return (state as dynamic).focusRememberedCard() == true;
-                                        } catch (_) {}
-                                      }
-                                      return false;
-                                    }
-                                  : () {
-                                      setState(() => _isHeroCompact = false);
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                        if (mounted) {
-                                          _heroKey.currentState?.focusPlayButton();
-                                        }
-                                      });
-                                      return true;
-                                    },
-                            ),
-                          );
-                        },
-                        childCount: sections.length,
-                      ),
-                    );
-                  },
-                  loading: () => SliverToBoxAdapter(
-                    child: Column(
-                      children: List.generate(3, (index) => const RowSkeleton()),
-                    ),
-                  ),
-                  error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
                 ),
+                error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error layout: $err'))),
+              ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 32)),
             ],

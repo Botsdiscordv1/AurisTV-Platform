@@ -199,7 +199,7 @@ class ResponsiveUtils {
 
   /// Altura proporcional para póster grande (AspectRatio 2:3).
   static double largePosterHeight(BuildContext context) {
-    return (largePosterWidth(context) * 1.5).roundToDouble();
+    return (largePosterWidth(context) * 1.32).roundToDouble();
   }
 
   /// Altura del contenedor para filas de póster grande.
