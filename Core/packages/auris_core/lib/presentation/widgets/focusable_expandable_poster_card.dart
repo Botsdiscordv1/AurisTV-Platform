@@ -185,7 +185,7 @@ class _FocusableExpandablePosterCardState extends ConsumerState<FocusableExpanda
             // Height is strictly constant in both states: baseW * 1.5
             // Unfocused: width = baseW (Aspect Ratio 2:3)
             // Focused: width = height * (16 / 9) (Aspect Ratio 16:9)
-            final double constantHeight = (baseW * 1.5).roundToDouble();
+            final double constantHeight = (baseW * 1.32).roundToDouble();
 
             return GestureDetector(
               onTap: () => _handleTap(context),

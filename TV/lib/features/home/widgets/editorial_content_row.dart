@@ -65,11 +65,22 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
     _itemFocusNodes = List.generate(widget.items.length, (index) {
       final node = FocusNode();
       node.addListener(() {
+        final bool isLarge = widget.format == SectionPresentation.posterLarge || widget.format == SectionPresentation.expandablePoster;
         if (node.hasFocus) {
           _lastFocusedIndex = index;
-          final bool isLarge = widget.format == SectionPresentation.posterLarge || widget.format == SectionPresentation.expandablePoster;
           final double cWidth = isLarge ? TVResponsiveUtils.largePosterWidth(context) : TVResponsiveUtils.posterWidth(context);
           _scrollToCard(index, cWidth);
+          if (isLarge) {
+            TvScroll.centerCardVertically(context);
+            TvScroll.onExpandableCardFocused?.call(true);
+          }
+        } else {
+          if (isLarge) {
+            final bool anyFocused = _itemFocusNodes.any((n) => n.hasFocus);
+            if (!anyFocused) {
+              TvScroll.onExpandableCardFocused?.call(false);
+            }
+          }
         }
       });
       return node;
