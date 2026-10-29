@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-class TVKeyboard extends StatelessWidget {
+/// Modo de teclado: `text` (búsqueda, comportamiento histórico) o `url`
+/// (ingreso de URLs de listas M3U: añade las filas de símbolos :/ etc.).
+enum TVKeyboardMode { text, url }
+
+class TVKeyboard extends StatefulWidget {
   final Function(String) onKeyTap;
   final VoidCallback onBackspace;
   final VoidCallback onClear;
   final String currentQuery;
+
+  /// Filas de símbolos extra que se muestran solo en modo [TVKeyboardMode.url].
+  final TVKeyboardMode mode;
 
   const TVKeyboard({
     super.key,
@@ -13,6 +20,7 @@ class TVKeyboard extends StatelessWidget {
     required this.onBackspace,
     required this.onClear,
     required this.currentQuery,
+    this.mode = TVKeyboardMode.text,
   });
 
   static const List<List<String>> keys = [
@@ -24,8 +32,40 @@ class TVKeyboard extends StatelessWidget {
     ['5', '6', '7', '8', '9', '0'],
   ];
 
+  /// Filas de símbolos de URL (solo modo url), misma rejilla de 6 columnas.
+  static const List<List<String>> urlSymbolRows = [
+    [':', '/', '.', '-', '_', '?'],
+    ['&', '=', '%', '+', '#', '~'],
+  ];
+
+  @override
+  State<TVKeyboard> createState() => _TVKeyboardState();
+}
+
+class _TVKeyboardState extends State<TVKeyboard> {
+  /// Mayúsculas activas (toggle "Shift"). Arranca en minúsculas: el modo
+  /// `text` conserva exactamente el comportamiento histórico.
+  bool _shift = false;
+
+  List<List<String>> get _rows {
+    if (widget.mode == TVKeyboardMode.url) {
+      return [...TVKeyboard.keys, ...TVKeyboard.urlSymbolRows];
+    }
+    return TVKeyboard.keys;
+  }
+
+  bool _isLetter(String key) {
+    final code = key.codeUnitAt(0);
+    return (code >= 97 && code <= 122) || (code >= 65 && code <= 90);
+  }
+
+  String _emit(String key) =>
+      _shift && _isLetter(key) ? key.toUpperCase() : key;
+
   @override
   Widget build(BuildContext context) {
+    final rows = _rows;
+
     return Container(
       width: 220,
       padding: const EdgeInsets.all(10),
@@ -35,14 +75,27 @@ class TVKeyboard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // FILA SUPERIOR: ESPACIO Y BORRAR
+          // FILA SUPERIOR: SHIFT, ESPACIO Y BORRAR
           Row(
             children: [
+              Expanded(
+                flex: 2,
+                child: _KeyboardKey(
+                  label: '⇧',
+                  onTap: () => setState(() => _shift = !_shift),
+                  isAction: true,
+                  isActive: _shift,
+                  border: const Border(
+                    right: BorderSide(color: Colors.black, width: 4),
+                    bottom: BorderSide(color: Colors.black, width: 4),
+                  ),
+                ),
+              ),
               Expanded(
                 flex: 3,
                 child: _KeyboardKey(
                   icon: Icons.space_bar_rounded, // Usamos icono oficial de espacio
-                  onTap: () => onKeyTap(' '),
+                  onTap: () => widget.onKeyTap(' '),
                   isAction: true,
                   border: const Border(
                     right: BorderSide(color: Colors.black, width: 4),
@@ -54,7 +107,7 @@ class TVKeyboard extends StatelessWidget {
                 flex: 3,
                 child: _KeyboardKey(
                   icon: Icons.backspace_outlined, // Usamos icono oficial de borrar
-                  onTap: onBackspace,
+                  onTap: widget.onBackspace,
                   isAction: true,
                   border: const Border(
                     bottom: BorderSide(color: Colors.black, width: 4),
@@ -63,12 +116,12 @@ class TVKeyboard extends StatelessWidget {
               ),
             ],
           ),
-          
-          // CUADRÍCULA 6x6
-          ...keys.asMap().entries.map((entry) {
+
+          // CUADRÍCULA 6 columnas (6 filas en texto, 8 en URL)
+          ...rows.asMap().entries.map((entry) {
             int rowIndex = entry.key;
             List<String> row = entry.value;
-            bool isLastRow = rowIndex == keys.length - 1;
+            bool isLastRow = rowIndex == rows.length - 1;
 
             return Row(
               children: row.asMap().entries.map((keyEntry) {
@@ -78,8 +131,8 @@ class TVKeyboard extends StatelessWidget {
 
                 return Expanded(
                   child: _KeyboardKey(
-                    label: key,
-                    onTap: () => onKeyTap(key),
+                    label: _emit(key),
+                    onTap: () => widget.onKeyTap(_emit(key)),
                     border: Border(
                       right: isLastCol ? BorderSide.none : const BorderSide(color: Colors.black, width: 4),
                       bottom: isLastRow ? BorderSide.none : const BorderSide(color: Colors.black, width: 4),
@@ -102,12 +155,16 @@ class _KeyboardKey extends StatefulWidget {
   final bool isAction;
   final Border border;
 
+  /// Resaltado permanente (p. ej. Shift activo).
+  final bool isActive;
+
   const _KeyboardKey({
     this.label,
     this.icon,
     required this.onTap,
     this.isAction = false,
     required this.border,
+    this.isActive = false,
   });
 
   @override
@@ -119,6 +176,8 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
 
   @override
   Widget build(BuildContext context) {
+    final bool highlighted = _isFocused || widget.isActive;
+
     return Focus(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       onKeyEvent: (node, event) {
@@ -137,35 +196,37 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
           height: 34,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: _isFocused 
-                ? const Color(0xFFD9D9D9)
+            color: highlighted
+                ? (widget.isActive && !_isFocused
+                    ? const Color(0xFFEF7A1E)
+                    : const Color(0xFFD9D9D9))
                 : const Color(0xFF1E1E1E),
             border: widget.border,
           ),
-          child: widget.icon != null 
-            ? (widget.icon == Icons.space_bar_rounded 
+          child: widget.icon != null
+            ? (widget.icon == Icons.space_bar_rounded
                 ? Container(
                     width: 36,
                     height: 8, // Reducido de 12 a 8 para que las líneas laterales sean más cortas
                     decoration: BoxDecoration(
                       border: Border(
-                        left: BorderSide(color: _isFocused ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A), width: 2),
-                        bottom: BorderSide(color: _isFocused ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A), width: 2),
-                        right: BorderSide(color: _isFocused ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A), width: 2),
+                        left: BorderSide(color: highlighted ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A), width: 2),
+                        bottom: BorderSide(color: highlighted ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A), width: 2),
+                        right: BorderSide(color: highlighted ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A), width: 2),
                       ),
                     ),
                   )
                 : Icon(
                     widget.icon,
                     size: 22,
-                    color: _isFocused ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A),
+                    color: highlighted ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A),
                   ))
             : Text(
                 widget.label ?? '',
                 style: TextStyle(
-                  color: _isFocused ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A),
+                  color: highlighted ? const Color(0xFF1A1A1A) : const Color(0xFF9A9A9A),
                   fontSize: 16,
-                  fontWeight: _isFocused ? FontWeight.w500 : FontWeight.normal,
+                  fontWeight: highlighted ? FontWeight.w500 : FontWeight.normal,
                 ),
               ),
         ),

@@ -183,18 +183,18 @@ class ResponsiveUtils {
     
     if (b < Breakpoint.md) {
       if (width > 550 || orientation == Orientation.landscape) {
-        return (width / 3.2).clamp(160.0, 200.0);
+        return (width / 3.2).clamp(115.0, 145.0);
       }
-      return (width / 2.2).clamp(160.0, 200.0);
+      return (width / 2.2).clamp(115.0, 145.0);
     }
     
     if (b == Breakpoint.md) {
-      return (width / 3.8).clamp(200.0, 250.0);
+      return (width / 3.8).clamp(145.0, 185.0);
     }
     
-    if (b == Breakpoint.lg) return 270.0;
-    if (b == Breakpoint.xl) return 295.0;
-    return 300.0;
+    if (b == Breakpoint.lg) return 200.0;
+    if (b == Breakpoint.xl) return 220.0;
+    return 230.0;
   }
 
   /// Altura proporcional para póster grande (AspectRatio 2:3).

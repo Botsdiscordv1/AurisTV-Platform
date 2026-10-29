@@ -404,6 +404,15 @@ Future<bool> _shouldInvalidateCache(Ref ref, EpisodesParams params, _EpisodeCach
 
 // --- Providers ---
 
+/// true si [url] apunta a un stream de reproducción (.m3u / .m3u8, con o sin
+/// query/fragment) y no a la ficha de una serie o película. En ese caso no se
+/// debe consultar /api/episodes: el server no puede resolver episodios desde
+/// un stream y la petición solo genera ruido (canales de listas M3U).
+bool isStreamPlaylistUrl(String url) {
+  final path = url.toLowerCase().split('?').first.split('#').first;
+  return path.endsWith('.m3u8') || path.endsWith('.m3u');
+}
+
 final contentSearchProvider = FutureProvider.family<SearchResponse, ContentSearchParams>((ref, params) async {
   final repo = ref.watch(aurisRepositoryProvider);
   final cancelToken = CancelToken();
@@ -418,6 +427,14 @@ final omdbSeasonProvider = FutureProvider.family<List<OmdbEpisode>, OmdbSeasonPa
 
 final AutoDisposeFutureProviderFamily<EpisodesResponse?, EpisodesParams> episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, EpisodesParams>((AutoDisposeFutureProviderRef<EpisodesResponse?> ref, EpisodesParams params) async {
   if (params.url.isEmpty || params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
+    return EpisodesResponse(episodes: const [], source: params.source, url: params.url, slug: '', total: 0);
+  }
+
+  // Directo de lista M3U (canales en vivo): la URL es un STREAM, no la ficha
+  // de una serie/película. El backend no puede devolver episodios y abrir un
+  // canal disparaba una llamada inútil a /api/episodes?url=<m3u8> (ruido y
+  // errores 404/500). Se responde vacío sin salir de la app.
+  if (isStreamPlaylistUrl(params.url)) {
     return EpisodesResponse(episodes: const [], source: params.source, url: params.url, slug: '', total: 0);
   }
   

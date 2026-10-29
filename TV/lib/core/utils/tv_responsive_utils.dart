@@ -145,7 +145,7 @@ class TVResponsiveUtils {
   /// reencuadra a hero (medido 1037 x 590). Auris conserva un formato
   /// editorial propio, escalado como póster x1.25 sobre la rejilla medida.
   static double largePosterWidth(BuildContext context) {
-    return grid(context, primePortraitCard * 1.25);
+    return grid(context, primePortraitCard * 0.95);
   }
 
   /// Altura proporcional de póster grande (2:3) para TV

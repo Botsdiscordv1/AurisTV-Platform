@@ -85,7 +85,9 @@ class ContentSports {
   }
 
   factory ContentSports.fromJson(Map<String, dynamic> json) {
-    final channelsList = json['channels'] as List?;
+    // Alias del shape de lacancha.tv: `name` (título), `ppvCategory`
+    // (deporte) y `options` (servidores/canales con embeds).
+    final channelsList = (json['channels'] ?? json['options']) as List?;
     final parsedChannels = (channelsList != null)
         ? channelsList.map((c) => Map<String, dynamic>.from(c as Map)).toList()
         : <Map<String, dynamic>>[];
@@ -116,9 +118,13 @@ class ContentSports {
 
     return ContentSports(
       id: json['id']?.toString() ?? '',
-      title: json['title']?.toString() ?? 'Evento deportivo',
-      sport: json['sport']?.toString(),
-      sportLabel: json['sportLabel']?.toString() ?? json['sport']?.toString(),
+      title: json['title']?.toString() ??
+          json['name']?.toString() ??
+          'Evento deportivo',
+      sport: json['sport']?.toString() ?? json['ppvCategory']?.toString(),
+      sportLabel: json['sportLabel']?.toString() ??
+          json['sport']?.toString() ??
+          json['ppvCategory']?.toString(),
       league: json['league']?.toString(),
       leagueLogo: json['leagueLogo']?.toString(),
       teams: parsedTeams,

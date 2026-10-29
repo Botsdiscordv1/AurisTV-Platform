@@ -13,6 +13,8 @@ import '../../features/player/presentation/player_screen.dart';
 import '../../features/schedule/presentation/schedule_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/settings/presentation/playlists_screen.dart';
+import '../../features/settings/presentation/playlist_channels_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/connections_screen.dart';
 import '../../features/avatar/presentation/avatar_selector_screen.dart';
@@ -231,6 +233,18 @@ final GoRouter appRouter = GoRouter(
             return AvatarSelectorScreen(profileId: profileId);
           },
         ),
+        GoRoute(
+          path: 'listas',
+          builder: (context, state) => const PlaylistsScreen(),
+          routes: [
+            GoRoute(
+              path: ':playlistId',
+              builder: (context, state) => PlaylistChannelsScreen(
+                playlistId: state.pathParameters['playlistId']!,
+              ),
+            ),
+          ],
+        ),
       ],
     ),
     GoRoute(
@@ -329,6 +343,8 @@ final GoRouter appRouter = GoRouter(
         final video720 = state.uri.queryParameters['video720'];
         final video1080 = state.uri.queryParameters['video1080'];
         final skipResume = state.uri.queryParameters['skipResume'] == '1';
+        // Directo (lista M3U): sin historial de "Continuar viendo".
+        final isLive = state.uri.queryParameters['isLive'] == '1';
         // Sesión de cast espejo: la TV reproduce para el emisor y no debe
         // escribir historial (ver PlayerScreen.isCastMirror).
         final isCastMirror = state.uri.queryParameters['cast'] == '1';
@@ -369,6 +385,7 @@ final GoRouter appRouter = GoRouter(
           video720: video720,
           video1080: video1080,
           skipResume: skipResume,
+          isLive: isLive,
           kind: kind,
           year: year,
           initialHeaders: initialHeaders,

@@ -12,6 +12,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/watch_next/watch_next_initializer.dart';
 import 'features/local_cast/local_cast_server.dart';
+import 'features/sports/sports_channel_launcher.dart';
 import 'features/remote_control/presentation/providers/remote_control_provider.dart';
 import 'features/remote_control/data/models/remote_device.dart';
 
@@ -57,6 +58,9 @@ Future<void> main() async {
       overrides: [
         // Senior Fix: Sincronizamos el navigatorKey del Core con el de GoRouter
         navigatorKeyProvider.overrideWithValue(rootNavigatorKey),
+        // Reproducción de eventos deportivos (lacancha): resuelve el m3u8 con
+        // un WebView oculto y lo abre en media_kit con Referer del embed.
+        sportsChannelLauncherProvider.overrideWithValue(launchSportsChannel),
       ],
       child: const AurisApp(),
     ),

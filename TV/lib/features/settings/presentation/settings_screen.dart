@@ -23,6 +23,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     'Cuenta',
     'Reproducción',
     'Subtítulos',
+    'Listas',
     'Sistema',
   ];
 
@@ -101,9 +102,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case 0: return _buildAccountCategory();
       case 1: return _buildPlaybackCategory(settings);
       case 2: return _buildSubtitlesCategory(settings);
-      case 3: return _buildSystemCategory();
+      case 3: return _buildListsCategory();
+      case 4: return _buildSystemCategory();
       default: return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildListsCategory() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CategoryHeader(title: 'Listas añadidas'),
+        const SizedBox(height: 12),
+        const Text(
+          'Abre tus listas de canales M3U/M3U8: las 18 integradas por defecto '
+          'y las tuyas. Selecciona una lista para ver sus canales y reproducirlos.',
+          style: TextStyle(color: Colors.white54, fontSize: 15, height: 1.4),
+        ),
+        const SizedBox(height: 30),
+        _SettingsTVButton(
+          label: 'Ver listas (integradas y tuyas)',
+          icon: Icons.playlist_play_rounded,
+          primary: true,
+          onTap: () => context.push('/settings/listas'),
+        ),
+      ],
+    );
   }
 
   Widget _buildAccountCategory() {

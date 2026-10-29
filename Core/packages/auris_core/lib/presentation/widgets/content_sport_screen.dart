@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auris_core.dart';
 
 /// Pantalla dedicada `content_sport` para eventos deportivos en vivo y próximos.
 /// Muestra los detalles completos del evento (liga, equipos, sinopsis, estado en vivo)
 /// y un selector directo de canales de transmisión (`channels`).
-class ContentSportScreen extends StatelessWidget {
+///
+/// Al abrirse busca el detalle del evento (`/es/ver/<id>` en la fuente lacancha)
+/// para sustituir los canales marcadores por los servidores reales (`embed_url`).
+/// Al tocar un servidor delega la reproducción en el [sportsChannelLauncherProvider]
+/// que cada app inyecta (resolvedor m3u8 → media_kit en Android; embed en Web).
+class ContentSportScreen extends ConsumerStatefulWidget {
   final ContentSports event;
   final ValueChanged<Map<String, dynamic>>? onChannelSelected;
   final VoidCallback? onBackPressed;
@@ -17,7 +23,87 @@ class ContentSportScreen extends StatelessWidget {
   });
 
   @override
+  ConsumerState<ContentSportScreen> createState() => _ContentSportScreenState();
+}
+
+class _ContentSportScreenState extends ConsumerState<ContentSportScreen> {
+  late ContentSports _event;
+  bool _loadingDetail = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _event = widget.event;
+    _loadDetail();
+  }
+
+  /// Busca los servidores reales del evento y los fusiona con la metadata del
+  /// catálogo (thumbnail, colores, viewers) que el detalle no trae.
+  Future<void> _loadDetail() async {
+    final id = widget.event.id;
+    // Solo la fuente lacancha tiene endpoint de detalle; los eventos del
+    // backend 3003 ya traen canales con `url` directa y no deben fetchear.
+    final looksLikeLacancha = widget.event.channels.isEmpty ||
+        widget.event.channels.any((c) =>
+            (c['embed_url']?.toString() ?? '').isNotEmpty ||
+            (c['url']?.toString() ?? '').isEmpty);
+    if (!looksLikeLacancha) {
+      setState(() => _loadingDetail = false);
+      return;
+    }
+
+    final source = ref.read(lacanchaEventsSourceProvider);
+    final detail = await source.fetchEventDetail(id);
+    if (!mounted || detail == null) {
+      if (mounted) setState(() => _loadingDetail = false);
+      return;
+    }
+
+    setState(() {
+      _event = ContentSports(
+        id: widget.event.id,
+        title: detail.title.isNotEmpty ? detail.title : widget.event.title,
+        sport: widget.event.sport,
+        sportLabel: widget.event.sportLabel ?? detail.sportLabel,
+        league: detail.league ?? widget.event.league,
+        leagueLogo: widget.event.leagueLogo,
+        teams: detail.teams.isNotEmpty ? detail.teams : widget.event.teams,
+        channels: detail.channels,
+        posterUrl: widget.event.posterUrl.isNotEmpty
+            ? widget.event.posterUrl
+            : detail.posterUrl,
+        bannerUrl: widget.event.bannerUrl.isNotEmpty
+            ? widget.event.bannerUrl
+            : detail.bannerUrl,
+        colors: widget.event.colors,
+        synopsis: widget.event.synopsis,
+        viewers: widget.event.viewers,
+        startsAtMs: widget.event.startsAtMs,
+        startsAt: detail.startsAt ?? widget.event.startsAt,
+        endsAtMs: widget.event.endsAtMs,
+        isLive: detail.isLive || widget.event.isLive,
+        alwaysLive: widget.event.alwaysLive,
+        status: detail.isLive ? 'EN VIVO' : widget.event.status,
+        source: 'ppv',
+      );
+      _loadingDetail = false;
+    });
+  }
+
+  void _onChannelTap(Map<String, dynamic> channel) {
+    debugPrint('[ContentSportScreen] canal: ${channel['name']} '
+        '(${channel['url'] ?? channel['embed_url']})');
+    if (widget.onChannelSelected != null) {
+      widget.onChannelSelected!(channel);
+      return;
+    }
+    // Delega en el lanzador que la app inyectó (go_router + resolvedor).
+    ref.read(sportsChannelLauncherProvider)(context, _event, channel);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final event = _event;
     debugPrint('[ContentSportScreen] OPENED successfully -> Title: "${event.title}", ID: ${event.id}, League: ${event.league}, Channels count: ${event.channels.length}');
     // El BACKEND calcula el estado real: usar event.isLive/status, no recalcular.
     final isLive = event.effectiveIsLive;
@@ -34,7 +120,7 @@ class ContentSportScreen extends StatelessWidget {
             backgroundColor: const Color(0xFF18181C),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
+              onPressed: widget.onBackPressed ?? () => Navigator.of(context).pop(),
             ),
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
@@ -159,7 +245,14 @@ class ContentSportScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if (event.channels.isEmpty)
+                  if (_loadingDetail && event.channels.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24.0),
+                      child: Center(
+                        child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+                      ),
+                    )
+                  else if (event.channels.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 24.0),
                       child: Center(
@@ -178,6 +271,11 @@ class ContentSportScreen extends StatelessWidget {
                         final channel = event.channels[index];
                         final channelName = channel['name']?.toString() ?? 'Canal ${index + 1}';
                         final channelQuality = channel['quality']?.toString() ?? 'HD';
+                        final url = (channel['url']?.toString() ??
+                                channel['embed_url']?.toString() ??
+                                '')
+                            .trim();
+                        final playable = url.isNotEmpty;
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -187,27 +285,28 @@ class ContentSportScreen extends StatelessWidget {
                             border: Border.all(color: Colors.white12),
                           ),
                           child: ListTile(
-                            leading: const CircleAvatar(
-                              backgroundColor: Color(0xFFEF7A1E),
-                              child: Icon(Icons.play_arrow, color: Colors.white),
+                            enabled: playable,
+                            leading: CircleAvatar(
+                              backgroundColor: playable
+                                  ? const Color(0xFFEF7A1E)
+                                  : Colors.white24,
+                              child: Icon(Icons.play_arrow,
+                                  color: playable ? Colors.white : Colors.white38),
                             ),
                             title: Text(
                               channelName,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: playable ? Colors.white : Colors.white38,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             subtitle: Text(
-                              'Calidad: $channelQuality',
+                              playable ? 'Calidad: $channelQuality' : 'No disponible',
                               style: const TextStyle(color: Colors.white54, fontSize: 12),
                             ),
-                            trailing: const Icon(Icons.chevron_right, color: Colors.white54),
-                            onTap: () {
-                              if (onChannelSelected != null) {
-                                onChannelSelected!(channel);
-                              } else {
-                                // Default action: play stream using activePlayerProvider or navigate
-                                debugPrint('[ContentSportScreen] Selected channel: $channelName (${channel['url']})');
-                              }
-                            },
+                            trailing: Icon(Icons.chevron_right,
+                                color: playable ? Colors.white54 : Colors.transparent),
+                            onTap: playable ? () => _onChannelTap(channel) : null,
                           ),
                         );
                       },

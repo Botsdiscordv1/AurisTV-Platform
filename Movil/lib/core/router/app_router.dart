@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,8 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/content/presentation/content_screen.dart';
 import '../../features/player/presentation/player_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/settings/presentation/playlists_screen.dart';
+import '../../features/settings/presentation/playlist_channels_screen.dart';
 import '../../features/auth/presentation/activate_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/connections_screen.dart';
@@ -150,6 +154,18 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: 'storage', // Esto será /settings/storage
           builder: (context, state) => const StorageScreen(),
+        ),
+        GoRoute(
+          path: 'listas', // Esto será /settings/listas
+          builder: (context, state) => const PlaylistsScreen(),
+          routes: [
+            GoRoute(
+              path: ':playlistId', // Esto será /settings/listas/:playlistId
+              builder: (context, state) => PlaylistChannelsScreen(
+                playlistId: state.pathParameters['playlistId']!,
+              ),
+            ),
+          ],
         ),
       ],
     ),
@@ -310,6 +326,20 @@ final GoRouter appRouter = GoRouter(
         final video720 = state.uri.queryParameters['video720'];
         final video1080 = state.uri.queryParameters['video1080'];
         final skipResume = state.uri.queryParameters['skipResume'] == '1';
+        // Directo (lista M3U): sin historial de "Continuar viendo".
+        final isLive = state.uri.queryParameters['isLive'] == '1';
+        // Headers iniciales para streams directos protegidos (p. ej. el
+        // Referer que exige el CDN del m3u8 de un evento lacancha).
+        Map<String, String>? initialHeaders;
+        final headersRaw = state.uri.queryParameters['headers'];
+        if (headersRaw != null && headersRaw.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(headersRaw);
+            if (decoded is Map) {
+              initialHeaders = decoded.map((k, v) => MapEntry(k.toString(), v.toString()));
+            }
+          } catch (_) {}
+        }
         // Cast elegido en la ficha: el player lo dispara al resolver el stream.
         final castTargetId = state.uri.queryParameters['castTarget'];
         
@@ -346,6 +376,8 @@ final GoRouter appRouter = GoRouter(
               video720: video720,
               video1080: video1080,
               skipResume: skipResume,
+              isLive: isLive,
+              initialHeaders: initialHeaders,
               kind: kind,
               year: year,
               castTargetId: castTargetId,
