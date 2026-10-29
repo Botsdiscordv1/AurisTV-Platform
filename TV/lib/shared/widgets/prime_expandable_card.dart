@@ -53,7 +53,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
   Widget build(BuildContext context) {
     final theme = EditorialBadgeTheme.getTheme(widget.badge);
     final bool isMobileDevice = ResponsiveUtils.isMobile(context);
-    final double normalWidth = isMobileDevice ? ResponsiveUtils.sp(context, 140) : 200;
+    final double normalWidth = isMobileDevice ? ResponsiveUtils.sp(context, 105) : 145;
 
     return Focus(
       onFocusChange: (focused) {
@@ -69,7 +69,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
           onTap: widget.onTap,
           child: SizedBox(
             width: normalWidth,
-            height: isMobileDevice ? ResponsiveUtils.sp(context, 280) : 400,
+            height: isMobileDevice ? ResponsiveUtils.sp(context, 210) : 290,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

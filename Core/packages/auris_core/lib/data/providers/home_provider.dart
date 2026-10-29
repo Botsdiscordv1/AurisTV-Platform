@@ -86,8 +86,19 @@ final heroBannerItemsProvider = FutureProvider.family<List<MediaItem>, String>((
     }
   }
 
-  // Senior Strategy: Si la categoría es 'live', consumimos el endpoint /api/home/hero del servidor sports con fallback a getSportsEvents
+  // Senior Strategy: Si la categoría es 'live', consumimos el catálogo de
+  // eventos en vivo de lacancha.tv (fuente primaria, sin servidor propio) y
+  // caemos al backend deportivo (3003) solo si lacancha no devuelve nada.
   if (category == 'live') {
+    try {
+      final lacanchaEvents = await ref.watch(lacanchaLiveEventsProvider.future)
+          .timeout(const Duration(seconds: 10));
+      final lacanchaItems = lacanchaEvents.map((e) => e.toMediaItem()).toList();
+      if (lacanchaItems.isNotEmpty) return lacanchaItems;
+    } catch (e) {
+      debugPrint('[heroBannerItemsProvider] Live lacancha error: $e');
+    }
+
     try {
       final heroItems = await repo.getHomeHero(category: 'live', imgSize: '1080')
           .timeout(const Duration(seconds: 10));
@@ -458,6 +469,31 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
   final cacheKey = 'personalized_home_${userId}_$currentCategory';
 
   if (currentCategory == 'live') {
+    // Fuente primaria: catálogo de eventos en vivo de lacancha.tv. Si hay
+    // eventos, pintamos la fila "En Vivo" y no consultamos el backend 3003.
+    try {
+      final lacanchaEvents = await ref.watch(lacanchaLiveEventsProvider.future)
+          .timeout(const Duration(seconds: 10));
+      if (lacanchaEvents.isNotEmpty) {
+        yield SectionComposer.compose([
+          HomeLayoutSection(
+            type: HomeSectionType.editorial,
+            title: 'En Vivo',
+            data: SportsEditorialRow(
+              title: 'En Vivo',
+              subtitle: 'Eventos deportivos transmitiéndose ahora',
+              items: lacanchaEvents,
+            ),
+            presentation: SectionPresentation.wide,
+            serverFormat: 'wide',
+          ),
+        ]);
+        return;
+      }
+    } catch (e) {
+      debugPrint('[homeLayoutProvider] Live lacancha error: $e');
+    }
+
     try {
       // El BACKEND arma las secciones (GET /api/home/sections); aquí solo las
       // mapeamos a HomeLayoutSection para pintarlas. Cada sección `cards` se

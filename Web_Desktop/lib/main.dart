@@ -14,6 +14,7 @@ import 'core/theme/app_theme.dart';
 import 'shared/widgets/min_width_wrapper.dart';
 import 'features/windows/presentation/windows_web_wrapper.dart';
 import 'core/utils/url_utils.dart';
+import 'features/sports/sports_channel_launcher.dart';
 import 'package:auristv_web/features/player/presentation/player_screen.dart';
 import 'features/remote_control/presentation/providers/remote_control_provider.dart';
 import 'features/remote_control/data/models/remote_device.dart';
@@ -62,6 +63,10 @@ Future<void> main() async {
       overrides: [
         // Senior Fix: Sincronizamos el navigatorKey del Core con el de GoRouter
         navigatorKeyProvider.overrideWithValue(rootNavigatorKey),
+        // Reproducción de eventos deportivos (lacancha): en Web/Desktop el
+        // embed se abre en el navegador del sistema (mismo comportamiento
+        // embed que PlayerScreen en estas plataformas).
+        sportsChannelLauncherProvider.overrideWithValue(launchSportsChannel),
       ],
       child: const AurisApp(),
     ),

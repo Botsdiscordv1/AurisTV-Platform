@@ -53,6 +53,10 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? video1080;
   final bool skipResume;
 
+  /// Reproducción en vivo (canales de listas M3U): no escribe historial
+  /// ("Continuar viendo") ni propone reanudar.
+  final bool isLive;
+
   const PlayerScreen({
     super.key,
     required this.contentId,
@@ -75,6 +79,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.video720,
     this.video1080,
     this.skipResume = false,
+    this.isLive = false,
   });
 
   @override
@@ -228,7 +233,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       final synced = ref.watch(activePlayerProvider.select((s) => s.availableEpisodes));
       final notifier = ref.read(activePlayerProvider.notifier);
       title = notifier.episodeInfoFor(_activeEpisode, _enrichedEpisodes(synced ?? const []))?.title;
-      if (title == null || title.isEmpty) {
+      // En directo (listas M3U) no hay episodios: no consultar /api/episodes.
+      if (!widget.isLive && (title == null || title.isEmpty)) {
         final eps = ref
             .read(episodesProvider(EpisodesParams(
               url: _seriesListUrl,
@@ -612,7 +618,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _videoKey = ref.read(activePlayerProvider).videoKey;
     WidgetsBinding.instance.addObserver(this);
     
-    _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
+    // En directo (listas M3U) no se persiste historial.
+    _historyNotifier = widget.isLive
+        ? null
+        : ref.read(playbackHistoryStateProvider.notifier);
 
     // Senior Normalization: Aseguramos que la URL del widget sea comparable con la del motor
     final String normalizedWidgetUrl = ApiEndpoints.fixUrl(widget.sourceUrl);
@@ -4495,7 +4504,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Autoplay Shield: Verificar si existe un siguiente episodio
     // Senior Fix (Issue #4): Usar consolidated provider
     final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
-    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
+    final episodesAsync = (widget.isLive || widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
         ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
       url: _seriesListUrl,
@@ -4962,7 +4971,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Senior Fix (Issue #4): Usar consolidated provider
     final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
     final bool hasPrevious = currentNum > 1;
-    final episodesAsync = (widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
+    final episodesAsync = (widget.isLive || widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
         ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
         : ref.watch(episodesProvider(EpisodesParams(
       url: _seriesListUrl,

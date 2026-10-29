@@ -190,6 +190,17 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
 
+              // SECCIÓN: LISTAS
+              const _SectionHeader(title: 'Listas añadidas'),
+              _SettingsCard(
+                child: _SettingsTile(
+                  icon: Icons.playlist_play_rounded,
+                  title: 'Listas (M3U)',
+                  subtitle: 'Ver y añadir listas de canales',
+                  onTap: () => context.push('/settings/listas'),
+                ),
+              ),
+
               // SECCIÓN: SISTEMA
               const _SectionHeader(title: 'Almacenamiento'),
               _SettingsCard(

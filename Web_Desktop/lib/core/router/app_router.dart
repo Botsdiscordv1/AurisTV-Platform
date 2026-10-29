@@ -11,6 +11,8 @@ import '../../features/player/presentation/player_screen.dart';
 import '../../features/schedule/presentation/schedule_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/settings/presentation/playlists_screen.dart';
+import '../../features/settings/presentation/playlist_channels_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/connections_screen.dart';
 import '../../features/avatar/presentation/avatar_selector_screen.dart';
@@ -231,6 +233,8 @@ final GoRouter appRouter = GoRouter(
           posterUrl: params['posterUrl'],
           bannerUrl: params['bannerUrl'],
           logoUrl: params['logoUrl'],
+          skipResume: params['skipResume'] == '1',
+          isLive: params['isLive'] == '1',
         );
       },
     ),
@@ -245,6 +249,18 @@ final GoRouter appRouter = GoRouter(
       parentNavigatorKey: rootNavigatorKey,
       path: '/settings/library',
       builder: (context, state) => const LibraryScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/settings/listas',
+      builder: (context, state) => const PlaylistsScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/settings/listas/:playlistId',
+      builder: (context, state) => PlaylistChannelsScreen(
+        playlistId: state.pathParameters['playlistId']!,
+      ),
     ),
         GoRoute(
       parentNavigatorKey: rootNavigatorKey,

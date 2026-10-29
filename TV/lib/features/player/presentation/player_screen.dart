@@ -54,6 +54,10 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? video1080;
   final bool skipResume;
 
+  /// Reproducción en vivo (canales de listas M3U): no escribe historial
+  /// ("Continuar viendo") ni propone reanudar.
+  final bool isLive;
+
   /// Cabeceras HTTP (Referer/UA) del stream resuelto, recibidas por el canal
   /// de cast (open_media con `direct=1`). Al tenerlas, el player abre el stream
   /// DIRECTO con estas headers (sin re-extraer, latencia 0 y fuente idéntica).
@@ -87,6 +91,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.video720,
     this.video1080,
     this.skipResume = false,
+    this.isLive = false,
     this.initialHeaders,
     this.isCastMirror = false,
   });
@@ -334,6 +339,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Si el contenido actual es un Tráiler.
   bool get _isTrailer => widget.episode == 'Trailer';
 
+  /// Stream directo en vivo: canal de lista M3U o evento lacancha (m3u8).
+  /// En este modo no hay episodios, servidores ni idiomas que cambiar, así
+  /// que la UI oculta el overlay "Siguiente episodio", las pills prev/next y
+  /// las pills de servidor e idioma.
+  bool get _isLiveStream =>
+      widget.isLive ||
+      (widget.source.isEmpty &&
+          widget.sourceUrl.isNotEmpty &&
+          (widget.sourceUrl.contains('.m3u8') ||
+              widget.sourceUrl.contains('.m3u')));
+
   /// Subtítulo del episodio en formato `T1:E1 "Título"` (igual en las 3
   /// plataformas). Observa la lista sincronizada: el título aparece en cuanto
   /// llega, y al mostrarse ya queda cargado para el guardado.
@@ -344,7 +360,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       final synced = ref.watch(activePlayerProvider.select((s) => s.availableEpisodes));
       final notifier = ref.read(activePlayerProvider.notifier);
       title = notifier.episodeInfoFor(_activeEpisode, _enrichedEpisodes(synced ?? const []))?.title;
-      if (title == null || title.isEmpty) {
+      // En directo (listas M3U) no hay episodios: no consultar /api/episodes.
+      if (!widget.isLive && (title == null || title.isEmpty)) {
         final eps = ref
             .read(episodesProvider(EpisodesParams(
               url: _seriesListUrl,
@@ -824,7 +841,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _isMobileDevice = ResponsiveUtils.isNative;
 
     // Senior Fix: Capturar el notifier en initState para poder usarlo en dispose de forma segura
-    _historyNotifier = ref.read(playbackHistoryStateProvider.notifier);
+    // En directo (listas M3U) no se persiste historial.
+    _historyNotifier = widget.isLive
+        ? null
+        : ref.read(playbackHistoryStateProvider.notifier);
 
     // En App Nativa mantenemos el control total del hardware.
     // TV: siempre horizontal 16:9 (las TV no tienen variante vertical).
@@ -2086,16 +2106,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   /// Suscripción (watch) para que la capa de pills se reconstruya cuando
   /// carguen los episodios. Solo llamar desde build.
-  AsyncValue<EpisodesResponse?> _episodesAsync() => ref.watch(episodesProvider(EpisodesParams(
-        url: _seriesListUrl,
-        source: widget.source,
-        title: widget.title,
-        season: widget.season,
-      )));
+  /// En directo (listas M3U) devuelve vacío sin tocar el backend.
+  AsyncValue<EpisodesResponse?> _episodesAsync() => widget.isLive
+      ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(
+          episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
+      : ref.watch(episodesProvider(EpisodesParams(
+          url: _seriesListUrl,
+          source: widget.source,
+          title: widget.title,
+          season: widget.season,
+        )));
 
   /// Lógica pura: ¿hay episodio anterior/siguiente? Reutiliza el mismo criterio
   /// que el overlay de autoplay. Usar valueOrNull/when sobre el AsyncValue.
   ({bool hasPrev, bool hasNext}) _episodeNavBounds(AsyncValue<EpisodesResponse?> episodesAsync) {
+    // En vivo/directo M3U no hay episodios: sin prev/next.
+    if (_isLiveStream) return (hasPrev: false, hasNext: false);
     final currentNum = int.tryParse(_activeEpisode ?? '') ?? 0;
     final bool hasPrev = currentNum > 1;
     final bool hasNext = episodesAsync.when(
@@ -2113,7 +2139,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _navigateToEpisode(bool next) async {
-    if (_isTrailer || _currentEpisode == null) return;
+    // En vivo/directo M3U no hay episodios: blindar también por D-PAD/remoto.
+    if (_isTrailer || _isLiveStream || _currentEpisode == null) return;
     final currentNum = int.tryParse(_currentEpisode!) ?? 1;
     final nextNum = next ? currentNum + 1 : currentNum - 1;
     if (nextNum < 1) return;
@@ -2311,6 +2338,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _startAutoplayCountdown({bool isResume = false}) {
+    // En vivo/directo M3U no hay "siguiente episodio": no arrancar countdown.
+    if (_isLiveStream) return;
     // Senior Fix: Respetar la preferencia de Autoplay del usuario
     final settings = ref.read(settingsProvider);
     if (!isResume && (!settings.autoPlayNextEpisode || !_policy.autoPlayNext)) return;
@@ -3220,11 +3249,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             );
           }
 
+          // En vivo/directo M3U no hay "siguiente episodio": nunca mostrar
+          // el overlay ni arrancar su countdown.
           bool shouldShowNext = false;
-          if (_policy.nextContentThreshold != null && progress >= _policy.nextContentThreshold!) {
-            shouldShowNext = true;
-          } else if (_policy.remainingTimeThreshold != null && remaining <= _policy.remainingTimeThreshold!) {
-            shouldShowNext = true;
+          if (!_isLiveStream) {
+            if (_policy.nextContentThreshold != null && progress >= _policy.nextContentThreshold!) {
+              shouldShowNext = true;
+            } else if (_policy.remainingTimeThreshold != null && remaining <= _policy.remainingTimeThreshold!) {
+              shouldShowNext = true;
+            }
           }
 
           if (shouldShowNext && !_showNextNotifier.value) {
@@ -3850,12 +3883,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Movil/Web). Sin esto el historial guardaba "T1:E1" sin título en TV:
     // los ticks/stop resuelven el título desde availableEpisodes.
     // Key anti re-sync: el whenData dispara por cada rebuild con data.
-    final episodesForSession = ref.watch(episodesProvider(EpisodesParams(
-      url: _seriesListUrl,
-      source: widget.source,
-      title: widget.title,
-      season: widget.season,
-    )));
+    // En directo (listas M3U) no hay serie/episodios: responder vacío y no
+    // consultar /api/episodes al abrir el canal.
+    final episodesForSession = widget.isLive
+        ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(
+            episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
+        : ref.watch(episodesProvider(EpisodesParams(
+            url: _seriesListUrl,
+            source: widget.source,
+            title: widget.title,
+            season: widget.season,
+          )));
     episodesForSession.whenData((data) {
       if (data == null || data.episodes.isEmpty) return;
       // Huella de contenido (NO solo longitud): fast y full suelen medir
@@ -5064,14 +5102,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // único hueco uniforme, así la separación es idéntica aunque se
     // oculten cápsulas (movie / OP-ED) — antes la última pill doblaba
     // el hueco (20px frente a 10px).
+    // En vivo/directo M3U no hay servidor ni idioma que cambiar: sin esas
+    // pills (ni episodios/prev/next, que ya se ocultan por _isMovie/nav).
     final pills = <Widget>[
-      _buildPillButton(
-        label: _currentSource.isNotEmpty ? simplifySourceName(_currentSource) : 'Servidor',
-        icon: AurisIcons.server,
-        isSelected: _activeOverlay == PlayerOverlay.server,
-        onTap: _showServerSelector,
-        focusNode: _serverPillFocusNode,
-      ),
+      if (!_isLiveStream)
+        _buildPillButton(
+          label: _currentSource.isNotEmpty ? simplifySourceName(_currentSource) : 'Servidor',
+          icon: AurisIcons.server,
+          isSelected: _activeOverlay == PlayerOverlay.server,
+          onTap: _showServerSelector,
+          focusNode: _serverPillFocusNode,
+        ),
     ];
     if (!_isMovie) {
       pills.add(
@@ -5107,7 +5148,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         );
       }
     }
-    if (!_isMovie && !_isOpEd) {
+    if (!_isMovie && !_isOpEd && !_isLiveStream) {
       pills.add(
         _buildPillButton(
           label: 'Saltar OP/ED',
@@ -5118,15 +5159,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ),
       );
     }
-    pills.add(
-      _buildPillButton(
-        label: _currentLanguageLabel,
-        icon: AurisIcons.subtitles,
-        isSelected: _activeOverlay == PlayerOverlay.language,
-        onTap: _showLanguageSelector,
-        focusNode: _languagePillFocusNode,
-      ),
-    );
+    if (!_isLiveStream) {
+      pills.add(
+        _buildPillButton(
+          label: _currentLanguageLabel,
+          icon: AurisIcons.subtitles,
+          isSelected: _activeOverlay == PlayerOverlay.language,
+          onTap: _showLanguageSelector,
+          focusNode: _languagePillFocusNode,
+        ),
+      );
+    }
 
     const double gap = 10;
     return Positioned(
@@ -5146,7 +5189,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildNextEpisodeOverlay() {
-    if (_isTrailer || _isAutoplayResume) return const SizedBox.shrink();
+    // Directo (listas M3U / eventos lacancha): sin "siguiente episodio"
+    // ni consulta de episodios.
+    if (_isTrailer || _isAutoplayResume || _isLiveStream) return const SizedBox.shrink();
     final isMobile = ResponsiveUtils.isMobile(context);
     final bool isCountdown = _autoplayCountdown >= 0;
     final String label = _isAutoplayResume ? 'Reanudar' : 'Siguiente episodio';
