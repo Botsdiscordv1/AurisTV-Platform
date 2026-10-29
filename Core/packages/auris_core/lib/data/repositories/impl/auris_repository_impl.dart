@@ -927,7 +927,12 @@ class AurisRepositoryImpl implements AurisRepository {
           final sectionMap = dataMap?['section'] as Map<String, dynamic>?;
           if (sectionMap != null) {
             final personalizedSection = EditorialSection.fromJson(sectionMap);
-            final idx = allSections.indexWhere((s) => s.id == 'top10Airing');
+            final idx = allSections.indexWhere((s) => 
+              s.id == 'top10Airing' || 
+              (s.title ?? '').toLowerCase().contains('top 10') ||
+              (s.format ?? '').toLowerCase().contains('top10') ||
+              (s.badge ?? '').toLowerCase().contains('top10')
+            );
             if (idx != -1) {
               allSections[idx] = personalizedSection;
             }

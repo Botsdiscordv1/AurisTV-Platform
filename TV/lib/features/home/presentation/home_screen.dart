@@ -113,6 +113,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
   bool _showSearch = false;
 
+  /// Último nodo del Home que tuvo foco antes de abrir el Search overlay.
+  /// Al cerrar el Search se restaura el foco a este nodo.
+  FocusNode? _lastHomeFocusedNode;
+
   // Nodos de foco de las cÃ¡psulas del topbar (uno por categorÃ­a): el hero los
   // usa para subir con D-pad arriba directo a la cÃ¡psula activa.
   final Map<String, FocusNode> _pillFocusNodes = {
@@ -138,6 +142,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
         setState(() => _isHeroHidden = focused);
       }
     };
+    // Rastrear el último nodo con foco en el Home (fuera del search overlay)
+    // para poder restaurarlo al cerrar el Search.
+    FocusManager.instance.addListener(_onGlobalFocusChange);
     _checkForUpdate();
     for (final entry in _pillFocusNodes.entries) {
       entry.value.addListener(() {
@@ -189,6 +196,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
   void dispose() {
     routeObserver.unsubscribe(this);
     TvScroll.onExpandableCardFocused = null;
+    FocusManager.instance.removeListener(_onGlobalFocusChange);
     _scrollController.removeListener(_onScroll);
     _searchIconFocusNode.dispose();
     _overlaySearchFocusNode.dispose();
@@ -216,6 +224,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     if (scrolled != _isScrolled) {
       setState(() => _isScrolled = scrolled);
     }
+  }
+
+  // ── Home focus tracking & Back navigation ───────────────────────────────────
+
+  /// Listener global de FocusManager. Guarda el nodo con foco siempre que no
+  /// estemos dentro del Search overlay ni del left bar.
+  void _onGlobalFocusChange() {
+    if (!mounted || _showSearch) return;
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary == null) return;
+    // Ignorar nodos del left bar / search icon para no sobreescribir la memoria.
+    final isRail = primary == homeProfileIconFocusNode ||
+        primary == _searchIconFocusNode ||
+        primary == _railLibraryFocusNode;
+    if (!isRail) {
+      _lastHomeFocusedNode = primary;
+    }
+  }
+
+  /// Restaura el foco al nodo del Home que tenia foco antes de abrir Search.
+  void _restoreHomeFocus() {
+    final target = _lastHomeFocusedNode ?? _railReturnNode;
+    if (target != null && target.context != null && target.canRequestFocus) {
+      target.requestFocus();
+      return;
+    }
+    _scrollToHeroAndFocusPlay();
+  }
+
+  /// Scroll al top + foco en el boton Reproducir del Hero.
+  void _scrollToHeroAndFocusPlay() {
+    setState(() => _isHeroCompact = false);
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _heroKey.currentState?.focusPlayButton();
+    });
   }
 
   // ── Left bar ──────────────────────────────────────────────────────────────
@@ -348,6 +398,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           onArrowLeftOnFirst: onArrowLeftOnFirst,
           onArrowDownToNext: onArrowDownToNext,
           onArrowUpToPrev: onArrowUpToPrev,
+          onBackToHero: _scrollToHeroAndFocusPlay,
         );
 
       case HomeSectionType.editorial:
@@ -369,6 +420,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onArrowLeftOnFirst: onArrowLeftOnFirst,
               onArrowDownToNext: onArrowDownToNext,
               onArrowUpToPrev: onArrowUpToPrev,
+              onBackToHero: _scrollToHeroAndFocusPlay,
             ),
           );
         } else if (row.format == SectionPresentation.wide || section.presentation == SectionPresentation.wide) {
@@ -383,6 +435,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onArrowLeftOnFirst: onArrowLeftOnFirst,
               onArrowDownToNext: onArrowDownToNext,
               onArrowUpToPrev: onArrowUpToPrev,
+              onBackToHero: _scrollToHeroAndFocusPlay,
             ),
           );
         } else {
@@ -399,6 +452,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onArrowLeftOnFirst: onArrowLeftOnFirst,
               onArrowDownToNext: onArrowDownToNext,
               onArrowUpToPrev: onArrowUpToPrev,
+              onBackToHero: _scrollToHeroAndFocusPlay,
             ),
           );
         }
@@ -412,6 +466,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           onArrowLeftOnFirst: onArrowLeftOnFirst,
           onArrowDownToNext: onArrowDownToNext,
           onArrowUpToPrev: onArrowUpToPrev,
+          onBackToHero: _scrollToHeroAndFocusPlay,
         );
 
       case HomeSectionType.recentlyAdded:
@@ -423,6 +478,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           onArrowLeftOnFirst: onArrowLeftOnFirst,
           onArrowDownToNext: onArrowDownToNext,
           onArrowUpToPrev: onArrowUpToPrev,
+          onBackToHero: _scrollToHeroAndFocusPlay,
         );
 
       case HomeSectionType.trendingAnime:
@@ -435,6 +491,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           onArrowLeftOnFirst: onArrowLeftOnFirst,
           onArrowDownToNext: onArrowDownToNext,
           onArrowUpToPrev: onArrowUpToPrev,
+          onBackToHero: _scrollToHeroAndFocusPlay,
         );
 
       case HomeSectionType.trendingMovies:
@@ -448,6 +505,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           onArrowLeftOnFirst: onArrowLeftOnFirst,
           onArrowDownToNext: onArrowDownToNext,
           onArrowUpToPrev: onArrowUpToPrev,
+          onBackToHero: _scrollToHeroAndFocusPlay,
         );
 
       case HomeSectionType.recentEpisodes:
@@ -459,6 +517,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
           onArrowLeftOnFirst: onArrowLeftOnFirst,
           onArrowDownToNext: onArrowDownToNext,
           onArrowUpToPrev: onArrowUpToPrev,
+          onBackToHero: _scrollToHeroAndFocusPlay,
         );
 
       case HomeSectionType.recommendation:
@@ -479,6 +538,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onArrowLeftOnFirst: onArrowLeftOnFirst,
               onArrowDownToNext: onArrowDownToNext,
               onArrowUpToPrev: onArrowUpToPrev,
+              onBackToHero: _scrollToHeroAndFocusPlay,
             ),
           );
         } else if (row.format == SectionPresentation.wide || section.presentation == SectionPresentation.wide) {
@@ -493,6 +553,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onArrowLeftOnFirst: onArrowLeftOnFirst,
               onArrowDownToNext: onArrowDownToNext,
               onArrowUpToPrev: onArrowUpToPrev,
+              onBackToHero: _scrollToHeroAndFocusPlay,
             ),
           );
         } else {
@@ -509,6 +570,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               onArrowLeftOnFirst: onArrowLeftOnFirst,
               onArrowDownToNext: onArrowDownToNext,
               onArrowUpToPrev: onArrowUpToPrev,
+              onBackToHero: _scrollToHeroAndFocusPlay,
             ),
           );
         }
@@ -675,7 +737,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
             curve: Curves.easeOutCubic,
             builder: (context, compactAnim, child) {
               final double fadeStart = 0.0 + (0.475 * compactAnim);
-              final double fadeEnd = 0.08 + (0.415 * compactAnim);
+              final double fadeEnd = 0.08 + (0.41 * compactAnim);
               return ShaderMask(
                 shaderCallback: (Rect rect) {
                   return LinearGradient(
@@ -708,7 +770,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                     height: _isHeroHidden
                         ? MediaQuery.of(context).size.height * 0.25
                         : (_isHeroCompact
-                            ? MediaQuery.of(context).size.height * 0.50
+                            ? MediaQuery.of(context).size.height * 0.48
                             : MediaQuery.of(context).size.height * 0.65),
                   ),
                 ),
@@ -793,24 +855,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
 
 
 
-          // Overlay de busqueda (se muestra encima del contenido, debajo de la topbar)
+          // Overlay de busqueda (cubre toda la pantalla con el fondo negro,
+          // tapando la topbar para que no aparezca ni deje huecos).
           if (_showSearch)
-            Positioned(
-              top: navHeight,
-              left: 0,
-              right: 0,
-              bottom: 0,
+            Positioned.fill(
               child: _SearchOverlay(
                 searchIconFocusNode: _searchIconFocusNode,
                 searchFieldFocusNode: _overlaySearchFocusNode,
-                onClose: () => setState(() => _showSearch = false),
+                onClose: () { setState(() => _showSearch = false); _restoreHomeFocus(); },
               ),
             ),
 
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: _buildTopNavContent(context, ref, currentCategory, navHeight),
-          ),
+          if (!_showSearch)
+            Positioned(
+              top: 0, left: 0, right: 0,
+              child: _buildTopNavContent(context, ref, currentCategory, navHeight),
+            ),
 
           // Left bar: siempre visible (iconos) y por encima del overlay de
           // búsqueda, igual que en Prime (el rail persiste en el buscador).
@@ -1417,6 +1477,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
   final bool Function()? onArrowLeftOnFirst;
   final bool Function()? onArrowDownToNext;
   final bool Function()? onArrowUpToPrev;
+  final VoidCallback? onBackToHero;
   const _ContinueWatchingSection({
     this.rowKey,
     required this.horizontalPadding,
@@ -1424,6 +1485,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
     this.onArrowUpToPrev,
+    this.onBackToHero,
   });
 
   @override
@@ -1445,6 +1507,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
           onArrowLeftOnFirst: onArrowLeftOnFirst,
           onArrowDownToNext: onArrowDownToNext,
           onArrowUpToPrev: onArrowUpToPrev,
+          onBackToHero: onBackToHero,
           items: filteredItems.take(10).map((h) {
             // LÃ³gica centralizada en Core (library_providers): solo diseÃ±o aquÃ­.
             final bool isMovieish = libraryIsMovieish(h);
@@ -1507,6 +1570,7 @@ class _Top10Section extends ConsumerWidget {
   final bool Function()? onArrowLeftOnFirst;
   final bool Function()? onArrowDownToNext;
   final bool Function()? onArrowUpToPrev;
+  final VoidCallback? onBackToHero;
   const _Top10Section({
     this.rowKey,
     required this.title,
@@ -1515,6 +1579,7 @@ class _Top10Section extends ConsumerWidget {
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
     this.onArrowUpToPrev,
+    this.onBackToHero,
   });
 
   @override
@@ -1525,6 +1590,7 @@ class _Top10Section extends ConsumerWidget {
         key: rowKey,
         title: title,
         isTop10Wide: true,
+        onBackToHero: onBackToHero,
         items: items.map((m) => WideContentItem(
           id: m.id,
           title: m.title,
@@ -1557,6 +1623,7 @@ class _RecentlyAddedSection extends ConsumerWidget {
   final bool Function()? onArrowLeftOnFirst;
   final bool Function()? onArrowDownToNext;
   final bool Function()? onArrowUpToPrev;
+  final VoidCallback? onBackToHero;
   const _RecentlyAddedSection({
     this.rowKey,
     required this.title,
@@ -1565,6 +1632,7 @@ class _RecentlyAddedSection extends ConsumerWidget {
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
     this.onArrowUpToPrev,
+    this.onBackToHero,
   });
 
   @override
@@ -1581,6 +1649,7 @@ class _RecentlyAddedSection extends ConsumerWidget {
         onArrowLeftOnFirst: onArrowLeftOnFirst,
         onArrowDownToNext: onArrowDownToNext,
         onArrowUpToPrev: onArrowUpToPrev,
+        onBackToHero: onBackToHero,
       ),
       loading: () => const RowSkeleton(),
       error: (_, __) => const SizedBox.shrink(),
@@ -1598,6 +1667,7 @@ class _TrendingSection extends ConsumerWidget {
   final bool Function()? onArrowLeftOnFirst;
   final bool Function()? onArrowDownToNext;
   final bool Function()? onArrowUpToPrev;
+  final VoidCallback? onBackToHero;
   const _TrendingSection({
     this.rowKey,
     required this.category,
@@ -1608,6 +1678,7 @@ class _TrendingSection extends ConsumerWidget {
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
     this.onArrowUpToPrev,
+    this.onBackToHero,
   });
 
   @override
@@ -1623,6 +1694,7 @@ class _TrendingSection extends ConsumerWidget {
             onArrowLeftOnFirst: onArrowLeftOnFirst,
             onArrowDownToNext: onArrowDownToNext,
             onArrowUpToPrev: onArrowUpToPrev,
+            onBackToHero: onBackToHero,
             items: items.map((m) {
               final rawSub = m.subtitle;
               final isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
@@ -1645,6 +1717,7 @@ class _TrendingSection extends ConsumerWidget {
           onArrowLeftOnFirst: onArrowLeftOnFirst,
           onArrowDownToNext: onArrowDownToNext,
           onArrowUpToPrev: onArrowUpToPrev,
+          onBackToHero: onBackToHero,
         );
       },
       loading: () => RowSkeleton(isWide: isWide),
@@ -1661,6 +1734,7 @@ class _RecentEpisodesSection extends ConsumerWidget {
   final bool Function()? onArrowLeftOnFirst;
   final bool Function()? onArrowDownToNext;
   final bool Function()? onArrowUpToPrev;
+  final VoidCallback? onBackToHero;
   const _RecentEpisodesSection({
     this.rowKey,
     required this.title,
@@ -1669,6 +1743,7 @@ class _RecentEpisodesSection extends ConsumerWidget {
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
     this.onArrowUpToPrev,
+    this.onBackToHero,
   });
 
   @override
@@ -1683,6 +1758,7 @@ class _RecentEpisodesSection extends ConsumerWidget {
         onArrowLeftOnFirst: onArrowLeftOnFirst,
         onArrowDownToNext: onArrowDownToNext,
         onArrowUpToPrev: onArrowUpToPrev,
+        onBackToHero: onBackToHero,
         items: items.map((m) {
           final rawSub = m.subtitle;
           final bool isJustYear = rawSub != null && RegExp(r'^(?:19|20)\d{2}$').hasMatch(rawSub.trim());
@@ -1727,6 +1803,16 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
   FocusNode? _internalFocusNode;
   final FocusNode _firstResultFocusNode = FocusNode();
   final FocusScopeNode _overlayScopeNode = FocusScopeNode();
+  final Map<int, FocusNode> _resultFocusNodes = {};
+  final ScrollController _resultsScrollController = ScrollController();
+
+  FocusNode _getResultFocusNode(int index) {
+    if (index == 0) return _firstResultFocusNode;
+    return _resultFocusNodes.putIfAbsent(
+      index,
+      () => FocusNode(debugLabel: 'search_result_$index'),
+    );
+  }
   final String _selectedCategory = 'all';
   Timer? _debounce;
   String _currentQuery = '';
@@ -1838,6 +1924,11 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
     _searchController.dispose();
     _internalFocusNode?.dispose();
     _firstResultFocusNode.dispose();
+    for (final node in _resultFocusNodes.values) {
+      node.dispose();
+    }
+    _resultFocusNodes.clear();
+    _resultsScrollController.dispose();
     // El slot 0 es _focusNode (ya disposed arriba si era interno).
     for (int i = 1; i < _slotNodes.length; i++) {
       _slotNodes[i].dispose();
@@ -2002,12 +2093,12 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
           child: Padding(
             // Prime Video (medidas 1.7) coloca el panel de teclado en
             // x 144..540 y la primera tecla en y 153, es decir 45 px por
-            // debajo del borde del overlay (que arranca bajo el topbar de
-            // 108 px). No hay campo de texto: la consulta se compone con el
-            // teclado en pantalla, igual que en Prime.
+            // debajo del borde del overlay (que cubre la pantalla completa
+            // desde y=0). No hay campo de texto: la consulta se compone con el
+            // teclado en pantalla, igual que en Prime (primera tecla en y=153).
             padding: EdgeInsets.only(
               left: TVResponsiveUtils.horizontalPadding(context),
-              top: TVResponsiveUtils.grid(context, 45),
+              top: TVResponsiveUtils.grid(context, 153),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2040,34 +2131,37 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
   /// resultados en y 195 (medidas de Prime Video 1.7).
   Widget _buildResultsPanel(
       BuildContext context, AsyncValue<SearchResponse> resultsAsync) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(height: TVResponsiveUtils.grid(context, 7)),
-        Padding(
-          padding:
-              EdgeInsets.only(right: TVResponsiveUtils.horizontalPadding(context)),
-          child: Text(
-            _resultsTitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: TVResponsiveUtils.rowTitleFontSize(context),
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.2,
+    return Transform.translate(
+      offset: Offset(0, -TVResponsiveUtils.grid(context, 38)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: TVResponsiveUtils.grid(context, 7)),
+          Padding(
+            padding:
+                EdgeInsets.only(right: TVResponsiveUtils.horizontalPadding(context)),
+            child: Text(
+              _resultsTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: TVResponsiveUtils.rowTitleFontSize(context),
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+              ),
             ),
           ),
-        ),
-        SizedBox(height: TVResponsiveUtils.grid(context, 4)),
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(
-                right: TVResponsiveUtils.horizontalPadding(context)),
-            child: ClipRect(child: _buildResultsState(resultsAsync)),
+          SizedBox(height: TVResponsiveUtils.grid(context, 4)),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                  right: TVResponsiveUtils.horizontalPadding(context)),
+              child: _buildResultsState(resultsAsync),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -2322,8 +2416,17 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
     final int? target;
     if (k == LogicalKeyboardKey.arrowLeft) {
       target = _leftOf(slot);
+      if (target == null && widget.searchIconFocusNode?.canRequestFocus == true) {
+        _focusExited = true;
+        widget.searchIconFocusNode!.requestFocus();
+        return KeyEventResult.handled;
+      }
     } else if (k == LogicalKeyboardKey.arrowRight) {
       target = _rightOf(slot);
+      if (target == null) {
+        _focusNearestResult(slot);
+        return KeyEventResult.handled;
+      }
     } else if (k == LogicalKeyboardKey.arrowUp) {
       target = _upOf(slot);
     } else if (k == LogicalKeyboardKey.arrowDown) {
@@ -2336,6 +2439,87 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
     return KeyEventResult.handled;
   }
 
+  void _focusNearestResult(int slot) {
+    _focusExited = true;
+    _lastSlot = slot;
+
+    // Fila del teclado en la que se encuentra el cursor (0 a 7)
+    final int kRow = slot < 36
+        ? (slot ~/ 6)
+        : (slot == _slotBackspace ? 6 : 7);
+
+    final int crossAxisCount = _overlayGridColumns(context);
+    final double cardW = TVResponsiveUtils.searchResultPosterWidth(context);
+    final double cardH = cardW / 0.52;
+    final double rowPitch = cardH + TVResponsiveUtils.sectionBottomGap(context);
+    final double scrollOffset = _resultsScrollController.hasClients
+        ? _resultsScrollController.offset
+        : 0.0;
+
+    final int firstVisibleRow = (scrollOffset / rowPitch).floor().clamp(0, 50);
+    // Filas superiores (f, l, q, w) van a la primera fila visible de tarjetas.
+    // Filas inferiores (3, 9, borrar, mic) van a la siguiente fila de tarjetas.
+    final int cardRow = kRow <= 3 ? firstVisibleRow : (firstVisibleRow + 1);
+    final int targetIndex = cardRow * crossAxisCount;
+
+    FocusNode? targetNode;
+    if (targetIndex == 0) {
+      targetNode = _firstResultFocusNode;
+    } else {
+      final node = _resultFocusNodes[targetIndex];
+      if (node != null && node.context != null && node.canRequestFocus) {
+        targetNode = node;
+      }
+    }
+
+    // Fallback: si la tarjeta calculada no existe o aún no está montada,
+    // enfocar la primera tarjeta (Card 0) que siempre está disponible.
+    if (targetNode == null || targetNode.context == null) {
+      if (_firstResultFocusNode.canRequestFocus) {
+        targetNode = _firstResultFocusNode;
+      } else {
+        for (final entry in _resultFocusNodes.entries) {
+          if (entry.value.context != null && entry.value.canRequestFocus) {
+            targetNode = entry.value;
+            break;
+          }
+        }
+      }
+    }
+
+    if (targetNode != null) {
+      targetNode.requestFocus();
+    }
+  }
+
+  void _focusKeyboardFromCard(int index, int crossAxisCount) {
+    final double cardW = TVResponsiveUtils.searchResultPosterWidth(context);
+    final double cardH = cardW / 0.52;
+    final double spacing = TVResponsiveUtils.sectionBottomGap(context);
+    final double rowPitch = cardH + spacing;
+    final double scrollOffset = _resultsScrollController.hasClients
+        ? _resultsScrollController.offset
+        : 0.0;
+
+    final int cRow = index ~/ crossAxisCount;
+    final double gridStartY = TVResponsiveUtils.grid(context, 195);
+    final double cardCenterY = gridStartY + cRow * rowPitch + cardH / 2 - scrollOffset;
+
+    final double keySize = TVResponsiveUtils.searchKeySize(context);
+    final double keyStartY = TVResponsiveUtils.grid(context, 153);
+    int kRow = ((cardCenterY - keyStartY - keySize / 2) / keySize).round().clamp(0, 7);
+
+    final int targetSlot;
+    if (kRow <= 5) {
+      targetSlot = kRow * 6 + 5;
+    } else if (kRow == 6) {
+      targetSlot = _slotBackspace;
+    } else {
+      targetSlot = _slotMic;
+    }
+
+    _focusSlot(targetSlot);
+  }
 
   Widget _buildResultsState(AsyncValue<SearchResponse> resultsAsync) {
     if (_currentQuery.isEmpty) {
@@ -2356,21 +2540,26 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
           ).notifier,
         );
 
-        // Tarjetas de resultado medidas en Prime: 336 x 189 (16:9), hueco 33.
-        // Entre x612 y el margen derecho (144) caben 3 columnas.
-        final double cardW = TVResponsiveUtils.searchResultCardWidth(context);
-        final double cardH = TVResponsiveUtils.searchResultCardHeight(context);
-        final double spacing = TVResponsiveUtils.grid(context, 33);
+        // Tarjetas de resultado en formato póster (2:3) con título debajo.
+        // Ratio 0.52 asegura espacio de sobra para el póster, el título y el focus ring sin recortes.
+        final double cardW = TVResponsiveUtils.searchResultPosterWidth(context);
+        const double childAspectRatio = 0.52;
+        final double spacing = TVResponsiveUtils.grid(context, 20);
         final int crossAxisCount = _overlayGridColumns(context);
 
         return GridView.builder(
           key: const ValueKey('overlay_results_grid'),
+          controller: _resultsScrollController,
           clipBehavior: Clip.none,
-          padding:
-              EdgeInsets.fromLTRB(0, 0, 0, TVResponsiveUtils.grid(context, 40)),
+          padding: EdgeInsets.fromLTRB(
+            TVResponsiveUtils.grid(context, 4),
+            TVResponsiveUtils.grid(context, 8),
+            TVResponsiveUtils.grid(context, 4),
+            TVResponsiveUtils.grid(context, 40),
+          ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: cardW / cardH,
+            childAspectRatio: childAspectRatio,
             crossAxisSpacing: spacing,
             mainAxisSpacing: TVResponsiveUtils.sectionBottomGap(context),
           ),
@@ -2395,15 +2584,22 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
             final result = results[index];
             final meta = result.resolveMetadata(_selectedCategory);
             return FocusablePosterCard(
-              focusNode: index == 0 ? _firstResultFocusNode : null,
+              focusNode: _getResultFocusNode(index),
               width: cardW,
               onKeyEvent: (node, event) {
-                // Primera fila de resultados -> de vuelta al teclado.
-                if (index < crossAxisCount &&
-                    event is KeyDownEvent &&
-                    event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                  _focusSlot(_lastSlot);
-                  return KeyEventResult.handled;
+                if (event is KeyDownEvent) {
+                  // Primera fila de resultados -> con D-pad arriba vuelve a la última tecla del teclado.
+                  if (index < crossAxisCount &&
+                      event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                    _focusSlot(_lastSlot);
+                    return KeyEventResult.handled;
+                  }
+                  // Primera columna de resultados -> con D-pad izquierda vuelve a la fila del teclado más cercana.
+                  if (index % crossAxisCount == 0 &&
+                      event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                    _focusKeyboardFromCard(index, crossAxisCount);
+                    return KeyEventResult.handled;
+                  }
                 }
                 return KeyEventResult.ignored;
               },
@@ -2425,9 +2621,9 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
               subtitle: meta.status,
               subtitleColor: meta.statusColor,
               activeBorderColor: Colors.white,
-              titleFontSize: TVResponsiveUtils.grid(context, 20),
-              showInfo: false, // Prime: la tarjeta de resultado es solo imagen
-              aspectRatio: 16 / 9,
+              titleFontSize: TVResponsiveUtils.grid(context, 18),
+              showInfo: true,
+              aspectRatio: 2 / 3,
               onTap: () => _onContentTap(result),
             );
           },
@@ -2441,11 +2637,10 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
     );
   }
 
-  /// Columnas de la rejilla de resultados: la tarjeta mide 336 px con un
-  /// hueco de 33 px y el panel ocupa desde x612 hasta el margen derecho.
+  /// Columnas de la rejilla de resultados para tarjetas póster (205 px)
   int _overlayGridColumns(BuildContext context) {
-    final double cw = TVResponsiveUtils.searchResultCardWidth(context);
-    final double gap = TVResponsiveUtils.grid(context, 33);
+    final double cw = TVResponsiveUtils.searchResultPosterWidth(context);
+    final double gap = TVResponsiveUtils.grid(context, 20);
     final double panelW = MediaQuery.sizeOf(context).width -
         TVResponsiveUtils.searchResultsLeft(context) -
         TVResponsiveUtils.horizontalPadding(context);
@@ -2457,51 +2652,64 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
     return trendingAsync.when(
       data: (items) {
         _focusFirstResultIfPending();
-        final double cardW = TVResponsiveUtils.searchResultCardWidth(context);
-        final double cardH = TVResponsiveUtils.searchResultCardHeight(context);
+        final double cardW = TVResponsiveUtils.searchResultPosterWidth(context);
+        const double childAspectRatio = 0.52;
+        final double spacing = TVResponsiveUtils.grid(context, 20);
         final int crossAxisCount = _overlayGridColumns(context);
         return GridView.builder(
           key: const ValueKey('overlay_trending_grid'),
+          controller: _resultsScrollController,
           clipBehavior: Clip.none,
-          padding:
-              EdgeInsets.fromLTRB(0, 0, 0, TVResponsiveUtils.grid(context, 40)),
+          padding: EdgeInsets.fromLTRB(
+            TVResponsiveUtils.grid(context, 4),
+            TVResponsiveUtils.grid(context, 8),
+            TVResponsiveUtils.grid(context, 4),
+            TVResponsiveUtils.grid(context, 40),
+          ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: cardW / cardH,
-            crossAxisSpacing: TVResponsiveUtils.grid(context, 33),
+            childAspectRatio: childAspectRatio,
+            crossAxisSpacing: spacing,
             mainAxisSpacing: TVResponsiveUtils.sectionBottomGap(context),
           ),
           itemCount: items.length,
           itemBuilder: (context, index) {
             final result = items[index];
-          final meta = result.resolveMetadata(_selectedCategory);
-          return FocusablePosterCard(
-            focusNode: index == 0 ? _firstResultFocusNode : null,
-            width: cardW,
-            onKeyEvent: (node, event) {
-              // Primera fila -> de vuelta al teclado.
-              if (index < crossAxisCount &&
-                  event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                _focusSlot(_lastSlot);
-                return KeyEventResult.handled;
-              }
-              return KeyEventResult.ignored;
-            },
-            title: cleanTitleForDisplay(
-                result.scrapedTitle ?? result.metadataTitle ?? result.title),
-            posterUrl: ApiEndpoints.proxyImage(result.thumbnail,
-                fallbackUrl: result.tmdbThumbnail),
-            badge: meta.label,
-            badgeColor: meta.labelColor,
-            subtitle: meta.status,
-            subtitleColor: meta.statusColor,
-            activeBorderColor: Colors.white,
-            titleFontSize: TVResponsiveUtils.grid(context, 20),
-            showInfo: false,
-            aspectRatio: 16 / 9,
-            onTap: () => _onContentTap(result),
-          );
+            final meta = result.resolveMetadata(_selectedCategory);
+            return FocusablePosterCard(
+              focusNode: _getResultFocusNode(index),
+              width: cardW,
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent) {
+                  // Primera fila -> de vuelta al teclado.
+                  if (index < crossAxisCount &&
+                      event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                    _focusSlot(_lastSlot);
+                    return KeyEventResult.handled;
+                  }
+                  // Primera columna -> de vuelta al teclado.
+                  if (index % crossAxisCount == 0 &&
+                      event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                    _focusKeyboardFromCard(index, crossAxisCount);
+                    return KeyEventResult.handled;
+                  }
+                }
+                return KeyEventResult.ignored;
+              },
+              title: cleanTitleForDisplay(
+                  result.scrapedTitle ?? result.metadataTitle ?? result.title),
+              posterUrl: ApiEndpoints.proxyImage(result.thumbnail,
+                  fallbackUrl: result.tmdbThumbnail),
+              badge: meta.label,
+              badgeColor: meta.labelColor,
+              subtitle: meta.status,
+              subtitleColor: meta.statusColor,
+              activeBorderColor: Colors.white,
+              titleFontSize: TVResponsiveUtils.grid(context, 18),
+              showInfo: true,
+              aspectRatio: 2 / 3,
+              onTap: () => _onContentTap(result),
+            );
           },
         );
       },

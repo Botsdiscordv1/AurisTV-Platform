@@ -200,102 +200,111 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     // DISEÑO TV EXCLUSIVO
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Stack(
         children: [
-          // Barra de búsqueda superior tipo TV
-          Padding(
-            padding: const EdgeInsets.fromLTRB(60, 40, 60, 16),
-            child: Focus(
-              focusNode: _blurFocusNode,
-              onKeyEvent: (node, event) {
-                if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                  if (_firstResultFocusNode.canRequestFocus) {
-                    _firstResultFocusNode.requestFocus();
-                    return KeyEventResult.handled;
-                  }
-                  FocusScope.of(context).focusInDirection(TraversalDirection.down);
-                  return KeyEventResult.handled;
-                }
-                return KeyEventResult.ignored;
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 56,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.zero,
-                  border: Border.all(
-                    color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white38,
-                    width: _isFocused ? 2.5 : 1.5,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 20),
-                    Icon(Icons.search_rounded, 
-                        color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white70, 
-                        size: 24),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        focusNode: _focusNode,
-                        textAlign: TextAlign.left,
-                        textAlignVertical: TextAlignVertical.center,
-                        style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-                        inputFormatters: [CapitalizeFirstLetterFormatter()],
-                        decoration: InputDecoration(
-                          hintText: 'Busca una serie, película o episodio',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 18),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          filled: false,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 20),
-                                  onPressed: _clearSearch,
-                                )
-                              : null,
-                        ),
-                        onChanged: _onSearchChanged,
-                        onSubmitted: _onSearchSubmitted,
+          Positioned.fill(
+            child: Container(color: Colors.black),
+          ),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+              // Barra de búsqueda superior tipo TV
+              Padding(
+                padding: const EdgeInsets.fromLTRB(60, 40, 60, 16),
+                child: Focus(
+                  focusNode: _blurFocusNode,
+                  onKeyEvent: (node, event) {
+                    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                      if (_firstResultFocusNode.canRequestFocus) {
+                        _firstResultFocusNode.requestFocus();
+                        return KeyEventResult.handled;
+                      }
+                      FocusScope.of(context).focusInDirection(TraversalDirection.down);
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.zero,
+                      border: Border.all(
+                        color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white38,
+                        width: _isFocused ? 2.5 : 1.5,
                       ),
                     ),
-                    const SizedBox(width: 20),
-                    _buildMicButton(),
-                    const SizedBox(width: 20),
-                  ],
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 20),
+                        Icon(Icons.search_rounded, 
+                            color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white70, 
+                            size: 24),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _focusNode,
+                            textAlign: TextAlign.left,
+                            textAlignVertical: TextAlignVertical.center,
+                            style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                            inputFormatters: [CapitalizeFirstLetterFormatter()],
+                            decoration: InputDecoration(
+                              hintText: 'Busca una serie, película o episodio',
+                              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 18),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              filled: false,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 20),
+                                      onPressed: _clearSearch,
+                                    )
+                                  : null,
+                            ),
+                            onChanged: _onSearchChanged,
+                            onSubmitted: _onSearchSubmitted,
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        _buildMicButton(),
+                        const SizedBox(width: 20),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
 
-          // Título de sección ("Lo más buscado" solo cuando no hay búsqueda activa)
-          if (_currentQuery.isEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(60, 10, 60, 12),
-              child: Text(
-                "Lo más buscado",
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              // Título de sección ("Lo más buscado" solo cuando no hay búsqueda activa)
+              if (_currentQuery.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(60, 10, 60, 12),
+                  child: Text(
+                    "Lo más buscado",
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+              // Grid de resultados
+              const SizedBox(height: 4),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 60),
+                  child: _buildResultsState(resultsAsync, isTV: true),
                 ),
               ),
-            ),
-
-          // Grid de resultados
-          const SizedBox(height: 4),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 60),
-              child: _buildResultsState(resultsAsync, isTV: true),
-            ),
+            ],
           ),
+        ),
         ],
       ),
     );

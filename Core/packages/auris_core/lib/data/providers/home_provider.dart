@@ -712,8 +712,7 @@ final homeLayoutProvider = StreamProvider<List<ComposedHomeSection>>((ref) async
     } else {
       final List<HomeLayoutSection> finalSections = [];
       final Set<String> finalTitles = {};
-      final personalizedMapped = _mapResponseToLayout(homeResponse, currentCategory);
-      final interleavedPersonalized = _interleaveCategorySections(personalizedMapped);
+      final interleavedPersonalized = _interleaveCategorySections(personalizedSections);
       for (final s in interleavedPersonalized) {
         if (s.title != null && finalTitles.add(_normalizeSectionTitle(s.title))) finalSections.add(s);
         else if (s.type == HomeSectionType.continueWatching) finalSections.add(s);

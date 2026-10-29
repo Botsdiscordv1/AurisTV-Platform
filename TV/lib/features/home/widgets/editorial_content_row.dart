@@ -21,6 +21,8 @@ class EditorialContentRow extends StatefulWidget {
   final bool Function()? onArrowDownToNext;
   /// D-pad arriba: salta a la sección anterior restaurando su última tarjeta.
   final bool Function()? onArrowUpToPrev;
+  /// Back/Escape: si index>0 mueve a primera; si index==0 llama a este callback.
+  final VoidCallback? onBackToHero;
 
   const EditorialContentRow({
     super.key,
@@ -35,6 +37,7 @@ class EditorialContentRow extends StatefulWidget {
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
     this.onArrowUpToPrev,
+    this.onBackToHero,
   });
 
   @override
@@ -293,7 +296,15 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                         onTap: () => widget.onItemTap(item),
                         onKeyEvent: (node, event) {
                           if (event is KeyDownEvent) {
-                            if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                            if (event.logicalKey == LogicalKeyboardKey.escape ||
+                                event.logicalKey == LogicalKeyboardKey.goBack) {
+                              if (index > 0) {
+                                _itemFocusNodes.first.requestFocus();
+                              } else {
+                                widget.onBackToHero?.call();
+                              }
+                              return KeyEventResult.handled;
+                            } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
                               if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
                             } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
                               if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
@@ -316,7 +327,15 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                         width: cardWidth,
                         onKeyEvent: (node, event) {
                           if (event is KeyDownEvent) {
-                            if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                            if (event.logicalKey == LogicalKeyboardKey.escape ||
+                                event.logicalKey == LogicalKeyboardKey.goBack) {
+                              if (index > 0) {
+                                _itemFocusNodes.first.requestFocus();
+                              } else {
+                                widget.onBackToHero?.call();
+                              }
+                              return KeyEventResult.handled;
+                            } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
                               if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
                             } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
                               if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
@@ -430,7 +449,15 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                             focusNode: _itemFocusNodes[index],
                             onKeyEvent: (node, event) {
                               if (event is KeyDownEvent) {
-                                if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                if (event.logicalKey == LogicalKeyboardKey.escape ||
+                                    event.logicalKey == LogicalKeyboardKey.goBack) {
+                                  if (index > 0) {
+                                    _itemFocusNodes.first.requestFocus();
+                                  } else {
+                                    widget.onBackToHero?.call();
+                                  }
+                                  return KeyEventResult.handled;
+                                } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
                                   if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
                                 } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
                                   if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;

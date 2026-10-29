@@ -611,7 +611,7 @@ class HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObser
             top: null,
             bottom: widget.isCompact
                 ? MediaQuery.of(context).size.height * 0.35
-                : 80,
+                : 110,
             right: horizontalPadding,
             child: Align(
               alignment: Alignment.bottomLeft,

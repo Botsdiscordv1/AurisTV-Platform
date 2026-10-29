@@ -50,6 +50,9 @@ class WideContentRow extends StatefulWidget {
   final bool Function()? onArrowDownToNext;
   /// D-pad arriba: igual pero hacia la seccion anterior.
   final bool Function()? onArrowUpToPrev;
+  /// D-pad BACK / Escape dentro de la fila:
+  /// tarjeta>0 → mueve a la primera; tarjeta 0 → llama a este callback.
+  final VoidCallback? onBackToHero;
 
   const WideContentRow({
     super.key,
@@ -63,6 +66,7 @@ class WideContentRow extends StatefulWidget {
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
     this.onArrowUpToPrev,
+    this.onBackToHero,
   });
 
   @override
@@ -257,6 +261,15 @@ class WideContentRowState extends State<WideContentRow>
       if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
     } else if (key == LogicalKeyboardKey.arrowUp) {
       if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.goBack) {
+      if (current > 0) {
+        _setFocusedIndex(0);
+        return KeyEventResult.handled;
+      } else {
+        widget.onBackToHero?.call();
+        return KeyEventResult.handled;
+      }
     } else if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.select ||
         key == LogicalKeyboardKey.space) {
