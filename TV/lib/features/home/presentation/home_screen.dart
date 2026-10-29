@@ -734,33 +734,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                             sections[index], 
                             horizontalPadding,
                             key: _sectionRowKeys[index],
-                            onArrowRightOnLast: index + 1 < sections.length
+                            onArrowRightOnLast: null,
+                            onArrowLeftOnFirst: index == 0
                                 ? () {
-                                    final state = _sectionRowKeys[index + 1].currentState;
-                                    if (state != null) {
-                                      try {
-                                        return (state as dynamic).focusFirstCard() == true;
-                                      } catch (_) {}
-                                    }
-                                    return false;
-                                  }
-                                : null,
-                            onArrowLeftOnFirst: index > 0
-                                ? () {
-                                    final state = _sectionRowKeys[index - 1].currentState;
-                                    if (state != null) {
-                                      try {
-                                        return (state as dynamic).focusLastCard() == true;
-                                      } catch (_) {}
-                                    }
-                                    return false;
-                                  }
-                                // Primera fila: IZQUIERDA abre el left bar
-                                // (en Prime el rail vive a la izquierda).
-                                : () {
                                     _enterRail();
                                     return true;
-                                  },
+                                  }
+                                : null,
                             onArrowDownToNext: index + 1 < sections.length
                                 ? () {
                                     final state = _sectionRowKeys[index + 1].currentState;
