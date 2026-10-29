@@ -112,6 +112,15 @@ class TVResponsiveUtils {
   static double searchResultCardHeight(BuildContext context) =>
       (searchResultCardWidth(context) / (16 / 9)).roundToDouble();
 
+  /// Tarjeta de resultados en formato póster (2:3) para el buscador.
+  static const double primeSearchPosterWidth = 205.0;
+
+  static double searchResultPosterWidth(BuildContext context) =>
+      grid(context, primeSearchPosterWidth);
+
+  static double searchResultPosterHeight(BuildContext context) =>
+      searchResultPosterWidth(context) * 1.5;
+
   /// Escalado de fuentes y componentes para TV (10ft UI)
   /// Optimizado con resolución por buckets (720p, 1080p, 4K) para evitar elementos gigantes.
   static double sp(BuildContext context, double size) {
@@ -194,7 +203,7 @@ class TVResponsiveUtils {
   static double bannerRowHeight(BuildContext context,
       {bool hasSubtitle = true, int subtitleLines = 1}) {
     final double extraSpace = hasSubtitle
-        ? grid(context, 24) + (subtitleLines > 1 ? (grid(context, 4) + grid(context, 24)) : 0)
+        ? (subtitleLines > 1 ? grid(context, 76.0) : grid(context, 40.0))
         : 0;
     return bannerHeight(context) + extraSpace + grid(context, 12);
   }
@@ -227,9 +236,9 @@ class TVResponsiveUtils {
     return designWidth / primeHeroHeight;
   }
 
-  /// Logo en el Hero (120 px originales escalados con el hero)
+  /// Logo en el Hero (155 px originales escalados con el hero)
   static double heroLogoHeight(BuildContext context) {
-    return grid(context, 120.0 * heroHeightRatio); // ≈ 93
+    return grid(context, 155.0 * heroHeightRatio); // ≈ 120
   }
 
   /// Sinopsis en el Hero. El 14 sp original era ilegible a 10 ft; se sube al

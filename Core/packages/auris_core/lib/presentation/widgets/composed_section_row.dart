@@ -101,8 +101,19 @@ class ComposedSectionRow extends ConsumerWidget {
                   rating: formatRating(item.rating),
                   mediaItem: item,
                 );
+              } else if (section.presentation == SectionPresentation.top10) {
+                // Top 10 Poster (Mobile/Web) - Sin título debajo de la tarjeta
+                cardWidget = FocusablePosterCard(
+                  title: item.title,
+                  posterUrl: item.posterUrl,
+                  onTap: () => onItemTap?.call(item),
+                  subtitle: item.subtitle,
+                  rating: formatRating(item.rating),
+                  mediaItem: item,
+                  showInfo: false,
+                );
               } else {
-                // Poster / Top 10 Poster normal
+                // Poster normal
                 cardWidget = FocusablePosterCard(
                   title: item.title,
                   posterUrl: item.posterUrl,

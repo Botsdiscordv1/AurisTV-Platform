@@ -18,6 +18,8 @@ class ContentRow extends StatefulWidget {
   final bool Function()? onArrowDownToNext;
   /// D-pad arriba: salta a la sección anterior restaurando su última tarjeta.
   final bool Function()? onArrowUpToPrev;
+  /// Back/Escape: index>0 mueve a primera; index==0 llama a este callback.
+  final VoidCallback? onBackToHero;
 
   const ContentRow({
     super.key,
@@ -30,6 +32,7 @@ class ContentRow extends StatefulWidget {
     this.onArrowLeftOnFirst,
     this.onArrowDownToNext,
     this.onArrowUpToPrev,
+    this.onBackToHero,
   });
 
   @override
@@ -264,7 +267,15 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                                     focusNode: _itemFocusNodes[index],
                                     onKeyEvent: (node, event) {
                                       if (event is KeyDownEvent) {
-                                        if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                                        if (event.logicalKey == LogicalKeyboardKey.escape ||
+                                            event.logicalKey == LogicalKeyboardKey.goBack) {
+                                          if (index > 0) {
+                                            _itemFocusNodes.first.requestFocus();
+                                          } else {
+                                            widget.onBackToHero?.call();
+                                          }
+                                          return KeyEventResult.handled;
+                                        } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
                                           if (widget.onArrowDownToNext?.call() == true) return KeyEventResult.handled;
                                         } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
                                           if (widget.onArrowUpToPrev?.call() == true) return KeyEventResult.handled;
