@@ -397,10 +397,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             cacheExtent: 1000,
             slivers: [
               // Espaciador para que el contenido empiece debajo de la barra fija
+              // Tablet portrait usa topbar compacto (56px) + content area
               SliverToBoxAdapter(
-                child: SizedBox(height: isMobile 
-                  ? (MediaQuery.of(context).padding.top + 52) 
-                  : 0 // Senior Fix: En Web el banner sangra hasta arriba (detrás de la barra)
+                child: SizedBox(height: (isMobile || MediaQuery.of(context).orientation == Orientation.portrait)
+                  ? (MediaQuery.of(context).padding.top + 52) // Top padding + 52px (topbar compact height)
+                  : 0 // Senior Fix: En Web/Tablet landscape el banner sangra hasta arriba (detrás de la barra)
                 ),
               ),
 
@@ -552,99 +553,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       loading: () => null,
       error: (_, __) => null,
     );
-    
     if (!isMobile) {
-      return ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: 20.0,
-            sigmaY: 20.0,
+      // Senior Optimization: Tablet topbar uses solid gradient instead of blur
+      return Container(
+        height: navHeight,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF000000),
+              Color(0x66000000),
+              Color(0x00000000),
+            ],
+            stops: [0.0, 0.7, 1.0],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            height: navHeight,
-            margin: EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: const Color(0xFF000000).withValues(alpha: 0.4),
-              border: Border(
-                bottom: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  width: 0.5,
-                ),
-              ),
-            ),
-            child: Stack(
-              fit: StackFit.passthrough,
-              children: [
-                if (topBannerUrl != null)
-                  Positioned.fill(
-                    child: ClipRect(
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        heightFactor: 0.2,
-                        child: Image.network(
-                          topBannerUrl,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                        ),
-                      ),
-                    ),
+        ),
+        margin: EdgeInsets.zero,
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Row(
+                children: [
+                  SvgPicture.asset(
+                    'assets/icons/auris-logo-web-flat.svg',
+                    height: logoHeight,
+                    fit: BoxFit.contain,
+                    colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
                   ),
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black.withOpacity(0.4),
+                  SizedBox(width: isCompactDesktop ? 20 : 40),
+                  _PillNavBar(
+                    currentCategory: currentCategory,
+                    onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
                   ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                  child: Row(
+                  const Spacer(),
+                  Row(
                     children: [
-                      SvgPicture.asset(
-                        'assets/icons/auris-logo-web-flat.svg',
-                        height: logoHeight,
-                        fit: BoxFit.contain,
-                        colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                      IconButton(
+                        icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 24),
+                        onPressed: () => context.push('/search'),
                       ),
-                      SizedBox(width: isCompactDesktop ? 20 : 40),
-                      _PillNavBar(
-                        currentCategory: currentCategory,
-                        onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
+                      const SizedBox(width: 16),
+                      IconButton(
+                        icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 24),
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            isScrollControlled: true,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                            ),
+                            builder: (_) => CastPickerSheet(),
+                          );
+                        },
                       ),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 24),
-                            onPressed: () => context.push('/search'),
-                          ),
-                          const SizedBox(width: 16),
-                          IconButton(
-                            icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 24),
-                            onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                backgroundColor: Colors.transparent,
-                                isScrollControlled: true,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                                ),
-                                builder: (_) => CastPickerSheet(),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 16),
-                          GestureDetector(
-                            onTap: () => context.push('/profile-with-nav'),
-                            child: _buildUserAvatar(context, isCompactDesktop),
-                          ),
-                        ],
+                      const SizedBox(width: 16),
+                      GestureDetector(
+                        onTap: () => context.push('/profile-with-nav'),
+                        child: _buildUserAvatar(context, isCompactDesktop),
                       ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ),
       );
     }

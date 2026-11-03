@@ -1,24 +1,9 @@
-# Carpetas de Flutter y Dart
-**/.dart_tool/
-**/build/
-**/.flutter-plugins
-**/.flutter-plugins-dependencies
-**/.pub-cache/
-**/.packages
-
-# Archivos de configuración de IDEs
-**/.idea/
-**/.vscode/
-**/*.iml
-
-# Logs y archivos temporales
-**/analysis.txt
-**/analyze_web.txt
-**/final_analysis.txt
-**/current_analysis.txt
-**/last_check.txt
-**/final_cleanup_check.txt
-
-# Sistema operativo
-.DS_Store
-Thumbs.db
+node_modules/
+frida_*.node
+frida_*.mjs
+frida_*.cjs
+.tmp_*
+*.log
+aar_list.txt
+aar_main_jar_list.txt
+run_log.txt
