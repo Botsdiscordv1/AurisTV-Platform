@@ -554,8 +554,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!isMobile) {
       // Senior Optimization: Tablet topbar uses solid gradient instead of blur
       final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+      // FIX SafeArea (tablet): incluir top inset del sistema en la altura para
+      // evitar que el topbar quede aplastado en dispositivos reales con notch.
       return Container(
-        height: isPortrait ? 56.0 : navHeight, // Compact en portrait, normal en landscape
+        height: (isPortrait ? 56.0 : navHeight) + MediaQuery.of(context).padding.top, // Compact en portrait, normal en landscape
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -628,7 +630,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return GestureDetector(
       onTap: _scrollToTop,
       child: Container(
-        height: 56.0,
+        // FIX SafeArea: altura incluye el top inset del sistema (status bar/notch).
+        // Antes: height fija 56 + padding top fijo (8) + SafeArea (top inset) → en
+        // dispositivos reales con notch el Row quedaba aplastado (~16px). En emulador
+        // sin safe area el top inset era 0 y se veía bien.
+        height: 56.0 + MediaQuery.of(context).padding.top,
         margin: const EdgeInsets.only(bottom: 24.0), // Extiende la capa oscura hacia abajo
         padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 8),
         decoration: const BoxDecoration(
@@ -644,6 +650,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         child: SafeArea(
+          top: true,
           bottom: false,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

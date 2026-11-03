@@ -141,8 +141,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   /// Render nativo (SurfaceView + vo=mediacodec_embed). La bandera la activa
   /// solo el entrypoint de Móvil; TV/Web conservan la textura.
+  /// WebM/VP9/AV1 no son compatibles con mediacodec_embed en todos los dispositivos,
+  /// así que los deshabilitamos para usar vo=gpu con textura media_kit.
   bool get _useNativeMobileSurface =>
-      !kIsWeb && Platform.isAndroid && VideoSurfaceConfig.nativeAndroidSurface;
+      !kIsWeb && Platform.isAndroid && VideoSurfaceConfig.nativeAndroidSurface && !_isWebM;
+
+  /// Flag que indica si la URL actual es WebM (OP/ED). En ese caso no usamos surface
+  /// nativo mediacodec_embed que no soporta bien VP9/AV1 en todos los dispositivos.
+  bool _isWebM = false;
 
   final GlobalKey _mobileSurfaceKey = GlobalKey();
   int? _mobileViewId;
@@ -1499,6 +1505,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true});
       ScreenBrightnessController.setBrightness(_brightness);
       _syncOrientationForCurrentMode();
+
+      // FIX Screen Off/On: al volver a foreground (pantalla encendida) si el
+      // player no está reproduciendo y no fue pausa manual del usuario, retomamos
+      // la reproducción. Sin esto, tras apagar/encender la pantalla el player queda
+      // en negro con overlay de loading hasta que el video responde.
+      if (_player != null && !_userHasPaused && !_isAutoplayResume) {
+        _player!.play();
+      }
     }
   }
 
@@ -2136,6 +2150,37 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
+  /// Obtiene la URL del episodio destino usando el episodesProvider
+  /// autoritativo del servidor, o fallback a buildEpisodeUrl.
+  Future<String?> _getEpisodeUrlFromProvider(int targetNum) async {
+    final state = ref.read(activePlayerProvider);
+    final url = state.url;
+    final source = state.source;
+    final season = state.season ?? 1;
+
+    if (url == null || source == null || source.isEmpty) return null;
+
+    try {
+      final response = await ref.read(episodesProvider(EpisodesParams(
+        url: url,
+        source: source,
+        season: season,
+      )).future);
+
+      if (response == null || response.episodes.isEmpty) return null;
+
+      final targetEp = response.episodes.firstWhere(
+        (e) => e.number == targetNum,
+        orElse: () => throw Exception('Episodio $targetNum no encontrado'),
+      );
+
+      return targetEp.url;
+    } catch (e) {
+      debugPrint('[Navigation] Error obteniendo URL del episodio: $e');
+      return null;
+    }
+  }
+
   void _navigateToEpisode(bool next) async {
     // En vivo/directo M3U no hay episodios: blindar también por gesto/remoto.
     if (_isTrailer || _isLiveStream || _currentEpisode == null) return;
@@ -2150,19 +2195,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _webViewController = null;
     }
 
+    // Get authoritative URL from episodesProvider (or fallback to buildEpisodeUrl)
+    final String? providerUrl = await _getEpisodeUrlFromProvider(nextNum);
+    
     final sources = ref.read(activeContentSourcesProvider);
-    // Match tolerante + fallback a la primera fuente: si el nombre no matchea,
-    // reusar la URL actual re-extraía el episodio ANTERIOR (reiniciado).
     final baseSource = findSourceByName(sources, _currentSource) ??
         (sources.isNotEmpty ? sources.first : null);
 
-    // Senior Navigation Fix: Calcular la URL del episodio destino ANTES de reemplazar
-    // la ruta. context.replace recrea la pantalla (GoRouter usa la URI como page key),
-    // por lo que el query param 'url' debe ser la del NUEVO episodio, no la actual,
-    // o el extract provider re-extraería la página del episodio anterior (bug E2->E3).
-    final String nextSourceUrl = baseSource != null
-        ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
-        : _currentSourceUrl;
+    // Senior Navigation Fix: Calcular la URL del episodio destino
+    final String nextSourceUrl = providerUrl ??
+        (baseSource != null
+            ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
+            : _currentSourceUrl);
+
+    // Clean preload if URL differs from what provider returns (handles season changes)
+    if (providerUrl != null && (nextSourceUrl != _currentSourceUrl)) {
+      final preloaded = ref.read(nextEpisodePreloadProvider);
+      final preloadTarget = ref.read(nextEpisodePreloadTargetProvider);
+      if (preloaded != null && (preloadTarget?.url != nextSourceUrl || preloadTarget?.episode != nextNum)) {
+        ref.read(playerPreloadControllerProvider).clearPreload();
+      }
+    }
 
     // Senior Navigation Fix: Actualizar la URL de la ruta sin añadir una nueva entrada al historial
     // para que el botón "Atrás" (Mouse 4) no nos regrese al episodio anterior.
@@ -2975,7 +3028,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Future<void> _initPlayer(String videoUrl, [Map<String, String> headers = const {}]) async {
-    debugPrint('[player] native flag=$_useNativeMobileSurface');
+    // Detect if this is a WebM file (OP/ED often uses WebM container)
+    _isWebM = videoUrl.toLowerCase().contains('.webm');
+    debugPrint('[player] native flag=$_useNativeMobileSurface isWebM=$_isWebM');
     // Senior Youtube Fix: Detectar URLs de YouTube para usar el player especializado
     // y evitar errores del motor nativo (MPV) sin yt-dlp.
     if (videoUrl.contains('youtube.com') || videoUrl.contains('youtu.be') || _currentSource == 'YouTube' || widget.source == 'YouTube') {
@@ -3151,7 +3206,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (playing) {
         setState(() {
           _playbackError = null;
-          _isLoading = false; 
+          // FIX Episodio: En modo nativo NO limpiamos `_isLoading` aquí. El
+          // evento `playing` puede dispararse cuando el audio arranca, antes de
+          // que el primer frame del video nuevo llegue a la SurfaceView. Si lo
+          // limpiamos, el overlay de "Cargando..." se retira y queda visible el
+          // frame congelado de la sesión anterior (audio del nuevo episodio,
+          // video congelado). El `_posSubscription` es quien retira `_isLoading`
+          // cuando la posición real avanza (primer frame presentado).
+          if (!_useNativeMobileSurface) _isLoading = false;
           _webNeedsInteraction = false; // Si empieza a sonar, ya no necesitamos interaction
           _extractRefreshCount = 0;
         });
@@ -3387,7 +3449,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         });
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _isLoading = false);
+          if (mounted) {
+            // FIX Episodio: En modo nativo NO limpiamos `_isLoading` aquí.
+            // El evento `buffering == false` puede dispararse antes de que el
+            // primer frame del video nuevo llegue a la SurfaceView; limpiarlo
+            // aquí borraba el overlay de "Cargando..." prematuramente, dejando
+            // visible el frame congelado de la sesión anterior. El
+            // `_posSubscription` retira `_isLoading` cuando la posición real
+            // avanza (`ms > 1000`), indicando que el frame fue presentado.
+            if (!_useNativeMobileSurface) {
+              setState(() => _isLoading = false);
+            }
+          }
         });
       }
     });
@@ -3440,6 +3513,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       finalHeaders['Referer'] = 'https://animethemes.moe/';
     }
 
+    // Detect if this is a WebM file (OP/ED often uses WebM container)
+    final bool isWebM = videoUrl.toLowerCase().contains('.webm');
+    
     try {
       final platform = player.platform as dynamic;
       if (!kIsWeb) {
@@ -3448,6 +3524,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // En el perfil tv-parity usamos los mismos valores que el player TV
         // para aislar el salto inicial del demuxer en Android.
         debugPrint('[player] mpv profile=${_tvMpvParityTest ? 'tv-parity' : 'mobile'}');
+        debugPrint('[player] detected WebM: $isWebM');
         platform.setProperty('msg-level', 'all=error');
         platform.setProperty('cache', 'yes');
         platform.setProperty('cache-on-disk', 'no');
@@ -3479,8 +3556,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         // Bloque de lectura de red optimizado para 5G/Wi-Fi
         platform.setProperty('stream-buffer-size', pcfg.streamBufferSizeFor(kIsWeb));
         
-        platform.setProperty('vd-lavc-threads', _tvMpvParityTest ? '0' : '4');
-        platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: HW con fallback seguro (estilo YouTube); si falla, mpv cae a SW
+        if (isWebM) {
+          // WebM (VP9/AV1) compatibility fixes for OP/ED
+          // Use software decoding and gpu vo for stable playback
+          platform.setProperty('hwdec', 'no'); // Forzar software para VP9/AV1
+          platform.setProperty('vd-lavc-threads', '1'); // Menos threads para SW
+          platform.setProperty('vo', 'gpu'); // Usar gpu vo en vez de mediacodec_embed
+          platform.setProperty('gpu-context', 'sdl');
+          debugPrint('[player] WebM detected: using software decoder + gpu vo');
+        } else {
+          platform.setProperty('vd-lavc-threads', _tvMpvParityTest ? '0' : '4');
+          platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: HW con fallback seguro (estilo YouTube); si falla, mpv cae a SW
+        }
         platform.setProperty('tls-verify', 'no');
         
         // Eliminamos agresividad en fflags que causaba frames rotos
