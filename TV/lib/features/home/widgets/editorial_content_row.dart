@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
+import 'package:auris_sdk/live/auris_core.dart' hide FocusablePosterCard;
 import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/prime_expandable_card.dart';
 import '../../../shared/widgets/focusable_poster_card.dart';

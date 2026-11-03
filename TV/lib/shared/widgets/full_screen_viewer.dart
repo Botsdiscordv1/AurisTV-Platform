@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 
 class FullScreenViewer extends StatefulWidget {
   final List<GalleryImage> images;

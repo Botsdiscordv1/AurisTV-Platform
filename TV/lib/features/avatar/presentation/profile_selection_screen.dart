@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Netflix TV "Who's watching?" Profile Selection — Pixel-Perfect Clone

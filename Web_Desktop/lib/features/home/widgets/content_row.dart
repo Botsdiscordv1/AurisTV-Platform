@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/utils/responsive_utils.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 
 class ContentRow extends StatefulWidget {
   final String title;

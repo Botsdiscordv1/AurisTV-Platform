@@ -1,5 +1,5 @@
 import 'auth_web_helper.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 
 class AuthWebHelperIO implements AuthWebHelper {
   @override

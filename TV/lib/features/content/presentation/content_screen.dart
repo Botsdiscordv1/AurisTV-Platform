@@ -14,7 +14,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:auris_core/auris_core.dart' hide FocusablePosterCard, FocusableWideCard;
+import 'package:auris_sdk/live/auris_core.dart' hide FocusablePosterCard, FocusableWideCard;
 import '../../../shared/widgets/focusable_poster_card.dart';
 import '../../../shared/widgets/focusable_wide_card.dart';
 import '../../../shared/widgets/full_screen_viewer.dart';

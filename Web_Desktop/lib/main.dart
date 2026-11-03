@@ -7,15 +7,14 @@ import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:auris_core/auris_core.dart';
-import 'dart:io' show Platform; // Para detectar Windows
+import 'package:auris_sdk/live/auris_core.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'shared/widgets/min_width_wrapper.dart';
 import 'features/windows/presentation/windows_web_wrapper.dart';
 import 'core/utils/url_utils.dart';
 import 'features/sports/sports_channel_launcher.dart';
-import 'package:auristv_web/features/player/presentation/player_screen.dart';
+import 'package:auris_web_desktop/features/player/presentation/player_screen.dart';
 import 'features/remote_control/presentation/providers/remote_control_provider.dart';
 import 'features/remote_control/data/models/remote_device.dart';
 
@@ -79,7 +78,7 @@ class AurisApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Si estamos en Windows (y no es Web), usamos el Wrapper de Alto Rendimiento
-    if (!kIsWeb && Platform.isWindows) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
       return MaterialApp(
         title: 'AurisTV Desktop',
         debugShowCheckedModeBanner: false,

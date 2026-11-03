@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
+import 'package:auris_sdk/live/auris_core.dart' hide FocusablePosterCard;
 import '../../../shared/widgets/focusable_poster_card.dart';
 import 'providers/search_provider.dart';
 import 'widgets/search_widgets.dart';

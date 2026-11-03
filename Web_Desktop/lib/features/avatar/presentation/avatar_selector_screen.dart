@@ -8,8 +8,9 @@ import '../domain/avatar_catalog.dart';
 import '../domain/avatar_franchise.dart';
 import '../domain/avatar_selection.dart';
 import 'providers/avatar_providers.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 class AvatarSelectorScreen extends ConsumerStatefulWidget {
   const AvatarSelectorScreen({super.key});
@@ -65,7 +66,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              final catalog = catalogAsync.valueOrNull;
+              final catalog = catalogAsync..value;
               if (catalog != null) {
                 // Guardar nombre
                 final newName = _nameController.text.trim();
@@ -74,7 +75,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
                 }
 
                 // Guardar avatar
-                final selectedAvatar = _selectedPath(catalog, selection);
+                final selectedAvatar = _selectedPath(catalog.value, selection);
                 if (selectedAvatar != null) {
                   ref.read(authProvider.notifier).updateAvatar(selectedAvatar);
                 }
@@ -175,7 +176,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
                         .toList();
 
                     // Calculamos qué mostrar en la preview: la selección actual o el avatar que ya tiene el usuario
-                    final previewPath = _selectedPath(catalog, selection) ?? user?.photoUrl;
+                    final previewPath = _selectedPath(catalog.value, selection) ?? user?.photoUrl;
 
                     if (filteredFranchises.isEmpty) {
                       return Column(

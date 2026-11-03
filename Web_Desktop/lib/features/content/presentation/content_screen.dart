@@ -15,14 +15,15 @@ import 'package:collection/collection.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
-import 'package:auris_core/auris_core.dart';
-import 'package:auris_core/presentation/widgets/adaptive_episodes_or_countdown.dart';
-import 'package:auristv_web/core/utils/responsive_utils.dart';
-import 'package:auristv_web/core/utils/url_utils.dart';
-import 'package:auristv_web/shared/widgets/auris_bottom_bar.dart';
-import 'package:auristv_web/shared/widgets/full_screen_viewer.dart';
-import 'package:auristv_web/features/player/presentation/player_screen.dart';
-import 'package:auristv_web/core/router/app_router.dart';
+import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_sdk/live/presentation/widgets/adaptive_episodes_or_countdown.dart';
+import 'package:auris_web_desktop/core/utils/responsive_utils.dart';
+import 'package:auris_web_desktop/core/utils/url_utils.dart';
+import 'package:auris_web_desktop/shared/widgets/auris_bottom_bar.dart';
+import 'package:auris_web_desktop/shared/widgets/full_screen_viewer.dart';
+import 'package:auris_web_desktop/features/player/presentation/player_screen.dart';
+import 'package:auris_web_desktop/core/router/app_router.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 // --- Galería Local Helpers ---
 
@@ -2880,7 +2881,7 @@ void _openPlayer(PlayerScreen player) {
                   initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
                 ),
                 episodesBuilder: (episodes) {
-                  final epBundleVal = episodesAsync.valueOrNull;
+                  final epBundleVal = episodesAsync..value;
                   final epDataVal = epBundleVal?.response;
                   if (epDataVal == null) return const SizedBox.shrink();
 
@@ -2897,7 +2898,7 @@ void _openPlayer(PlayerScreen player) {
                           final ep = index < epDataVal.episodes.length ? epDataVal.episodes[index] : null;
                           final epNum = (ep?.number ?? index + 1).toString();
                           final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                          final epSource = epBundleVal?.sourceForIndex(index) ?? currentSource;
+                          final epSource = epBundleVal.value?.sourceForIndex(index) ?? currentSource;
                           return _EpisodeCard(
                             episodeNumber: ep?.number ?? index + 1,
                             title: ep?.title ?? 'Episodio ${index + 1}',
@@ -2917,7 +2918,7 @@ void _openPlayer(PlayerScreen player) {
                             isCompact: isCompact,
                             onTap: () {
                               final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                              final tapSource = epBundleVal?.sourceForIndex(index) ?? currentSource;
+                              final tapSource = epBundleVal.value?.sourceForIndex(index) ?? currentSource;
                               final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
                               final player = PlayerScreen(
                                 contentId: widget.title,
@@ -2955,7 +2956,7 @@ void _openPlayer(PlayerScreen player) {
                           final ep = index < epDataVal.episodes.length ? epDataVal.episodes[index] : null;
                           final epNum = (ep?.number ?? index + 1).toString();
                           final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                          final epSource = epBundleVal?.sourceForIndex(index) ?? currentSource;
+                          final epSource = epBundleVal.value?.sourceForIndex(index) ?? currentSource;
                           return _EpisodeCard(
                             episodeNumber: ep?.number ?? index + 1,
                             title: ep?.title ?? 'Episodio ${index + 1}',
@@ -2974,7 +2975,7 @@ void _openPlayer(PlayerScreen player) {
                             isCompact: isCompact,
                             onTap: () {
                               final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                              final tapSource = epBundleVal?.sourceForIndex(index) ?? currentSource;
+                              final tapSource = epBundleVal.value?.sourceForIndex(index) ?? currentSource;
                               final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
                               final player = PlayerScreen(
                                 contentId: widget.title,
@@ -3124,7 +3125,7 @@ void _openPlayer(PlayerScreen player) {
       slivers.addAll(_buildRelatedTab(0, unifiedRelations: unifiedRelationsAsync, currentSource: currentSource));
     }
     if (selectedTabIndex == castTabIndex && castTabIndex != -1) {
-      slivers.addAll(_buildCastTab(detailData, castAsync.valueOrNull ?? const [], 0));
+      slivers.addAll(_buildCastTab(detailData, castAsync.value ?? const [], 0));
     }
     if (selectedTabIndex == extrasTabIndex) {
       slivers.addAll(_buildExtrasTab(detailData, 0, openings: openings, endings: endings));
@@ -3223,12 +3224,12 @@ void _openPlayer(PlayerScreen player) {
 
       // OP/ED desde /api/themes (fuera del detail: no lo bloquean). Movies
       // siguen leyéndolos de su detail (si el server los envía).
-      final themesData = detailState.themes.valueOrNull;
+      final themesData = detailState.themes..value;
       final currentOpenings = detailData is AnimeDetail
-          ? (themesData?.openings ?? const <AnimeThemeInfo>[])
+          ? (themesData.value?.openings ?? const <AnimeThemeInfo>[])
           : (detailData is MovieDetail ? (detailData as MovieDetail).openings : const <AnimeThemeInfo>[]);
       final currentEndings = detailData is AnimeDetail
-          ? (themesData?.endings ?? const <AnimeThemeInfo>[])
+          ? (themesData.value?.endings ?? const <AnimeThemeInfo>[])
           : (detailData is MovieDetail ? (detailData as MovieDetail).endings : const <AnimeThemeInfo>[]);
       final extrasTabIndexRaw = (currentOpenings.isNotEmpty || currentEndings.isNotEmpty) ? 1 : -1;
 

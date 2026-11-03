@@ -299,22 +299,35 @@ class ResponsiveUtils {
 
   /// Senior UI Strategy: AspectRatio dinámico para el HeroBanner.
   /// Evita que el banner sea demasiado "fino" en tablets y demasiado "alto" en monitores ultrawide.
+  /// Usa formato 3:2 en tablets (portrait y landscape), 2:3 en móvil vertical y ratios
+  /// cinematográficos en landscape de móviles anchos y pantallas grandes.
   static double heroAspectRatio(BuildContext context) {
     final b = getBreakpoint(context);
     final double width = MediaQuery.of(context).size.width;
+    final Orientation orientation = MediaQuery.of(context).orientation;
 
-    if (b == Breakpoint.base) return 3 / 4; // Vertical 3:4 para móviles en portrait
-    
-    // Senior Fix: Para plegables y móviles anchos (sm/md), aumentamos el ratio 
+    // Senior Fix: Tablets (ancho entre 600 y 1024) siempre usan 3:2,
+    // tanto en vertical como en horizontal. Así el Hero no se vuelve "gigante"
+    // al girar la tablet y mantiene la misma proporción en ambas orientaciones.
+    if (width >= 600 && width < Breakpoint.lg.minWidth) {
+      return 3 / 2;
+    }
+
+    // Móvil vertical: formato 2:3 (alargado).
+    if (orientation == Orientation.portrait) {
+      return 2 / 3;
+    }
+
+    // Senior Fix: Para plegables y móviles anchos (sm/md), aumentamos el ratio
     // para evitar que el banner vertical asfixie el contenido inferior.
     if (b == Breakpoint.sm) {
       return width > 600 ? 2.2 : 1.8;
     }
-    
+
     if (b == Breakpoint.md) {
-      return 2.3; // Tablets: Más cinemático y menos alto
+      return 2.3; // Tablets en landscape: Más cinemático y menos alto
     }
-    
+
     if (b == Breakpoint.lg) return 2.4;
     return 3.2; // Pantallas grandes/Ultrawide: Más cinemático y menos "aire" vertical
   }

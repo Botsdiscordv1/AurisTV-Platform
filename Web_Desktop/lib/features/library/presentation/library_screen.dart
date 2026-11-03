@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/url_utils.dart';
 
 import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
 import '../../home/widgets/unified_section.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});

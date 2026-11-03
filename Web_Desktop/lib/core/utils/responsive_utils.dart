@@ -1,9 +1,9 @@
 library responsive_utils;
 
 import 'package:flutter/widgets.dart';
-import 'package:auris_core/core/utils/responsive_utils.dart';
+import 'package:auris_sdk/live/core/utils/responsive_utils.dart';
 
-export 'package:auris_core/core/utils/responsive_utils.dart';
+export 'package:auris_sdk/live/core/utils/responsive_utils.dart';
 
 ({int columns, double spacing, double padding}) webPosterGridMetrics(BuildContext context) {
   final double width = MediaQuery.sizeOf(context).width;

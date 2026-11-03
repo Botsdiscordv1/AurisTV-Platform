@@ -5,6 +5,7 @@ import 'package:hive_ce/hive_ce.dart';
 import '../../data/avatar_catalog_repository.dart';
 import '../../domain/avatar_catalog.dart';
 import '../../domain/avatar_selection.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 /// Repositorio del catálogo local de avatares.
 final avatarCatalogRepositoryProvider = Provider<AvatarCatalogRepository>((ref) {
@@ -61,9 +62,11 @@ final avatarSelectionProvider =
 final selectedAvatarPathProvider = Provider<String?>((ref) {
   final selection = ref.watch(avatarSelectionProvider);
   final catalogAsync = ref.watch(avatarCatalogProvider);
-  final catalog = catalogAsync.valueOrNull;
+  final catalog = catalogAsync..value;
   if (catalog == null || selection.characterId == null) return null;
-  for (final franchise in catalog.franchises) {
+  assert(catalog != null);
+  final catalogCatalog = catalog!;
+  for (final franchise in (catalogCatalog.value.franchises ?? [])) {
     for (final character in franchise.characters) {
       if (character.characterId == selection.characterId) {
         return character.variantAt(selection.variantIndex);

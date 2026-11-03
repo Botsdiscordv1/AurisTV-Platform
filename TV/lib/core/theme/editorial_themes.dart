@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 
 class EditorialBadgeTheme {
   final Color primary;

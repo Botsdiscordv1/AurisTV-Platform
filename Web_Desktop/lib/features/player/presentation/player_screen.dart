@@ -1,5 +1,4 @@
 ﻿import 'dart:async';
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -19,7 +18,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart' as yt;
 
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/url_utils.dart';
@@ -29,6 +28,7 @@ import '../../../core/utils/web_utils.dart';
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
 import '../../remote_control/data/models/remote_device.dart';
 import '../../remote_control/presentation/widgets/device_selector_dialog.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final String contentId;
@@ -242,9 +242,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               title: widget.title,
               season: widget.season,
             )))
-            .valueOrNull
+            .value
             ?.episodes;
-        title = notifier.episodeInfoFor(_activeEpisode, _enrichedEpisodes(eps ?? const []))?.title;
+        final _enriched = _enrichedEpisodes(eps ?? const []) ?? const [];
+    title = notifier.episodeInfoFor(_activeEpisode, _enriched)?.title;
       }
     } catch (_) {}
     return episodeDisplayLabel(_activeEpisode, season: widget.season, title: title);
@@ -498,7 +499,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               title: widget.title,
               season: widget.season,
             )))
-            .valueOrNull;
+            .value;
         final info = notifier.episodeInfoFor(_activeEpisode,
             _enrichedEpisodes(epsData?.episodes ?? const []));
         if (info?.thumbnail != null && info!.thumbnail!.isNotEmpty) {
@@ -815,13 +816,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       // Senior Shield: Si el usuario minimiza la app o apaga la pantalla, 
       // restauramos la UI del sistema para no "secuestrar" los botones de volumen fuera del player.
-      VolumeController().showSystemUI = true;
+      VolumeController.instance.showSystemUI = true;
       if (!kIsWeb) {
         try { _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false}); } catch (_) {}
       }
     } else if (state == AppLifecycleState.resumed) {
       // Al volver al player, retomamos el control total de la interfaz de volumen.
-      VolumeController().showSystemUI = false;
+      VolumeController.instance.showSystemUI = false;
       if (!kIsWeb) {
         try { _volumeControlChannel.invokeMethod('setIntercept', {'enabled': true}); } catch (_) {}
       }
@@ -2097,7 +2098,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Config remota de playback: dispara la descarga (no bloquea) y usa los
     // valores actuales; si aún no cargó, defaults = valores hardcodeados previos.
-    final pcfg = ref.read(playbackConfigProvider).valueOrNull ?? PlaybackConfig.defaults;
+    final pcfg = ref.read(playbackConfigProvider).value ?? PlaybackConfig.defaults;
     PlaybackTelemetry.instance.configure(pcfg);
     PlaybackTelemetry.instance.beginSession();
 
@@ -2864,7 +2865,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Esto asegura que el audio anterior se detenga al cambiar de fuente
     _player?.stop();
     
-    final isWebOrDesktop = kIsWeb || (Platform.isWindows || Platform.isMacOS || Platform.isLinux);
+    final isWebOrDesktop = kIsWeb ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.linux;
 
     if (isWebOrDesktop) {
       setState(() => _webViewController = null);
@@ -2923,7 +2927,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
     
     if (!kIsWeb && _isMobileDevice && _isExiting) {
-      VolumeController().showSystemUI = true;
+      VolumeController.instance.showSystemUI = true;
       try { _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false}); } catch (_) {}
     }
     _posSubscription?.cancel();
@@ -3062,11 +3066,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       try { _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false}); } catch (_) {}
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-      VolumeController().showSystemUI = true;
+      VolumeController.instance.showSystemUI = true;
     } else if (_isMobileDevice) {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-      VolumeController().showSystemUI = true;
+      VolumeController.instance.showSystemUI = true;
     }
 
     // 3. Salida limpia usando GoRouter

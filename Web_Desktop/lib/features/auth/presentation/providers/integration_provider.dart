@@ -5,8 +5,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 import 'auth_web_helper.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 final integrationProvider = StateNotifierProvider<IntegrationNotifier, void>((ref) {
   return IntegrationNotifier(ref);

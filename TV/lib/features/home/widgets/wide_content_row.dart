@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:auris_core/auris_core.dart' hide FocusableWideCard, FocusableTop10WideCard;
+import 'package:auris_sdk/live/auris_core.dart' hide FocusableWideCard, FocusableTop10WideCard;
 import '../../../shared/widgets/focusable_top10_wide_card.dart';
 import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/focusable_wide_card.dart';

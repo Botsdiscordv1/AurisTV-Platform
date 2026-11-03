@@ -14,7 +14,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 import '../../../core/utils/tv_responsive_utils.dart';
 import '../../../shared/widgets/tv_focus_wrapper.dart';
 

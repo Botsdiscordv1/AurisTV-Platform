@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,8 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 import '../../data/models/remote_device.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 final remoteControlProvider = StateNotifierProvider<RemoteControlNotifier, RemoteControlState>((ref) {
   return RemoteControlNotifier(ref);
@@ -132,14 +132,14 @@ class RemoteControlNotifier extends StateNotifier<RemoteControlState> with Widge
       if (kIsWeb) {
         deviceName = 'Web Browser';
         type = RemoteDeviceType.web;
-      } else if (Platform.isAndroid) {
+      } else if (defaultTargetPlatform == TargetPlatform.android) {
         final androidInfo = await deviceInfo.androidInfo;
         deviceName = androidInfo.model;
         type = RemoteDeviceType.android;
-      } else if (Platform.isWindows) {
+      } else if (defaultTargetPlatform == TargetPlatform.windows) {
         deviceName = 'Windows PC';
         type = RemoteDeviceType.windows;
-      } else if (Platform.isIOS) {
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         final iosInfo = await deviceInfo.iosInfo;
         deviceName = iosInfo.name;
         type = RemoteDeviceType.ios;

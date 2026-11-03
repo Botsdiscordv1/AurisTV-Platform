@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 import 'content_row.dart';
 import 'editorial_content_row.dart';
 import 'wide_content_row.dart';

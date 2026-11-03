@@ -12,7 +12,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:auris_core/auris_core.dart' hide HeroBanner, FocusablePosterCard;
+import 'package:auris_sdk/live/auris_core.dart' hide HeroBanner, FocusablePosterCard;
 import '../../../core/utils/web_utils.dart';
 import '../../../core/utils/tv_responsive_utils.dart';
 import '../widgets/content_row.dart';

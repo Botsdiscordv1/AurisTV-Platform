@@ -150,4 +150,6 @@ class AurisIcons {
   static String get chevronRight => reiconSvg(Reicon.outline.chevronRight);
   static String get chevronUp => reiconSvg(Reicon.outline.chevronUp);
   static String get chevronDown => reiconSvg(Reicon.outline.chevronDown);
+
+  static String get library => reiconSvg(Reicon.outline.library);
 }

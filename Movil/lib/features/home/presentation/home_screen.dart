@@ -648,82 +648,79 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       );
     }
-
+    // Senior Optimization: Mobile topbar uses dark gradient layer that extends beyond the topbar container
+    // La capa oscura se extende 24px más allá del contenedor visual del topbar
     return GestureDetector(
       onTap: _scrollToTop,
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: 15.0,
-            sigmaY: 15.0,
+      child: Container(
+        height: 56.0,
+        margin: const EdgeInsets.only(bottom: 24.0), // Extiende la capa oscura hacia abajo
+        padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 8),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF000000),
+              Color(0x66000000),
+              Color(0x00000000),
+            ],
+            stops: [0.0, 0.5, 1.0],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            decoration: BoxDecoration(
-              color: const Color(0xFF000000).withValues(alpha: 0.4),
-              border: Border(
-                bottom: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  width: 0.5,
-                ),
-              ),
-            ),
-            padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 8),
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        greetingName,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      _CategoriesDropdownPill(
-                        currentCategory: currentCategory,
-                        onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
-                      ),
-                    ],
+                  Text(
+                    greetingName,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            backgroundColor: Colors.transparent,
-                            isScrollControlled: true,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                            ),
-                            builder: (_) => CastPickerSheet(),
-                          );
-                        },
-                        constraints: BoxConstraints(minWidth: 36, minHeight: 36),
-                        padding: EdgeInsets.zero,
-                      ),
-                      const SizedBox(width: 12),
-                      IconButton(
-                        icon: const Icon(Icons.download_rounded, color: Colors.white, size: 22),
-                        onPressed: () => context.push('/settings/library'),
-                        constraints: BoxConstraints(minWidth: 36, minHeight: 36),
-                        padding: EdgeInsets.zero,
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  _CategoriesDropdownPill(
+                    currentCategory: currentCategory,
+                    onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
                   ),
                 ],
               ),
-            ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        isScrollControlled: true,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                        ),
+                        builder: (_) => CastPickerSheet(),
+                      );
+                    },
+                    constraints: BoxConstraints(minWidth: 36, minHeight: 36),
+                    padding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    icon: AurisIcon(AurisIcons.library, color: Colors.white, size: 22),
+                    onPressed: () => context.push('/settings/library'),
+                    constraints: BoxConstraints(minWidth: 36, minHeight: 36),
+                    padding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -1525,9 +1522,15 @@ class _CategoriesDropdownPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final GlobalKey key = GlobalKey();
-    final label = currentCategory == 'inicio' 
-        ? 'Categorías' 
-        : (currentCategory[0].toUpperCase() + currentCategory.substring(1));
+    final label = switch (currentCategory) {
+      'inicio' => 'Inicio',
+      'series' => 'Series',
+      'películas' => 'Películas',
+      'animes' => 'Animes',
+      'kdrama' => 'KDramas',
+      'live' => 'Live',
+      _ => currentCategory,
+    };
 
     return GestureDetector(
       key: key,

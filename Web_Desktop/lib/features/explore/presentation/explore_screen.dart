@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:collection/collection.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/url_utils.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 import '../../schedule/presentation/schedule_screen.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 final _exploreFilterProvider = StateProvider<String>((ref) => 'En Emisión');
 final _exploreSearchQueryProvider = StateProvider<String>((ref) => '');

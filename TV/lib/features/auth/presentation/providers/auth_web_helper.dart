@@ -1,6 +1,6 @@
 import 'auth_web_helper_io.dart'
     if (dart.library.js_interop) 'auth_web_helper_web.dart' as impl;
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_sdk/live/auris_core.dart';
 
 abstract class AuthWebHelper {
   String getOrigin();
