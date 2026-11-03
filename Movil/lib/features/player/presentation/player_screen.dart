@@ -1197,6 +1197,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _enforceLandscapeOrientation();
     }
   }
+
+  /// Adquiere el wake lock para mantener la pantalla encendida.
+  /// Solo funciona en Android, en otras plataformas es un no-op.
+  Future<void> _acquireWakeLock() async {
+    if (!_isMobileDevice || !Platform.isAndroid) return;
+    try {
+      await _wakeLockChannel.invokeMethod('acquire');
+    } catch (e) {
+      debugPrint('[WakeLock] Error acquiring: $e');
+    }
+  }
+
+  /// Libera el wake lock para permitir que la pantalla se apague.
+  /// Solo funciona en Android, en otras plataformas es un no-op.
+  Future<void> _releaseWakeLock() async {
+    if (!_isMobileDevice || !Platform.isAndroid) return;
+    try {
+      await _wakeLockChannel.invokeMethod('release');
+    } catch (e) {
+      debugPrint('[WakeLock] Error releasing: $e');
+    }
+  }
   
   @override
   void initState() {
@@ -3117,7 +3139,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Si el video arranca a reproducirse (p.ej. tras un error de codec no
     // fatal en una pista de audio), retiramos cualquier cartel de error.
     _playingSubscription = player.stream.playing.listen((playing) {
-      if (mounted && playing) {
+      if (!mounted) return;
+      
+      // Manage wake lock: acquire when playing, release when paused/stopped
+      if (playing) {
+        _acquireWakeLock();
+      } else {
+        _releaseWakeLock();
+      }
+      
+      if (playing) {
         setState(() {
           _playbackError = null;
           _isLoading = false; 
@@ -6456,7 +6487,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
           
           // Anterior (Sólido suele verse pequeño, subimos un poco)
-          if (hasPrevious)
+          // Solo el icono se oculta en películas (no toda la capsula)
+          if (hasPrevious && !_isMovie)
             _buildCapsuleIconButton(
               icon: AurisIcons.backwardStep,
               onTap: () => _navigateToEpisode(false),
@@ -6466,7 +6498,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
           
           // Siguiente (Sólido suele verse pequeño, subimos un poco)
-          if (hasNext)
+          // Solo el icono se oculta en películas (no toda la capsula)
+          if (hasNext && !_isMovie)
             _buildCapsuleIconButton(
               icon: AurisIcons.forwardStep,
               onTap: () => _navigateToEpisode(true),
@@ -6475,7 +6508,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               minWidth: 40,
             ),
           
-          if (hasPrevious || hasNext)
+          if ((hasPrevious || hasNext) && !_isMovie)
             Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
 
           // Velocidad (Icono + Texto)
@@ -6527,15 +6560,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
 
           // Audio / Subtítulos (oculto en vivo/directo M3U)
-          if (!_isOpEd && !_isTrailer && !_isLiveStream) ...[
-            Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
+          if (!_isOpEd && !_isTrailer && !_isLiveStream)
             _buildCapsuleIconButton(
               icon: AurisIcons.subtitles,
               onTap: _showLanguageSelector,
               size: baseIconSize - 2,
               minWidth: 40,
             ),
-          ],
+
+          // Cast (solo visible en películas, al final de la capsula)
+          if (!_isOpEd && !_isTrailer && _isMovie)
+            _buildCapsuleIconButton(
+              icon: AurisIcons.cast,
+              onTap: _showCastPicker,
+              size: baseIconSize - 2,
+              minWidth: 40,
+            ),
           
           const SizedBox(width: 6),
         ],
@@ -6784,11 +6824,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             onPressed: _showEpisodesPanel
                           ),
                           SizedBox(width: spacing),
-                          _buildCastIcon(iconSize),
                           if (!_isOpEd && !_isMovie && !_isTrailer) ...[
                             SizedBox(width: spacing),
                             _PlayerTextButton(onPressed: _skipOpEd, icon: AurisIcons.fastForward, label: 'OP / ED', useBackground: true),
                           ],
+                          // Cast: visible a la derecha en series/animes, dentro de la capsula en películas
+                          if (!_isMovie)
+                            _buildCastIcon(iconSize),
                         ],
                       ),
                     ],

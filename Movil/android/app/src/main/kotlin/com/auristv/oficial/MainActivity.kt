@@ -179,8 +179,8 @@ class MainActivity: AudioServiceFragmentActivity() {
                         if (wakeLock == null || wakeLock?.isHeld != true) {
                             val pm = applicationContext.getSystemService(POWER_SERVICE) as android.os.PowerManager
                             wakeLock = pm.newWakeLock(
-                                android.os.PowerManager.PARTIAL_WAKE_LOCK,
-                                "auristv:cast_proxy")
+                                android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK,
+                                "auristv:video_player")
                             wakeLock?.setReferenceCounted(false)
                             wakeLock?.acquire()
                         }

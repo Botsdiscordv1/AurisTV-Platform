@@ -553,8 +553,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
     if (!isMobile) {
       // Senior Optimization: Tablet topbar uses solid gradient instead of blur
+      final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
       return Container(
-        height: navHeight,
+        height: isPortrait ? 56.0 : navHeight, // Compact en portrait, normal en landscape
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -574,28 +575,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Container(
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  SvgPicture.asset(
-                    'assets/icons/auris-logo-web-flat.svg',
-                    height: logoHeight,
-                    fit: BoxFit.contain,
-                    colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
-                  ),
-                  SizedBox(width: isCompactDesktop ? 20 : 40),
+                  if (!isPortrait) ...[
+                    SvgPicture.asset(
+                      'assets/icons/auris-logo-web-flat.svg',
+                      height: logoHeight,
+                      fit: BoxFit.contain,
+                      colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                    ),
+                    SizedBox(width: isCompactDesktop ? 20 : 40),
+                  ] else ...[
+                    const SizedBox(width: 16),
+                  ],
                   _PillNavBar(
                     currentCategory: currentCategory,
                     onCategoryChanged: (cat) => ref.read(homeCategoryProvider.notifier).state = cat,
                   ),
-                  const Spacer(),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: AurisIcon(AurisIcons.search, color: Colors.white, size: 24),
-                        onPressed: () => context.push('/search'),
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 24),
+                        icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
                         onPressed: () {
                           showModalBottomSheet(
                             context: context,
@@ -608,10 +609,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           );
                         },
                       ),
-                      const SizedBox(width: 16),
-                      GestureDetector(
-                        onTap: () => context.push('/profile-with-nav'),
-                        child: _buildUserAvatar(context, isCompactDesktop),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        icon: AurisIcon(AurisIcons.library, color: Colors.white, size: 22),
+                        onPressed: () => context.push('/settings/library'),
                       ),
                     ],
                   ),

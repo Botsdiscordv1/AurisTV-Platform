@@ -131,7 +131,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     final nextIndex = (_backgroundIndex + 1) % widget.items.length;
     final nextItem = widget.items[nextIndex];
 
-    final imageUrl = _heroBackgroundUrl(nextItem);
+    final imageUrl = _heroBackgroundUrl(nextItem, context);
     if (imageUrl != null && imageUrl.isNotEmpty) {
       precacheImage(
         ResizeImage(
@@ -171,12 +171,13 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
     super.dispose();
   }
 
-  String _heroBackgroundUrl(MediaItem item) {
-    if (_resolvedLayout == HeroBannerLayout.mobile) {
+  String _heroBackgroundUrl(MediaItem item, BuildContext context) {
+    // Móvil estricto (Smartphones): < 768 → posterUrl (vertical)
+    if (context.isMobile) {
       return item.posterUrl;
-    } else {
-      return item.bannerUrl ?? item.posterUrl;
     }
+    // Tablet (768-1023) y Desktop (≥ 1024): bannerUrl (horizontal)
+    return item.bannerUrl ?? item.posterUrl;
   }
 
   String? _formatMovieDuration(String? durationStr, int? runtimeMin) {
@@ -618,7 +619,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
       },
       child: CachedNetworkImage(
         key: ValueKey('bg_${item.id}_$_lastRenderedBgIndex'),
-        imageUrl: _heroBackgroundUrl(item),
+        imageUrl: _heroBackgroundUrl(item, context),
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
