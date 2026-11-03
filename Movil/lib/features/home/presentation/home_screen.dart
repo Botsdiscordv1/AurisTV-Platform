@@ -397,14 +397,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             cacheExtent: 1000,
             slivers: [
               // Espaciador para que el contenido empiece debajo de la barra fija
-              // Tablet portrait usa topbar compacto (56px) + content area
+    // Espaciador para que el contenido empiece debajo de la barra fija
+              // Tablet (portrait y landscape) necesita spacer extra por el topbar completo (80px)
+              // Mobile y tablet portrait usan topbar compacto (56px)
               SliverToBoxAdapter(
-                child: SizedBox(height: (isMobile || MediaQuery.of(context).orientation == Orientation.portrait)
-                  ? (MediaQuery.of(context).padding.top + 52) // Top padding + 52px (topbar compact height)
-                  : 0 // Senior Fix: En Web/Tablet landscape el banner sangra hasta arriba (detrás de la barra)
-                ),
+                child: SizedBox(height: _buildTopbarSpacerHeight(context, isMobile, MediaQuery.of(context).orientation, width)),
               ),
-
               // 1. Banner Principal con Datos Curados por Categoría
               heroBannerItemsAsync.when(
                 data: (displayItems) => SliverToBoxAdapter(
@@ -701,6 +699,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
+  }
+
+  double _buildTopbarSpacerHeight(BuildContext context, bool isMobile, Orientation orientation, double width) {
+    if (isMobile) {
+      // Mobile: topbar compacto = 56px
+      return MediaQuery.of(context).padding.top + 56;
+    }
+    // Tablet:
+    if (orientation == Orientation.portrait) {
+      // Tablet portrait: topbar compacto (56px)
+      return MediaQuery.of(context).padding.top + 56;
+    }
+    // Tablet landscape: topbar completo = 80px
+    final bool isCompactDesktop = width >= 800 && width < 1100;
+    final navHeight = isCompactDesktop ? 70.0 : 80.0;
+    return MediaQuery.of(context).padding.top + navHeight;
   }
 
   Widget _buildUserAvatar(BuildContext context, bool isCompact) {
