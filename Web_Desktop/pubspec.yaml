@@ -11,8 +11,8 @@ dependencies:
     sdk: flutter
 
   # LÓGICA COMPARTIDA
-  auris_sdk:
-    path: E:/Auris_Projects/AurisSDK/auris_sdk
+  auris_core:
+    path: ../Core/packages/auris_core
 
   # Red / API
   dio: ^5.9.2
