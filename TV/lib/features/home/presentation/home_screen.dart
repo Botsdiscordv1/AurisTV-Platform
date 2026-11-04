@@ -9,10 +9,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:auris_sdk/live/auris_core.dart' hide HeroBanner, FocusablePosterCard;
+import 'package:auris_core/auris_core.dart' hide HeroBanner, FocusablePosterCard;
 import '../../../core/utils/web_utils.dart';
 import '../../../core/utils/tv_responsive_utils.dart';
 import '../widgets/content_row.dart';
@@ -1854,7 +1853,8 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
   /// foco vuelva a entrar.
   bool _focusExited = false;
 
-  final stt.SpeechToText _speech = stt.SpeechToText();
+  // Speech-to-text disabled for TV compatibility
+  // final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
 
   @override
@@ -1937,51 +1937,11 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
   }
 
   Future<void> _initSpeech() async {
-    final status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      final result = await Permission.microphone.request();
-      if (!result.isGranted) return;
-    }
-    await _speech.initialize(
-      onError: (error) {
-        if (mounted) setState(() => _isListening = false);
-      },
-      onStatus: (status) {
-        if (mounted && status == 'done') {
-          setState(() => _isListening = false);
-        }
-      },
-    );
+    // Speech-to-text disabled for TV compatibility
   }
 
   Future<void> _startVoiceSearch() async {
-    if (_isListening) {
-      await _speech.stop();
-      if (mounted) setState(() => _isListening = false);
-      return;
-    }
-    if (!_speech.isAvailable) {
-      await _initSpeech();
-      if (!_speech.isAvailable) return;
-    }
-    if (!mounted) return;
-    setState(() => _isListening = true);
-    _speech.listen(
-      localeId: 'es_ES',
-      listenFor: const Duration(seconds: 10),
-      pauseFor: const Duration(seconds: 3),
-      onResult: (result) {
-        if (!mounted) return;
-        if (result.finalResult) {
-          setState(() => _isListening = false);
-          final text = result.recognizedWords.trim();
-          if (text.isNotEmpty) {
-            _searchController.text = text;
-            _onSearchSubmitted(text);
-          }
-        }
-      },
-    );
+    // Speech-to-text disabled for TV compatibility
   }
 
   void _close() async {

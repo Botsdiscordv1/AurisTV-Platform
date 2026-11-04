@@ -1,4 +1,4 @@
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 
 /// Datos de ejemplo — reemplazar por datasources/repositories reales.
 class MockData {

@@ -8,7 +8,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import '../../data/models/remote_device.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 
 final remoteControlProvider = StateNotifierProvider<RemoteControlNotifier, RemoteControlState>((ref) {
   return RemoteControlNotifier(ref);

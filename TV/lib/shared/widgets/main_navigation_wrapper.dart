@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 
 /// Senior TV Wrapper: Solo mantiene la lógica de pantalla grande y navegación.
 /// En TV, el dispositivo actúa únicamente como receptor de comandos.

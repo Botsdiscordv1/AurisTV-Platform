@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:auris_sdk/live/auris_core.dart' hide FocusableWideCard;
+import 'package:auris_core/auris_core.dart' hide FocusableWideCard;
 import 'focusable_wide_card.dart';
 
 /// Tarjeta Top 10 panorámica (Wide) estilo Netflix TV.

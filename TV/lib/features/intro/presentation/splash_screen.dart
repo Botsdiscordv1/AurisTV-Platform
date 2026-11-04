@@ -1,9 +1,9 @@
-ï»¿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/web_utils.dart';
 import '../../../core/router/app_router.dart';
 import 'widgets/auris_splash_logo.dart';
@@ -22,7 +22,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // Precarga el collage del Login mientras se ve el Splash para que, al
     // entrar (ahora o cuando Login sea la pantalla de arranque), aparezca
-    // LLENO desde el primer frame sin tarjetas vacÃ­as.
+    // LLENO desde el primer frame sin tarjetas vacías.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) CollageGridBackground.precache(context);
     });
@@ -38,20 +38,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
   }
 
-  /// NavegaciÃ³n al terminar la intro del logo.
+  /// Navegación al terminar la intro del logo.
   ///
-  /// Nuevo flujo de TV: splash â†’ Login (con el collage/carrusel ya precargado
-  /// desde initState) cuando NO hay sesiÃ³n; splash â†’ Home cuando sÃ­ la hay.
+  /// Nuevo flujo de TV: splash ? Login (con el collage/carrusel ya precargado
+  /// desde initState) cuando NO hay sesión; splash ? Home cuando sí la hay.
   /// `authProvider` restaura el usuario local (Hive) en un microtask al
-  /// construirse, asÃ­ que para este punto (tras la animaciÃ³n del logo) ya
-  /// resolviÃ³ el estado o sigue siendo invitado.
+  /// construirse, así que para este punto (tras la animación del logo) ya
+  /// resolvió el estado o sigue siendo invitado.
   void _onAnimationFinished() {
     if (!mounted) return;
     final config = appRouter.routerDelegate.currentConfiguration;
     final matches = config.matches;
     final String current = matches.isNotEmpty ? matches.last.matchedLocation : config.uri.path;
 
-    // Si un Cast o DeepLink abriÃ³ el reproductor sobre el splash, no lo pisamos
+    // Si un Cast o DeepLink abrió el reproductor sobre el splash, no lo pisamos
     if (current != '/splash') return;
 
     final user = ref.read(authProvider);

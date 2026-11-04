@@ -1,4 +1,4 @@
-Ôªøimport 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:ui' as ui;
@@ -21,7 +21,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
 import '../../../core/utils/web_utils.dart';
 import 'tv_video_surface.dart';
@@ -40,7 +40,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? serverName;
   final int? startPosition;
   final String? category;
-  /// Kind granular + a√±o para historial fiel (ver Movil).
+  /// Kind granular + aÒo para historial fiel (ver Movil).
   final String? kind;
   final int? year;
   final int? totalEpisodes;
@@ -54,19 +54,19 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? video1080;
   final bool skipResume;
 
-  /// Reproducci√≥n en vivo (canales de listas M3U): no escribe historial
+  /// ReproducciÛn en vivo (canales de listas M3U): no escribe historial
   /// ("Continuar viendo") ni propone reanudar.
   final bool isLive;
 
   /// Cabeceras HTTP (Referer/UA) del stream resuelto, recibidas por el canal
   /// de cast (open_media con `direct=1`). Al tenerlas, el player abre el stream
-  /// DIRECTO con estas headers (sin re-extraer, latencia 0 y fuente id√©ntica).
+  /// DIRECTO con estas headers (sin re-extraer, latencia 0 y fuente idÈntica).
   final Map<String, String>? initialHeaders;
 
-  /// Sesi√≥n de cast espejo (`open_media` del emisor): la TV reproduce pero NO
+  /// SesiÛn de cast espejo (`open_media` del emisor): la TV reproduce pero NO
   /// escribe historial. Necesario para los episodios del cast, que llegan sin
-  /// `initialHeaders` (la URL del siguiente episodio a√∫n no est√° resuelta y la
-  /// TV re-extrae) y antes se colaban como sesi√≥n local.
+  /// `initialHeaders` (la URL del siguiente episodio a˙n no est· resuelta y la
+  /// TV re-extrae) y antes se colaban como sesiÛn local.
   final bool isCastMirror;
 
   const PlayerScreen({
@@ -102,13 +102,13 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 enum PlayerOverlay { none, language, server, quality, config, speed, volume, episodes, aspect }
 
-/// Modos de "Relaci√≥n de aspecto" (tama√±o/encuadre) del reproductor.
+/// Modos de "RelaciÛn de aspecto" (tamaÒo/encuadre) del reproductor.
 /// Cada modo define el [BoxFit] del video y, opcionalmente, un factor de
-/// ampliaci√≥n (Zoom).
+/// ampliaciÛn (Zoom).
 enum AspectMode {
   normal(
     'Normal',
-    'Proporci√≥n original ¬∑ barras negras si hace falta',
+    'ProporciÛn original ∑ barras negras si hace falta',
     BoxFit.contain,
     1.0,
   ),
@@ -155,11 +155,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   late final FocusNode _opedPillFocusNode = FocusNode(debugLabel: "pill_oped");
   late final FocusNode _languagePillFocusNode = FocusNode(debugLabel: "pill_language");
   late final FocusNode _sidePanelCloseNode = FocusNode(debugLabel: "sidepanel_close");
-  // Nodos de entrada de los paneles de Configuraci√≥n: al abrir un submen√∫
-  // (o volver a Configuraci√≥n) el foco debe caer EXPL√çCITAMENTE en la opci√≥n
+  // Nodos de entrada de los paneles de ConfiguraciÛn: al abrir un submen˙
+  // (o volver a ConfiguraciÛn) el foco debe caer EXPLÕCITAMENTE en la opciÛn
   // actual dentro del panel. El `autofocus` se pierde al recrear el contenido
-  // (KeyedSubtree) y el foco terminaba en el nodo ra√≠z del player, con lo que
-  // LEFT hac√≠a seek en vez de que la trampa del two-panel enfocara el video.
+  // (KeyedSubtree) y el foco terminaba en el nodo raÌz del player, con lo que
+  // LEFT hacÌa seek en vez de que la trampa del two-panel enfocara el video.
   final FocusNode _configEntryNode = FocusNode(debugLabel: "panel_config_entry");
   final FocusNode _qualityEntryNode = FocusNode(debugLabel: "panel_quality_entry");
   final FocusNode _speedEntryNode = FocusNode(debugLabel: "panel_speed_entry");
@@ -178,11 +178,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   int? _tvWid;
   int _tvSurfaceW = 0;
   int _tvSurfaceH = 0;
-  /// `wid` de la superficie que ya recibi√≥ su init completo de mpv (`--vo`).
-  /// Un cambio s√≥lo de tama√±o (mismo `wid`) no debe reiniciar `--vo`.
+  /// `wid` de la superficie que ya recibiÛ su init completo de mpv (`--vo`).
+  /// Un cambio sÛlo de tamaÒo (mismo `wid`) no debe reiniciar `--vo`.
   int? _tvInitializedWid;
-  /// Resoluci√≥n del video enviada al SurfaceView para fijar (`setFixedSize`) el
-  /// tama√±o de la superficie; as√≠ el SurfaceView escala los modos de aspecto.
+  /// ResoluciÛn del video enviada al SurfaceView para fijar (`setFixedSize`) el
+  /// tamaÒo de la superficie; asÌ el SurfaceView escala los modos de aspecto.
   int _tvVideoW = 0;
   int _tvVideoH = 0;
   StreamSubscription<int?>? _videoWidthSub;
@@ -207,7 +207,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   WebViewController? _webViewController;
     bool _hasInitialized = false;
-    // Clave del √∫ltimo sync de episodios al provider global (evita re-syncs
+    // Clave del ˙ltimo sync de episodios al provider global (evita re-syncs
     // en cada rebuild: el whenData dispara por cada frame mientras hay data).
     String? _episodesSyncKey;
     List<EpisodeInfo>? _fpCacheList;
@@ -224,9 +224,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _showControls = true;
   bool _hasResetPosition = false;
   int _resumePosition = 0;
-  /// Generaci√≥n del seek de resume: cada _initPlayer la incrementa para que
+  /// GeneraciÛn del seek de resume: cada _initPlayer la incrementa para que
   /// los loops de reintento del episodio/fuente anterior se aborten y no
-  /// apliquen su seek tard√≠o sobre el nuevo stream (igual que Movil).
+  /// apliquen su seek tardÌo sobre el nuevo stream (igual que Movil).
   int _resumeSeekGen = 0;
   DateTime? _resumeGuardUntil;
   int _resumeGuardRetries = 0;
@@ -242,10 +242,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isExiting = false;
   bool _webNeedsInteraction = false; // Senior Web Fix: Autoplay blocker
   PlayerOverlay _activeOverlay = PlayerOverlay.none;
-  /// Sub-panel padre para la navegaci√≥n en dos niveles (Configuraci√≥n ‚Üí
+  /// Sub-panel padre para la navegaciÛn en dos niveles (ConfiguraciÛn ?
   /// Calidad): salir desde el hijo vuelve al padre en vez de cerrar.
   PlayerOverlay? _overlayParent;
-  /// Fila de Configuraci√≥n que abri√≥ el submen√∫ actual: al volver, el foco
+  /// Fila de ConfiguraciÛn que abriÛ el submen˙ actual: al volver, el foco
   /// regresa a ella (en vez de saltar al primer item).
   PlayerOverlay? _configFocusTarget;
   bool _isVolumePillHovered = false;
@@ -267,21 +267,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Duration _seekDiff = Duration.zero;
   // Hold-scrub estilo YouTube TV (D-pad mantenido en el timeline).
   Timer? _holdTimer;
-  int _holdDir = 0; // -1 atr√°s, +1 adelante, 0 inactivo
+  int _holdDir = 0; // -1 atr·s, +1 adelante, 0 inactivo
   int _holdBaseMs = 0;
   DateTime? _holdStart;
   Timer? _historySaveTimer;
   int? _lastSeekPosMs;
 
-  /// En m√≥vil/tablet el player ya ocupa toda la pantalla, as√≠ que el bot√≥n
+  /// En mÛvil/tablet el player ya ocupa toda la pantalla, asÌ que el botÛn
   /// "fullscreen" no cambia la ventana sino el formato/ajuste del video:
-  /// Normal ‚Üí Estirar ‚Üí Expandir ‚Üí Normal.
-  /// En TV/desktop el mismo ajuste se elige desde Configuraci√≥n ‚Üí Relaci√≥n de
+  /// Normal ? Estirar ? Expandir ? Normal.
+  /// En TV/desktop el mismo ajuste se elige desde ConfiguraciÛn ? RelaciÛn de
   /// aspecto (ver [AspectMode]).
   AspectMode _aspectMode = AspectMode.normal;
 
-  /// En Android/iOS (phone/tablet/foldable) y en web m√≥vil el player ya cubre
-  /// toda la pantalla, as√≠ que el bot√≥n debe ajustar el formato del video en
+  /// En Android/iOS (phone/tablet/foldable) y en web mÛvil el player ya cubre
+  /// toda la pantalla, asÌ que el botÛn debe ajustar el formato del video en
   /// lugar de entrar/salir de fullscreen del SO/navegador.
   bool get _useVideoFitCycle {
     if (kIsWeb) {
@@ -292,12 +292,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   bool _isLoading = true;
   bool _isCompleted = false;
-  // La superficie nativa (SurfaceView) se monta SOLO cuando termin√≥ la carga:
-  // mientras hay una animaci√≥n en Dart (el spinner), Hybrid Composition congela
+  // La superficie nativa (SurfaceView) se monta SOLO cuando terminÛ la carga:
+  // mientras hay una animaciÛn en Dart (el spinner), Hybrid Composition congela
   // la capa de UI superpuesta. El flag es "sticky" para no desmontar el video si
-  // vuelve el buffering durante la reproducci√≥n.
+  // vuelve el buffering durante la reproducciÛn.
   bool _tvSurfaceReady = false;
-  // Primer frame real ya pintado: hasta que la posici√≥n avance de verdad, el
+  // Primer frame real ya pintado: hasta que la posiciÛn avance de verdad, el
   // spinner de carga NO debe ocultarse (mpv reporta playing/buffering=false
   // antes de tener imagen, y eso dejaba ver los controles sobre un video negro).
   bool _firstFrameRendered = false;
@@ -309,7 +309,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Calidades disponibles de la pista actual (parseadas del master HLS).
   List<QualityOption> _qualityOptions = [];
 
-  /// Stream base de la pista actual (para volver a "Autom√°tico").
+  /// Stream base de la pista actual (para volver a "Autom·tico").
   String _currentStreamUrl = '';
   Map<String, String> _currentStreamHeaders = const {};
 
@@ -336,11 +336,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Si el contenido actual es un Opening (OP) o Ending (ED).
   bool get _isOpEd => widget.episode == 'OP' || widget.episode == 'ED';
 
-  /// Si el contenido actual es un Tr√°iler.
+  /// Si el contenido actual es un Tr·iler.
   bool get _isTrailer => widget.episode == 'Trailer';
 
   /// Stream directo en vivo: canal de lista M3U o evento lacancha (m3u8).
-  /// En este modo no hay episodios, servidores ni idiomas que cambiar, as√≠
+  /// En este modo no hay episodios, servidores ni idiomas que cambiar, asÌ
   /// que la UI oculta el overlay "Siguiente episodio", las pills prev/next y
   /// las pills de servidor e idioma.
   bool get _isLiveStream =>
@@ -350,8 +350,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           (widget.sourceUrl.contains('.m3u8') ||
               widget.sourceUrl.contains('.m3u')));
 
-  /// Subt√≠tulo del episodio en formato `T1:E1 "T√≠tulo"` (igual en las 3
-  /// plataformas). Observa la lista sincronizada: el t√≠tulo aparece en cuanto
+  /// SubtÌtulo del episodio en formato `T1:E1 "TÌtulo"` (igual en las 3
+  /// plataformas). Observa la lista sincronizada: el tÌtulo aparece en cuanto
   /// llega, y al mostrarse ya queda cargado para el guardado.
   String _episodeLabel() {
     if (_isSpecial) return 'Temporada 0';
@@ -392,11 +392,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return widget.sourceUrl;
   }
 
-  /// Hereda la metadata enriquecida de la ficha (t√≠tulos ES, thumbnails TMDB)
-  /// desde el cach√© de serie del core. El player consulta episodesProvider
-  /// con la URL del episodio y recibe la respuesta cruda (n√∫meros/URLs); sin
-  /// esto el carrusel y los t√≠tulos quedan sin metadata. Si la ficha no se
-  /// visit√≥ (deep link, Continuar Viendo directo) devuelve la lista intacta.
+  /// Hereda la metadata enriquecida de la ficha (tÌtulos ES, thumbnails TMDB)
+  /// desde el cachÈ de serie del core. El player consulta episodesProvider
+  /// con la URL del episodio y recibe la respuesta cruda (n˙meros/URLs); sin
+  /// esto el carrusel y los tÌtulos quedan sin metadata. Si la ficha no se
+  /// visitÛ (deep link, Continuar Viendo directo) devuelve la lista intacta.
   List<EpisodeInfo> _enrichedEpisodes(List<EpisodeInfo> episodes) {
     if (episodes.isEmpty) return episodes;
     return ProgressiveContentNotifier.enrichWithSeriesMetadata(
@@ -417,7 +417,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _diagPosCount = 0;
     _hasResetPosition = false; // Bloqueamos historial
     
-    // Capturamos la √∫ltima posici√≥n buena o la de reanudaci√≥n
+    // Capturamos la ˙ltima posiciÛn buena o la de reanudaciÛn
     final currentPos = _player?.state.position.inMilliseconds ?? 0;
     if (currentPos > 3000) _resumePosition = currentPos;
     
@@ -484,8 +484,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         }
         break;
       case RemoteAction.dpadUp:
-        // D-PAD del mando m√≥vil: navega la UI del player (igual que las
-        // flechas del mando f√≠sico del TV). El volumen va por los botones
+        // D-PAD del mando mÛvil: navega la UI del player (igual que las
+        // flechas del mando fÌsico del TV). El volumen va por los botones
         // dedicados volume_up/volume_down/mute.
         _handleKeyEvent(KeyDownEvent(
           physicalKey: PhysicalKeyboardKey.arrowUp,
@@ -521,8 +521,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         if (context.canPop()) context.pop();
         break;
       case RemoteAction.mute:
-        // _toggleMute guarda el volumen previo en _lastAppliedVolume, as√≠ el
-        // mute remoto se comporta igual que el bot√≥n de la TV al desmutear.
+        // _toggleMute guarda el volumen previo en _lastAppliedVolume, asÌ el
+        // mute remoto se comporta igual que el botÛn de la TV al desmutear.
         _toggleMute();
         break;
     }
@@ -533,8 +533,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_player == null || !mounted) return;
 
     // Cast Local: publica al bridge del server para el /cast/status del
-    // m√≥vil (poll). Throttle propio a 1 s para un timeline m√°s fluido que
-    // el de Supabase (3 s), sin tocar su l√≥gica.
+    // mÛvil (poll). Throttle propio a 1 s para un timeline m·s fluido que
+    // el de Supabase (3 s), sin tocar su lÛgica.
     final nowBridge = DateTime.now().millisecondsSinceEpoch;
     if (force || nowBridge - _lastBridgeReportMs >= 1000) {
       _lastBridgeReportMs = nowBridge;
@@ -623,36 +623,36 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _applyVolume() {
     if (kIsWeb) {
       if (_volume <= 1.0) {
-        // Modo Est√°ndar: Usar volumen nativo y ganancia neutra
+        // Modo Est·ndar: Usar volumen nativo y ganancia neutra
         _player?.setVolume(_volume * 100);
         WebUtils.applyAudioBoost(1.0);
       } else {
-        // Modo Boost: Volumen nativo al m√°ximo y usar GainNode para el extra
+        // Modo Boost: Volumen nativo al m·ximo y usar GainNode para el extra
         _player?.setVolume(100.0);
         WebUtils.applyAudioBoost(_volume);
       }
       return;
     }
 
-    // Volumen 0-200% = volumen INTERNO del v√≠deo, igual que el boost:
-    // nunca se escribe el volumen del sistema. As√≠ 100% es la referencia
-    // del propio v√≠deo, el valor no lo pisa el sistema y el boost sigue
-    // funcionando aunque el volumen del sistema est√© por debajo del 100%.
-    // (mpv `volume-max 200` ya est√° configurado al crear la plataforma).
+    // Volumen 0-200% = volumen INTERNO del vÌdeo, igual que el boost:
+    // nunca se escribe el volumen del sistema. AsÌ 100% es la referencia
+    // del propio vÌdeo, el valor no lo pisa el sistema y el boost sigue
+    // funcionando aunque el volumen del sistema estÈ por debajo del 100%.
+    // (mpv `volume-max 200` ya est· configurado al crear la plataforma).
     _player?.setVolume(_volume * 100);
   }
 
   void _updateHistory({required int positionMs, required int durationMs, bool force = false}) {
     if (_isDisposed) return;
-    // Cast propio (espejo): el EMISOR (m√≥vil/Web) es due√±o del progreso y
-    // persiste su historial mientras dura la sesi√≥n. La TV solo reproduce,
-    // as√≠ que no escribe (evita espejos que pisen la posici√≥n del emisor y
-    // resumes que "viajen" a una plataforma que no la gener√≥).
+    // Cast propio (espejo): el EMISOR (mÛvil/Web) es dueÒo del progreso y
+    // persiste su historial mientras dura la sesiÛn. La TV solo reproduce,
+    // asÌ que no escribe (evita espejos que pisen la posiciÛn del emisor y
+    // resumes que "viajen" a una plataforma que no la generÛ).
     if (widget.initialHeaders != null || widget.isCastMirror) return;
     if (widget.contentId.isEmpty || _historyNotifier == null || _isOpEd) return;
     
     // Senior Performance Fix: Throttling de guardado en base de datos.
-    // Solo guardamos si es 'force' o si han pasado 1s desde el √∫ltimo movimiento.
+    // Solo guardamos si es 'force' o si han pasado 1s desde el ˙ltimo movimiento.
     if (!force) {
       _historySaveTimer?.cancel();
       _historySaveTimer = Timer(const Duration(seconds: 1), () {
@@ -669,9 +669,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Tras dispose el ref muere (StateError): el guardado final usa
     // _finalSaveOnDispose (sin ref). Igual que Movil.
     if (_isDisposed) return;
-    // T√≠tulo/banner del episodio: 1) lista sincronizada del provider global,
+    // TÌtulo/banner del episodio: 1) lista sincronizada del provider global,
     // 2) lectura directa de episodios (no depende del timing del sync), igual
-    // que Movil. Sin esto Continuar Viendo mostraba "T1:E1" sin t√≠tulo en TV.
+    // que Movil. Sin esto Continuar Viendo mostraba "T1:E1" sin tÌtulo en TV.
     String? episodeThumb;
     String? episodeTitle;
     try {
@@ -733,7 +733,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Guardado final en dispose SIN usar ref (ver Movil: el ref muere con el
   /// widget y ref.read lanza StateError en finalizeTree).
   void _finalSaveOnDispose(int positionMs, int durationMs) {
-    // Cast propio (espejo): el historial del fan est√° en el emisor (ver
+    // Cast propio (espejo): el historial del fan est· en el emisor (ver
     // _updateHistory); la TV no persiste al cerrarse el player del cast.
     if (widget.initialHeaders != null || widget.isCastMirror) return;
     try {
@@ -765,7 +765,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   PlaybackHistoryNotifier? _historyNotifier;
-  // Tras dispose el ref muere: bandera + √∫ltimos valores para el guardado
+  // Tras dispose el ref muere: bandera + ˙ltimos valores para el guardado
   // final sin ref (igual que Movil).
   bool _isDisposed = false;
   String? _lastResolvedEpisodeTitle;
@@ -800,22 +800,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   String _lastVideoUrl = '';
   Map<String, String> _lastVideoHeaders = const {};
 
-  /// Auto-reintento silencioso (sin popup): ante un error gen√©rico se
+  /// Auto-reintento silencioso (sin popup): ante un error genÈrico se
   /// re-abre el MISMO stream con sus headers un par de veces con backoff;
   /// el popup solo aparece cuando se agotan los intentos.
   int _autoRetryCount = 0;
   static const int _kMaxAutoRetry = 3;
   Timer? _autoRetryTimer;
   // Contador de refreshes de extract por URLs firmadas expiradas (vimeos rota
-  // host+tokens por extract). M√°x 2 re-extracciones con backoff; despu√©s, UI error.
+  // host+tokens por extract). M·x 2 re-extracciones con backoff; despuÈs, UI error.
   int _extractRefreshCount = 0;
   static const int _kMaxExtractRefresh = 2;
 
   static const _volumeControlChannel = MethodChannel('auristv/volume');
 
-  /// Activa/desactiva la intercepci√≥n nativa de teclas de volumen.
+  /// Activa/desactiva la intercepciÛn nativa de teclas de volumen.
   /// En TV no hay handler nativo (el volumen lo maneja el sistema o el remoto IR
-  /// de la TV certificada), as√≠ que se ignora silenciosamente en vez de lanzar
+  /// de la TV certificada), asÌ que se ignora silenciosamente en vez de lanzar
   /// MissingPluginException.
   Future<void> _setVolumeIntercept(bool enabled) async {
     try {
@@ -837,7 +837,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
     WidgetsBinding.instance.addObserver(this);
     
-    // Senior Restore: Identificaci√≥n precisa de dispositivo nativo vs t√°ctil.
+    // Senior Restore: IdentificaciÛn precisa de dispositivo nativo vs t·ctil.
     _isMobileDevice = ResponsiveUtils.isNative;
 
     // Senior Fix: Capturar el notifier en initState para poder usarlo en dispose de forma segura
@@ -865,11 +865,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     if (_isMobileDevice) {
       // El volumen del player (0-200%) es SIEMPRE el volumen interno del
-      // v√≠deo: no se lee ni se escribe el volumen del sistema, as√≠ el valor
-      // no salta con los botones f√≠sicos ni el sistema pisa el boost.
+      // vÌdeo: no se lee ni se escribe el volumen del sistema, asÌ el valor
+      // no salta con los botones fÌsicos ni el sistema pisa el boost.
       VolumeController.instance.showSystemUI = true;
       
-      // Senior Shield: Activar la intercepci√≥n nativa inmediatamente al entrar
+      // Senior Shield: Activar la intercepciÛn nativa inmediatamente al entrar
       _setVolumeIntercept(true);
     }
     
@@ -884,19 +884,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     _initRemoteControl();
 
-    // Senior Bridge Listener: Escuchar se√±ales de botones f√≠sicos desde Android
+    // Senior Bridge Listener: Escuchar seÒales de botones fÌsicos desde Android
     _volumeControlChannel.setMethodCallHandler((call) async {
       if (call.method == 'volumeUp') _handleVolumeStep(0.05);
       else if (call.method == 'volumeDown') _handleVolumeStep(-0.05);
     });
 
-    // Senior Restoration: Si el provider de fuentes est√° vac√≠o (viniendo de "Continuar Viendo"),
+    // Senior Restoration: Si el provider de fuentes est· vacÌo (viniendo de "Continuar Viendo"),
     // intentamos restaurarlo desde el historial persistido para permitir cambio de servidor.
     final currentSources = ref.read(activeContentSourcesProvider);
     if (currentSources.isEmpty) {
       final history = _historyNotifier?.getProgress(widget.contentId, widget.season, _activeEpisode);
       if (history?.alternativeSources != null && history!.alternativeSources!.isNotEmpty) {
-        // Senior Fix: Diferimos la actualizaci√≥n al siguiente microtask para evitar el error
+        // Senior Fix: Diferimos la actualizaciÛn al siguiente microtask para evitar el error
         // "Tried to modify a provider while the widget tree was building"
         Future.microtask(() {
           if (mounted) {
@@ -908,8 +908,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     }
 
-    // Cast AurisTV (open_media con stream resuelto + headers): reproducci√≥n
-    // directa sin re-extraer. Tambi√©n cubre la v√≠a cl√°sica (source vac√≠o).
+    // Cast AurisTV (open_media con stream resuelto + headers): reproducciÛn
+    // directa sin re-extraer. TambiÈn cubre la vÌa cl·sica (source vacÌo).
     if (widget.sourceUrl.isNotEmpty &&
         (widget.source.isEmpty || widget.initialHeaders != null)) {
       _hasInitialized = true;
@@ -938,7 +938,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Senior Fix: Si no hay fuentes en el provider (abierto desde "Continuar Viendo"
     // o deep link) pero conocemos el servidor actual, al menos mostramos ese para
-    // que la lista de servidores no quede vac√≠a.
+    // que la lista de servidores no quede vacÌa.
     if (effective.isEmpty && widget.source.isNotEmpty) {
       effective = [
         SearchResult(
@@ -983,7 +983,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _switchTrack(int index) {
     if (index >= _allTracks.length) return;
     
-    // Senior Hybrid Fix: Obtener posici√≥n actual seg√∫n el motor activo
+    // Senior Hybrid Fix: Obtener posiciÛn actual seg˙n el motor activo
     final int currentPosMs = (_player?.state.position.inMilliseconds ?? 0);
     
     final int durationMs = (_player?.state.duration.inMilliseconds ?? 0);
@@ -1002,7 +1002,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final track = _allTracks[index];
 
     setState(() {
-      _selectedTrackIndex = index; // Senior Fix: Actualizamos el √≠ndice para marcarlo como seleccionado
+      _selectedTrackIndex = index; // Senior Fix: Actualizamos el Ìndice para marcarlo como seleccionado
       _currentLanguage = trackQualityType(track.quality) == 'SUB' ? 'SUB' : 'LAT';
       _resumePosition = currentPosMs;
       _isAutoplayResume = false;
@@ -1018,7 +1018,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _switchSource(SearchResult newSource) async {
-    // Senior Hybrid Fix: Obtener posici√≥n actual seg√∫n el motor activo
+    // Senior Hybrid Fix: Obtener posiciÛn actual seg˙n el motor activo
     final int currentPosMs = (_player?.state.position.inMilliseconds ?? 0);
     
     final int durationMs = (_player?.state.duration.inMilliseconds ?? 0);
@@ -1057,7 +1057,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _currentSourceUrl = resolvedUrl;
       _currentSource = newSource.source;
       _currentServerName = newSource.source;
-      // Senior Language Fix: Mantener el idioma que se ven√≠a reproduciendo al
+      // Senior Language Fix: Mantener el idioma que se venÌa reproduciendo al
       // cambiar de fuente (p.ej. DUB desde AnimeJara). El fallback a SUB solo
       // ocurre si la nueva fuente no expone pista DUB, lo resuelve
       // _indexForLanguage al inicializar el extract. Si no hay idioma previo,
@@ -1133,22 +1133,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  /// Cierra el panel lateral y devuelve el foco D-pad a la pill que lo abri√≥
+  /// Cierra el panel lateral y devuelve el foco D-pad a la pill que lo abriÛ
   /// (estilo YouTube-TV: salir del panel = volver a los controles).
   ///
   /// Con [fully] (OK/SELECT sobre el video enfocado) se cierra TODO el panel de
-  /// una vez ‚Äîvuelve el video a pantalla completa‚Äî incluso desde un submen√∫, en
-  /// lugar de subir un nivel. Atr√°s sigue subiendo de nivel (back/dismiss sin
+  /// una vez óvuelve el video a pantalla completaó incluso desde un submen˙, en
+  /// lugar de subir un nivel. Atr·s sigue subiendo de nivel (back/dismiss sin
   /// [fully]).
   void _dismissSidePanel({bool fully = false}) {
-    // Escudo anti-doble Back: el Back f√≠sico dispara la trampa (tecla) y
-    // despu√©s el back del sistema (PopScope); sin esto el segundo encuentra
-    // el panel ya cerrado y oculta los controles reci√©n mostrados.
+    // Escudo anti-doble Back: el Back fÌsico dispara la trampa (tecla) y
+    // despuÈs el back del sistema (PopScope); sin esto el segundo encuentra
+    // el panel ya cerrado y oculta los controles reciÈn mostrados.
     _ignoreNextPop = true;
     Timer(const Duration(milliseconds: 300), () {
       _ignoreNextPop = false;
     });
-    // Vuelta atr√°s de un nivel (Calidad ‚Üí Configuraci√≥n).
+    // Vuelta atr·s de un nivel (Calidad ? ConfiguraciÛn).
     if (!fully && _overlayParent != null) {
       final parent = _overlayParent!;
       setState(() {
@@ -1410,7 +1410,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       final type = trackQualityType(q);
       if (type == 'DUB') return 0;
       if (type == 'CAST') return 1;
-      return 2; // SUB y dem√°s
+      return 2; // SUB y dem·s
     }
     sourceOptions.sort((a, b) {
       final ra = langRank(a.result.quality);
@@ -1477,15 +1477,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  /// Men√∫ ra√≠z del engranaje de configuraci√≥n: cada fila abre su sub-panel.
+  /// Men˙ raÌz del engranaje de configuraciÛn: cada fila abre su sub-panel.
   /// Calidad solo aparece cuando hay opciones reales (ver _hasQualityOptions).
   Widget _buildConfigMenuContent({bool isSidebar = false}) {
     final String qualitySub = _selectedQuality == 'auto'
-        ? 'Autom√°tico'
+        ? 'Autom·tico'
         : '${_selectedQuality.toUpperCase()}p';
     final bool showQuality = _hasQualityOptions;
-    // Al volver de un submen√∫ el foco debe caer en la fila que lo abri√≥
-    // (_configFocusTarget). Si no hay destino v√°lido (o Calidad est√° oculta),
+    // Al volver de un submen˙ el foco debe caer en la fila que lo abriÛ
+    // (_configFocusTarget). Si no hay destino v·lido (o Calidad est· oculta),
     // cae en el primer item visible.
     final PlayerOverlay? target = _configFocusTarget;
     final bool targetValid =
@@ -1526,7 +1526,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         onTap: () => _openConfigSubPanel(PlayerOverlay.volume),
       ),
       AurisOptionCard(
-        title: 'Relaci√≥n de aspecto',
+        title: 'RelaciÛn de aspecto',
         subtitle: _aspectMode.label,
         icon: _aspectIcon(_aspectMode),
         isCurrent: _aspectMode != AspectMode.normal,
@@ -1549,7 +1549,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  /// Abre un sub-panel desde Configuraci√≥n (vuelta atr√°s de un nivel).
+  /// Abre un sub-panel desde ConfiguraciÛn (vuelta atr·s de un nivel).
   void _openConfigSubPanel(PlayerOverlay overlay) {
     setState(() {
       _overlayParent = PlayerOverlay.config;
@@ -1560,8 +1560,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _focusPanelEntrySoon();
   }
 
-  /// Tras cambiar de nivel en el panel (Configuraci√≥n ‚Üî submen√∫) el foco debe
-  /// quedar en la opci√≥n actual DENTRO del panel. Si se pierde, LEFT lo consume
+  /// Tras cambiar de nivel en el panel (ConfiguraciÛn ? submen˙) el foco debe
+  /// quedar en la opciÛn actual DENTRO del panel. Si se pierde, LEFT lo consume
   /// el player (seek) en lugar de que la trampa del two-panel enfoque el video.
   void _focusPanelEntrySoon() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1578,7 +1578,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
-  /// Selector de "Relaci√≥n de aspecto" (tama√±o/encuadre del video).
+  /// Selector de "RelaciÛn de aspecto" (tamaÒo/encuadre del video).
   Widget _buildAspectSelectorContent({bool isSidebar = false}) {
     final int currentIndex = AspectMode.values.indexOf(_aspectMode);
     final int autofocusIndex = currentIndex >= 0 ? currentIndex : 0;
@@ -1611,7 +1611,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       };
 
   /// Aplica el [AspectMode] actual al widget de video: fija el [BoxFit] y,
-  /// si el modo lo pide (Zoom), ampl√≠a la imagen.
+  /// si el modo lo pide (Zoom), amplÌa la imagen.
   Widget _applyAspectMode(Widget video) {
     if (_aspectMode.scale != 1.0) {
       return Transform.scale(scale: _aspectMode.scale, child: video);
@@ -1648,10 +1648,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     try {
       final platform = player.platform as dynamic;
       if (_tvInitializedWid == wid) {
-        // Misma superficie, s√≥lo cambi√≥ el tama√±o (abrir/cerrar el two-panel o
-        // su animaci√≥n de padding). Con `vo=mediacodec_embed` el frame se
-        // renderiza sobre la Surface y la SurfaceView lo escala a sus l√≠mites,
-        // as√≠ que NO hay que reiniciar --vo ni hacer seek (eso causaba un par√≥n
+        // Misma superficie, sÛlo cambiÛ el tamaÒo (abrir/cerrar el two-panel o
+        // su animaciÛn de padding). Con `vo=mediacodec_embed` el frame se
+        // renderiza sobre la Surface y la SurfaceView lo escala a sus lÌmites,
+        // asÌ que NO hay que reiniciar --vo ni hacer seek (eso causaba un parÛn
         // de ~3s re-decodiendo desde el keyframe).
         await platform.setProperty('android-surface-size', '${width}x$height');
         return;
@@ -1668,7 +1668,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
-  /// Fija el tama√±o de la superficie al de la resoluci√≥n real del video
+  /// Fija el tamaÒo de la superficie al de la resoluciÛn real del video
   /// (`SurfaceHolder.setFixedSize`). Con la superficie al aspect del video, el
   /// SurfaceView escala la superficie a su View y los modos de aspecto
   /// (Contener/Cubrir/Estirar/Zoom) funcionan como un `BoxFit`.
@@ -1705,7 +1705,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   /// Encaja la superficie nativa al aspecto real del video. media_kit lo hace
   /// con un `FittedBox` en su widget `Video`; al usar un `SurfaceView` propio
-  /// hay que replicarlo o el c√≥dec estira el frame a pantalla completa.
+  /// hay que replicarlo o el cÛdec estira el frame a pantalla completa.
   Widget _buildTvSurfaceFitted(Widget surface) {
     final player = _player;
     if (player == null) return surface;
@@ -1755,8 +1755,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   sw *= scale;
                   sh *= scale;
                 }
-                // OverflowBox en vez de SizedBox: un SizedBox recorta su tama√±o
-                // a las constraints del padre, as√≠ que Cubrir/Zoom (que deben
+                // OverflowBox en vez de SizedBox: un SizedBox recorta su tamaÒo
+                // a las constraints del padre, asÌ que Cubrir/Zoom (que deben
                 // desbordar para recortar) quedaban capados al contenedor y no
                 // se notaban. El Stack padre recorta el sobrante.
                 return OverflowBox(
@@ -1775,8 +1775,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  /// Subt√≠tulos renderizados en Flutter sobre la superficie nativa (media_kit los
-  /// pinta con su propio widget sobre la textura, que aqu√≠ no usamos).
+  /// SubtÌtulos renderizados en Flutter sobre la superficie nativa (media_kit los
+  /// pinta con su propio widget sobre la textura, que aquÌ no usamos).
   Widget _tvSubtitleOverlay(UserSettings settings) {
     final player = _player;
     if (player == null) return const SizedBox.shrink();
@@ -1824,7 +1824,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   String get _volumeLabel {
     final percent = (_volume * 100).round();
-    return _volume > 1.0 ? '$percent% ¬∑ Boost' : '$percent%';
+    return _volume > 1.0 ? '$percent% ∑ Boost' : '$percent%';
   }
 
   void _setPlaybackSpeed(double speed) {
@@ -1879,7 +1879,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         final percent = (value * 100).round();
         final bool isCurrent = (_volume - value).abs() < 0.01;
         return AurisOptionCard(
-          title: value >= 2.0 ? '$percent% M√°ximo' : '$percent%',
+          title: value >= 2.0 ? '$percent% M·ximo' : '$percent%',
           subtitle: value <= 1.0 ? 'Normal' : (value > 1.0 ? 'Boost' : ''),
           isCurrent: isCurrent,
           autofocus: index == autofocusIndex,
@@ -1920,7 +1920,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     final sources = ref.read(activeContentSourcesProvider);
     // Match tolerante + fallback a la primera fuente: si el nombre no matchea,
-    // reusar la URL actual re-extraer√≠a el episodio ANTERIOR (reiniciado).
+    // reusar la URL actual re-extraerÌa el episodio ANTERIOR (reiniciado).
     final baseSource = findSourceByName(sources, _currentSource) ??
         (sources.isNotEmpty ? sources.first : null);
 
@@ -1955,15 +1955,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
 
     // Senior Fix (Autoplay): NO usamos context.replace. GoRouter usa la URI como
-    // page key, as√≠ que cambiar solo la query recreaba el State del PlayerScreen:
-    // el State nuevo creaba un 2¬∫ Player mientras el dispose del viejo hac√≠a
-    // stop()+dispose() del 1¬∫. Los dos players peleaban por el surface/GL de
-    // Android y el nuevo quedaba en pausa (cargaba duration pero no reproduc√≠a).
+    // page key, asÌ que cambiar solo la query recreaba el State del PlayerScreen:
+    // el State nuevo creaba un 2∫ Player mientras el dispose del viejo hacÌa
+    // stop()+dispose() del 1∫. Los dos players peleaban por el surface/GL de
+    // Android y el nuevo quedaba en pausa (cargaba duration pero no reproducÌa).
     // Recargamos in-place: el setState de arriba pone _hasInitialized=false y
     // cambia _currentSourceUrl, el extractProvider re-extrae y su rama data
     // llama _initPlayer, que REUTILIZA el _player actual (if (_player == null)),
-    // igual que _switchTrack/_switchSource ‚Äî as√≠ nunca hay dos players.
-    // La URL de la ruta queda desfasada, pero en TV "Atr√°s" salir del player
+    // igual que _switchTrack/_switchSource ó asÌ nunca hay dos players.
+    // La URL de la ruta queda desfasada, pero en TV "Atr·s" salir del player
     // directamente es el comportamiento esperado.
   }
 
@@ -2054,8 +2054,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (kIsWeb) {
       final bool isTactic = ResponsiveUtils.isTactic(context);
       
-      // Senior Web Logic: Si es Web M√≥vil y ya estamos en "Modo Fullscreen" (browser),
-      // el bot√≥n act√∫a como ciclo de ajuste (Fit/Fill/Cover) seg√∫n pidi√≥ el usuario.
+      // Senior Web Logic: Si es Web MÛvil y ya estamos en "Modo Fullscreen" (browser),
+      // el botÛn act˙a como ciclo de ajuste (Fit/Fill/Cover) seg˙n pidiÛ el usuario.
       if (isTactic && _isFullscreen) {
         _cycleVideoFit();
         return;
@@ -2083,8 +2083,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
-  /// Ciclo de formato del video en m√≥vil/tablet (el player ya est√° a pantalla
-  /// completa): Normal ‚Üí Estirar ‚Üí Expandir ‚Üí Normal.
+  /// Ciclo de formato del video en mÛvil/tablet (el player ya est· a pantalla
+  /// completa): Normal ? Estirar ? Expandir ? Normal.
   void _cycleVideoFit() {
     setState(() {
       _aspectMode = switch (_aspectMode) {
@@ -2104,9 +2104,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
-  /// Suscripci√≥n (watch) para que la capa de pills se reconstruya cuando
+  /// SuscripciÛn (watch) para que la capa de pills se reconstruya cuando
   /// carguen los episodios. Solo llamar desde build.
-  /// En directo (listas M3U) devuelve vac√≠o sin tocar el backend.
+  /// En directo (listas M3U) devuelve vacÌo sin tocar el backend.
   AsyncValue<EpisodesResponse?> _episodesAsync() => widget.isLive
       ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(
           episodes: const [], source: widget.source, url: widget.sourceUrl, slug: '', total: 0))
@@ -2117,7 +2117,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           season: widget.season,
         )));
 
-  /// L√≥gica pura: ¬øhay episodio anterior/siguiente? Reutiliza el mismo criterio
+  /// LÛgica pura: øhay episodio anterior/siguiente? Reutiliza el mismo criterio
   /// que el overlay de autoplay. Usar valueOrNull/when sobre el AsyncValue.
   ({bool hasPrev, bool hasNext}) _episodeNavBounds(AsyncValue<EpisodesResponse?> episodesAsync) {
     // En vivo/directo M3U no hay episodios: sin prev/next.
@@ -2139,7 +2139,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _navigateToEpisode(bool next) async {
-    // En vivo/directo M3U no hay episodios: blindar tambi√©n por D-PAD/remoto.
+    // En vivo/directo M3U no hay episodios: blindar tambiÈn por D-PAD/remoto.
     if (_isTrailer || _isLiveStream || _currentEpisode == null) return;
     final currentNum = int.tryParse(_currentEpisode!) ?? 1;
     final nextNum = next ? currentNum + 1 : currentNum - 1;
@@ -2154,20 +2154,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     final sources = ref.read(activeContentSourcesProvider);
     // Match tolerante + fallback a la primera fuente: si el nombre no matchea,
-    // reusar la URL actual re-extra√≠a el episodio ANTERIOR (reiniciado).
+    // reusar la URL actual re-extraÌa el episodio ANTERIOR (reiniciado).
     final baseSource = findSourceByName(sources, _currentSource) ??
         (sources.isNotEmpty ? sources.first : null);
 
     // Senior Navigation Fix: Calcular la URL del episodio destino ANTES de reemplazar
     // la ruta. context.replace recrea la pantalla (GoRouter usa la URI como page key),
     // por lo que el query param 'url' debe ser la del NUEVO episodio, no la actual,
-    // o el extract provider re-extraer√≠a la p√°gina del episodio anterior (bug E2->E3).
+    // o el extract provider re-extraerÌa la p·gina del episodio anterior (bug E2->E3).
     final String nextSourceUrl = baseSource != null
         ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
         : _currentSourceUrl;
 
-    // Senior Navigation Fix: Actualizar la URL de la ruta sin a√±adir una nueva entrada al historial
-    // para que el bot√≥n "Atr√°s" (Mouse 4) no nos regrese al episodio anterior.
+    // Senior Navigation Fix: Actualizar la URL de la ruta sin aÒadir una nueva entrada al historial
+    // para que el botÛn "Atr·s" (Mouse 4) no nos regrese al episodio anterior.
     final String newPath = '/player/${widget.contentId}';
     final queryParams = Map<String, String>.from(GoRouterState.of(context).uri.queryParameters);
     queryParams['episode'] = nextNum.toString();
@@ -2177,8 +2177,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     } else {
       queryParams.remove('skipResume');
     }
-    // Senior Language Fix: Persistir el idioma que el usuario eligi√≥ realmente
-    // (por si cambi√≥ la pista manualmente), para que el siguiente episodio
+    // Senior Language Fix: Persistir el idioma que el usuario eligiÛ realmente
+    // (por si cambiÛ la pista manualmente), para que el siguiente episodio
     // mantenga LAT/SUB aunque la pantalla se reconstruya.
     
     // Usamos context.replace para sustituir la entrada actual en el historial
@@ -2188,8 +2188,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final preloaded = ref.read(nextEpisodePreloadProvider);
     final preloadTarget = ref.read(nextEpisodePreloadTargetProvider);
     // Solo consumir el preload si es para ESTE destino (url+episodio). Un
-    // preload stale reproducir√≠a el episodio equivocado; se limpia y se sigue
-    // por extracci√≥n fresca.
+    // preload stale reproducirÌa el episodio equivocado; se limpia y se sigue
+    // por extracciÛn fresca.
     final bool preloadValid = preloaded != null &&
         next &&
         preloadTarget != null &&
@@ -2220,7 +2220,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
       if (tracks.isNotEmpty) {
         // Senior Language Fix: Respetar el idioma elegido (LAT/SUB) al reproducir
-        // el episodio pre-cargado, con fallback a SUB si el doblaje a√∫n no existe.
+        // el episodio pre-cargado, con fallback a SUB si el doblaje a˙n no existe.
         final trackIdx = _indexForLanguage(tracks);
         final initialTrack = tracks[trackIdx];
         _selectedTrackIndex = trackIdx;
@@ -2256,7 +2256,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
-  /// Senior Language Strategy: Selecciona autom√°ticamente la pista inicial bas√°ndose 
+  /// Senior Language Strategy: Selecciona autom·ticamente la pista inicial bas·ndose 
   /// exclusivamente en los Ajustes del Usuario, ignorando etiquetas externas.
   /// Prioridad: Preferencia -> SUB (como fallback universal) -> Primera disponible.
   int _indexForLanguage(List<VideoTrackOption> tracks) {
@@ -2265,7 +2265,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final settings = ref.read(settingsProvider);
     final String pref = settings.preferredLanguage.toLowerCase();
     
-    // Mapeo de preferencia a tipo de track t√©cnico
+    // Mapeo de preferencia a tipo de track tÈcnico
     final String targetType = pref == 'latino' ? 'DUB' : (pref == 'castellano' ? 'CAST' : 'SUB');
 
     final latIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'DUB');
@@ -2277,7 +2277,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (targetType == 'CAST' && castIdx >= 0) return castIdx;
     if (targetType == 'SUB' && subIdx >= 0) return subIdx;
 
-    // 2. Fallback Senior: Si la preferencia no est√° disponible (ej: no hay DUB a√∫n), 
+    // 2. Fallback Senior: Si la preferencia no est· disponible (ej: no hay DUB a˙n), 
     // siempre priorizamos SUB antes que cualquier otra cosa para asegurar contenido.
     if (subIdx >= 0) return subIdx;
 
@@ -2286,7 +2286,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   /// Senior Quality Fix: Aplica las calidades de la pista seleccionada y resetea
-  /// la selecci√≥n a "auto" si la pista nueva no las ofrece (o solo tiene una).
+  /// la selecciÛn a "auto" si la pista nueva no las ofrece (o solo tiene una).
   void _applyTrackQualityOptions(VideoTrackOption track) {
     final newQualities = track.qualities;
     final settings = ref.read(settingsProvider);
@@ -2312,13 +2312,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   List<Map<String, dynamic>> get _qualityMenuOptions {
     if (_isOpEd) {
       return [
-        {'key': 'auto', 'label': 'Autom√°tico', 'sub': 'Mejor calidad disponible', 'url': widget.sourceUrl, 'headers': const <String, String>{}},
-        {'key': '720', 'label': '720p HD', 'sub': 'Calidad Est√°ndar', 'url': widget.video720, 'headers': const <String, String>{}},
-        {'key': '1080', 'label': '1080p FHD', 'sub': 'Alta Definici√≥n', 'url': widget.video1080, 'headers': const <String, String>{}},
+        {'key': 'auto', 'label': 'Autom·tico', 'sub': 'Mejor calidad disponible', 'url': widget.sourceUrl, 'headers': const <String, String>{}},
+        {'key': '720', 'label': '720p HD', 'sub': 'Calidad Est·ndar', 'url': widget.video720, 'headers': const <String, String>{}},
+        {'key': '1080', 'label': '1080p FHD', 'sub': 'Alta DefiniciÛn', 'url': widget.video1080, 'headers': const <String, String>{}},
       ];
     }
     return [
-      {'key': 'auto', 'label': 'Autom√°tico', 'sub': 'Mejor calidad disponible', 'url': _currentStreamUrl, 'headers': _currentStreamHeaders},
+      {'key': 'auto', 'label': 'Autom·tico', 'sub': 'Mejor calidad disponible', 'url': _currentStreamUrl, 'headers': _currentStreamHeaders},
       ..._qualityOptions.map((q) => {
         'key': q.key,
         'label': q.label,
@@ -2329,7 +2329,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     ];
   }
 
-  /// ¬øDebe mostrarse el bot√≥n de calidad? Solo si hay m√°s de una opci√≥n real.
+  /// øDebe mostrarse el botÛn de calidad? Solo si hay m·s de una opciÛn real.
   bool get _hasQualityOptions {
     if (_isOpEd) {
       return (widget.video720?.isNotEmpty ?? false) || (widget.video1080?.isNotEmpty ?? false);
@@ -2344,7 +2344,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final settings = ref.read(settingsProvider);
     if (!isResume && (!settings.autoPlayNextEpisode || !_policy.autoPlayNext)) return;
     
-    // Evitar reiniciar si ya est√° corriendo el mismo tipo de cuenta atr√°s
+    // Evitar reiniciar si ya est· corriendo el mismo tipo de cuenta atr·s
     if (_autoplayTimer != null && _autoplayTimer!.isActive && _isAutoplayResume == isResume) {
       return;
     }
@@ -2456,7 +2456,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_isExiting) return KeyEventResult.ignored;
     final key = event.logicalKey;
 
-    // Reiniciar timer de ocultaci√≥n en cualquier interacci√≥n de teclado / D-PAD
+    // Reiniciar timer de ocultaciÛn en cualquier interacciÛn de teclado / D-PAD
     if (_showControls && (event is KeyDownEvent || event is KeyRepeatEvent)) {
       _startHideTimer();
     }
@@ -2507,7 +2507,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return KeyEventResult.handled;
     }
 
-    // 1. SI LOS CONTROLES EST√ÅN OCULTOS: Cualquier flecha o bot√≥n central los muestra
+    // 1. SI LOS CONTROLES EST¡N OCULTOS: Cualquier flecha o botÛn central los muestra
     if (!_showControls) {
       if (event is KeyDownEvent || event is KeyRepeatEvent) {
         if (key == LogicalKeyboardKey.arrowUp || 
@@ -2525,8 +2525,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _startHideTimer();
 
           // Al despertar los controles, el foco cae siempre en la timeline
-          // fusionada, tambi√©n con D-PAD arriba/abajo. Desde ah√≠ el usuario
-          // puede subir al header o bajar a las c√°psulas.
+          // fusionada, tambiÈn con D-PAD arriba/abajo. Desde ahÌ el usuario
+          // puede subir al header o bajar a las c·psulas.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && _timelineFocusNode.canRequestFocus) {
               _timelineFocusNode.requestFocus();
@@ -2551,7 +2551,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     }
 
-    // 2. SI LOS CONTROLES YA EST√ÅN VISIBLES:
+    // 2. SI LOS CONTROLES YA EST¡N VISIBLES:
     if (event is KeyDownEvent || event is KeyRepeatEvent) {
       // Escape / Back
       if (key == LogicalKeyboardKey.escape ||
@@ -2615,10 +2615,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
-    // Senior Shield: Ignorar cambios de m√©tricas si el widget ya no est√° activo o est√° saliendo
+    // Senior Shield: Ignorar cambios de mÈtricas si el widget ya no est· activo o est· saliendo
     if (!mounted || _isExiting) return;
 
-    // Sincronizar el estado de pantalla completa real (especialmente √∫til en Web con ESC)
+    // Sincronizar el estado de pantalla completa real (especialmente ˙til en Web con ESC)
     if (kIsWeb) {
       final bool realFullscreen = isAppFullscreen();
       if (realFullscreen != _isFullscreen) {
@@ -2630,7 +2630,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _safeSetState(() {});
     }
     
-    // Segundo ciclo para asegurar ajuste Web/M√≥vil tras rotaci√≥n f√≠sica
+    // Segundo ciclo para asegurar ajuste Web/MÛvil tras rotaciÛn fÌsica
     Future.delayed(const Duration(milliseconds: 100), () {
       _safeSetState(() {});
     });
@@ -2639,7 +2639,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _startHideTimer() {
     _hideTimer?.cancel();
     // Sin exenciones por foco: cualquier tecla en timeline/header/pills
-    // vuelve a mostrar los controles, as√≠ que ocultar con foco aparcado
+    // vuelve a mostrar los controles, asÌ que ocultar con foco aparcado
     // es seguro y evita que queden encendidos eternamente.
     _hideTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) {
@@ -2666,7 +2666,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _skipForward() {
     final now = DateTime.now();
-    // Senior Logic: Soporte para "Rapid Fire" con acumulaci√≥n (YouTube Style)
+    // Senior Logic: Soporte para "Rapid Fire" con acumulaciÛn (YouTube Style)
     final bool isRapidFire = _lastManualSeekTime != null && 
                              now.difference(_lastManualSeekTime!).inMilliseconds < 800;
     
@@ -2699,7 +2699,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _skipBackward() {
     final now = DateTime.now();
-    // Senior Logic: Soporte para "Rapid Fire" con acumulaci√≥n
+    // Senior Logic: Soporte para "Rapid Fire" con acumulaciÛn
     final bool isRapidFire = _lastManualSeekTime != null && 
                              now.difference(_lastManualSeekTime!).inMilliseconds < 800;
                              
@@ -2731,9 +2731,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  /// Hold-scrub estilo YouTube TV: al mantener ‚Üê/‚Üí en el timeline el
+  /// Hold-scrub estilo YouTube TV: al mantener ?/? en el timeline el
   /// objetivo avanza por ticks acelerados con preview, y UN solo seek se
-  /// confirma al soltar. Un toque simple equivale al ¬±10s de antes.
+  /// confirma al soltar. Un toque simple equivale al ±10s de antes.
   void _beginHoldScrub(int dir) {
     if (_holdDir != 0) return;
     final now = DateTime.now();
@@ -2754,7 +2754,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _seekDiff = Duration(milliseconds: target - pos);
     });
     _holdTimer?.cancel();
-    // Delay de 400ms antes de iniciar el tictac de aceleraci√≥n (hold-scrub),
+    // Delay de 400ms antes de iniciar el tictac de aceleraciÛn (hold-scrub),
     // para que un toque normal en control remoto de TV (~200-300ms) no dispare el segundo tick.
     _holdTimer = Timer(const Duration(milliseconds: 400), () {
       if (_holdDir == 0 || !mounted) return;
@@ -2862,7 +2862,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
-  /// ¬øLa pista de audio es Espa√±ol? (por language normalizado o por t√≠tulo).
+  /// øLa pista de audio es EspaÒol? (por language normalizado o por tÌtulo).
   bool _isSpanishAudio(AudioTrack? t) {
     if (t == null) return false;
     final lang = (t.language ?? '').toLowerCase().trim();
@@ -2876,7 +2876,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         lang.startsWith('esp')) {
       return true;
     }
-    return title.contains('espa√±ol') ||
+    return title.contains('espaÒol') ||
         title.contains('espanol') ||
         title.contains('castellano') ||
         title.contains('latino') ||
@@ -2886,7 +2886,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         title == 'es';
   }
 
-  /// Selecciona autom√°ticamente Espa√±ol cuando el contenedor trae varias pistas
+  /// Selecciona autom·ticamente EspaÒol cuando el contenedor trae varias pistas
   /// de audio (ej: HLS con EXT-X-MEDIA ES DEFAULT + EN). Se aplica una vez por
   /// stream para no pelear con un cambio manual del usuario.
   void _maybeAutoSelectSpanishAudio(Player player, Tracks tracks) {
@@ -2915,7 +2915,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     videoUrl = ApiEndpoints.fixUrl(videoUrl);
 
     // Config remota de playback: dispara la descarga (no bloquea) y usa los
-    // valores actuales; si a√∫n no carg√≥, defaults = valores hardcodeados previos.
+    // valores actuales; si a˙n no cargÛ, defaults = valores hardcodeados previos.
     final pcfg = ref.read(playbackConfigProvider).valueOrNull ?? PlaybackConfig.defaults;
     PlaybackTelemetry.instance.setPlatformOverride('tv');
     PlaybackTelemetry.instance.configure(pcfg);
@@ -2923,7 +2923,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     final bool isHls = videoUrl.contains('.m3u8');
 
-    // Senior Quality Fix: Guardar el stream base para poder volver a "Autom√°tico".
+    // Senior Quality Fix: Guardar el stream base para poder volver a "Autom·tico".
     _currentStreamUrl = videoUrl;
     _currentStreamHeaders = headers;
     
@@ -2933,16 +2933,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final int historyPos = (history != null && history.positionInMilliseconds > 3000) ? history.positionInMilliseconds : 0;
 
     final bool isSwitching = _resumePosition > 0;
-    // Senior Autoplay Fix: Si venimos de una navegaci√≥n de episodio, saltamos el
-    // di√°logo de "reanudar" aunque el widget se haya recreado (widget.skipResume).
+    // Senior Autoplay Fix: Si venimos de una navegaciÛn de episodio, saltamos el
+    // di·logo de "reanudar" aunque el widget se haya recreado (widget.skipResume).
     final bool skipResume = _skipResumeOnNextInit || widget.skipResume;
     _skipResumeOnNextInit = false;
     // Invalidar loops de resume-retry de inits anteriores (ver campo).
     _resumeSeekGen++;
 
     // Nuevo stream elegido por el usuario (server/episodio/calidad distinta)
-    // ‚Üí se reinicia el contador de auto-reintentos. Un retry del MISMO stream
-    // llega con la misma URL, as√≠ que no interfiere con el ciclo silencioso.
+    // ? se reinicia el contador de auto-reintentos. Un retry del MISMO stream
+    // llega con la misma URL, asÌ que no interfiere con el ciclo silencioso.
     if (videoUrl != _lastVideoUrl) _autoRetryCount = 0;
     _lastVideoUrl = videoUrl;
     _lastVideoHeaders = headers;
@@ -2977,9 +2977,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     debugPrint('[player] init resume=${_resumePosition} resumeCountdown=$_isAutoplayResume url=$videoUrl (HLS=$isHls)');
 
-    // Senior Resume Fix: Tras confirmar la reanudaci√≥n, vigilar la posici√≥n
+    // Senior Resume Fix: Tras confirmar la reanudaciÛn, vigilar la posiciÛn
     // durante 30s. Si mpv reinicia el demuxer desde 0 (p.ej. "Could not open
-    // codec" en av1), el guard re-aplica el seek al punto de reanudaci√≥n.
+    // codec" en av1), el guard re-aplica el seek al punto de reanudaciÛn.
     if (_resumePosition > 3000) {
       _resumeGuardUntil = DateTime.now().add(const Duration(seconds: 30));
       _resumeGuardRetries = 0;
@@ -3035,12 +3035,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
 
     // Audio multi-pista (HLS EXT-X-MEDIA ES/EN): mpv arranca con la primera
-    // pista; forzamos Espa√±ol una vez aparecen las pistas reales.
+    // pista; forzamos EspaÒol una vez aparecen las pistas reales.
     _tracksSubscription = player.stream.tracks.listen((tracks) {
       if (mounted) _maybeAutoSelectSpanishAudio(player, tracks);
     });
 
-    // Resoluci√≥n del video -> tama√±o fijo de la superficie (modos de aspecto).
+    // ResoluciÛn del video -> tamaÒo fijo de la superficie (modos de aspecto).
     _videoWidthSub?.cancel();
     _videoHeightSub?.cancel();
     if (_useNativeTvSurface) {
@@ -3053,9 +3053,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       
       final String errorMsg = message.toString();
 
-      // Senior Web Fix: Detectar bloqueo de autoplay por falta de interacci√≥n del usuario
+      // Senior Web Fix: Detectar bloqueo de autoplay por falta de interacciÛn del usuario
       if (kIsWeb && errorMsg.contains('interact')) {
-        debugPrint('[player web] Autoplay bloqueado. Requiere interacci√≥n del usuario.');
+        debugPrint('[player web] Autoplay bloqueado. Requiere interacciÛn del usuario.');
         setState(() {
           _webNeedsInteraction = true;
           _isLoading = false;
@@ -3064,14 +3064,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
 
       if (errorMsg.contains('DEMUXER_ERROR') || errorMsg.contains('COULD_NOT_PARSE')) {
-        // La URL firmada muri√≥ (tokens vimeos rotan por extract). Re-extraer
+        // La URL firmada muriÛ (tokens vimeos rotan por extract). Re-extraer
         // con backoff en vez de reintentar la misma URL en loop (eso generaba
         // la tormenta de 403s en el server). Trailers/YouTube no expiran:
-        // esos s√≠ reintentan la misma URL como antes.
+        // esos sÌ reintentan la misma URL como antes.
         //
         // En streams DIRECTOS (cast: initialHeaders != null) la URL ya viene
-        // resuelta desde el emisor: no hay extract que refrescar, as√≠ que
-        // ese caso cae al auto-retry silencioso gen√©rico.
+        // resuelta desde el emisor: no hay extract que refrescar, asÌ que
+        // ese caso cae al auto-retry silencioso genÈrico.
         if (!_isTrailer &&
             widget.initialHeaders == null &&
             _extractRefreshCount < _kMaxExtractRefresh) {
@@ -3082,9 +3082,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           Future.delayed(wait, () {
             if (!mounted) return;
             // Invalidar SOLO esta instancia (no toda la familia): invalidar la
-            // familia reconstru√≠a Consumers defunctos de otras pantallas
-            // (prefetch) ‚Üí crash markNeedsBuild. Lee estado actual por si el
-            // usuario cambi√≥ de servidor en la espera.
+            // familia reconstruÌa Consumers defunctos de otras pantallas
+            // (prefetch) ? crash markNeedsBuild. Lee estado actual por si el
+            // usuario cambiÛ de servidor en la espera.
             try {
               ref.invalidate(extractProvider(ExtractParams(
                 url: _currentSourceUrl,
@@ -3102,14 +3102,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             });
           });
         } else {
-          debugPrint('[player recovery] Sin m√°s refreshes (intentos agotados o trailer). Reintentando misma URL...');
+          debugPrint('[player recovery] Sin m·s refreshes (intentos agotados o trailer). Reintentando misma URL...');
           _retryPlayback();
         }
         return;
       }
 
       if (kIsWeb && message.contains('interrupted')) {
-        debugPrint('[player] Ignorando error de interrupci√≥n normal en Web');
+        debugPrint('[player] Ignorando error de interrupciÛn normal en Web');
         return;
       }
 
@@ -3120,7 +3120,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       // Auto-reintento SILENCIOSO del mismo stream+headers (con backoff):
       // muchos fallos son transitorios (red, mpv arrancando, servidor
       // congestionado). El popup "Reintentar" solo si se agotan los
-      // intentos ‚Äî sin pedir intervenci√≥n del usuario para transitorios.
+      // intentos ó sin pedir intervenciÛn del usuario para transitorios.
       if (_autoRetryCount < _kMaxAutoRetry) {
         _autoRetryCount++;
         final wait = Duration(seconds: 2 * _autoRetryCount);
@@ -3170,13 +3170,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _reportStatusToRemote(); // Reportar a Auris Remote
       final ms = pos.inMilliseconds;
       if (ms > 0) PlaybackTelemetry.instance.markFirstFrame();
-      // Progreso real: el stream vive ‚Üí el ciclo de auto-reintentos queda
-      // limpio para el pr√≥ximo error transitorio.
+      // Progreso real: el stream vive ? el ciclo de auto-reintentos queda
+      // limpio para el prÛximo error transitorio.
       if (ms > 1000) _autoRetryCount = 0;
       final duration = player.state.duration.inMilliseconds;
 
-      // Senior UI Fix: la carga termina cuando la posici√≥n avanza de verdad
-      // (no al llamar a play()); as√≠ el spinner cubre el tiempo de buffering.
+      // Senior UI Fix: la carga termina cuando la posiciÛn avanza de verdad
+      // (no al llamar a play()); asÌ el spinner cubre el tiempo de buffering.
       if (ms > 1000) _firstFrameRendered = true;
       if (ms > 1000 && mounted && _isLoading) {
         setState(() => _isLoading = false);
@@ -3192,10 +3192,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         }
       }
 
-      // Senior Resume Fix: Solo nativo. Si tras confirmar la reanudaci√≥n la
-      // posici√≥n cae a ~0 (demuxer reiniciado por error de codec av1/buffering),
-      // re-aplicamos el seek al punto de reanudaci√≥n. Limitado a pocos intentos
-      // y se ignora si el usuario busc√≥ manualmente o paus√≥.
+      // Senior Resume Fix: Solo nativo. Si tras confirmar la reanudaciÛn la
+      // posiciÛn cae a ~0 (demuxer reiniciado por error de codec av1/buffering),
+      // re-aplicamos el seek al punto de reanudaciÛn. Limitado a pocos intentos
+      // y se ignora si el usuario buscÛ manualmente o pausÛ.
       if (!kIsWeb &&
           _resumePosition > 3000 &&
           _resumeGuardRetries < 3 &&
@@ -3206,7 +3206,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           (_lastManualSeekTime == null ||
               DateTime.now().difference(_lastManualSeekTime!) > const Duration(seconds: 5))) {
         _resumeGuardRetries++;
-        debugPrint('[player] Resume guard: posici√≥n cay√≥ a $ms tras confirmar $_resumePosition. Re-seeking.');
+        debugPrint('[player] Resume guard: posiciÛn cayÛ a $ms tras confirmar $_resumePosition. Re-seeking.');
         _lastStablePositionMs = _resumePosition;
         _lastFrameMs = _resumePosition;
         _player?.seek(Duration(milliseconds: _resumePosition));
@@ -3261,7 +3261,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           }
 
           if (shouldShowNext && !_showNextNotifier.value) {
-            // DIFERIMIENTO AS√çNCRONO TOTAL: Sacar la actualizaci√≥n del frame actual
+            // DIFERIMIENTO ASÕNCRONO TOTAL: Sacar la actualizaciÛn del frame actual
             Future.delayed(Duration.zero, () {
               if (mounted) _showNextNotifier.value = true;
             });
@@ -3370,7 +3370,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('video-sync', 'audio');
         platform.setProperty('framedrop', 'decoder+vo');
         
-        // Colch√≥n de audio estable (5s)
+        // ColchÛn de audio estable (5s)
         platform.setProperty('audio-buffer', '${pcfg.audioBufferSecFor(kIsWeb)}'); 
         platform.setProperty('volume-max', '200');
         platform.setProperty('cache-pause', 'yes'); 
@@ -3382,7 +3382,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('hwdec', 'auto-safe');
         platform.setProperty('tls-verify', 'no');
         
-        // Suavizamos el parseo para evitar corrupci√≥n visual en el arranque
+        // Suavizamos el parseo para evitar corrupciÛn visual en el arranque
         platform.setProperty('demuxer-lavf-o', 'probesize=5000000,analyzeduration=5000000,seek2any=1');
         platform.setProperty('user-agent', finalHeaders['User-Agent'] ?? 'Mozilla/5.0');
 
@@ -3408,12 +3408,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: false));
     }
 
-    // Senior Web Fix: Auto-Fullscreen en Web M√≥vil al abrir el reproductor
+    // Senior Web Fix: Auto-Fullscreen en Web MÛvil al abrir el reproductor
     if (kIsWeb) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && ResponsiveUtils.isTactic(context)) {
           if (!_isFullscreen) {
-            // Forzamos que la UI detecte modo t√°ctil/m√≥vil antes de entrar
+            // Forzamos que la UI detecte modo t·ctil/mÛvil antes de entrar
             setState(() => _isMobileDevice = true);
             _toggleFullscreen();
           }
@@ -3424,10 +3424,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // --- FLUJO SEQUENCIAL DE ALTA ESTABILIDAD (SOLO NATIVO) ---
     if (!kIsWeb) {
       // Senior Fix: NO llamamos player.stop() antes de open(). stop() destruye
-      // el contexto de v√≠deo (vo/EGL) y open() no logra recrearlo, provocando
+      // el contexto de vÌdeo (vo/EGL) y open() no logra recrearlo, provocando
       // "Failed initializing any suitable GPU context" y rompiendo el seek/play
-      // en el cambio de episodio. open() gestiona la transici√≥n internamente
-      // reutilizando la salida de v√≠deo.
+      // en el cambio de episodio. open() gestiona la transiciÛn internamente
+      // reutilizando la salida de vÌdeo.
       //
       // Senior Fix: Si NO hay que reanudar (video nuevo desde 0) abrimos con
       // play: true para que arranque directo. Abrir con play: false y luego
@@ -3448,7 +3448,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         await Future.delayed(const Duration(milliseconds: 100));
         timeout++;
         // Los re-inits de retry/switch pueden destruir este player mientras
-        // esta continuaci√≥n sigue viva: abortar silenciosamente en ese caso.
+        // esta continuaciÛn sigue viva: abortar silenciosamente en ese caso.
         if (_isDisposed || !mounted) return;
       }
       
@@ -3471,9 +3471,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
 
       if (!_isAutoplayResume && _resumePosition > 3000) {
-        // Resume Fix: el primer seek puede perderse si el demuxer a√∫n no est√°
+        // Resume Fix: el primer seek puede perderse si el demuxer a˙n no est·
         // listo (MP4 progresivo / stream directo del cast). Verifica por
-        // posici√≥n y reintenta una vez.
+        // posiciÛn y reintenta una vez.
         unawaited(_resumeSeekWhenReady(
             Duration(milliseconds: _resumePosition), player, _resumeSeekGen));
       }
@@ -3481,9 +3481,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (mounted) {
         setState(() {
           // Senior UI Fix: _isLoading se deja en true para el play normal; lo
-          // limpia la posici√≥n (ms > 1000) cuando el video arranca de verdad.
-          // En autoplay-resume (pausado con countdown) s√≠ se limpia para que el
-          // countdown de reanudaci√≥n no quede cubierto por el spinner.
+          // limpia la posiciÛn (ms > 1000) cuando el video arranca de verdad.
+          // En autoplay-resume (pausado con countdown) sÌ se limpia para que el
+          // countdown de reanudaciÛn no quede cubierto por el spinner.
           if (_isAutoplayResume) _isLoading = false;
           _showControls = true;
           _hasResetPosition = true;
@@ -3494,7 +3494,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return;
     }
 
-    // --- FLUJO EST√ÅNDAR (WEB / FALLBACK) ---
+    // --- FLUJO EST¡NDAR (WEB / FALLBACK) ---
     // Senior Autoplay Fix: Pausar el stream anterior ANTES de abrir el nuevo para
     // evitar audio de fondo mientras el HLS nuevo carga (cambios de episodio/fuente).
     player.pause();
@@ -3517,10 +3517,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           
           if (kIsWeb) {
             // Web: HTML5/hls.js ignoran seek() hasta que el media tiene metadata,
-            // as√≠ que los reintentos a ciegas antes de play() solo a√±ad√≠an ~2.3s
+            // asÌ que los reintentos a ciegas antes de play() solo aÒadÌan ~2.3s
             // de espera muerta. Arrancamos el play de inmediato para que el
             // manifest/segmentos carguen en paralelo y aplicamos el seek en
-            // cuanto el elemento <video> est√© listo.
+            // cuanto el elemento <video> estÈ listo.
             _startStabilizationTimer();
             unawaited(_webResumeSeek(player, resumeMs, _resumeSeekGen));
             player.play();
@@ -3535,16 +3535,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           setState(() => _isLoading = false);
           player.play();
           // Senior Autoplay Fix: En web el elemento <video> puede quedar pausado
-          // si play() se emite antes de que est√© listo (HLS). Reintentamos.
+          // si play() se emite antes de que estÈ listo (HLS). Reintentamos.
           _ensureAutoplay(player);
         }
       }
     });
   }
 
-  /// Red de seguridad: si el player qued√≥ en pausa tras abrir el nuevo
+  /// Red de seguridad: si el player quedÛ en pausa tras abrir el nuevo
   /// stream (mpv puede reportar pause=true durante la carga del HLS),
-  /// reintenta el play hasta que efectivamente est√© reproduciendo.
+  /// reintenta el play hasta que efectivamente estÈ reproduciendo.
   void _ensureAutoplay(Player player) {
     void tryPlay() {
       if (mounted && !player.state.playing && !_isAutoplayResume && !_userHasPaused) {
@@ -3553,7 +3553,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
 
     // Serie de reintentos que cubren tanto la carga nativa lenta como la
-    // creaci√≥n del elemento <video> en web tras cambiar de episodio.
+    // creaciÛn del elemento <video> en web tras cambiar de episodio.
     Future.delayed(const Duration(milliseconds: 800), tryPlay);
     Future.delayed(const Duration(milliseconds: 2500), tryPlay);
     Future.delayed(const Duration(seconds: 5), tryPlay);
@@ -3563,11 +3563,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
-  /// Resume Fix: cuando el seek inicial se emiti√≥ con duration==0 (MP4 directo
-  /// /progresivo, moov a√∫n sin parsear) el comando falla en silencio y la
-  /// reproducci√≥n arranca desde 0. Aqu√≠ esperamos a que el stream est√© listo y
-  /// reintentamos el seek absoluto, verificando por posici√≥n (no por errores,
-  /// que llegan por player.stream y no lanzan excepci√≥n).
+  /// Resume Fix: cuando el seek inicial se emitiÛ con duration==0 (MP4 directo
+  /// /progresivo, moov a˙n sin parsear) el comando falla en silencio y la
+  /// reproducciÛn arranca desde 0. AquÌ esperamos a que el stream estÈ listo y
+  /// reintentamos el seek absoluto, verificando por posiciÛn (no por errores,
+  /// que llegan por player.stream y no lanzan excepciÛn).
   Future<void> _resumeSeekWhenReady(Duration target, Player player, int gen) async {
     final tMs = target.inMilliseconds;
     if (tMs <= 3000) return;
@@ -3585,11 +3585,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     await player.seek(target);
   }
 
-  /// Web Resume Fix: hls.js/HTML5 descartan seek() mientras la metadata no est√°
-  /// lista. En lugar de reintentar a ciegas antes del play (que manten√≠a el
-  /// stream sin cargar ~2.3s), esperamos a que el media arranque (posici√≥n > 0
-  /// o duraci√≥n conocida) y ah√≠ s√≠ aplicamos el seek absoluto verificando por
-  /// posici√≥n. El spinner se oculta al confirmar el salto.
+  /// Web Resume Fix: hls.js/HTML5 descartan seek() mientras la metadata no est·
+  /// lista. En lugar de reintentar a ciegas antes del play (que mantenÌa el
+  /// stream sin cargar ~2.3s), esperamos a que el media arranque (posiciÛn > 0
+  /// o duraciÛn conocida) y ahÌ sÌ aplicamos el seek absoluto verificando por
+  /// posiciÛn. El spinner se oculta al confirmar el salto.
   Future<void> _webResumeSeek(Player player, int targetMs, int gen) async {
     int waited = 0;
     while (waited < 80 && mounted && gen == _resumeSeekGen) {
@@ -3620,7 +3620,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   /// Normaliza cualquier URL de YouTube (watch, youtu.be, embed) al formato
-  /// embed con autoplay, que es el √∫nico reproducible en el WebView de TV.
+  /// embed con autoplay, que es el ˙nico reproducible en el WebView de TV.
   String _youTubeEmbedUrl(String url) {
     try {
       final uri = Uri.parse(url);
@@ -3690,12 +3690,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   @override
   void dispose() {
-    // Cast Local: el server deja de reportar media activa (el m√≥vil har√°
+    // Cast Local: el server deja de reportar media activa (el mÛvil har·
     // handback al ver loaded=false en /cast/status).
     try {
       ref.read(localCastBridgeProvider.notifier).clear();
     } catch (_) {}
-    // Primero la bandera: a partir de aqu√≠ el ref est√° muerto (igual que Movil).
+    // Primero la bandera: a partir de aquÌ el ref est· muerto (igual que Movil).
     _isDisposed = true;
     // Senior Fix: Cancelar TODOS los timers para evitar fugas de memoria y llamadas a setState
     _loadWatchdogTimer?.cancel();
@@ -3727,8 +3727,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final ms = _player?.state.position.inMilliseconds ?? 0;
     final duration = _player?.state.duration.inMilliseconds ?? 0;
     
-    // Senior Shield: Solo guardamos si el reproductor realmente logr√≥ sincronizar la posici√≥n
-    // de reanudaci√≥n. Si cerramos antes de que MPV enganche, evitamos sobreescribir con 0ms.
+    // Senior Shield: Solo guardamos si el reproductor realmente logrÛ sincronizar la posiciÛn
+    // de reanudaciÛn. Si cerramos antes de que MPV enganche, evitamos sobreescribir con 0ms.
     // Guardado final SIN ref (ver _finalSaveOnDispose).
     if (_hasResetPosition && ms > 3000 && duration > 0) {
       _finalSaveOnDispose(ms, duration);
@@ -3823,28 +3823,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       debugPrint('[player] Error during safety flush: $e');
     }
     
-    // Senior Fix: Marcar como saliendo ANTES de cualquier otra acci√≥n
+    // Senior Fix: Marcar como saliendo ANTES de cualquier otra acciÛn
     setState(() => _isExiting = true);
     
-    // 1. Silencio absoluto y detenci√≥n radical del motor nativo
+    // 1. Silencio absoluto y detenciÛn radical del motor nativo
     final p = _player;
     _player = null; 
     try {
       p?.setVolume(0);
-      await p?.stop(); // Esperamos a que el buffer se vac√≠e educadamente
+      await p?.stop(); // Esperamos a que el buffer se vacÌe educadamente
       p?.dispose();
     } catch (e) {
       debugPrint('[player] Error killing native instance: $e');
     }
     
-    // 2. Forzar restauraci√≥n del sistema (Orientaci√≥n + UI)
+    // 2. Forzar restauraciÛn del sistema (OrientaciÛn + UI)
     if (_isMobileDevice) {
       _setVolumeIntercept(false);
       // Senior Fix: Disparar de forma paralela sin 'await' para evitar retrasos en transiciones
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       VolumeController.instance.showSystemUI = true;
     }
-    // TV: siempre horizontal 16:9, tambi√©n al salir (antes restauraba
+    // TV: siempre horizontal 16:9, tambiÈn al salir (antes restauraba
     // portraitUp y la plataforma cambiaba a vertical).
     SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.landscapeLeft,
@@ -3874,16 +3874,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   @override
   Widget build(BuildContext context) {
-    // Senior Fix: Sincronizaci√≥n forzada de UI antes de cada build para evitar
-    // layouts de escritorio en pantallas m√≥viles durante transiciones.
+    // Senior Fix: SincronizaciÛn forzada de UI antes de cada build para evitar
+    // layouts de escritorio en pantallas mÛviles durante transiciones.
     _isMobileDevice = ResponsiveUtils.isTactic(context);
     final settings = ref.watch(settingsProvider);
 
     // Senior Session Sync: lista de episodios al provider global (igual que
-    // Movil/Web). Sin esto el historial guardaba "T1:E1" sin t√≠tulo en TV:
-    // los ticks/stop resuelven el t√≠tulo desde availableEpisodes.
+    // Movil/Web). Sin esto el historial guardaba "T1:E1" sin tÌtulo en TV:
+    // los ticks/stop resuelven el tÌtulo desde availableEpisodes.
     // Key anti re-sync: el whenData dispara por cada rebuild con data.
-    // En directo (listas M3U) no hay serie/episodios: responder vac√≠o y no
+    // En directo (listas M3U) no hay serie/episodios: responder vacÌo y no
     // consultar /api/episodes al abrir el canal.
     final episodesForSession = widget.isLive
         ? AsyncValue<EpisodesResponse?>.data(EpisodesResponse(
@@ -3915,7 +3915,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       });
     });
 
-    // Senior Shield: Interceptamos la navegaci√≥n de retroceso (Mouse 4, Bot√≥n Atr√°s, Gestos)
+    // Senior Shield: Interceptamos la navegaciÛn de retroceso (Mouse 4, BotÛn Atr·s, Gestos)
     return PopScope(
       canPop: _isExiting,
       onPopInvokedWithResult: (didPop, result) {
@@ -3938,9 +3938,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
-  /// Pantalla √öNICA de carga, compartida por la extracci√≥n de la fuente y el
+  /// Pantalla ⁄NICA de carga, compartida por la extracciÛn de la fuente y el
   /// arranque del reproductor: ambos usan el mismo spinner, texto y fondo para
-  /// que el usuario vea una sola carga continua y no crea que la app se qued√≥
+  /// que el usuario vea una sola carga continua y no crea que la app se quedÛ
   /// congelada.
   Widget _buildContentLoadingView({
     bool showBack = false,
@@ -3973,7 +3973,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ),
               const SizedBox(height: 8),
               Text(
-                'Preparando tu reproducci√≥n, un momento por favor.',
+                'Preparando tu reproducciÛn, un momento por favor.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   color: Colors.white54,
@@ -4009,7 +4009,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (target != null) return _buildRemoteModeView(target);
     }
 
-    // Fondo: negro puro en reproducci√≥n; gris del panel solo con men√∫ abierto.
+    // Fondo: negro puro en reproducciÛn; gris del panel solo con men˙ abierto.
     final bg = _activeOverlay != PlayerOverlay.none ? const Color(0xFF0F0F0F) : Colors.black;
 
     // Senior Direct Flow: Fuentes que ya entregan el stream directo o proxied
@@ -4092,7 +4092,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     const Text('Enlace Caducado o Error de Servidor', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), 
                     const SizedBox(height: 12),
                     Text(
-                      'El enlace guardado en tu historial ya no es v√°lido. Esto es com√∫n en fuentes como Zilla o JKAnime.',
+                      'El enlace guardado en tu historial ya no es v·lido. Esto es com˙n en fuentes como Zilla o JKAnime.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
                     ),
@@ -4169,35 +4169,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       ),
                     ),
                     
-                    // Footer (Bot√≥n Desconectar siempre visible o al final del scroll)
+                    // Footer (BotÛn Desconectar siempre visible o al final del scroll)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: TextButton.icon(
                         onPressed: () {
-                          // Senior Handback Logic: Recuperar posici√≥n y volver a local
+                          // Senior Handback Logic: Recuperar posiciÛn y volver a local
                           final int resumeMs = target.positionMs;
                           
                           // 1. Detener al receptor remotamente
                           _sendRemoteAction(target, RemoteAction.stop);
                           
-                          // 2. Limpiar el v√≠nculo y restaurar estado local
+                          // 2. Limpiar el vÌnculo y restaurar estado local
                           ref.read(remoteControlProvider.notifier).setActiveTarget(null);
                           
                           setState(() {
                             _resumePosition = resumeMs;
-                            _hasInitialized = false; // Forzar re-inicializaci√≥n del reproductor local
+                            _hasInitialized = false; // Forzar re-inicializaciÛn del reproductor local
                             _isLoading = true;
                           });
 
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               backgroundColor: Color(0xFFEF7A1E),
-                              content: Text('Recuperando reproducci√≥n local...', style: TextStyle(fontWeight: FontWeight.bold)),
+                              content: Text('Recuperando reproducciÛn local...', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           );
                         },
                         icon: const Icon(Icons.cast_connected_rounded, size: 16),
-                        label: const Text('DETENER TRANSMISI√ìN', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                        label: const Text('DETENER TRANSMISI”N', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                         style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
                       ),
                     ),
@@ -4595,7 +4595,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
         : _currentSourceUrl;
 
-    // Actualizamos localmente para que el controller sepa en qu√© episodio est√°
+    // Actualizamos localmente para que el controller sepa en quÈ episodio est·
     setState(() {
       _currentEpisode = nextNum.toString();
       _currentSourceUrl = nextSourceUrl;
@@ -4622,7 +4622,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final playableTracks = tracks.where((t) => !t.isDownload).toList();
     if (!_isCurrentTrackEmbed(playableTracks)) return _buildMobilePlayer(playableTracks, settings);
 
-    // Senior Elite Fix: WebView (Embed) directo sin Scaffold intermedio para m√°ximo aprovechamiento.
+    // Senior Elite Fix: WebView (Embed) directo sin Scaffold intermedio para m·ximo aprovechamiento.
     return _buildEmbedStack(playableTracks);
   }
 
@@ -4632,7 +4632,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         else Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.open_in_browser, color: Colors.white70, size: 64),
                 const SizedBox(height: 16),
-                const Text('Reproducci√≥n externa iniciada', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('ReproducciÛn externa iniciada', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE50914), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
@@ -4644,7 +4644,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   label: const Text('Reabrir navegador'),
                 ),
               ])),
-        // Senior Fix: Bot√≥n de salida para reproducci√≥n externa
+        // Senior Fix: BotÛn de salida para reproducciÛn externa
         Positioned(
           top: 16,
           left: 16,
@@ -4741,8 +4741,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         else if (_useNativeTvSurface)
           // SurfaceView nativo (punch-out): sin opacity/transform/clip encima,
           // ya que esas capas fuerzan el modo overlay de hybrid composition y
-          // provocan UI duplicada/transl√∫cida. Fondo negro opaco para ocultar
-          // la capa Flutter inferior mientras la superficie a√∫n no tiene frame.
+          // provocan UI duplicada/transl˙cida. Fondo negro opaco para ocultar
+          // la capa Flutter inferior mientras la superficie a˙n no tiene frame.
           ColoredBox(
             color: Colors.black,
             child: Stack(
@@ -4920,9 +4920,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 if (_isLoading)
                   Positioned.fill(
                     child: IgnorePointer(
-                      // Misma vista de carga que la extracci√≥n de la fuente ‚Üí
+                      // Misma vista de carga que la extracciÛn de la fuente ?
                       // una sola carga percibida por el usuario.
-                      // Opaco durante la reanudaci√≥n y SIEMPRE opaco en la ruta
+                      // Opaco durante la reanudaciÛn y SIEMPRE opaco en la ruta
                       // SurfaceView para no dejar traslucir la capa Flutter
                       // inferior (UI duplicada).
                       child: _buildContentLoadingView(
@@ -4945,7 +4945,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 64),
                             const SizedBox(height: 24),
                             const Text(
-                              'SINCROIZACI√ìN REMOTA',
+                              'SINCROIZACI”N REMOTA',
                               style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2),
                             ),
                             const SizedBox(height: 8),
@@ -4976,21 +4976,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ],
               panelOpen: isMenuOpen,
               panelTitle: switch (_activeOverlay) {
-                PlayerOverlay.language => 'Audio y subt√≠tulos',
+                PlayerOverlay.language => 'Audio y subtÌtulos',
                 PlayerOverlay.server => 'Servidor',
                 PlayerOverlay.quality => 'Calidad',
                 PlayerOverlay.speed => 'Velocidad',
                 PlayerOverlay.volume => 'Volumen',
-                PlayerOverlay.aspect => 'Relaci√≥n de aspecto',
+                PlayerOverlay.aspect => 'RelaciÛn de aspecto',
                 PlayerOverlay.episodes => 'Episodios',
-                _ => 'Configuraci√≥n',
+                _ => 'ConfiguraciÛn',
               },
-              // KeyedSubtree con la clave del overlay: al cambiar de men√∫/submen√∫,
-              // la ListView del panel NO debe reutilizar los elementos por √≠ndice
-              // (config item i -> item i del submen√∫), porque conservar√≠a el
-              // FocusNode viejo y el `autofocus` de la opci√≥n actual no se
-              // aplicar√≠a. Con la clave se recrea el contenido y el foco cae en
-              // la opci√≥n actual (ver autofocusIndex en cada selector).
+              // KeyedSubtree con la clave del overlay: al cambiar de men˙/submen˙,
+              // la ListView del panel NO debe reutilizar los elementos por Ìndice
+              // (config item i -> item i del submen˙), porque conservarÌa el
+              // FocusNode viejo y el `autofocus` de la opciÛn actual no se
+              // aplicarÌa. Con la clave se recrea el contenido y el foco cae en
+              // la opciÛn actual (ver autofocusIndex en cada selector).
               panelContent: KeyedSubtree(
                 key: ValueKey(_activeOverlay),
                 child: switch (_activeOverlay) {
@@ -5010,19 +5010,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               showCloseButton: false,
               // LEFT desde el panel enfoca el video (borde blanco 3px); RIGHT vuelve.
               enableVideoFocus: true,
-              // Transici√≥n compacto (two-panel) ‚Üî pantalla completa m√°s r√°pida y
-              // con arranque √°gil (easeOut) para que el video crezca fluido al
+              // TransiciÛn compacto (two-panel) ? pantalla completa m·s r·pida y
+              // con arranque ·gil (easeOut) para que el video crezca fluido al
               // pulsar OK sobre el video enfocado.
               animationDuration: const Duration(milliseconds: 180),
               animationCurve: Curves.easeOutCubic,
               trapFocus: true,
               onBack: _dismissSidePanel,
               railWidth: 460,
-              // Con `lockAspect` el √°rea de video se ajusta a 16:9 mediante
-              // padding (sin cambiar la estructura del sub√°rbol), de modo que el
+              // Con `lockAspect` el ·rea de video se ajusta a 16:9 mediante
+              // padding (sin cambiar la estructura del sub·rbol), de modo que el
               // video la rellena y el redondeo del contenedor coincide con el
               // video. El SurfaceView (punch-out) no soporta clip redondeado en
-              // Hybrid Composition: se redondean las esquinas con una m√°scara
+              // Hybrid Composition: se redondean las esquinas con una m·scara
               // del color del fondo (16px), no con ClipRRect.
               lockAspect: true,
               borderRadius: _useNativeTvSurface ? 0 : 16,
@@ -5098,9 +5098,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildMobilePillsLayer() {
-    // Pills seg√∫n tipo de contenido: se arma la lista y se separa con un
-    // √∫nico hueco uniforme, as√≠ la separaci√≥n es id√©ntica aunque se
-    // oculten c√°psulas (movie / OP-ED) ‚Äî antes la √∫ltima pill doblaba
+    // Pills seg˙n tipo de contenido: se arma la lista y se separa con un
+    // ˙nico hueco uniforme, asÌ la separaciÛn es idÈntica aunque se
+    // oculten c·psulas (movie / OP-ED) ó antes la ˙ltima pill doblaba
     // el hueco (20px frente a 10px).
     // En vivo/directo M3U no hay servidor ni idioma que cambiar: sin esas
     // pills (ni episodios/prev/next, que ya se ocultan por _isMovie/nav).
@@ -5223,7 +5223,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return ValueListenableBuilder<bool>(
       valueListenable: _showNextNotifier,
       builder: (context, showNext, _) {
-        // El bot√≥n es visible si estamos en el umbral del 93% O si el video ha terminado (countdown)
+        // El botÛn es visible si estamos en el umbral del 93% O si el video ha terminado (countdown)
         // PERO solo si hay un siguiente episodio disponible (o si es el modo Reanudar).
         final bool isVisible = (showNext || isCountdown) && (_isAutoplayResume || hasNext);
         
@@ -5251,11 +5251,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 ),
                 child: Stack(
                   children: [
-                    // Capa de progreso: Animaci√≥n de 5 segundos FLUIDA (una sola vez)
+                    // Capa de progreso: AnimaciÛn de 5 segundos FLUIDA (una sola vez)
                     if (isCountdown)
                       Positioned.fill(
                         child: _NetflixProgressBar(
-                          // Usamos una clave que persista durante toda la cuenta atr√°s
+                          // Usamos una clave que persista durante toda la cuenta atr·s
                           // Solo cambia si el modo (Resume vs Autoplay) cambia, pero no con cada segundo
                           key: ValueKey('netflix_persistent_bar_${_isAutoplayResume}'), 
                         ),
@@ -5480,8 +5480,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             if (!_showControls) {
               setState(() => _showControls = true);
             }
-            // Extremos de la fila superior: contener la direcci√≥n para no
-            // perder el foco del bot√≥n (p. ej. DERECHA en Configuraci√≥n).
+            // Extremos de la fila superior: contener la direcciÛn para no
+            // perder el foco del botÛn (p. ej. DERECHA en ConfiguraciÛn).
             if (key == LogicalKeyboardKey.arrowRight && absorbRight) {
               return KeyEventResult.handled;
             }
@@ -5598,12 +5598,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }) {
     return Container(
       width: minWidth, height: 44, // Unificado a 44px
-      padding: const EdgeInsets.all(4), // Inset de 4px para forma de c√°psula interna
+      padding: const EdgeInsets.all(4), // Inset de 4px para forma de c·psula interna
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18), // Forma de c√°psula interna refinada (Radio 18 para alto 36)
+          borderRadius: BorderRadius.circular(18), // Forma de c·psula interna refinada (Radio 18 para alto 36)
           hoverColor: Colors.white.withValues(alpha: 0.12),
           splashColor: Colors.white.withValues(alpha: 0.08),
           child: Center(
@@ -5712,7 +5712,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 // _buildMobileBottomBar replaced by independent layers
 
   /// Orden visual de las pills (igual que [_buildMobilePillsLayer]).
-  /// La navegaci√≥n izq/der es expl√≠cita porque el scoring geom√©trico del
+  /// La navegaciÛn izq/der es explÌcita porque el scoring geomÈtrico del
   /// traversal salta al timeline ancho en vez de a la pill vecina.
   List<FocusNode> get _pillTraversalOrder {
     final order = <FocusNode>[_serverPillFocusNode];
@@ -5750,11 +5750,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _startHideTimer();
         }
       },
-      // D-pad en pills: OK/centro (select) activa ‚Äîel mando de TV no manda
-      // Enter sino `select`, sin binding por defecto‚Äî y arriba vuelve al
+      // D-pad en pills: OK/centro (select) activa óel mando de TV no manda
+      // Enter sino `select`, sin binding por defectoó y arriba vuelve al
       // timeline. Izquierda/derecha/abajo se contienen en la fila con orden
-      // expl√≠cito (los topes se tragan para no fugar el foco al timeline).
-      // Se consume aqu√≠ para que Espacio no llegue al play/pausa global.
+      // explÌcito (los topes se tragan para no fugar el foco al timeline).
+      // Se consume aquÌ para que Espacio no llegue al play/pausa global.
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent || event is KeyRepeatEvent) {
           final key = event.logicalKey;
@@ -5875,7 +5875,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             if (mounted) setState(() {});
           },
           onKeyEvent: (node, event) {
-            // Soltar ‚Üê/‚Üí confirma el hold-scrub con un solo seek.
+            // Soltar ?/? confirma el hold-scrub con un solo seek.
             if (event is KeyUpEvent &&
                 (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
                     event.logicalKey == LogicalKeyboardKey.arrowRight)) {
@@ -5883,8 +5883,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               return KeyEventResult.handled;
             }
             if (event is KeyDownEvent || event is KeyRepeatEvent) {
-              // El timeline consume las teclas antes que la ra√≠z: si los
-              // controles est√°n ocultos hay que mostrarlos aqu√≠ tambi√©n.
+              // El timeline consume las teclas antes que la raÌz: si los
+              // controles est·n ocultos hay que mostrarlos aquÌ tambiÈn.
               final bool wasHidden = !_showControls;
               if (wasHidden) {
                 setState(() => _showControls = true);
@@ -5909,7 +5909,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 _startHideTimer();
                 return KeyEventResult.handled;
               } else if (key == LogicalKeyboardKey.arrowDown) {
-                // Igual que arriba: al despertar no saltamos a las c√°psulas.
+                // Igual que arriba: al despertar no saltamos a las c·psulas.
                 if (wasHidden ||
                     DateTime.now().difference(_timelineFocusTime).inMilliseconds < 250) {
                   _startHideTimer();
@@ -5954,8 +5954,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             FontFeature.tabularFigures()
                           ],
                         );
-                        // Solo durante el scrub: od√≥metro vertical por
-                        // d√≠gito en vez de saltos.
+                        // Solo durante el scrub: odÛmetro vertical por
+                        // dÌgito en vez de saltos.
                         if (!scrubbing) return Text(timeText, style: style);
                         return Row(
                           mainAxisSize: MainAxisSize.min,
@@ -6081,14 +6081,14 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
   }
 }
 
-/// D√≠gito con ruleta vertical (od√≥metro): tira 0-9 que rota hasta el
+/// DÌgito con ruleta vertical (odÛmetro): tira 0-9 que rota hasta el
 /// valor actual. La altura se mide de la propia fuente para un encaje exacto.
-/// El wrap (9‚Üí0 / 0‚Üí9) usa duplicados en los bordes para seguir girando en
-/// la direcci√≥n del scrub en vez de rebobinar.
+/// El wrap (9?0 / 0?9) usa duplicados en los bordes para seguir girando en
+/// la direcciÛn del scrub en vez de rebobinar.
 class _OdometerDigit extends StatefulWidget {
   final int value; // 0-9
   final TextStyle style;
-  final int direction; // +1 adelante, -1 atr√°s
+  final int direction; // +1 adelante, -1 atr·s
 
   const _OdometerDigit({
     required this.value,
@@ -6122,7 +6122,7 @@ class _OdometerDigitState extends State<_OdometerDigit> {
     if (widget.direction >= 0 && widget.value == 0 && _to >= 8.5) {
       target = 10.0; // wrap adelante: girar al "0" duplicado
     } else if (widget.direction < 0 && widget.value == 9 && _to <= 0.5) {
-      target = -1.0; // wrap atr√°s: girar al "9" duplicado
+      target = -1.0; // wrap atr·s: girar al "9" duplicado
     }
     _from = _lastRendered;
     _to = target;
@@ -6184,7 +6184,7 @@ class _OdometerDigitState extends State<_OdometerDigit> {
 }
 
 class _ZeroPaddingSliderTrackShape extends RoundedRectSliderTrackShape {
-  /// Fracci√≥n (0..1) del tramo ya cargado en buffer. Se pinta como una "l√≠nea
+  /// FracciÛn (0..1) del tramo ya cargado en buffer. Se pinta como una "lÌnea
   /// de buffer" (estilo YouTube TV) entre la pista inactiva y la activa.
   final double bufferFraction;
 
@@ -6278,7 +6278,7 @@ class _NetflixProgressBarState extends State<_NetflixProgressBar> {
   void initState() {
     super.initState();
     _startTime = DateTime.now();
-    // CRON√ìMETRO MANUAL: Garantiza 5 segundos reales independientemente del motor de frames
+    // CRON”METRO MANUAL: Garantiza 5 segundos reales independientemente del motor de frames
     _timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
       final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
       final double newProgress = (elapsed / 5000).clamp(0.0, 1.0);

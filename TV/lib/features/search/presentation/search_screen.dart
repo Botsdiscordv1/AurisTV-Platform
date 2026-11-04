@@ -4,10 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 
-import 'package:auris_sdk/live/auris_core.dart' hide FocusablePosterCard;
+import 'package:auris_core/auris_core.dart' hide FocusablePosterCard;
 import '../../../shared/widgets/focusable_poster_card.dart';
 import 'providers/search_provider.dart';
 import 'widgets/search_widgets.dart';
@@ -29,14 +28,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String _currentQuery = '';
   bool _isFocused = false;
 
-  final stt.SpeechToText _speech = stt.SpeechToText();
+  // Speech-to-text disabled for TV compatibility
+  // final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   String _voiceStatus = '';
 
   @override
   void initState() {
     super.initState();
-    _initSpeech();
+    // _initSpeech(); // disabled for TV
     _focusNode.addListener(() {
       setState(() => _isFocused = _focusNode.hasFocus);
     });
@@ -49,72 +49,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _initSpeech() async {
-    final status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      final result = await Permission.microphone.request();
-      if (!result.isGranted) return;
-    }
-    final available = await _speech.initialize(
-      onError: (error) {
-        if (mounted) {
-          setState(() {
-            _isListening = false;
-            _voiceStatus = '';
-          });
-        }
-      },
-      onStatus: (status) {
-        if (mounted && status == 'done') {
-          setState(() {
-            _isListening = false;
-            _voiceStatus = '';
-          });
-        }
-      },
-    );
-    if (!available && mounted) {
-      setState(() => _voiceStatus = 'Micrófono no disponible');
-    }
+    // Speech-to-text disabled for TV compatibility
   }
 
   Future<void> _toggleListening() async {
-    if (_isListening) {
-      await _speech.stop();
-      if (mounted) setState(() => _isListening = false);
-      return;
-    }
-
-    if (!_speech.isAvailable) {
-      await _initSpeech();
-      if (!_speech.isAvailable) return;
-    }
-
-    setState(() {
-      _isListening = true;
-      _voiceStatus = 'Escuchando…';
-    });
-
-    _speech.listen(
-      localeId: 'es_ES',
-      listenFor: const Duration(seconds: 10),
-      pauseFor: const Duration(seconds: 3),
-      onResult: (result) {
-        if (!mounted) return;
-        if (result.finalResult) {
-          setState(() {
-            _isListening = false;
-            _voiceStatus = '';
-          });
-          final text = result.recognizedWords.trim();
-          if (text.isNotEmpty) {
-            _searchController.text = text;
-            _onSearchSubmitted(text);
-          }
-        } else {
-          setState(() => _voiceStatus = result.recognizedWords);
-        }
-      },
-    );
+    // Speech-to-text disabled for TV compatibility
   }
 
   @override
