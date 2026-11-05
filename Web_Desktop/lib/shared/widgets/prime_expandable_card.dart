@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/utils/responsive_utils.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../core/theme/editorial_themes.dart';
 import 'editorial_animation_controller.dart';
 

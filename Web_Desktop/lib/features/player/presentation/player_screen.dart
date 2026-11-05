@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -18,7 +18,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart' as yt;
 
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/url_utils.dart';
@@ -28,7 +28,7 @@ import '../../../core/utils/web_utils.dart';
 import '../../remote_control/presentation/providers/remote_control_provider.dart';
 import '../../remote_control/data/models/remote_device.dart';
 import '../../remote_control/presentation/widgets/device_selector_dialog.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final String contentId;
@@ -39,7 +39,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? serverName;
   final int? startPosition;
   final String? category;
-  /// Kind granular + año para historial fiel (ver Movil).
+  /// Kind granular + a�o para historial fiel (ver Movil).
   final String? kind;
   final int? year;
   final int? totalEpisodes;
@@ -53,7 +53,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
   final String? video1080;
   final bool skipResume;
 
-  /// Reproducción en vivo (canales de listas M3U): no escribe historial
+  /// Reproducci�n en vivo (canales de listas M3U): no escribe historial
   /// ("Continuar viendo") ni propone reanudar.
   final bool isLive;
 
@@ -112,9 +112,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   bool _isLandscapeOnly = true;
   bool _hasResetPosition = false;
   int _resumePosition = 0;
-  /// Generación del seek de resume: cada _initPlayer la incrementa para que
+  /// Generaci�n del seek de resume: cada _initPlayer la incrementa para que
   /// los loops de reintento del episodio/fuente anterior se aborten y no
-  /// apliquen su seek tardío sobre el nuevo stream (igual que Movil/TV).
+  /// apliquen su seek tard�o sobre el nuevo stream (igual que Movil/TV).
   int _resumeSeekGen = 0;
   DateTime? _resumeGuardUntil;
   int _resumeGuardRetries = 0;
@@ -127,7 +127,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Timer? _stabilizationTimer;
   bool _isMobileDevice = false;
   bool _isFullscreen = false;
-  bool _isBoostActive = false; // Senior Fix: Flag para rastrear si el audio ya está enganchado a WebAudio
+  bool _isBoostActive = false; // Senior Fix: Flag para rastrear si el audio ya est� enganchado a WebAudio
   bool _isExiting = false;
   bool _webNeedsInteraction = false; // Senior Web Fix: Autoplay blocker
   yt.YoutubePlayerController? _ytController;
@@ -161,19 +161,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   Duration _seekDiff = Duration.zero;
   Timer? _historySaveTimer;
 
-  /// En móvil/tablet el player ya ocupa toda la pantalla, así que el botón
+  /// En m�vil/tablet el player ya ocupa toda la pantalla, as� que el bot�n
   /// "fullscreen" no cambia la ventana sino el formato/ajuste del video:
-  /// contain (default) → fill (estira a los bordes) → cover (rellena sin
-  /// estirar) → contain.
+  /// contain (default) ? fill (estira a los bordes) ? cover (rellena sin
+  /// estirar) ? contain.
   BoxFit _videoFit = BoxFit.contain;
 
-  /// En Android/iOS (phone/tablet/foldable) y en web móvil el player ya cubre
-  /// toda la pantalla, así que el botón debe ajustar el formato del video en
+  /// En Android/iOS (phone/tablet/foldable) y en web m�vil el player ya cubre
+  /// toda la pantalla, as� que el bot�n debe ajustar el formato del video en
   /// lugar de entrar/salir de fullscreen del SO/navegador.
   bool get _useVideoFitCycle {
     if (kIsWeb) {
-      // Senior Fix: En Web, solo usamos el ciclo de iconos si ya estamos en Fullscreen (Modo Táctico)
-      // o si es un dispositivo móvil detectado.
+      // Senior Fix: En Web, solo usamos el ciclo de iconos si ya estamos en Fullscreen (Modo T�ctico)
+      // o si es un dispositivo m�vil detectado.
       return ResponsiveUtils.isTactic(context) && _isFullscreen;
     }
     return _isMobileDevice || ResponsiveUtils.isTablet(context);
@@ -190,7 +190,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Calidades disponibles de la pista actual (parseadas del master HLS).
   List<QualityOption> _qualityOptions = [];
 
-  /// Stream base de la pista actual (para volver a "Automático").
+  /// Stream base de la pista actual (para volver a "Autom�tico").
   String _currentStreamUrl = '';
   Map<String, String> _currentStreamHeaders = const {};
 
@@ -212,19 +212,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// Episodio activo: se actualiza al navegar entre episodios.
   String? get _activeEpisode => _currentEpisode ?? widget.episode;
 
-  // Un especial (Temporada 0) debe mostrar su propio título en el player, no el
-  // del anime/temporada. Para eso content_screen envía `episodeTitle`.
+  // Un especial (Temporada 0) debe mostrar su propio t�tulo en el player, no el
+  // del anime/temporada. Para eso content_screen env�a `episodeTitle`.
   bool get _isSpecial => widget.season == 0;
   String get _displayTitle {
     if (_isOpEd && widget.title != null) return widget.title!;
-    if (_isTrailer) return 'Tráiler: ${widget.title ?? widget.contentId}';
+    if (_isTrailer) return 'Tr�iler: ${widget.title ?? widget.contentId}';
     if (_isSpecial && widget.episodeTitle?.isNotEmpty == true) return widget.episodeTitle!;
     if (_isSpecial) return widget.title ?? widget.contentId;
     return widget.title ?? widget.contentId;
   }
 
-  /// Subtítulo del episodio en formato `T1:E1 "Título"` (igual en las 3
-  /// plataformas). Observa la lista sincronizada: el título aparece en cuanto
+  /// Subt�tulo del episodio en formato `T1:E1 "T�tulo"` (igual en las 3
+  /// plataformas). Observa la lista sincronizada: el t�tulo aparece en cuanto
   /// llega, y al mostrarse ya queda cargado para el guardado.
   String _episodeLabel() {
     if (_isSpecial) return 'Temporada 0';
@@ -251,10 +251,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return episodeDisplayLabel(_activeEpisode, season: widget.season, title: title);
   }
 
-  /// Hereda la metadata enriquecida de la ficha (títulos ES, thumbnails TMDB)
-  /// desde el caché de serie del core. El player consulta episodesProvider
-  /// con la URL del episodio y recibe la respuesta cruda (números/URLs); sin
-  /// esto la lista queda sin metadata. Si la ficha no se visitó devuelve la
+  /// Hereda la metadata enriquecida de la ficha (t�tulos ES, thumbnails TMDB)
+  /// desde el cach� de serie del core. El player consulta episodesProvider
+  /// con la URL del episodio y recibe la respuesta cruda (n�meros/URLs); sin
+  /// esto la lista queda sin metadata. Si la ficha no se visit� devuelve la
   /// lista intacta.
   /// URL de SERIE para listar episodios. El player recibe la URL del
   /// episodio y con ella el backend devuelve lista incompleta (a veces solo
@@ -295,7 +295,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _diagPosCount = 0;
     _hasResetPosition = false; // Bloqueamos historial
     
-    // Capturamos la última posición buena o la de reanudación
+    // Capturamos la �ltima posici�n buena o la de reanudaci�n
     final currentPos = _player?.state.position.inMilliseconds ?? 0;
     if (currentPos > 3000) _resumePosition = currentPos;
     
@@ -382,7 +382,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     final now = DateTime.now().millisecondsSinceEpoch;
     // Throttling: solo cada 3 segundos para comandos fluidos pero eficientes
-    // EXCEPCIÓN: Si los tracks acaban de cargar, forzamos reporte.
+    // EXCEPCI�N: Si los tracks acaban de cargar, forzamos reporte.
     final bool tracksLoaded = _allTracks.isNotEmpty;
     
     if (now - _lastRemoteUpdateMs < 3000 && !tracksLoaded) return;
@@ -456,7 +456,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _player?.setVolume((_volume * 100).clamp(0, 100));
     
     if (kIsWeb && _isBoostActive) {
-      // Si el boost estaba activo, lo reseteamos a 1.0 una última vez y dejamos de usarlo.
+      // Si el boost estaba activo, lo reseteamos a 1.0 una �ltima vez y dejamos de usarlo.
       WebUtils.applyAudioBoost(1.0);
       _isBoostActive = false;
     }
@@ -467,7 +467,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (widget.contentId.isEmpty || _historyNotifier == null || _isOpEd || _isTrailer) return;
 
     // Senior Performance Fix: Throttling de guardado en base de datos.
-    // Solo guardamos si es 'force' o si han pasado 1s desde el último movimiento.
+    // Solo guardamos si es 'force' o si han pasado 1s desde el �ltimo movimiento.
     if (!force) {
       _historySaveTimer?.cancel();
       _historySaveTimer = Timer(const Duration(seconds: 1), () {
@@ -484,8 +484,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Tras dispose el ref muere (StateError): el guardado final usa
     // _finalSaveOnDispose (sin ref). Igual que Movil/TV.
     if (_isDisposed) return;
-    // Título/banner del episodio: 1) lista sincronizada, 2) lectura directa
-    // (igual que Movil/TV) para que el historial guarde T1:E1 "Título".
+    // T�tulo/banner del episodio: 1) lista sincronizada, 2) lectura directa
+    // (igual que Movil/TV) para que el historial guarde T1:E1 "T�tulo".
     String? episodeThumb;
     String? episodeTitle;
     try {
@@ -576,7 +576,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   PlaybackHistoryNotifier? _historyNotifier;
-  // Tras dispose el ref muere: bandera + últimos valores para el guardado
+  // Tras dispose el ref muere: bandera + �ltimos valores para el guardado
   // final sin ref (igual que Movil/TV).
   bool _isDisposed = false;
   String? _lastResolvedEpisodeTitle;
@@ -607,7 +607,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   String _lastVideoUrl = '';
   Map<String, String> _lastVideoHeaders = const {};
   // Contador de refreshes de extract por URLs firmadas expiradas (vimeos rota
-  // host+tokens por extract). Máx 2 re-extracciones con backoff; después, UI error.
+  // host+tokens por extract). M�x 2 re-extracciones con backoff; despu�s, UI error.
   int _extractRefreshCount = 0;
   static const int _kMaxExtractRefresh = 2;
 
@@ -648,7 +648,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     _initRemoteControl();
 
-    // Senior Bridge Listener: Escuchar señales de botones físicos desde Android (solo móvil)
+    // Senior Bridge Listener: Escuchar se�ales de botones f�sicos desde Android (solo m�vil)
     if (!kIsWeb) {
       _volumeControlChannel.setMethodCallHandler((call) async {
         if (call.method == 'volumeUp') _handleVolumeStep(0.05);
@@ -661,8 +661,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final bool isResumingSession = activePlayer.player != null && activePlayer.uiState != PlayerUIState.none && (isSameEpisode || activePlayer.url == widget.sourceUrl || activePlayer.url == normalizedWidgetUrl);
     final currentSources = ref.read(activeContentSourcesProvider);
 
-    // Senior Restoration: Si ya venimos de una sesión activa, marcamos inicialización
-    // síncronamente para bloquear extracciones redundantes en el primer build.
+    // Senior Restoration: Si ya venimos de una sesi�n activa, marcamos inicializaci�n
+    // s�ncronamente para bloquear extracciones redundantes en el primer build.
     // Esta es la clave del miniplayer continuo: reusa player, tracks, episodios y servidores.
     if (isResumingSession) {
       _hasInitialized = true;
@@ -680,7 +680,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         if (trackQualityType(t.quality) == 'CAST') _currentLanguage = 'CAST';
       }
 
-      // Re-agrupar fuentes síncronamente
+      // Re-agrupar fuentes s�ncronamente
       final Map<String, List<SearchResult>> grouped = {};
       for (final r in activePlayer.availableSources) {
         final sName = simplifySourceName(r.source);
@@ -705,13 +705,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     }
 
-    // Senior Restoration: Si el provider de fuentes está vacío (viniendo de "Continuar Viendo"),
+    // Senior Restoration: Si el provider de fuentes est� vac�o (viniendo de "Continuar Viendo"),
     // intentamos restaurarlo desde el historial persistido para permitir cambio de servidor.
-    // [Trailer Fix] Los tráilers no necesitan buscar alternativas ni restaurar fuentes.
+    // [Trailer Fix] Los tr�ilers no necesitan buscar alternativas ni restaurar fuentes.
     if (!isResumingSession && currentSources.isEmpty && !_isTrailer) {
       final history = _historyNotifier?.getProgress(widget.contentId, widget.season, _activeEpisode);
       if (history?.alternativeSources != null && history!.alternativeSources!.isNotEmpty) {
-        // Senior Fix: Usar addPostFrameCallback para evitar errores de modificación durante build
+        // Senior Fix: Usar addPostFrameCallback para evitar errores de modificaci�n durante build
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             ref.read(activeContentSourcesProvider.notifier).state = history.alternativeSources!;
@@ -766,7 +766,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Senior Fix: Si no hay fuentes en el provider (abierto desde "Continuar Viendo"
     // o deep link) pero conocemos el servidor actual, al menos mostramos ese para
-    // que la lista de servidores no quede vacía.
+    // que la lista de servidores no quede vac�a.
     if (effective.isEmpty && widget.source.isNotEmpty) {
       effective = [
         SearchResult(
@@ -832,7 +832,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _switchTrack(int index) {
     if (index >= _allTracks.length) return;
     
-    // Senior Hybrid Fix: Obtener posición actual según el motor activo
+    // Senior Hybrid Fix: Obtener posici�n actual seg�n el motor activo
     final int currentPosMs = (_player?.state.position.inMilliseconds ?? 0);
     
     final int durationMs = (_player?.state.duration.inMilliseconds ?? 0);
@@ -843,7 +843,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final track = _allTracks[index];
 
     setState(() {
-      _selectedTrackIndex = index; // Senior Fix: Actualizamos el índice para marcarlo como seleccionado
+      _selectedTrackIndex = index; // Senior Fix: Actualizamos el �ndice para marcarlo como seleccionado
       _currentLanguage = trackQualityType(track.quality) == 'SUB' ? 'SUB' : 'LAT';
       _resumePosition = currentPosMs;
       _isAutoplayResume = false;
@@ -854,7 +854,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (_qualityOptions.length <= 1) _selectedQuality = 'auto';
     });
 
-    // Senior Session Sync: Sincronizar selección de track + idioma para miniplayer
+    // Senior Session Sync: Sincronizar selecci�n de track + idioma para miniplayer
     final newLang = trackQualityType(track.quality) == 'SUB' ? 'SUB' : trackQualityType(track.quality) == 'CAST' ? 'CAST' : 'LAT';
     ref.read(activePlayerProvider.notifier).updateSession(selectedIndex: index);
 
@@ -863,7 +863,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _switchSource(SearchResult newSource) async {
-    // Senior Hybrid Fix: Obtener posición actual según el motor activo
+    // Senior Hybrid Fix: Obtener posici�n actual seg�n el motor activo
     final int currentPosMs = (_player?.state.position.inMilliseconds ?? 0);
     
     final int durationMs = (_player?.state.duration.inMilliseconds ?? 0);
@@ -894,7 +894,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _currentSourceUrl = resolvedUrl;
       _currentSource = newSource.source;
       _currentServerName = newSource.source;
-      // Senior Language Fix: Mantener el idioma que se venía reproduciendo al
+      // Senior Language Fix: Mantener el idioma que se ven�a reproduciendo al
       // cambiar de fuente (p.ej. DUB desde AnimeJara). El fallback a SUB solo
       // ocurre si la nueva fuente no expone pista DUB, lo resuelve
       // _indexForLanguage al inicializar el extract. Si no hay idioma previo,
@@ -915,7 +915,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     ref.read(activePlayerProvider.notifier).updateSession(
       sources: _groupedSources.values.expand((e) => e).toList(),
     );
-    // Mantiene url/episode coherentes para reanudación desde mini
+    // Mantiene url/episode coherentes para reanudaci�n desde mini
     ref.read(activePlayerProvider.notifier).play(
       item: ref.read(activePlayerProvider).currentItem ?? MediaItem(id: widget.contentId, title: widget.title ?? '', posterUrl: widget.posterUrl ?? '', bannerUrl: widget.bannerUrl, type: widget.category == 'movie' ? MediaType.movie : MediaType.anime),
       url: resolvedUrl,
@@ -1216,7 +1216,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _player?.stop();
     ref.invalidate(extractProvider);
 
-    // En Web el player es un Overlay/Diálogo: estado interno, sin router.
+    // En Web el player es un Overlay/Di�logo: estado interno, sin router.
     setState(() {
       _activeOverlay = PlayerOverlay.none;
       _currentEpisode = epNum.toString();
@@ -1322,7 +1322,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       final type = trackQualityType(q);
       if (type == 'DUB') return 0;
       if (type == 'CAST') return 1;
-      return 2; // SUB y demás
+      return 2; // SUB y dem�s
     }
     sourceOptions.sort((a, b) {
       final ra = langRank(a.result.quality);
@@ -1402,7 +1402,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     super.didChangeDependencies();
     final bool isTactic = kIsWeb && ResponsiveUtils.isTactic(context);
     final double screenHeight = MediaQuery.of(context).size.height;
-    // Senior Fix: En Web Móvil Landscape (altura < 500), forzamos modo móvil
+    // Senior Fix: En Web M�vil Landscape (altura < 500), forzamos modo m�vil
     _isMobileDevice = isTactic || screenHeight < 500;
   }
 
@@ -1410,8 +1410,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (kIsWeb) {
       final bool isTactic = ResponsiveUtils.isTactic(context);
       
-      // Senior Web Logic: Si es Web Móvil y ya estamos en "Modo Fullscreen" (browser),
-      // el botón actúa como ciclo de ajuste (Fit/Fill/Cover) según pidió el usuario.
+      // Senior Web Logic: Si es Web M�vil y ya estamos en "Modo Fullscreen" (browser),
+      // el bot�n act�a como ciclo de ajuste (Fit/Fill/Cover) seg�n pidi� el usuario.
       if (isTactic && _isFullscreen) {
         _cycleVideoFit();
         return;
@@ -1439,9 +1439,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
-  /// Ciclo de formato del video en móvil/tablet (el player ya está a pantalla
-  /// completa): contain → fill (estirar a los bordes) → cover (rellenar sin
-  /// estirar la imagen) → contain.
+  /// Ciclo de formato del video en m�vil/tablet (el player ya est� a pantalla
+  /// completa): contain ? fill (estirar a los bordes) ? cover (rellenar sin
+  /// estirar la imagen) ? contain.
   void _cycleVideoFit() {
     setState(() {
       _videoFit = switch (_videoFit) {
@@ -1478,9 +1478,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Match tolerante + fallback a la primera fuente (ver Movil).
     final baseSource = findSourceByName(sources, _currentSource) ??
         (sources.isNotEmpty ? sources.first : null);
-    final String nextSourceUrl = baseSource != null
-        ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
-        : _currentSourceUrl;
+
+    // Fix 1 (episode): Usar episodesProvider como fuente autoritativa de URLs
+    // en lugar de buildEpisodeUrl, que puede generar URLs incorrectas.
+    final episodesAsync = ref.read(episodesProvider(EpisodesParams(
+      url: _seriesListUrl,
+      source: _currentSource,
+      title: widget.title ?? '',
+      season: widget.season ?? 1,
+    )));
+
+    String nextSourceUrl = _currentSourceUrl;
+    final episodeData = episodesAsync.value;
+    if (episodeData != null && episodeData.episodes.isNotEmpty) {
+      final targetEpisode = episodeData.episodes
+          .where((e) => e.number == nextNum)
+          .firstOrNull;
+      if (targetEpisode != null && targetEpisode.url.isNotEmpty) {
+        nextSourceUrl = targetEpisode.url;
+      }
+    }
+
+    // Fallback: si episodesProvider no tiene la URL, usar buildEpisodeUrl
+    if (nextSourceUrl.isEmpty || nextSourceUrl == _currentSourceUrl) {
+      if (baseSource != null) {
+        nextSourceUrl = buildEpisodeUrl(baseSource.url, baseSource.source, nextNum);
+      }
+    }
 
     final preloaded = ref.read(nextEpisodePreloadProvider);
     final preloadTarget = ref.read(nextEpisodePreloadTargetProvider);
@@ -1515,7 +1539,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
       if (tracks.isNotEmpty) {
         // Senior Language Fix: Respetar el idioma elegido (LAT/SUB) al reproducir
-        // el episodio pre-cargado, con fallback a SUB si el doblaje aún no existe.
+        // el episodio pre-cargado, con fallback a SUB si el doblaje a�n no existe.
         final trackIdx = _indexForLanguage(tracks);
         final initialTrack = tracks[trackIdx];
         _selectedTrackIndex = trackIdx;
@@ -1534,18 +1558,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _onEpisodeChanged(int epNum) {
-    // Senior Web Fix: Al cambiar de episodio vía Autoplay o Menú, 
+    // Senior Web Fix: Al cambiar de episodio v�a Autoplay o Men�, 
     // simplemente actualizamos el estado interno. Como el reproductor
-    // es un diálogo/overlay, no necesitamos tocar la URL del navegador.
+    // es un di�logo/overlay, no necesitamos tocar la URL del navegador.
     final currentNum = int.tryParse(_currentEpisode ?? '1') ?? 1;
     if (epNum == currentNum) return;
 
     final sources = ref.read(activeContentSourcesProvider);
     final baseSource = findSourceByName(sources, _currentSource) ??
         (sources.isNotEmpty ? sources.first : null);
-    final String nextSourceUrl = baseSource != null
-        ? buildEpisodeUrl(baseSource.url, baseSource.source, epNum)
-        : _currentSourceUrl;
+
+    // Fix 1 (episode): Usar episodesProvider como fuente autoritativa de URLs.
+    final episodesAsync = ref.read(episodesProvider(EpisodesParams(
+      url: _seriesListUrl,
+      source: _currentSource,
+      title: widget.title ?? '',
+      season: widget.season ?? 1,
+    )));
+
+    String nextSourceUrl = _currentSourceUrl;
+    final episodeData = episodesAsync.value;
+    if (episodeData != null && episodeData.episodes.isNotEmpty) {
+      final targetEpisode = episodeData.episodes
+          .where((e) => e.number == epNum)
+          .firstOrNull;
+      if (targetEpisode != null && targetEpisode.url.isNotEmpty) {
+        nextSourceUrl = targetEpisode.url;
+      }
+    }
+
+    // Fallback: si episodesProvider no tiene la URL, usar buildEpisodeUrl
+    if (nextSourceUrl.isEmpty || nextSourceUrl == _currentSourceUrl) {
+      if (baseSource != null) {
+        nextSourceUrl = buildEpisodeUrl(baseSource.url, baseSource.source, epNum);
+      }
+    }
 
     setState(() {
       _currentEpisode = epNum.toString();
@@ -1566,7 +1613,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
-  /// Senior Language Strategy: Selecciona automáticamente la pista inicial basándose
+  /// Senior Language Strategy: Selecciona autom�ticamente la pista inicial bas�ndose
   /// exclusivamente en los Ajustes del Usuario, ignorando etiquetas externas.
   /// Prioridad: Preferencia -> SUB (como fallback universal) -> Primera disponible.
   int _indexForLanguage(List<VideoTrackOption> tracks) {
@@ -1575,7 +1622,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final settings = ref.read(settingsProvider);
     final String pref = settings.preferredLanguage.toLowerCase();
     
-    // Mapeo de preferencia a tipo de track técnico
+    // Mapeo de preferencia a tipo de track t�cnico
     final String targetType = pref == 'latino' ? 'DUB' : (pref == 'castellano' ? 'CAST' : 'SUB');
 
     final latIdx = tracks.indexWhere((t) => trackQualityType(t.quality) == 'DUB');
@@ -1587,7 +1634,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (targetType == 'CAST' && castIdx >= 0) return castIdx;
     if (targetType == 'SUB' && subIdx >= 0) return subIdx;
 
-    // 2. Fallback Senior: Si la preferencia no está disponible (ej: no hay DUB aún),
+    // 2. Fallback Senior: Si la preferencia no est� disponible (ej: no hay DUB a�n),
     // siempre priorizamos SUB antes que cualquier otra cosa para asegurar contenido.
     if (subIdx >= 0) return subIdx;
 
@@ -1596,7 +1643,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   /// Senior Quality Fix: Aplica las calidades de la pista seleccionada y resetea
-  /// la selección a "auto" si la pista nueva no las ofrece (o solo tiene una).
+  /// la selecci�n a "auto" si la pista nueva no las ofrece (o solo tiene una).
   void _applyTrackQualityOptions(VideoTrackOption track) {
     final newQualities = track.qualities;
     final settings = ref.read(settingsProvider);
@@ -1622,13 +1669,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   List<Map<String, dynamic>> get _qualityMenuOptions {
     if (_isOpEd) {
       return [
-        {'key': 'auto', 'label': 'Automático', 'sub': 'Mejor calidad disponible', 'url': widget.sourceUrl, 'headers': const <String, String>{}},
-        {'key': '720', 'label': '720p HD', 'sub': 'Calidad Estándar', 'url': widget.video720, 'headers': const <String, String>{}},
-        {'key': '1080', 'label': '1080p FHD', 'sub': 'Alta Definición', 'url': widget.video1080, 'headers': const <String, String>{}},
+        {'key': 'auto', 'label': 'Autom�tico', 'sub': 'Mejor calidad disponible', 'url': widget.sourceUrl, 'headers': const <String, String>{}},
+        {'key': '720', 'label': '720p HD', 'sub': 'Calidad Est�ndar', 'url': widget.video720, 'headers': const <String, String>{}},
+        {'key': '1080', 'label': '1080p FHD', 'sub': 'Alta Definici�n', 'url': widget.video1080, 'headers': const <String, String>{}},
       ];
     }
     return [
-      {'key': 'auto', 'label': 'Automático', 'sub': 'Mejor calidad disponible', 'url': _currentStreamUrl, 'headers': _currentStreamHeaders},
+      {'key': 'auto', 'label': 'Autom�tico', 'sub': 'Mejor calidad disponible', 'url': _currentStreamUrl, 'headers': _currentStreamHeaders},
       ..._qualityOptions.map((q) => {
         'key': q.key,
         'label': q.label,
@@ -1639,7 +1686,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     ];
   }
 
-  /// ¿Debe mostrarse el botón de calidad? Solo si hay más de una opción real.
+  /// �Debe mostrarse el bot�n de calidad? Solo si hay m�s de una opci�n real.
   bool get _hasQualityOptions {
     if (_isOpEd) {
       return (widget.video720?.isNotEmpty ?? false) || (widget.video1080?.isNotEmpty ?? false);
@@ -1648,13 +1695,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   void _startAutoplayCountdown({bool isResume = false}) {
-    if (_isTrailer) return; // [Trailer Fix] No hay reproducción automática para tráilers
+    if (_isTrailer) return; // [Trailer Fix] No hay reproducci�n autom�tica para tr�ilers
 
     // Senior Fix: Respetar la preferencia de Autoplay del usuario
     final settings = ref.read(settingsProvider);
     if (!isResume && (!settings.autoPlayNextEpisode || !_policy.autoPlayNext)) return;
     
-    // Evitar reiniciar si ya está corriendo el mismo tipo de cuenta atrás
+    // Evitar reiniciar si ya est� corriendo el mismo tipo de cuenta atr�s
     if (_autoplayTimer != null && _autoplayTimer!.isActive && _isAutoplayResume == isResume) {
       return;
     }
@@ -1873,10 +1920,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
-    // Senior Shield: Ignorar cambios de métricas si el widget ya no está activo o está saliendo
+    // Senior Shield: Ignorar cambios de m�tricas si el widget ya no est� activo o est� saliendo
     if (!mounted || _isExiting) return;
 
-    // Sincronizar el estado de pantalla completa real (especialmente útil en Web con ESC)
+    // Sincronizar el estado de pantalla completa real (especialmente �til en Web con ESC)
     if (kIsWeb) {
       final bool realFullscreen = isAppFullscreen();
       if (realFullscreen != _isFullscreen) {
@@ -1888,7 +1935,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _safeSetState(() {});
     }
     
-    // Segundo ciclo para asegurar ajuste Web/Móvil tras rotación física
+    // Segundo ciclo para asegurar ajuste Web/M�vil tras rotaci�n f�sica
     Future.delayed(const Duration(milliseconds: 100), () {
       _safeSetState(() {});
     });
@@ -1924,7 +1971,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _skipForward() {
     final now = DateTime.now();
-    // Senior Logic: Soporte para "Rapid Fire" con acumulación (YouTube Style)
+    // Senior Logic: Soporte para "Rapid Fire" con acumulaci�n (YouTube Style)
     final bool isRapidFire = _lastManualSeekTime != null && 
                              now.difference(_lastManualSeekTime!).inMilliseconds < 800;
     
@@ -1940,7 +1987,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     _player?.seek(target);
 
-    // Activamos Visual Feedback con acumulación
+    // Activamos Visual Feedback con acumulaci�n
     setState(() {
       _lastSkipValue = isRapidFire ? _lastSkipValue + 10 : 10;
       _showRightSkip = true;
@@ -1965,7 +2012,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _skipBackward() {
     final now = DateTime.now();
-    // Senior Logic: Soporte para "Rapid Fire" con acumulación
+    // Senior Logic: Soporte para "Rapid Fire" con acumulaci�n
     final bool isRapidFire = _lastManualSeekTime != null && 
                              now.difference(_lastManualSeekTime!).inMilliseconds < 800;
                              
@@ -1982,7 +2029,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     _player?.seek(finalTarget);
 
-    // Activamos Visual Feedback con acumulación
+    // Activamos Visual Feedback con acumulaci�n
     setState(() {
       _lastSkipValue = isRapidFire ? _lastSkipValue + 10 : 10;
       _showLeftSkip = true;
@@ -2033,7 +2080,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
   }
 
-  /// ¿La pista de audio es Español? (por language normalizado o por título).
+  /// �La pista de audio es Espa�ol? (por language normalizado o por t�tulo).
   bool _isSpanishAudio(AudioTrack? t) {
     if (t == null) return false;
     final lang = (t.language ?? '').toLowerCase().trim();
@@ -2047,7 +2094,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         lang.startsWith('esp')) {
       return true;
     }
-    return title.contains('español') ||
+    return title.contains('espa�ol') ||
         title.contains('espanol') ||
         title.contains('castellano') ||
         title.contains('latino') ||
@@ -2057,7 +2104,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         title == 'es';
   }
 
-  /// Selecciona automáticamente Español cuando el contenedor trae varias pistas
+  /// Selecciona autom�ticamente Espa�ol cuando el contenedor trae varias pistas
   /// de audio (ej: HLS con EXT-X-MEDIA ES DEFAULT + EN). Se aplica una vez por
   /// stream para no pelear con un cambio manual del usuario.
   void _maybeAutoSelectSpanishAudio(Player player, Tracks tracks) {
@@ -2097,23 +2144,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final bool isHls = videoUrl.contains('.m3u8');
 
     // Config remota de playback: dispara la descarga (no bloquea) y usa los
-    // valores actuales; si aún no cargó, defaults = valores hardcodeados previos.
+    // valores actuales; si a�n no carg�, defaults = valores hardcodeados previos.
     final pcfg = ref.read(playbackConfigProvider).value ?? PlaybackConfig.defaults;
     PlaybackTelemetry.instance.configure(pcfg);
     PlaybackTelemetry.instance.beginSession();
 
-    // Senior Quality Fix: Guardar el stream base para poder volver a "Automático".
+    // Senior Quality Fix: Guardar el stream base para poder volver a "Autom�tico".
     _currentStreamUrl = videoUrl;
     _currentStreamHeaders = headers;
     
     // Senior: Obtener historial al inicio para setear la propiedad 'start' de MPV
-    // [PlaybackHistory] Ignoramos historial para OP/ED y Tráilers
+    // [PlaybackHistory] Ignoramos historial para OP/ED y Tr�ilers
     final history = (_isOpEd || _isTrailer) ? null : _historyNotifier?.getProgress(widget.contentId, widget.season, _activeEpisode);
     final int historyPos = (history != null && history.positionInMilliseconds > 3000) ? history.positionInMilliseconds : 0;
 
     final bool isSwitching = _resumePosition > 0;
-    // Senior Autoplay Fix: Si venimos de una navegación de episodio, saltamos el
-    // diálogo de "reanudar" aunque el widget se haya recreado (widget.skipResume).
+    // Senior Autoplay Fix: Si venimos de una navegaci�n de episodio, saltamos el
+    // di�logo de "reanudar" aunque el widget se haya recreado (widget.skipResume).
     final bool skipResume = _skipResumeOnNextInit || widget.skipResume;
     _skipResumeOnNextInit = false;
     // Invalidar loops de resume-retry de inits anteriores (ver campo).
@@ -2137,7 +2184,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         } else if (!skipResume && historyPos > 0) {
            _resumePosition = historyPos;
            _hasResetPosition = false;
-           // En lugar de mostrar el diálogo estático, disparamos el contador blanco de reanudación
+           // En lugar de mostrar el di�logo est�tico, disparamos el contador blanco de reanudaci�n
            WidgetsBinding.instance.addPostFrameCallback((_) {
              if (mounted) _startAutoplayCountdown(isResume: true);
            });
@@ -2154,9 +2201,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     debugPrint('[player] init resume=${_resumePosition} resumeCountdown=$_isAutoplayResume url=$videoUrl (HLS=$isHls)');
 
-    // Senior Resume Fix: Tras confirmar la reanudación, vigilar la posición
+    // Senior Resume Fix: Tras confirmar la reanudaci�n, vigilar la posici�n
     // durante 30s. Si mpv reinicia el demuxer desde 0 (p.ej. "Could not open
-    // codec" en av1), el guard re-aplica el seek al punto de reanudación.
+    // codec" en av1), el guard re-aplica el seek al punto de reanudaci�n.
     if (_resumePosition > 3000) {
       _resumeGuardUntil = DateTime.now().add(const Duration(seconds: 30));
       _resumeGuardRetries = 0;
@@ -2196,7 +2243,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     if (_player == null) {
       var active = ref.read(activePlayerProvider);
       if (active.player == null) {
-        // Senior Web Race Condition Fix: Si el player aún se está inicializando asíncronamente
+        // Senior Web Race Condition Fix: Si el player a�n se est� inicializando as�ncronamente
         // en el provider global, esperamos un par de ciclos de eventos.
         int retries = 0;
         while (active.player == null && retries < 10) {
@@ -2256,7 +2303,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
 
     // Audio multi-pista (HLS EXT-X-MEDIA ES/EN): mpv arranca con la primera
-    // pista; forzamos Español una vez aparecen las pistas reales.
+    // pista; forzamos Espa�ol una vez aparecen las pistas reales.
     _tracksSubscription = player.stream.tracks.listen((tracks) {
       if (mounted) _maybeAutoSelectSpanishAudio(player, tracks);
     });
@@ -2266,9 +2313,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       
       final String errorMsg = message.toString();
 
-      // Senior Web Fix: Detectar bloqueo de autoplay por falta de interacción del usuario
+      // Senior Web Fix: Detectar bloqueo de autoplay por falta de interacci�n del usuario
       if (kIsWeb && errorMsg.contains('interact')) {
-        debugPrint('[player web] Autoplay bloqueado. Requiere interacción del usuario.');
+        debugPrint('[player web] Autoplay bloqueado. Requiere interacci�n del usuario.');
         setState(() {
           _webNeedsInteraction = true;
           _isLoading = false;
@@ -2277,10 +2324,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
 
       if (errorMsg.contains('DEMUXER_ERROR') || errorMsg.contains('COULD_NOT_PARSE')) {
-        // La URL firmada murió (tokens vimeos rotan por extract). Re-extraer
+        // La URL firmada muri� (tokens vimeos rotan por extract). Re-extraer
         // con backoff en vez de reintentar la misma URL en loop (eso generaba
         // la tormenta de 403s en el server). Trailers/YouTube no expiran:
-        // esos sí reintentan la misma URL como antes.
+        // esos s� reintentan la misma URL como antes.
         if (!_isTrailer && _extractRefreshCount < _kMaxExtractRefresh) {
           _extractRefreshCount++;
           PlaybackTelemetry.instance.markError('AURI1002');
@@ -2289,9 +2336,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           Future.delayed(wait, () {
             if (!mounted) return;
             // Invalidar SOLO esta instancia (no toda la familia): invalidar la
-            // familia reconstruía Consumers defunctos de otras pantallas
-            // (prefetch) → crash markNeedsBuild. Lee estado actual por si el
-            // usuario cambió de servidor en la espera.
+            // familia reconstru�a Consumers defunctos de otras pantallas
+            // (prefetch) ? crash markNeedsBuild. Lee estado actual por si el
+            // usuario cambi� de servidor en la espera.
             try {
               ref.invalidate(extractProvider(ExtractParams(
                 url: _currentSourceUrl,
@@ -2309,14 +2356,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             });
           });
         } else {
-          debugPrint('[player recovery] Sin más refreshes (intentos agotados o trailer). Reintentando misma URL...');
+          debugPrint('[player recovery] Sin m�s refreshes (intentos agotados o trailer). Reintentando misma URL...');
           _retryPlayback();
         }
         return;
       }
 
       if (kIsWeb && message.contains('interrupted')) {
-        debugPrint('[player] Ignorando error de interrupción normal en Web');
+        debugPrint('[player] Ignorando error de interrupci�n normal en Web');
         return;
       }
 
@@ -2359,8 +2406,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (ms > 0) PlaybackTelemetry.instance.markFirstFrame();
       final duration = player.state.duration.inMilliseconds;
 
-      // Senior UI Fix: la carga termina cuando la posición avanza de verdad
-      // (no al llamar a play()); así el spinner cubre el tiempo de buffering.
+      // Senior UI Fix: la carga termina cuando la posici�n avanza de verdad
+      // (no al llamar a play()); as� el spinner cubre el tiempo de buffering.
       // Para clips cortos como OP/ED, quitamos el spinner de inmediato si avanza > 0ms.
       final int threshold = _isOpEd ? 0 : 1000;
       if (ms > threshold && mounted && _isLoading) {
@@ -2377,10 +2424,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         }
       }
 
-      // Senior Resume Fix: Solo nativo. Si tras confirmar la reanudación la
-      // posición cae a ~0 (demuxer reiniciado por error de codec av1/buffering),
-      // re-aplicamos el seek al punto de reanudación. Limitado a pocos intentos
-      // y se ignora si el usuario buscó manualmente o pausó.
+      // Senior Resume Fix: Solo nativo. Si tras confirmar la reanudaci�n la
+      // posici�n cae a ~0 (demuxer reiniciado por error de codec av1/buffering),
+      // re-aplicamos el seek al punto de reanudaci�n. Limitado a pocos intentos
+      // y se ignora si el usuario busc� manualmente o paus�.
       if (!kIsWeb &&
           _resumePosition > 3000 &&
           _resumeGuardRetries < 3 &&
@@ -2391,7 +2438,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           (_lastManualSeekTime == null ||
               DateTime.now().difference(_lastManualSeekTime!) > const Duration(seconds: 5))) {
         _resumeGuardRetries++;
-        debugPrint('[player] Resume guard: posición cayó a $ms tras confirmar $_resumePosition. Re-seeking.');
+        debugPrint('[player] Resume guard: posici�n cay� a $ms tras confirmar $_resumePosition. Re-seeking.');
         _lastStablePositionMs = _resumePosition;
         _lastFrameMs = _resumePosition;
         _player?.seek(Duration(milliseconds: _resumePosition));
@@ -2442,7 +2489,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           }
 
           if (shouldShowNext && !_showNextNotifier.value) {
-            // DIFERIMIENTO ASÍNCRONO TOTAL: Sacar la actualización del frame actual
+            // DIFERIMIENTO AS�NCRONO TOTAL: Sacar la actualizaci�n del frame actual
             Future.delayed(Duration.zero, () {
               if (mounted) _showNextNotifier.value = true;
             });
@@ -2589,10 +2636,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       
       if (_resumePosition > 3000) {
         debugPrint('[player] 4. RESUME SEEK to $_resumePosition (Duration: ${player.state.duration})');
-        // Senior Fix: Seek absoluto forzado después de que el demuxer está listo.
+        // Senior Fix: Seek absoluto forzado despu�s de que el demuxer est� listo.
         // Si mpv lo pierde, _resumeSeekWhenReady (tras el play) verifica y reintenta.
         await player.seek(Duration(milliseconds: _resumePosition));
-        // Senior: Retardo mayor para estabilización de hardware tras fallo de codec
+        // Senior: Retardo mayor para estabilizaci�n de hardware tras fallo de codec
         await Future.delayed(const Duration(milliseconds: 1200));
       } else {
         debugPrint('[player] 4. NEW VIDEO (Start from 0)');
@@ -2606,15 +2653,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         debugPrint('[player] 5. PLAY');
         await player.play();
         // Senior Autoplay Fix: Garantizar que el stream arranca aunque el motor
-        // reporte pausa justo después del open (común en HLS nativo).
+        // reporte pausa justo despu�s del open (com�n en HLS nativo).
         _ensureAutoplay(player);
       }
 
       if (!_isAutoplayResume && _resumePosition > 3000) {
         // Senior Resume Fix: mpv/media_kit no confirma seek() (retorna sin
-        // lanzar excepción). Aunque el demuxer reporte duración y el seek
+        // lanzar excepci�n). Aunque el demuxer reporte duraci�n y el seek
         // "parezca" aplicado, a veces se pierde y el video arranca desde 0 con
-        // el overlay mostrando la posición guardada. Verificamos por posición
+        // el overlay mostrando la posici�n guardada. Verificamos por posici�n
         // SIEMPRE en reanudaciones y reintentamos hasta que aterrice.
         unawaited(_resumeSeekWhenReady(
             Duration(milliseconds: _resumePosition), player, _resumeSeekGen));
@@ -2623,9 +2670,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (mounted) {
         setState(() {
           // Senior UI Fix: _isLoading se deja en true para el play normal; lo
-          // limpia la posición (ms > 1000) cuando el video arranca de verdad.
-          // En autoplay-resume (pausado con countdown) sí se limpia para que el
-          // countdown de reanudación no quede cubierto por el spinner.
+          // limpia la posici�n (ms > 1000) cuando el video arranca de verdad.
+          // En autoplay-resume (pausado con countdown) s� se limpia para que el
+          // countdown de reanudaci�n no quede cubierto por el spinner.
           if (_isAutoplayResume) _isLoading = false;
           _showControls = true;
           _hasResetPosition = true;
@@ -2636,7 +2683,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return;
     }
 
-    // --- FLUJO ESTÁNDAR (WEB / FALLBACK) ---
+    // --- FLUJO EST�NDAR (WEB / FALLBACK) ---
     // Senior Autoplay Fix: Pausar el stream anterior ANTES de abrir el nuevo para
     // evitar audio de fondo mientras el HLS nuevo carga (cambios de episodio/fuente).
     player.pause();
@@ -2659,10 +2706,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           
           if (kIsWeb) {
             // Web: HTML5/hls.js ignoran seek() hasta que el media tiene metadata,
-            // así que los reintentos a ciegas antes de play() solo añadían ~2.3s
+            // as� que los reintentos a ciegas antes de play() solo a�ad�an ~2.3s
             // de espera muerta. Arrancamos el play de inmediato para que el
             // manifest/segmentos carguen en paralelo y aplicamos el seek en
-            // cuanto el elemento <video> esté listo.
+            // cuanto el elemento <video> est� listo.
             _startStabilizationTimer();
             unawaited(_webResumeSeek(player, resumeMs, _resumeSeekGen));
             player.play();
@@ -2678,8 +2725,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           setState(() => _isLoading = false);
           player.play();
 
-          // Senior Watchdog Web Shield: Para la primera reproducción en web, si tras 1.5s
-          // el audio ya suena de fondo, forzamos la caída del spinner por seguridad.
+          // Senior Watchdog Web Shield: Para la primera reproducci�n en web, si tras 1.5s
+          // el audio ya suena de fondo, forzamos la ca�da del spinner por seguridad.
           if (kIsWeb && _isOpEd) {
             Future.delayed(const Duration(milliseconds: 1500), () {
               if (mounted && _isLoading && !player.state.buffering) {
@@ -2689,16 +2736,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           }
 
           // Senior Autoplay Fix: En web el elemento <video> puede quedar pausado
-          // si play() se emite antes de que esté listo (HLS). Reintentamos.
+          // si play() se emite antes de que est� listo (HLS). Reintentamos.
           _ensureAutoplay(player);
         }
       }
     });
   }
 
-  /// Red de seguridad: si el player quedó en pausa tras abrir el nuevo
+  /// Red de seguridad: si el player qued� en pausa tras abrir el nuevo
   /// stream (mpv puede reportar pause=true durante la carga del HLS),
-  /// reintenta el play hasta que efectivamente esté reproduciendo.
+  /// reintenta el play hasta que efectivamente est� reproduciendo.
   void _ensureAutoplay(Player player) {
     void tryPlay() {
       if (mounted && !player.state.playing && !_isAutoplayResume && !_userHasPaused) {
@@ -2707,7 +2754,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
 
     // Serie de reintentos que cubren tanto la carga nativa lenta como la
-    // creación del elemento <video> en web tras cambiar de episodio.
+    // creaci�n del elemento <video> en web tras cambiar de episodio.
     Future.delayed(const Duration(milliseconds: 800), tryPlay);
     Future.delayed(const Duration(milliseconds: 2500), tryPlay);
     Future.delayed(const Duration(seconds: 5), tryPlay);
@@ -2717,11 +2764,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
-  /// Resume Fix: cuando el seek inicial se emitió con duration==0 (MP4 directo
-  /// /progresivo, moov aún sin parsear) el comando falla en silencio y la
-  /// reproducción arranca desde 0. Aquí esperamos a que el stream esté listo y
-  /// reintentamos el seek absoluto, verificando por posición (no por errores,
-  /// que llegan por player.stream y no lanzan excepción).
+  /// Resume Fix: cuando el seek inicial se emiti� con duration==0 (MP4 directo
+  /// /progresivo, moov a�n sin parsear) el comando falla en silencio y la
+  /// reproducci�n arranca desde 0. Aqu� esperamos a que el stream est� listo y
+  /// reintentamos el seek absoluto, verificando por posici�n (no por errores,
+  /// que llegan por player.stream y no lanzan excepci�n).
   Future<void> _resumeSeekWhenReady(Duration target, Player player, int gen) async {
     int waited = 0;
     while (waited < 60 && mounted && gen == _resumeSeekGen) {
@@ -2744,7 +2791,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       debugPrint('[player] Resume retry seek a $tMs (attempt ${attempt + 1}, pos $before)');
       if (gen != _resumeSeekGen) return;
       await player.seek(target);
-      // Senior: 900ms de settle; el seek en MP4 progresivo dispara una petición
+      // Senior: 900ms de settle; el seek en MP4 progresivo dispara una petici�n
       // de rango al CDN que tarda en responder por el primer byte.
       await Future.delayed(const Duration(milliseconds: 900));
       final after = player.state.position.inMilliseconds;
@@ -2755,11 +2802,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
   }
 
-  /// Web Resume Fix: hls.js/HTML5 descartan seek() mientras la metadata no está
-  /// lista. En lugar de reintentar a ciegas antes del play (que mantenía el
-  /// stream sin cargar ~2.3s), esperamos a que el media arranque (posición > 0
-  /// o duración conocida) y ahí sí aplicamos el seek absoluto verificando por
-  /// posición. El spinner se oculta al confirmar el salto.
+  /// Web Resume Fix: hls.js/HTML5 descartan seek() mientras la metadata no est�
+  /// lista. En lugar de reintentar a ciegas antes del play (que manten�a el
+  /// stream sin cargar ~2.3s), esperamos a que el media arranque (posici�n > 0
+  /// o duraci�n conocida) y ah� s� aplicamos el seek absoluto verificando por
+  /// posici�n. El spinner se oculta al confirmar el salto.
   Future<void> _webResumeSeek(Player player, int targetMs, int gen) async {
     int waited = 0;
     while (waited < 80 && mounted && gen == _resumeSeekGen) {
@@ -2834,7 +2881,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && ResponsiveUtils.isTactic(context)) {
           if (!_isFullscreen) {
-            // Forzamos que la UI detecte modo táctil/móvil antes de entrar
+            // Forzamos que la UI detecte modo t�ctil/m�vil antes de entrar
             setState(() => _isMobileDevice = true);
             _toggleFullscreen();
           }
@@ -2911,7 +2958,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   @override
   void dispose() {
-    // Primero la bandera: a partir de aquí el ref está muerto (igual que Movil/TV).
+    // Primero la bandera: a partir de aqu� el ref est� muerto (igual que Movil/TV).
     _isDisposed = true;
     // Senior Fix: Cancelar TODOS los timers para evitar fugas de memoria y llamadas a setState
     _loadWatchdogTimer?.cancel();
@@ -2943,8 +2990,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final ms = _player?.state.position.inMilliseconds ?? 0;
     final duration = _player?.state.duration.inMilliseconds ?? 0;
     
-    // Senior Shield: Solo guardamos si el reproductor realmente logró sincronizar la posición
-    // de reanudación. Si cerramos antes de que MPV enganche, evitamos sobreescribir con 0ms.
+    // Senior Shield: Solo guardamos si el reproductor realmente logr� sincronizar la posici�n
+    // de reanudaci�n. Si cerramos antes de que MPV enganche, evitamos sobreescribir con 0ms.
     // Guardado final SIN ref (ver _finalSaveOnDispose).
     if (_hasResetPosition && ms > 3000 && duration > 0) {
       _finalSaveOnDispose(ms, duration);
@@ -2963,7 +3010,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _volumeExitTimer?.cancel();
 
     if (_player != null) {
-      // Senior Fix: Ya no matamos al player aquí, lo gestiona el Global Provider
+      // Senior Fix: Ya no matamos al player aqu�, lo gestiona el Global Provider
       _player = null;
     }
 
@@ -3008,7 +3055,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Senior: Sincronizar estado completo antes de minimizar para que el badge
     // superior (servidor/track) no se pierda al volver del miniplayer.
-    // Sincronización síncrona crítica: tracks, servidor, idioma y url actual.
+    // Sincronizaci�n s�ncrona cr�tica: tracks, servidor, idioma y url actual.
     if (_allTracks.isNotEmpty) {
       ref.read(activePlayerProvider.notifier).updateSession(
         tracks: _allTracks,
@@ -3044,7 +3091,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       debugPrint('[player] Error during safety flush: $e');
     }
     
-    // Senior Fix: Marcar como saliendo ANTES de cualquier otra acción
+    // Senior Fix: Marcar como saliendo ANTES de cualquier otra acci�n
     setState(() => _isExiting = true);
     
     if (!minimizing) {
@@ -3061,7 +3108,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       ref.read(activePlayerProvider.notifier).stop();
     }
     
-    // 2. Forzar restauración del sistema (Orientación + UI)
+    // 2. Forzar restauraci�n del sistema (Orientaci�n + UI)
     if (!kIsWeb && _isMobileDevice) {
       try { _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false}); } catch (_) {}
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -3100,12 +3147,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   @override
   Widget build(BuildContext context) {
-    // Senior Fix: Sincronización forzada de UI antes de cada build para evitar
-    // layouts de escritorio en pantallas móviles durante transiciones.
+    // Senior Fix: Sincronizaci�n forzada de UI antes de cada build para evitar
+    // layouts de escritorio en pantallas m�viles durante transiciones.
     _isMobileDevice = ResponsiveUtils.isTactic(context);
     final settings = ref.watch(settingsProvider);
 
-    // Senior Shield: Interceptamos la navegación de retroceso (Mouse 4, Botón Atrás, Gestos)
+    // Senior Shield: Interceptamos la navegaci�n de retroceso (Mouse 4, Bot�n Atr�s, Gestos)
     return PopScope(
       canPop: _isExiting,
       onPopInvokedWithResult: (didPop, result) {
@@ -3166,8 +3213,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     )));
 
     // Senior Fix (Issue #6): ref.listen para sync de session sin mutar build.
-    // NO usar ref.watch(episodesProvider) aquí: causaría rebuild antes de
-    // _initPlayer (async en postFrameCallback), bloqueando la inicialización.
+    // NO usar ref.watch(episodesProvider) aqu�: causar�a rebuild antes de
+    // _initPlayer (async en postFrameCallback), bloqueando la inicializaci�n.
     ref.listen(episodesProvider(EpisodesParams(
       url: _seriesListUrl,
       source: widget.source,
@@ -3233,7 +3280,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     const Text('Enlace Caducado o Error de Servidor', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), 
                     const SizedBox(height: 12),
                     Text(
-                      'El enlace guardado en tu historial ya no es válido. Esto es común en fuentes como Zilla o JKAnime.',
+                      'El enlace guardado en tu historial ya no es v�lido. Esto es com�n en fuentes como Zilla o JKAnime.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 14),
                     ),
@@ -3312,35 +3359,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       ),
                     ),
                     
-                    // Footer (Botón Desconectar siempre visible o al final del scroll)
+                    // Footer (Bot�n Desconectar siempre visible o al final del scroll)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: TextButton.icon(
                         onPressed: () {
-                          // Senior Handback Logic: Recuperar posición y volver a local
+                          // Senior Handback Logic: Recuperar posici�n y volver a local
                           final int resumeMs = target.positionMs;
                           
                           // 1. Detener al receptor remotamente
                           _sendRemoteAction(target, RemoteAction.stop);
                           
-                          // 2. Limpiar el vínculo y restaurar estado local
+                          // 2. Limpiar el v�nculo y restaurar estado local
                           ref.read(remoteControlProvider.notifier).setActiveTarget(null);
                           
                           setState(() {
                             _resumePosition = resumeMs;
-                            _hasInitialized = false; // Forzar re-inicialización del reproductor local
+                            _hasInitialized = false; // Forzar re-inicializaci�n del reproductor local
                             _isLoading = true;
                           });
 
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               backgroundColor: Color(0xFFEF7A1E),
-                              content: Text('Recuperando reproducción local...', style: TextStyle(fontWeight: FontWeight.bold)),
+                              content: Text('Recuperando reproducci�n local...', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           );
                         },
                         icon: const Icon(Icons.cast_connected_rounded, size: 16),
-                        label: const Text('DETENER TRANSMISIÓN', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                        label: const Text('DETENER TRANSMISI�N', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                         style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
                       ),
                     ),
@@ -3753,11 +3800,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final baseSource = findSourceByName(sources, _currentSource) ??
         (sources.isNotEmpty ? sources.first : null);
 
-    final String nextSourceUrl = baseSource != null
-        ? buildEpisodeUrl(baseSource.url, baseSource.source, nextNum)
-        : _currentSourceUrl;
+    // Fix 1 (episode): Usar episodesProvider como fuente autoritativa de URLs.
+    final episodesAsync = ref.read(episodesProvider(EpisodesParams(
+      url: _seriesListUrl,
+      source: _currentSource,
+      title: widget.title ?? '',
+      season: widget.season ?? 1,
+    )));
 
-    // Actualizamos localmente para que el controller sepa en qué episodio está
+    String nextSourceUrl = _currentSourceUrl;
+    final episodeData = episodesAsync.value;
+    if (episodeData != null && episodeData.episodes.isNotEmpty) {
+      final targetEpisode = episodeData.episodes
+          .where((e) => e.number == nextNum)
+          .firstOrNull;
+      if (targetEpisode != null && targetEpisode.url.isNotEmpty) {
+        nextSourceUrl = targetEpisode.url;
+      }
+    }
+
+    // Fallback: si episodesProvider no tiene la URL, usar buildEpisodeUrl
+    if (nextSourceUrl.isEmpty || nextSourceUrl == _currentSourceUrl) {
+      if (baseSource != null) {
+        nextSourceUrl = buildEpisodeUrl(baseSource.url, baseSource.source, nextNum);
+      }
+    }
+
+    // Actualizamos localmente para que el controller sepa en qu� episodio est�
     setState(() {
       _currentEpisode = nextNum.toString();
       _currentSourceUrl = nextSourceUrl;
@@ -3812,7 +3881,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final playableTracks = tracks.where((t) => !t.isDownload).toList();
     if (!_isCurrentTrackEmbed(playableTracks)) return _buildMobilePlayer(playableTracks, settings);
 
-    // Senior Elite Fix: WebView (Embed) directo sin Scaffold intermedio para máximo aprovechamiento.
+    // Senior Elite Fix: WebView (Embed) directo sin Scaffold intermedio para m�ximo aprovechamiento.
     return _buildEmbedStack(playableTracks);
   }
 
@@ -3822,7 +3891,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         else Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.open_in_browser, color: Colors.white70, size: 64),
                 const SizedBox(height: 16),
-                const Text('Reproducción externa iniciada', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Reproducci�n externa iniciada', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE50914), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
@@ -3834,7 +3903,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                   label: const Text('Reabrir navegador'),
                 ),
               ])),
-        // Senior Fix: Botón de salida para reproducción externa
+        // Senior Fix: Bot�n de salida para reproducci�n externa
         Positioned(
           top: 16,
           left: 16,
@@ -3924,7 +3993,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       child: Container(
         width: MediaQuery.sizeOf(context).width / 4,
         height: double.infinity,
-        // Solo mostramos un fondo sutil en móvil para delimitar la zona táctil
+        // Solo mostramos un fondo sutil en m�vil para delimitar la zona t�ctil
         decoration: useMobileLayout ? BoxDecoration(
           color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.only(
@@ -4035,7 +4104,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           else if (_controller != null)
             RepaintBoundary(
               child: AnimatedOpacity(
-                // Senior Visual Shield: Opacidad 0 hasta que el seek de reanudación sea estable
+                // Senior Visual Shield: Opacidad 0 hasta que el seek de reanudaci�n sea estable
                 opacity: (!_hasResetPosition && _resumePosition > 3000) ? 0.0 : 1.0,
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeIn,
@@ -4140,7 +4209,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           
                           final double screenWidth = MediaQuery.sizeOf(context).width;
                           final duration = _player!.state.duration;
-                          // Senior Plus: Sensibilidad de búsqueda (deslizar toda la pantalla = 2 min de búsqueda o duración total si es menor)
+                          // Senior Plus: Sensibilidad de b�squeda (deslizar toda la pantalla = 2 min de b�squeda o duraci�n total si es menor)
                           final double sensitivityMs = (duration.inMinutes > 2) ? 120000.0 : duration.inMilliseconds.toDouble();
                           final double deltaMs = (details.primaryDelta! / screenWidth) * sensitivityMs;
                           
@@ -4188,7 +4257,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                                 _showVolumeIndicator = false; 
                                });
                                
-                               // Senior Plus: Feedback Háptico en límites (0% y 100%)
+                               // Senior Plus: Feedback H�ptico en l�mites (0% y 100%)
                                if ((newBrightness == 0.0 || newBrightness == 1.0) && oldB != newBrightness) {
                                  HapticFeedback.selectionClick();
                                }
@@ -4204,7 +4273,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                              final double oldV = _volume;
                              double nextVol = _volume + delta;
                              
-                             // Senior Plus: Snap magnético en 100% (límite de hardware)
+                             // Senior Plus: Snap magn�tico en 100% (l�mite de hardware)
                              if (oldV < 1.0 && nextVol > 1.0) nextVol = 1.0;
                              else if (oldV > 1.0 && nextVol < 1.0) nextVol = 1.0;
                              else if ((nextVol - 1.0).abs() < 0.02) nextVol = 1.0;
@@ -4217,7 +4286,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                                  _showBrightnessIndicator = false; 
                                });
 
-                               // Senior Plus: Feedback Háptico en límites y cambio de modo Boost
+                               // Senior Plus: Feedback H�ptico en l�mites y cambio de modo Boost
                                if ((newVolume == 0.0 || newVolume == 2.0 || (newVolume == 1.0 && oldV != 1.0)) && oldV != newVolume) {
                                  HapticFeedback.mediumImpact();
                                }
@@ -4312,12 +4381,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
            ),
            // Senior UI Fix: El overlay se muestra durante TODA la carga (antes
            // se ocultaba con `!_showControls`, pero al abrir el stream los
-           // controles ya son visibles y el usuario veía negro + 0:00).
+           // controles ya son visibles y el usuario ve�a negro + 0:00).
            if (_isLoading) 
              Positioned.fill(
                child: IgnorePointer(
                  child: Container(
-                   // Senior UI: Negro opaco durante la reanudación para ocultar flickeos
+                   // Senior UI: Negro opaco durante la reanudaci�n para ocultar flickeos
                    color: (_resumePosition > 3000 && !_hasResetPosition) ? Colors.black : Colors.black45, 
                    child: const Center(
                      child: Column(
@@ -4352,7 +4421,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                        const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 64),
                        const SizedBox(height: 24),
                        const Text(
-                         'SINCROIZACIÓN REMOTA',
+                         'SINCROIZACI�N REMOTA',
                          style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2),
                        ),
                        const SizedBox(height: 8),
@@ -4534,7 +4603,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     return ValueListenableBuilder<bool>(
       valueListenable: _showNextNotifier,
       builder: (context, showNext, _) {
-        // El botón es visible si estamos en el umbral del 93% O si el video ha terminado (countdown)
+        // El bot�n es visible si estamos en el umbral del 93% O si el video ha terminado (countdown)
         // PERO solo si hay un siguiente episodio disponible (o si es el modo Reanudar).
         final bool isVisible = (showNext || isCountdown) && (_isAutoplayResume || hasNext);
         
@@ -4562,11 +4631,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 ),
                 child: Stack(
                   children: [
-                    // Capa de progreso: Animación de 5 segundos FLUIDA (una sola vez)
+                    // Capa de progreso: Animaci�n de 5 segundos FLUIDA (una sola vez)
                     if (isCountdown)
                       Positioned.fill(
                         child: _NetflixProgressBar(
-                          // Usamos una clave que persista durante toda la cuenta atrás
+                          // Usamos una clave que persista durante toda la cuenta atr�s
                           // Solo cambia si el modo (Resume vs Autoplay) cambia, pero no con cada segundo
                           key: ValueKey('netflix_persistent_bar_${_isAutoplayResume}'), 
                         ),
@@ -4638,7 +4707,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               IconButton(
                 iconSize: iconSize,
                 icon: AurisIcon(AurisIcons.chevronDown, color: Colors.white, size: 32),
-                onPressed: _minimizePlayer, // Botón dedicado para minimizar
+                onPressed: _minimizePlayer, // Bot�n dedicado para minimizar
               ),
               SizedBox(width: spacing),
             ],
@@ -4814,12 +4883,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }) {
     return Container(
       width: minWidth, height: 44, // Unificado a 44px
-      padding: const EdgeInsets.all(4), // Inset de 4px para forma de cápsula interna
+      padding: const EdgeInsets.all(4), // Inset de 4px para forma de c�psula interna
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18), // Forma de cápsula interna refinada (Radio 18 para alto 36)
+          borderRadius: BorderRadius.circular(18), // Forma de c�psula interna refinada (Radio 18 para alto 36)
           hoverColor: Colors.white.withOpacity(0.12),
           splashColor: Colors.white.withOpacity(0.08),
           child: Center(
@@ -5007,7 +5076,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           children: [
             _buildMobileTimeline(),
             SizedBox(height: isLandscape ? 2 : 12),
-            // Senior: Usar SingleChildScrollView para evitar overflow en pantallas pequeñas/anchas
+            // Senior: Usar SingleChildScrollView para evitar overflow en pantallas peque�as/anchas
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
@@ -5171,7 +5240,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           clipBehavior: Clip.none,
           alignment: Alignment.center,
           children: [
-            // ÁREA DE EVENTOS (Capa invisible para el ratón - Aislada de StreamBuilders)
+            // �REA DE EVENTOS (Capa invisible para el rat�n - Aislada de StreamBuilders)
             if (!_isMobileDevice)
               Positioned.fill(
                 child: MouseRegion(
@@ -5397,7 +5466,7 @@ class _NetflixProgressBarState extends State<_NetflixProgressBar> {
   void initState() {
     super.initState();
     _startTime = DateTime.now();
-    // CRONÓMETRO MANUAL: Garantiza 5 segundos reales independientemente del motor de frames
+    // CRON�METRO MANUAL: Garantiza 5 segundos reales independientemente del motor de frames
     _timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
       final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
       final double newProgress = (elapsed / 5000).clamp(0.0, 1.0);

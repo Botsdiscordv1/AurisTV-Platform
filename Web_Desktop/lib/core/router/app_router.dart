@@ -1,7 +1,7 @@
 import '../../features/auth/presentation/activate_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import '../utils/url_utils.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/content/presentation/content_screen.dart';

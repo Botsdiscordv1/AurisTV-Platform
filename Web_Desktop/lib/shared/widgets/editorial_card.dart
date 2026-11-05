@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../core/theme/editorial_themes.dart';
 import '../../core/utils/responsive_utils.dart';
 import 'editorial_animation_controller.dart';

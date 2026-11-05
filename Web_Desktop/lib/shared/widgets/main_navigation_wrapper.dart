@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:collection/collection.dart';
 import '../../../core/utils/responsive_utils.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../core/utils/url_utils.dart';
 import '../../features/player/presentation/player_screen.dart';
 import 'package:auris_web_desktop/features/remote_control/presentation/providers/remote_control_provider.dart';

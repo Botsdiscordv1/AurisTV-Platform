@@ -101,7 +101,7 @@ class AppTheme {
       ),
 
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: surface,
+        backgroundColor: Colors.black,
         indicatorColor: const Color(0xFF3D1D0A),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {

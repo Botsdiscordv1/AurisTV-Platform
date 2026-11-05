@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:js_interop';
 import 'package:web/web.dart' as web;
 import 'auth_web_helper.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 
 @JS('JSON.stringify')
 external String _jsStringify(JSAny obj);

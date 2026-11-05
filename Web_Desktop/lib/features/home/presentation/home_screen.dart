@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/web_utils.dart';
 import '../../../core/utils/url_utils.dart';
@@ -17,7 +17,7 @@ import '../widgets/wide_content_row.dart';
 import '../widgets/unified_section.dart';
 import 'package:auris_web_desktop/features/player/presentation/player_screen.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Senior: Helpers de navegación globales para permitir acceso desde widgets externos
 /// sin depender de la instancia privada de _HomeScreenState.

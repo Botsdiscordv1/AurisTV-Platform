@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 
 class AurisBottomBar extends ConsumerWidget {
   final int currentIndex;
@@ -18,7 +18,7 @@ class AurisBottomBar extends ConsumerWidget {
     return Container(
       height: 60 + MediaQuery.of(context).padding.bottom,
       decoration: const BoxDecoration(
-        color: Color(0xFF0B0B0D),
+        color: Colors.black,
         border: Border(top: BorderSide(color: Colors.white10, width: 0.5)),
       ),
       child: Row(

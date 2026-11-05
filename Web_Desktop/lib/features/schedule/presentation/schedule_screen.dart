@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/utils/url_utils.dart';
 import '../../../core/utils/responsive_utils.dart';
 import 'package:auris_web_desktop/core/router/app_router.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 

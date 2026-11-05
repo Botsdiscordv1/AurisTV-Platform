@@ -6,7 +6,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:hive_ce/hive_ce.dart';
 
 import '../../../core/utils/responsive_utils.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import 'providers/settings_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 

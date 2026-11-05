@@ -1109,9 +1109,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
               _NetflixHeroButton(
                 focusNode: _playButtonFocusNode,
                 onPressed: () => SafeTap.run(() => _handlePlay(item)),
-                // FIX: icono Play solo "filled + negro" en móvil/tablet
-                // (useMobileLayout). Otras plataformas conservan el outline.
-                icon: context.useMobileLayout ? AurisIcons.playFilled : AurisIcons.play,
+                icon: AurisIcons.playFilled,
                 label: 'Reproducir',
                 isPrimary: true,
                 autofocus: widget.autofocus,

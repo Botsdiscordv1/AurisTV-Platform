@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'shared/widgets/min_width_wrapper.dart';

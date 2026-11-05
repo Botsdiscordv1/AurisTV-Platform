@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:collection/collection.dart';
 
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_web_desktop/core/router/app_router.dart';
 import 'package:auris_web_desktop/core/utils/responsive_utils.dart';
@@ -14,7 +14,7 @@ import 'package:auris_web_desktop/core/utils/url_utils.dart';
 import 'package:auris_web_desktop/features/search/presentation/providers/search_provider.dart';
 import 'package:auris_web_desktop/features/search/presentation/widgets/search_widgets.dart';
 import 'package:auris_web_desktop/features/home/widgets/unified_section.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   final String initialQuery;

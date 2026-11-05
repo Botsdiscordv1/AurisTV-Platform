@@ -1,8 +1,8 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
-import 'package:auris_sdk/live/auris_core.dart';
+import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/web_utils.dart';
 import 'widgets/auris_splash_logo.dart';
 
@@ -20,7 +20,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Precarga el collage del Login durante el Splash para que, al entrar
     // (ahora o cuando Login sea la pantalla de arranque), aparezca LLENO
-    // desde el primer frame sin tarjetas vacías.
+    // desde el primer frame sin tarjetas vac�as.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) CollageGridBackground.precache(context);
     });
