@@ -100,9 +100,14 @@ flutter:
     - assets/icons/
     - assets/branding/
     - assets/data/
+    - assets/intro/
     - assets/avatars/
+    - assets/avatars/animes/
     - assets/avatars/animes/dandadan/
     - assets/avatars/animes/kusuriya_no_hitorigoto/
     - assets/avatars/animes/sakamoto_days/
     - assets/avatars/animes/seihantai_na_kimi_to_boku/
     - assets/avatars/animes/yofukashi_no_uta/
+    - assets/avatars/kdrama/
+    - assets/avatars/series/
+    - assets/avatars/peliculas/

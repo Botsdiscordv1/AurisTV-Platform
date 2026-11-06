@@ -2116,7 +2116,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
       }
     }
 
-    final int displayTotalSeasons = totalSeasons > 0 ? totalSeasons : (widget.totalSeasons ?? 1);
+    final int displayTotalSeasons = totalSeasons > 0 ? totalSeasons : 1;
     final bool bottomBarVisible = ref.watch(bottomNavVisibleProvider);
 
     return MouseRegion(

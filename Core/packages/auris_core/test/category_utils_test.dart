@@ -204,4 +204,13 @@ void main() {
       expect(simplifySourceName('TUDORAMA'), 'TDM');
     });
   });
+
+  group('simplifySourceName para LatinoYT y Veranime', () {
+    test('Simplifica LatinoYT a LYT y Veranime a VAE', () {
+      expect(simplifySourceName('latinoyt'), 'LYT');
+      expect(simplifySourceName('LatinoYT'), 'LYT');
+      expect(simplifySourceName('veranime'), 'VAE');
+      expect(simplifySourceName('Veranime'), 'VAE');
+    });
+  });
 }

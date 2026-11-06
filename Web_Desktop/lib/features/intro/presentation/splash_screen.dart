@@ -20,7 +20,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Precarga el collage del Login durante el Splash para que, al entrar
     // (ahora o cuando Login sea la pantalla de arranque), aparezca LLENO
-    // desde el primer frame sin tarjetas vacías.
+    // desde el primer frame sin tarjetas vacias.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) CollageGridBackground.precache(context);
     });

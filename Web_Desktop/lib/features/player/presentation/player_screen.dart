@@ -756,7 +756,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
     });
 
-    if (!isResumingSession && !_isTrailer) _findAlternatives();
+    if (!isResumingSession && !_isTrailer) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _findAlternatives();
+      });
+    }
     _startHideTimer();
   }
 

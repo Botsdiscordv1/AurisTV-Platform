@@ -3189,7 +3189,7 @@ void _openPlayer(PlayerScreen player) {
       final isMovieCategory = detailState.isMovieish;
       final currentSeason = detailState.currentSeason;
       final totalSeasons = detailState.totalSeasons;
-      final int resolvedTotalSeasons = totalSeasons > 0 ? totalSeasons : (widget.totalSeasons ?? 1);
+      final int resolvedTotalSeasons = totalSeasons > 0 ? totalSeasons : 1;
       final activeSources = detailState.allSources;
       final currentSource = detailState.selectedSource;
       final episodesAsync = detailState.episodes;

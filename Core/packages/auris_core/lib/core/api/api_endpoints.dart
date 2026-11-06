@@ -119,6 +119,8 @@ class ApiEndpoints {
     'animegratis',
     'animeflv',
     'telegram',
+    'veranime',
+    'latinoyt',
   ];
   static const List<String> movieSourceHints = [
     'gnula',
@@ -280,7 +282,7 @@ class ApiEndpoints {
         // wp.com/nu es ambiguo, pero si la URL original es gnulahd, ya se detectó vía source; fallback conservador a movies
         if (lowerUrl.contains('gnulahd') || lowerUrl.contains('onlypelis') || lowerUrl.contains('lamovie') || lowerUrl.contains('repelishd')) return moviesSeriesBaseUrl;
       }
-      if (lowerUrl.contains('jkanime') || lowerUrl.contains('animeav1') || lowerUrl.contains('animed23') || lowerUrl.contains('animejara')) return animeBaseUrl;
+      if (lowerUrl.contains('jkanime') || lowerUrl.contains('animeav1') || lowerUrl.contains('animed23') || lowerUrl.contains('animejara') || lowerUrl.contains('veranime') || lowerUrl.contains('latinoyt')) return animeBaseUrl;
       if (lowerUrl.contains('tudorama') || lowerUrl.contains('doramas')) return kdramasBaseUrl;
       return baseUrl;
     }

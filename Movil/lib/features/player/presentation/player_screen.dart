@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:ui' as ui;
@@ -1445,9 +1445,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (widget.sourceUrl.isNotEmpty && widget.source.isEmpty) {
         _hasInitialized = true;
         _initPlayer(widget.sourceUrl, widget.initialHeaders ?? const {});
-        if (!_isTrailer) _findAlternatives();
-      } else {
-        if (!_isTrailer) _findAlternatives();
+      }
+      if (!_isTrailer) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _findAlternatives();
+        });
       }
     }
     

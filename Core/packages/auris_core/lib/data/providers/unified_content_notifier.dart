@@ -375,38 +375,32 @@ final unifiedContentProvider = Provider.autoDispose
   final detailData = detailAsync.valueOrNull;
   int resolvedTotalSeasons = 1;
 
-  // 1. Autoridad primaria: respuesta de /api/episodes de la fuente activa
+  // 1. Temporadas reportadas por la fuente activa (/api/episodes).
+  int activeSourceSeasons = 1;
   final epData = episodesAsync.valueOrNull?.response;
-  if (epData != null && ((epData.totalSeasons != null && epData.totalSeasons! > 0) || epData.seasons.isNotEmpty)) {
-    final epSeasonsCount = epData.seasons.isNotEmpty
-        ? epData.seasons.map((s) => s.number).fold(epData.seasons.length, max)
-        : (epData.totalSeasons ?? 1);
-    resolvedTotalSeasons = max(epData.totalSeasons ?? 1, epSeasonsCount);
-  } else {
-    // 2. Fallback mientras carga /api/episodes o si la fuente no envía totalSeasons
-    if (detailData != null) {
-      resolvedTotalSeasons = [
-        resolvedTotalSeasons,
-        detailData.anime?.totalSeasons ?? 1,
-        detailData.movie?.totalSeasons ?? 1,
-        detailData.movie?.seasons.length ?? 1,
-      ].reduce(max);
-    }
-    for (final s in allSources) {
-      if (s.totalSeasons != null && s.totalSeasons! > resolvedTotalSeasons) {
-        resolvedTotalSeasons = s.totalSeasons!;
-      }
-      if (s.season != null && s.season! > resolvedTotalSeasons) {
-        resolvedTotalSeasons = s.season!;
-      }
+  if (epData != null) {
+    if ((epData.totalSeasons != null && epData.totalSeasons! > 0) || epData.seasons.isNotEmpty) {
+      final epSeasonsCount = epData.seasons.isNotEmpty
+          ? epData.seasons.map((s) => s.number).fold(epData.seasons.length, max)
+          : (epData.totalSeasons ?? 1);
+      activeSourceSeasons = max(epData.totalSeasons ?? 1, epSeasonsCount);
     }
   }
 
-  if (epData == null && params.season != null && params.season! > resolvedTotalSeasons) {
-    resolvedTotalSeasons = params.season!;
+  // 2. Si alguna de las otras fuentes (allSources) tiene totalSeasons > 1, lo tomamos en cuenta
+  // para que el usuario pueda ver el SeasonSelector y cambiar de temporada/fuente.
+  final sourcesMaxSeasons = allSources
+      .map((s) => s.totalSeasons ?? 1)
+      .fold(1, max);
+
+  resolvedTotalSeasons = max(activeSourceSeasons, sourcesMaxSeasons);
+
+  // 3. Fallback de inicio: si aún no cargan episodios y params.season vino explícito (> 1)
+  if (epData == null && params.season != null && params.season! > 1) {
+    resolvedTotalSeasons = max(resolvedTotalSeasons, params.season!);
   }
 
-  // Ajustar input.season si excede las temporadas reales reportadas por la fuente activa
+  // Ajustar input.season si excede las temporadas reales descubiertas
   int effectiveCurrentSeason = input.season;
   if (input.season > resolvedTotalSeasons) {
     if (epData != null) {

@@ -138,9 +138,6 @@ class SectionComposer {
           debugPrint('📺 [SectionComposer] 🟢 TV MODE ACTIVE: Section "$title" (top10) successfully promoted to TOP10_WIDE (Wide cards + giant ranking numbers)');
         } else if (presentation == SectionPresentation.top10Wide) {
           debugPrint('📺 [SectionComposer] 🟢 TV MODE ACTIVE: Section "$title" using explicit TOP10_WIDE');
-        } else if (presentation == SectionPresentation.poster || presentation == SectionPresentation.posterLarge) {
-          presentation = SectionPresentation.expandablePoster;
-          debugPrint('📺 [SectionComposer] 🟢 TV MODE ACTIVE: Section "$title" promoted to EXPANDABLE_POSTER');
         }
       } else {
         if (presentation == SectionPresentation.top10Wide) {

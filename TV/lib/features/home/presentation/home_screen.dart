@@ -286,75 +286,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
     _heroKey.currentState?.requestPlayFocus();
   }
 
-  List<ComposedHomeSection> _applyTVRhythm(List<ComposedHomeSection> rawSections) {
+  List<ComposedHomeSection> _applyTVRhythm(
+    List<ComposedHomeSection> rawSections, {
+    required bool isInicio,
+  }) {
     if (rawSections.isEmpty) return [];
 
-    // En TV ignoramos el layout de póster del servidor y usamos widgets WIDE,
-    // añadiendo las tarjetas expandibles en las 3 posiciones indicadas.
-    final List<ComposedHomeSection> sections = rawSections.map((sec) {
-      if (sec.type == HomeSectionType.continueWatching || 
-          sec.presentation == SectionPresentation.top10 || 
-          sec.presentation == SectionPresentation.top10Wide) {
+    // Senior Logic: TV respeta los formatos nativos enviados por el servidor (poster, wide, top10, expandablePoster).
+    // Si estamos en 'Inicio', aplicamos la regla de armonía: máximo 3 secciones con formato póster grande (expandablePoster/posterLarge).
+    if (isInicio) {
+      int expandableCount = 0;
+      return rawSections.map((sec) {
+        final isExpandable = sec.presentation == SectionPresentation.expandablePoster ||
+            sec.presentation == SectionPresentation.posterLarge ||
+            (sec.data is EditorialRow &&
+                ((sec.data as EditorialRow).format == SectionPresentation.expandablePoster ||
+                    (sec.data as EditorialRow).format == SectionPresentation.posterLarge));
+
+        if (isExpandable) {
+          if (expandableCount < 3) {
+            expandableCount++;
+            return sec;
+          } else {
+            // Degrada las excedentes a póster estándar
+            return ComposedHomeSection(
+              id: sec.id,
+              type: sec.type,
+              title: sec.title,
+              subtitle: sec.subtitle,
+              items: sec.items,
+              sportsItems: sec.sportsItems,
+              brandItems: sec.brandItems,
+              presentation: SectionPresentation.poster,
+              data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.poster) : sec.data,
+              badge: sec.badge,
+            );
+          }
+        }
         return sec;
-      }
-      return ComposedHomeSection(
-        id: sec.id,
-        type: sec.type,
-        title: sec.title,
-        subtitle: sec.subtitle,
-        items: sec.items,
-        sportsItems: sec.sportsItems,
-        brandItems: sec.brandItems,
-        presentation: SectionPresentation.wide,
-        data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.wide) : sec.data,
-        badge: sec.badge,
-      );
-    }).toList();
-
-    int continueWatchingIndex = sections.indexWhere((s) => s.type == HomeSectionType.continueWatching);
-    int section1Index = continueWatchingIndex != -1 ? continueWatchingIndex + 1 : 0;
-    int firstExpandableIndex = section1Index + 1;
-
-    int lastIndex = sections.length - 1;
-    int beforeLastIndex = lastIndex - 1;
-
-    int middleIndex = (sections.length ~/ 2);
-    if (middleIndex <= firstExpandableIndex) {
-      middleIndex = firstExpandableIndex + 1;
-    }
-    if (middleIndex >= beforeLastIndex) {
-      middleIndex = beforeLastIndex - 1;
+      }).toList();
     }
 
-    final Set<int> expandableIndices = {};
-    if (firstExpandableIndex < sections.length) expandableIndices.add(firstExpandableIndex);
-    if (middleIndex > 0 && middleIndex < sections.length) expandableIndices.add(middleIndex);
-    if (beforeLastIndex >= 0 && beforeLastIndex < sections.length) expandableIndices.add(beforeLastIndex);
-
-    final List<ComposedHomeSection> tvSections = [];
-    for (int i = 0; i < sections.length; i++) {
-      var sec = sections[i];
-      if (expandableIndices.contains(i) && 
-          sec.type != HomeSectionType.continueWatching && 
-          sec.presentation != SectionPresentation.top10 && 
-          sec.presentation != SectionPresentation.top10Wide) {
-        sec = ComposedHomeSection(
-          id: '${sec.id}_expandable',
-          type: sec.type,
-          title: sec.title,
-          subtitle: sec.subtitle,
-          items: sec.items,
-          sportsItems: sec.sportsItems,
-          brandItems: sec.brandItems,
-          presentation: SectionPresentation.expandablePoster,
-          data: sec.data is EditorialRow ? (sec.data as EditorialRow).copyWith(format: SectionPresentation.expandablePoster) : sec.data,
-          badge: sec.badge,
-        );
-      }
-      tvSections.add(sec);
-    }
-
-    return tvSections;
+    // En el resto de categorías, se respetan tal cual los formatos enviados por el servidor
+    return rawSections;
   }
 
   Widget _buildSection(
@@ -445,7 +419,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               subtitle: null,
               items: row.items,
               badge: row.badge,
-              format: SectionPresentation.expandablePoster,
+              format: section.presentation == SectionPresentation.poster ? SectionPresentation.poster : row.format,
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
@@ -563,7 +537,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               subtitle: null,
               items: row.items,
               badge: row.badge,
-              format: SectionPresentation.expandablePoster,
+              format: section.presentation == SectionPresentation.poster ? SectionPresentation.poster : row.format,
               onItemTap: (item) => openTVDetails(context, item, 'inicio'),
               onArrowRightOnLast: onArrowRightOnLast,
               onArrowLeftOnFirst: onArrowLeftOnFirst,
@@ -777,10 +751,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
               // 2. Contenido dinámico
               layoutAsync.when(
                 data: (rawSections) {
-                  const tvHomeCategories = {'inicio', 'animes', 'películas', 'series', 'kdrama', 'kdramas'};
-                  final sections = tvHomeCategories.contains(currentCategory.toLowerCase())
-                      ? _applyTVRhythm(rawSections)
-                      : rawSections;
+                  final sections = _applyTVRhythm(
+                    rawSections,
+                    isInicio: currentCategory.toLowerCase() == 'inicio',
+                  );
                   while (_sectionRowKeys.length < sections.length) {
                     _sectionRowKeys.add(GlobalKey());
                   }

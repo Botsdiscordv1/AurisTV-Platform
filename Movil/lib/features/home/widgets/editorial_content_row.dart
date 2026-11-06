@@ -171,7 +171,8 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
   }
 
   Widget _buildStandardRow(bool isMobile, double horizontalPadding) {
-    final bool isLarge = widget.format == SectionPresentation.expandablePoster;
+    final bool isLarge = widget.format == SectionPresentation.expandablePoster ||
+        widget.format == SectionPresentation.posterLarge;
     final double cardWidth = isLarge
         ? ResponsiveUtils.largePosterWidth(context)
         : ResponsiveUtils.posterWidth(context);

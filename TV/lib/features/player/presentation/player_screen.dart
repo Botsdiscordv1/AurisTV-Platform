@@ -918,16 +918,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       } else {
         _initPlayer(widget.sourceUrl);
       }
-      _findAlternatives();
     } else if (widget.source == 'YouTube' && widget.sourceUrl.isNotEmpty) {
       // OP/ED de /api/themes con solo ID de YouTube (igual que Movil): van
       // directo al WebView en formato embed (watch no sirve en TV).
       _hasInitialized = true;
       _initEmbedPlayer(_youTubeEmbedUrl(widget.sourceUrl));
-      _findAlternatives();
-    } else {
-      _findAlternatives();
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _findAlternatives();
+    });
     
     _startHideTimer();
   }

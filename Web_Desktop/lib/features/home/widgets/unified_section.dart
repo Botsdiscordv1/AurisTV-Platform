@@ -56,6 +56,7 @@ class UnifiedSection extends StatelessWidget {
             onItemTap: onItemTap,
           ),
         );
+      case SectionPresentation.expandablePoster:
       case SectionPresentation.posterLarge:
         return RepaintBoundary(
           child: EditorialContentRow(
@@ -63,7 +64,7 @@ class UnifiedSection extends StatelessWidget {
             subtitle: subtitle,
             items: items,
             badge: badge ?? EditorialBadge.mythical,
-            format: SectionPresentation.posterLarge,
+            format: presentation,
             verMas: verMas,
             onItemTap: onItemTap,
           ),

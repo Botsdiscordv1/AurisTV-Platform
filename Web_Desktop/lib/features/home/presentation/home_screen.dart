@@ -225,6 +225,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         id: m.id,
         title: m.title,
         imageUrl: m.bannerUrl ?? m.posterUrl,
+        logoUrl: m.logoUrl,
+        isBannerFallback: m.isBannerFallback,
         subtitle: m.subtitle,
         rating: formatRating(m.rating),
         badgeOverlay: badgeOverlay,
@@ -323,18 +325,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               
               // 2. Contenido dinámico
               layoutAsync.when(
-                data: (sections) => SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final section = sections[index];
-                      return RepaintBoundary(
-                        key: ValueKey('section_${section.id}'), // Senior Fix: Diffing Engine para preservación de estado
-                        child: _buildSection(section, horizontalPadding),
-                      );
-                    },
-                    childCount: sections.length,
-                  ),
-                ),
+                data: (sections) {
+                  // Senior Logic: En 'Inicio' limitamos a máximo 3 las secciones con formato póster grande (expandablePoster/posterLarge)
+                  final Set<String> allowedExpandableSectionIds = {};
+                  if (currentCategory == 'inicio') {
+                    int expandableCount = 0;
+                    for (final sec in sections) {
+                      final pres = sec.presentation;
+                      if (pres == SectionPresentation.expandablePoster ||
+                          pres == SectionPresentation.posterLarge) {
+                        if (expandableCount < 3) {
+                          allowedExpandableSectionIds.add(sec.id);
+                          expandableCount++;
+                        }
+                      }
+                    }
+                  }
+
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final section = sections[index];
+                        final effectiveSection = (currentCategory == 'inicio' &&
+                                (section.presentation == SectionPresentation.expandablePoster ||
+                                    section.presentation == SectionPresentation.posterLarge) &&
+                                !allowedExpandableSectionIds.contains(section.id))
+                            ? ComposedHomeSection(
+                                id: section.id,
+                                type: section.type,
+                                title: section.title,
+                                subtitle: section.subtitle,
+                                items: section.items,
+                                sportsItems: section.sportsItems,
+                                brandItems: section.brandItems,
+                                presentation: SectionPresentation.poster,
+                                data: section.data,
+                                badge: section.badge,
+                              )
+                            : section;
+
+                        return RepaintBoundary(
+                          key: ValueKey('section_${section.id}'), // Senior Fix: Diffing Engine para preservación de estado
+                          child: _buildSection(effectiveSection, horizontalPadding),
+                        );
+                      },
+                      childCount: sections.length,
+                    ),
+                  );
+                },
                 loading: () => SliverToBoxAdapter(
                   child: Column(
                     children: [

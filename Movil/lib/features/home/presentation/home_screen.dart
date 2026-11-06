@@ -141,7 +141,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (context.mounted) context.push(uri, extra: item.toContentSeed());
   }
 
-  Widget _buildSection(ComposedHomeSection section, double horizontalPadding) {
+  Widget _buildSection(
+    ComposedHomeSection section, 
+    double horizontalPadding, {
+    Set<String>? allowedExpandableSectionIds,
+  }) {
     // Carrusel de marcas/categorías deportivas → SportsBrandCarousel
     if (section.type == HomeSectionType.brands && section.brandItems != null) {
       return SportsBrandCarousel(
@@ -170,8 +174,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       case HomeSectionType.editorial:
       case HomeSectionType.discovery:
+      case HomeSectionType.recommendation:
         final row = section.data as EditorialRow;
-        if (row.format == SectionPresentation.top10) {
+        
+        // Senior Fix: En 'Inicio' limitamos a máximo 3 secciones con formato póster grande (expandablePoster).
+        // Las excedentes se degradan suavemente a póster estándar para mantener la armonía visual.
+        SectionPresentation effectiveFormat = row.format;
+        if ((row.format == SectionPresentation.expandablePoster ||
+                row.format == SectionPresentation.posterLarge) &&
+            allowedExpandableSectionIds != null &&
+            !allowedExpandableSectionIds.contains(section.id)) {
+          effectiveFormat = SectionPresentation.poster;
+        }
+
+        if (effectiveFormat == SectionPresentation.top10) {
           return EditorialContentRow(
             title: row.title,
             subtitle: row.subtitle,
@@ -181,7 +197,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             verMas: row.verMas,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           );
-        } else if (row.format == SectionPresentation.wide) {
+        } else if (effectiveFormat == SectionPresentation.wide) {
           return WideContentRow(
             title: row.title,
             subtitle: row.subtitle,
@@ -195,7 +211,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             subtitle: row.subtitle,
             items: row.items,
             badge: row.badge,
-            format: row.format,
+            format: effectiveFormat,
             verMas: row.verMas,
             onItemTap: (item) => _openDetails(context, item, 'inicio'),
           );
@@ -272,37 +288,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           loading: () => RowSkeleton(isWide: true),
           error: (err, _) => const SizedBox.shrink(),
         );
-
-      case HomeSectionType.recommendation:
-        final row = section.data as EditorialRow;
-        if (row.format == SectionPresentation.top10) {
-          return EditorialContentRow(
-            title: row.title,
-            subtitle: row.subtitle,
-            items: row.items,
-            badge: row.badge,
-            forceTopDesign: true,
-            verMas: row.verMas,
-            onItemTap: (item) => _openDetails(context, item, 'inicio'),
-          );
-        } else if (row.format == SectionPresentation.wide) {
-          return WideContentRow(
-            title: row.title,
-            subtitle: row.subtitle,
-            items: row.items.map((m) => _wideItemFromMedia(m)).toList(),
-            verMas: row.verMas,
-            onItemTap: (wideItem) => _openDetails(context, wideItem.originalItem as MediaItem, 'inicio'),
-          );
-        } else {
-          return ContentRow(
-            title: row.title,
-            subtitle: row.subtitle,
-            items: row.items,
-            horizontalPadding: horizontalPadding,
-            verMas: row.verMas,
-            onItemTap: (item) => _openDetails(context, item, 'inicio'),
-          );
-        }
 
       // Marcas: ya se maneja al inicio de _buildSection (defensivo).
       case HomeSectionType.brands:
@@ -449,18 +434,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // 2. Contenido dinámico con Server-Driven UI Lite
               if (currentCategory == 'inicio') 
                 layoutAsync.when(
-                  data: (sections) => SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final section = sections[index];
-                        return RepaintBoundary(
-                          key: ValueKey('section_${section.id}'), // Senior Fix: Diffing Engine para preservación de estado
-                          child: _buildSection(section, horizontalPadding),
-                        );
-                      },
-                      childCount: sections.length,
-                    ),
-                  ),
+                  data: (sections) {
+                    // Senior Logic: Limitar a máximo 3 la cantidad de expandablePoster en Inicio para mantener la armonía
+                    final allowedExpandableSectionIds = <String>{};
+                    int expandableCount = 0;
+                    for (final sec in sections) {
+                      if (sec.data is EditorialRow) {
+                        final row = sec.data as EditorialRow;
+                        if (row.format == SectionPresentation.expandablePoster ||
+                            row.format == SectionPresentation.posterLarge) {
+                          if (expandableCount < 3) {
+                            allowedExpandableSectionIds.add(sec.id);
+                            expandableCount++;
+                          }
+                        }
+                      }
+                    }
+
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final section = sections[index];
+                          return RepaintBoundary(
+                            key: ValueKey('section_${section.id}'), // Senior Fix: Diffing Engine para preservación de estado
+                            child: _buildSection(
+                              section, 
+                              horizontalPadding,
+                              allowedExpandableSectionIds: allowedExpandableSectionIds,
+                            ),
+                          );
+                        },
+                        childCount: sections.length,
+                      ),
+                    );
+                  },
                   loading: () => SliverToBoxAdapter(
                     child: Column(
                       children: [

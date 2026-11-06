@@ -875,10 +875,9 @@ List<HomeLayoutSection> _interleaveInicioSections(
       } else if (sec.presentation == SectionPresentation.top10 && primaryTop10Sec == null) {
         primaryTop10Sec = sec;
       } else if ((sec.presentation == SectionPresentation.expandablePoster ||
-                  sec.type == HomeSectionType.editorial ||
-                  sec.type == HomeSectionType.recommendation) &&
+                  sec.presentation == SectionPresentation.posterLarge) &&
                  primaryPosterLargeSec == null) {
-        primaryPosterLargeSec = _promoteSectionToExpandablePoster(sec);
+        primaryPosterLargeSec = sec;
       } else {
         pool.add(sec);
       }
@@ -915,7 +914,7 @@ List<HomeLayoutSection> _interleaveInicioSections(
 
   int categoryPointer = 0;
 
-  // 2. Loop de armonía visual estándar (Poster -> Poster -> Wide / PosterLarge)
+  // 2. Loop de armonía visual estándar (Poster -> Poster -> Wide)
   while (availablePools.any((pool) => pool.isNotEmpty)) {
     SectionPresentation? forbiddenFormat;
     SectionPresentation? preferredFormat;
@@ -931,12 +930,7 @@ List<HomeLayoutSection> _interleaveInicioSections(
       } else if (result.length >= 2 &&
           result[result.length - 1].presentation == SectionPresentation.poster &&
           result[result.length - 2].presentation == SectionPresentation.poster) {
-        // Rompe monotonía de 2 posters alternando entre WIDE y POSTER_LARGE
-        final wideCount = result.where((s) => s.presentation == SectionPresentation.wide).length;
-        final largeCount = result.where((s) => s.presentation == SectionPresentation.expandablePoster).length;
-        preferredFormat = (largeCount <= wideCount)
-            ? SectionPresentation.expandablePoster
-            : SectionPresentation.wide;
+        preferredFormat = SectionPresentation.wide;
       }
     }
 
@@ -966,14 +960,6 @@ List<HomeLayoutSection> _interleaveInicioSections(
         }
 
         if (preferredFormat != null && fmt != preferredFormat) {
-          if (preferredFormat == SectionPresentation.expandablePoster &&
-              fmt == SectionPresentation.poster &&
-              (candidate.type == HomeSectionType.editorial || candidate.type == HomeSectionType.recommendation)) {
-            bestCandidate = _promoteSectionToExpandablePoster(candidate);
-            chosenCategoryIndex = catIdx;
-            chosenItemIndex = i;
-            break;
-          }
           if (preferredFormat == SectionPresentation.wide &&
               fmt == SectionPresentation.poster) {
             bestCandidate = _promoteSectionToWide(candidate);
@@ -1065,10 +1051,9 @@ List<HomeLayoutSection> _interleaveCategorySections(List<HomeLayoutSection> sect
     } else if (sec.presentation == SectionPresentation.top10 && primaryTop10Sec == null) {
       primaryTop10Sec = sec;
     } else if ((sec.presentation == SectionPresentation.expandablePoster ||
-                sec.type == HomeSectionType.editorial ||
-                sec.type == HomeSectionType.recommendation) &&
+                sec.presentation == SectionPresentation.posterLarge) &&
                primaryPosterLargeSec == null) {
-      primaryPosterLargeSec = _promoteSectionToExpandablePoster(sec);
+      primaryPosterLargeSec = sec;
     } else {
       pool.add(sec);
     }
@@ -1082,7 +1067,6 @@ List<HomeLayoutSection> _interleaveCategorySections(List<HomeLayoutSection> sect
 
   while (pool.isNotEmpty) {
     SectionPresentation? forbiddenFormat;
-    SectionPresentation? preferredFormat;
 
     if (result.isNotEmpty) {
       final lastFormat = result.last.presentation;
@@ -1090,16 +1074,8 @@ List<HomeLayoutSection> _interleaveCategorySections(List<HomeLayoutSection> sect
         forbiddenFormat = SectionPresentation.wide;
       } else if (lastFormat == SectionPresentation.top10) {
         forbiddenFormat = SectionPresentation.top10;
-      } else if (lastFormat == SectionPresentation.expandablePoster) {
+      } else if (lastFormat == SectionPresentation.expandablePoster || lastFormat == SectionPresentation.posterLarge) {
         forbiddenFormat = SectionPresentation.expandablePoster;
-      } else if (result.length >= 2 &&
-          result[result.length - 1].presentation == SectionPresentation.poster &&
-          result[result.length - 2].presentation == SectionPresentation.poster) {
-        final wideCount = result.where((s) => s.presentation == SectionPresentation.wide).length;
-        final largeCount = result.where((s) => s.presentation == SectionPresentation.expandablePoster).length;
-        preferredFormat = (largeCount <= wideCount)
-            ? SectionPresentation.expandablePoster
-            : SectionPresentation.wide;
       }
     }
 
@@ -1111,27 +1087,6 @@ List<HomeLayoutSection> _interleaveCategorySections(List<HomeLayoutSection> sect
       final fmt = candidate.presentation;
 
       if (forbiddenFormat != null && fmt == forbiddenFormat) {
-        continue;
-      }
-
-      if (preferredFormat != null && fmt != preferredFormat) {
-        if (preferredFormat == SectionPresentation.expandablePoster &&
-            fmt == SectionPresentation.poster &&
-            (candidate.type == HomeSectionType.editorial || candidate.type == HomeSectionType.recommendation)) {
-          bestCandidate = _promoteSectionToExpandablePoster(candidate);
-          chosenIndex = i;
-          break;
-        }
-        if (preferredFormat == SectionPresentation.wide &&
-            fmt == SectionPresentation.poster) {
-          bestCandidate = _promoteSectionToWide(candidate);
-          chosenIndex = i;
-          break;
-        }
-        if (bestCandidate == null) {
-          bestCandidate = candidate;
-          chosenIndex = i;
-        }
         continue;
       }
 
@@ -1348,6 +1303,8 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
     else if (result.id.contains('repelishd')) effectiveSource = 'RepelisHD';
     else if (result.id.contains('cuevana')) effectiveSource = 'Cuevana';
     else if (result.id.contains('doramasmp4')) effectiveSource = 'DoramasMP4';
+    else if (result.id.contains('latinoyt')) effectiveSource = 'LatinoYT';
+    else if (result.id.contains('veranime')) effectiveSource = 'Veranime';
   }
 
   // Senior Fix: Fallback de imagen horizontal para secciones WIDE editoriales
@@ -1439,6 +1396,8 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
     else if (result.url.contains('repelishd')) effectiveSource = 'RepelisHD';
     else if (result.url.contains('cuevana')) effectiveSource = 'Cuevana';
     else if (result.url.contains('doramasmp4')) effectiveSource = 'DoramasMP4';
+    else if (result.url.contains('latinoyt')) effectiveSource = 'LatinoYT';
+    else if (result.url.contains('veranime')) effectiveSource = 'Veranime';
   }
 
   // Senior Fix: Eliminamos el año como subtítulo por petición UX
@@ -1597,6 +1556,8 @@ final recentEpisodesProvider = FutureProvider<List<MediaItem>>((ref) async {
       else if (u.contains('cuevana')) effectiveSource = 'Cuevana';
       else if (u.contains('doramasmp4')) effectiveSource = 'DoramasMP4';
       else if (u.contains('tudorama')) effectiveSource = 'TuDorama';
+      else if (u.contains('latinoyt')) effectiveSource = 'LatinoYT';
+      else if (u.contains('veranime')) effectiveSource = 'Veranime';
     }
 
     final String? rawBanner = (item.banner != null && item.banner!.isNotEmpty) ? item.banner : item.coverImage;
