@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../core/api/api_endpoints.dart';
 import 'disney_focus.dart';
 
@@ -203,7 +202,7 @@ class _SportsBrandCarouselState extends State<SportsBrandCarousel> {
               padding: EdgeInsets.symmetric(horizontal: _edgePad(vw)),
               child: Text(
                 widget.title!,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: _onSurface,
                   fontSize: titleFs,
                   fontWeight: FontWeight.w700,
@@ -294,7 +293,7 @@ class _SportsBrandCarouselState extends State<SportsBrandCarousel> {
                             placeholder: (context, url) => Center(
                               child: Text(
                                 item.name,
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
                                   color: _onSurface.withValues(alpha: 0.7),
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
@@ -304,7 +303,7 @@ class _SportsBrandCarouselState extends State<SportsBrandCarousel> {
                             errorWidget: (context, url, error) => Center(
                               child: Text(
                                 item.name,
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
                                   color: _onSurface,
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
@@ -321,7 +320,7 @@ class _SportsBrandCarouselState extends State<SportsBrandCarousel> {
                     item.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       color: _onSurface,
                       fontSize: labelFs,
                       fontWeight: FontWeight.w700,

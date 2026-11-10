@@ -19,7 +19,6 @@ import 'package:volume_controller/volume_controller.dart';
 import 'package:collection/collection.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/app_fullscreen.dart';
@@ -124,6 +123,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   WebViewController? _webViewController;
   bool _hasInitialized = false;
+  /// Indica que el SSE de extracción aún está activo (emitiendo más tracks).
+  bool _isTrackStreaming = false;
 
   bool _showControls = true;
   bool _isLocked = false;
@@ -139,16 +140,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   static const bool _tvMpvParityTest =
       bool.fromEnvironment('TV_MPV_PARITY', defaultValue: true);
 
-  /// Render nativo (SurfaceView + vo=mediacodec_embed). La bandera la activa
-  /// solo el entrypoint de Móvil; TV/Web conservan la textura.
-  /// WebM/VP9/AV1 no son compatibles con mediacodec_embed en todos los dispositivos,
-  /// así que los deshabilitamos para usar vo=gpu con textura media_kit.
+  /// Render nativo (SurfaceView + vo=mediacodec_embed).
+  /// Modo por defecto: Textura GPU (media_kit) por su bajo consumo y fluidez.
+  /// SurfaceView se conserva como fallback de último recurso si la textura falla.
   bool get _useNativeMobileSurface =>
-      !kIsWeb && Platform.isAndroid && VideoSurfaceConfig.nativeAndroidSurface && !_isWebM;
+      !kIsWeb &&
+      Platform.isAndroid &&
+      VideoSurfaceConfig.nativeAndroidSurface &&
+      _isRecoveryFallback;
 
-  /// Flag que indica si la URL actual es WebM (OP/ED). En ese caso no usamos surface
-  /// nativo mediacodec_embed que no soporta bien VP9/AV1 en todos los dispositivos.
+  bool _isRecoveryFallback = false;
   bool _isWebM = false;
+  bool _isHls = false;
 
   final GlobalKey _mobileSurfaceKey = GlobalKey();
   int? _mobileViewId;
@@ -347,6 +350,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _forceSoftwareRestart(String url, Map<String, String> headers) {
     if (_resetRetryCount >= 4) return; // Evitar bucles infinitos
     _resetRetryCount = 4; // El valor 4 activa el modo 'hwdec: no'
+    _isRecoveryFallback = true; // Activar fallback a SurfaceView si falla la textura
     _diagPosCount = 0;
     _hasResetPosition = false; // Bloqueamos historial
     
@@ -1520,14 +1524,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   void _switchTrack(int index) {
     if (index >= _allTracks.length) return;
-    
+
     // Senior Hybrid Fix: Obtener posición actual según el motor activo
     final int currentPosMs = (_player?.state.position.inMilliseconds ?? 0);
-    
+
     final int durationMs = (_player?.state.duration.inMilliseconds ?? 0);
 
-    // Senior Stability Fix: Parar el reproductor INMEDIATAMENTE
-    _player?.stop();
+    // Senior Surface Fix: NO llamamos player.stop() antes del reinit. stop()
+    // destruye el contexto de video (vo/EGL) y, al recrear el player, el wid
+    // de la Surface no está listo cuando llega el attach -> video negro al
+    // cambiar de idioma. El provider play() gestiona la transición interna
+    // sin destruir el contexto (mismo camino que _switchSource, que sí
+    // funciona). La TextureView se mantiene viva mientras el widget esté
+    // montado, así que su wid y tamaño siguen siendo válidos.
+    final int savedViewId = _mobileViewId ?? -1;
+    final int savedWid = _mobileWid ?? 0;
+    final int savedW = _mobileSurfaceW;
+    final int savedH = _mobileSurfaceH;
 
     final track = _allTracks[index];
 
@@ -1547,20 +1560,47 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     ref.read(activePlayerProvider.notifier).updateSession(selectedIndex: index);
 
     _initPlayer(track.url, track.headers);
+    // Senior Surface Fix: reenganchar la misma superficie nativa al nuevo
+    // player. Sin esto el video queda negro al cambiar de fuente. El delay
+    // da tiempo a que el nuevo decoder inicialice antes de vencer el wid.
+    if (_useNativeMobileSurface && savedWid > 0 && savedW > 0 && savedH > 0) {
+      _reattachMobileSurfaceDelayed(savedViewId, savedWid, savedW, savedH);
+    }
     _startHideTimer();
   }
 
   void _switchSource(SearchResult newSource) async {
+    // Inmediatamente ocultar la superficie nativa previa y activar la capa negra de carga
+    if (mounted) {
+      setState(() {
+        _nativeSurfaceReady = false;
+        _holdingFirstFrame = true;
+        _isLoading = true;
+      });
+    }
+
     // Senior Hybrid Fix: Obtener posición actual según el motor activo
     final int currentPosMs = (_player?.state.position.inMilliseconds ?? 0);
-    
+
     final int durationMs = (_player?.state.duration.inMilliseconds ?? 0);
 
     final qualityLower = newSource.quality.toLowerCase();
     final epNum = _activeEpisode != null ? int.tryParse(_activeEpisode!) ?? 1 : 1;
-    
-    // Senior Stability Fix: Parar el reproductor INMEDIATAMENTE
+
+    // Senior Stability Fix: Parar el reproductor INMEDIATAMENTE y desacoplar
+    // la superficie activa en NativeVideoSurfaceBinder para forzar a re-vincular
+    // wid y vo=mediacodec_embed en el nuevo stream.
+    if (_useNativeMobileSurface) {
+      unawaited(NativeVideoSurfaceBinder.detach(
+        _player,
+        viewId: _mobileViewId,
+        wid: _mobileWid,
+      ));
+    }
     _player?.stop();
+    _controller = null;
+    _mobileViewId = null;
+    _mobileWid = null;
 
     String resolvedUrl = _activeEpisode != null
         ? buildEpisodeUrl(newSource.url, newSource.source, epNum)
@@ -1591,10 +1631,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         _currentLanguage = trackQualityType(newSource.quality) == 'SUB' ? 'SUB' : 'LAT';
       }
       _hasInitialized = false;
+      _mobileSurfaceMounted = false; // Forzar desmontaje de la superficie para que la nueva fuente genere un SurfaceView limpio
+      _mobileViewId = null;
+      _mobileWid = null;
       _resumePosition = currentPosMs;
       _isAutoplayResume = false;
-      _hasResetPosition = false; 
+      _hasResetPosition = false;
       _isStabilizing = true;
+      _holdingFirstFrame = true;
       // Senior Quality Fix: Resetear calidades hasta que el nuevo extract las aporte.
       _qualityOptions = const [];
       _selectedQuality = 'auto';
@@ -1700,6 +1744,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     if (targetUrl == null || targetUrl.isEmpty) return;
 
+    // Senior Surface Fix: La TextureView se mantiene viva mientras el widget
+    // esté montado, así que su wid y tamaño siguen siendo válidos. Guardarlos
+    // ANTES del reinit evita que el nuevo player quede sin superficie.
+    final int savedViewId = _mobileViewId ?? -1;
+    final int savedWid = _mobileWid ?? 0;
+    final int savedW = _mobileSurfaceW;
+    final int savedH = _mobileSurfaceH;
+
     setState(() {
       _selectedQuality = quality;
       if (_player != null) {
@@ -1708,6 +1760,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     });
 
     _initPlayer(targetUrl, targetHeaders);
+    // Senior Surface Fix: reenganchar la misma superficie nativa al nuevo
+    // player. Sin esto el video queda negro al cambiar de calidad.
+    if (_useNativeMobileSurface && savedWid > 0 && savedW > 0 && savedH > 0) {
+      unawaited(_reattachMobileSurface(savedViewId, savedWid, savedW, savedH));
+    }
   }
 
   void _showQualitySelector() {
@@ -1902,6 +1959,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _autoplayTimer?.cancel();
 
     ref.invalidate(extractProvider);
+    ref.invalidate(extractStreamProvider);
 
     setState(() {
       _activeOverlay = PlayerOverlay.none;
@@ -2038,49 +2096,94 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildLanguageSelectorContent({bool isSidebar = false}) {
     final sourceOptions = _getLanguageOptions();
+
+    // Sin fuentes aún: spinner si SSE activo, mensaje si ya terminó
     if (sourceOptions.isEmpty) {
+      if (_isTrackStreaming) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFFEF7A1E)),
+                ),
+                SizedBox(height: 12),
+                Text('Buscando fuentes...', style: TextStyle(color: Colors.white54, fontSize: 13)),
+              ],
+            ),
+          ),
+        );
+      }
       return const Center(child: Padding(
         padding: EdgeInsets.all(32.0),
         child: Text('No hay fuentes disponibles', style: TextStyle(color: Colors.white54)),
       ));
     }
 
-    return ListView.builder(
-      shrinkWrap: !isSidebar,
-      padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
-      itemCount: sourceOptions.length,
-      itemBuilder: (context, index) {
-        final entry = sourceOptions[index];
-        final s = entry.result;
-        final serverName = entry.server;
-        final type = trackQualityType(s.quality);
-        final bool isCurrent = entry.isTrack
-            ? entry.trackIndex == _selectedTrackIndex
-            : s.url == _currentSourceUrl;
+    return Column(
+      children: [
+        // Banner progresivo: aparece mientras el SSE sigue entregando tracks
+        if (_isTrackStreaming)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: const [
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFEF7A1E)),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Cargando más fuentes...',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: ListView.builder(
+            padding: isSidebar ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
+            itemCount: sourceOptions.length,
+            itemBuilder: (context, index) {
+              final entry = sourceOptions[index];
+              final s = entry.result;
+              final serverName = entry.server;
+              final type = trackQualityType(s.quality);
+              final bool isCurrent = entry.isTrack
+                  ? entry.trackIndex == _selectedTrackIndex
+                  : s.url == _currentSourceUrl;
 
-        final titleText = '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source} ($type)';
-        final subtitleText = s.quality.isNotEmpty ? s.quality.toUpperCase() : 'Servidor: $serverName';
+              final titleText = '${entry.isTrack ? _allTracks[entry.trackIndex].label : s.source} ($type)';
+              final subtitleText = s.quality.isNotEmpty ? s.quality.toUpperCase() : 'Servidor: $serverName';
 
-        return AurisOptionCard(
-          title: titleText,
-          subtitle: subtitleText,
-          icon: AurisIcons.subtitles,
-          isCurrent: isCurrent,
-          autofocus: index == 0,
-          onTap: () {
-            if (!isSidebar) Navigator.pop(context);
-            else setState(() => _activeOverlay = PlayerOverlay.none);
+              return AurisOptionCard(
+                title: titleText,
+                subtitle: subtitleText,
+                icon: AurisIcons.subtitles,
+                isCurrent: isCurrent,
+                autofocus: index == 0,
+                onTap: () {
+                  if (!isSidebar) Navigator.pop(context);
+                  else setState(() => _activeOverlay = PlayerOverlay.none);
 
-            if (!isCurrent) {
-              if (entry.isTrack) {
-                _switchTrack(entry.trackIndex);
-              } else {
-                _switchSource(s);
-              }
-            }
-          },
-        );
-      },
+                  if (!isCurrent) {
+                    if (entry.isTrack) {
+                      _switchTrack(entry.trackIndex);
+                    } else {
+                      _switchSource(s);
+                    }
+                  }
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -2724,7 +2827,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _updateHistory(
       positionMs: _lastFrameMs,
       durationMs: _player?.state.duration.inMilliseconds ?? 0,
-      force: true,
+      force: false,
     );
   }
 
@@ -2766,7 +2869,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     _updateHistory(
       positionMs: _lastFrameMs,
       durationMs: _player?.state.duration.inMilliseconds ?? 0,
-      force: true,
+      force: false,
     );
   }
 
@@ -2871,11 +2974,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   ) async {
     // El primer PlatformView de Flutter tiene id 0: es válido. Solo un id
     // negativo indica que la vista aún no está registrada.
-    if (viewId < 0 || wid <= 0 || width <= 0 || height <= 0) return;
+    if (viewId < 0 || wid <= 0) return;
+    // Senior HLS Fix: en HLS el onSurface puede llegar antes del primer
+    // layout, con width/height = 0. Si devolvíamos sin hacer nada, mpv quedaba
+    // sin superficie (audio sí, video negro). Usamos un tamaño de seguridad;
+    // mpv lo sobrescribe con los datos reales cuando llegan.
+    final int safeW = width > 0 ? width : 1920;
+    final int safeH = height > 0 ? height : 1080;
     _mobileViewId = viewId;
     _mobileWid = wid;
-    _mobileSurfaceW = width;
-    _mobileSurfaceH = height;
+    _mobileSurfaceW = safeW;
+    _mobileSurfaceH = safeH;
     final player = _player;
     if (player == null) return;
     await NativeVideoSurfaceBinder.attach(
@@ -2898,6 +3007,75 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         }
       });
     }
+  }
+
+  /// Reenganchar la MISMA superficie nativa tras un reinit del player
+  /// (_switchTrack/_switchSource). La TextureView se mantiene viva mientras el
+  /// widget esté montado, así que su wid y tamaño siguen siendo válidos. Sin
+  /// esto el video queda negro/parado al cambiar de idioma o servidor.
+  Future<void> _reattachMobileSurface(
+    int viewId,
+    int wid,
+    int width,
+    int height,
+  ) async {
+    if (viewId < 0 || wid <= 0) return;
+    // Evitar reenganchar un wid viejo si ya existe una superficie activa diferente creada por la vista
+    if (_mobileWid != null && _mobileWid! > 0 && (_mobileWid != wid || _mobileViewId != viewId)) {
+      debugPrint('[native-surface] ignorando reattach de wid viejo ($wid), activo es $_mobileWid');
+      return;
+    }
+    final player = _player;
+    if (player == null) return;
+    // Senior HLS Fix: mismo rationale que _applyMobileSurface — usar un
+    // tamaño de seguridad cuando no se conoce para no dejar a mpv sin
+    // superficie (video negro con audio).
+    final int safeW = width > 0 ? width : 1920;
+    final int safeH = height > 0 ? height : 1080;
+    _mobileViewId = viewId;
+    _mobileWid = wid;
+    _mobileSurfaceW = safeW;
+    _mobileSurfaceH = safeH;
+    debugPrint(
+        '[native-surface] reattach view=$viewId wid=$wid ${width}x$height '
+        'player=${player.hashCode}');
+    try {
+      await NativeVideoSurfaceBinder.attach(
+        player: player,
+        viewId: viewId,
+        wid: wid,
+        width: width,
+        height: height,
+      );
+    } catch (e) {
+      debugPrint('[native-surface] reattach error: $e');
+    }
+    // La superficie ya estaba lista: no reiniciar el timer de overlay.
+    if (mounted && !_nativeSurfaceReady) {
+      _nativeSurfaceReadyTimer?.cancel();
+      _nativeSurfaceReadyTimer =
+          Timer(const Duration(milliseconds: 200), () {
+        if (mounted) {
+          setState(() => _nativeSurfaceReady = true);
+        }
+      });
+    }
+  }
+
+  /// Reenganchar la superficie nativa con un delay: el nuevo decoder del
+  /// _switchTrack necesita unos ms para inicializar antes de que el wid esté
+  /// listo. Un attach inmediato puede llegar antes y el player queda sin
+  /// superficie (video negro al cambiar de idioma).
+  void _reattachMobileSurfaceDelayed(
+    int viewId,
+    int wid,
+    int width,
+    int height,
+  ) {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      unawaited(_reattachMobileSurface(viewId, wid, width, height));
+    });
   }
 
   Future<void> _pushMobileVideoSize() async {
@@ -3053,7 +3231,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final pcfg = ref.read(playbackConfigProvider).valueOrNull ?? PlaybackConfig.defaults;
     PlaybackTelemetry.instance.configure(pcfg);
     PlaybackTelemetry.instance.beginSession();
-    final bool isHls = videoUrl.contains('.m3u8');
+    _isHls = videoUrl.contains('.m3u8');
+    final bool isHls = _isHls;
 
     // Senior Quality Fix: Guardar el stream base para poder volver a "Automático".
     _currentStreamUrl = videoUrl;
@@ -3113,7 +3292,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       _isStabilizing = true; 
       _lastFrameMs = _resumePosition; 
       _lastStablePositionMs = _resumePosition;
-      if (_useNativeMobileSurface && _resumePosition <= 3000) {
+      if (_useNativeMobileSurface) {
         _holdingGen = _resumeSeekGen;
         _holdingFirstFrame = true;
       }
@@ -3268,6 +3447,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               )));
             } catch (_) {
               ref.invalidate(extractProvider);
+    ref.invalidate(extractStreamProvider);
             }
             setState(() {
               _hasInitialized = false;
@@ -3285,6 +3465,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
       if (kIsWeb && message.contains('interrupted')) {
         debugPrint('[player] Ignorando error de interrupción normal en Web');
+        return;
+      }
+
+      // Ignorar errores no fatales de comandos MPV (ej. seek antes de que el demuxer esté listo)
+      if (errorMsg.contains('_command(seek') ||
+          errorMsg.contains('seek') ||
+          errorMsg.contains('command event')) {
+        debugPrint('[player] Ignorando error no fatal de comando MPV: $errorMsg');
         return;
       }
 
@@ -3327,10 +3515,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       if (ms > 0) PlaybackTelemetry.instance.markFirstFrame();
       final duration = player.state.duration.inMilliseconds;
 
-      // Senior UI Fix: la carga termina cuando la posición avanza de verdad
-      // (no al llamar a play()); así el spinner cubre el tiempo de buffering.
-      if (ms > 1000 && mounted && _isLoading) {
-        setState(() => _isLoading = false);
+      // Senior UI Fix: Sincronizar la desaparición del cargando con el inicio real de audio/video.
+      if (mounted && player.state.playing && ms > 0) {
+        final bool posIsReady = _resumePosition > 3000
+            ? ((ms - _resumePosition).abs() < 5000 || ms >= _resumePosition)
+            : ms > 100;
+        if (posIsReady) {
+          _hasResetPosition = true;
+          if (_isLoading || _holdingFirstFrame || !_nativeSurfaceReady) {
+            setState(() {
+              _isLoading = false;
+              _holdingFirstFrame = false;
+              _nativeSurfaceReady = true;
+            });
+          }
+        }
       }
 
       if (!_hasResetPosition) {
@@ -3566,6 +3765,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           platform.setProperty('vo', 'gpu'); // Usar gpu vo en vez de mediacodec_embed
           platform.setProperty('gpu-context', 'sdl');
           debugPrint('[player] WebM detected: using software decoder + gpu vo');
+        } else if (isHls) {
+          // HLS: el device no tiene MediaCodec de AV1 (falla "Could not open
+          // codec"). Con hwdec=no mpv usa su propio decoder software (lavc)
+          // que sí decodifica AV1. Si _useNativeMobileSurface es false,
+          // debemos usar vo=gpu ya que mediacodec_embed requiere un wid (WinID)
+          // nativo y de lo contrario mpv crashea con SIGABRT en C.
+          platform.setProperty('hwdec', 'no'); // Forzar software para AV1/HLS
+          platform.setProperty('vd-lavc-threads', '2'); // SW: menos threads = más estable
+          if (_useNativeMobileSurface) {
+            platform.setProperty('vo', 'mediacodec_embed');
+            debugPrint('[player] HLS detected: using software decoder + mediacodec_embed vo');
+          } else {
+            platform.setProperty('vo', 'gpu');
+            platform.setProperty('gpu-context', 'sdl');
+            debugPrint('[player] HLS detected: using software decoder + gpu vo');
+          }
         } else {
           platform.setProperty('vd-lavc-threads', _tvMpvParityTest ? '0' : '4');
           platform.setProperty('hwdec', 'auto-safe'); // Senior Fix: HW con fallback seguro (estilo YouTube); si falla, mpv cae a SW
@@ -3598,23 +3813,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         setState(() => _mobileSurfaceMounted = true);
         await WidgetsBinding.instance.endOfFrame;
       }
-      // No esperamos a que la SurfaceView exista: si aparece después del
-      // open, _applyMobileSurface la engancha sin reiniciar el decoder.
-      final viewId = _mobileViewId;
-      final wid = _mobileWid;
-      if (viewId != null &&
-          wid != null &&
-          _mobileSurfaceW > 0 &&
-          _mobileSurfaceH > 0) {
-        await _applyMobileSurface(
-          viewId,
-          wid,
-          _mobileSurfaceW,
-          _mobileSurfaceH,
-        );
-      }
       debugPrint(
-          '[player] native surface mounting (view=$viewId wid=$wid)');
+          '[player] native surface mounting (view=$_mobileViewId wid=$_mobileWid)');
 
       // El tamaño real puede llegar después de enganchar la superficie.
       unawaited(_mobileWidthSub?.cancel());
@@ -3627,7 +3827,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       });
     } else {
       final bool hadController = _controller != null;
-      _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: true));
+      _controller ??= VideoController(player, configuration: const VideoControllerConfiguration(androidAttachSurfaceAfterVideoParameters: false));
       if (!hadController && mounted) {
         setState(() {});
         await WidgetsBinding.instance.endOfFrame;
@@ -3680,6 +3880,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         ), 
         play: !needsResumeSeek
       );
+
+      // Senior Surface Fix: Conectar la superficie nativa tras open() para forzar
+      // a mpv/mediacodec_embed a recrear la instancia del decodificador MediaCodec
+      // para el nuevo stream.
+      if (_useNativeMobileSurface) {
+        final viewId = _mobileViewId;
+        final wid = _mobileWid;
+        if (viewId != null &&
+            wid != null &&
+            _mobileSurfaceW > 0 &&
+            _mobileSurfaceH > 0) {
+          await _applyMobileSurface(
+            viewId,
+            wid,
+            _mobileSurfaceW,
+            _mobileSurfaceH,
+          );
+        }
+      }
       
       debugPrint('[player] 3. WAIT UNTIL PARSED (Polling duration)');
       int timeout = 0;
@@ -3690,9 +3909,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       
       if (needsResumeSeek) {
         debugPrint('[player] 4. RESUME SEEK to $_resumePosition (Duration: ${player.state.duration})');
+        if ((!_tvMpvParityTest || _useNativeMobileSurface) && mounted) {
+          _holdingGen = _resumeSeekGen;
+          setState(() => _holdingFirstFrame = true);
+        }
         // Senior Fix: Seek absoluto forzado después de que el demuxer está listo.
         // Si mpv lo pierde, _resumeSeekWhenReady (tras el play) verifica y reintenta.
-        await player.seek(Duration(milliseconds: _resumePosition));
+        try {
+          await player.seek(Duration(milliseconds: _resumePosition));
+        } catch (e) {
+          debugPrint('[player] Resume seek initial error (ignored, will retry when ready): $e');
+        }
         // Senior: Retardo mayor para estabilización de hardware tras fallo de codec
         await Future.delayed(const Duration(milliseconds: 1200));
       } else {
@@ -3724,11 +3951,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       } else {
         debugPrint('[player] 5. PLAY');
         await player.play();
-        // Gate de primer frame solo para videos nuevos (ver campo).
-        if ((!_tvMpvParityTest || _useNativeMobileSurface) &&
-            _resumePosition <= 3000 &&
-            !_isAutoplayResume) {
-          _gateFirstFrame(player, _resumeSeekGen);
+        // Gate de primer frame para la transición visual (nuevo video o reanudación)
+        if ((!_tvMpvParityTest || _useNativeMobileSurface) && !_isAutoplayResume) {
+          if (_resumePosition <= 3000) {
+            _gateFirstFrame(player, _resumeSeekGen);
+          } else {
+            _gateResumePlayback(player, _resumeSeekGen, _resumePosition);
+          }
         }
         // Senior Autoplay Fix: Garantizar que el stream arranca aunque el motor
         // reporte pausa justo después del open (común en HLS nativo).
@@ -3941,7 +4170,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       }
       if (gen != _resumeSeekGen) return;
       debugPrint('[player] Resume retry seek a $tMs (attempt ${attempt + 1}, pos $before)');
-      await player.seek(target);
+      try {
+        await player.seek(target);
+      } catch (e) {
+        debugPrint('[player] Resume retry seek error: $e');
+      }
       // Senior: 900ms de settle; el seek en MP4 progresivo dispara una petición
       // de rango al CDN que tarda en responder por el primer byte.
       await Future.delayed(const Duration(milliseconds: 900));
@@ -4462,6 +4695,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       );
     }
 
+    // Senior Fix: Al salir del player (_isExiting=true), el setState dispara un
+    // rebuild. Sin este guard, el rebuild llega al ref.watch(extractStreamProvider)
+    // y relanza la petición SSE innecesariamente al cerrar.
+    if (_isExiting) return const Material(color: Colors.black);
+
     // Senior Direct Flow: Fuentes que ya entregan el stream directo o proxied
     final bool isDirectSource = _currentSource == 'Themes' || _currentSource == 'YouTube';
 
@@ -4475,11 +4713,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       return Material(color: Colors.black, child: _playerView(settings: settings));
     }
 
-    final extractAsync = ref.watch(extractProvider(ExtractParams(
+    final extractAsync = ref.watch(extractStreamProvider(ExtractParams(
       url: _currentSourceUrl, 
       source: _currentSource,
       category: widget.category,
     )));
+
+    // Senior Fix: Usar ref.listen para capturar CADA evento SSE del StreamProvider
+    // y actualizar _allTracks vía setState. Esto garantiza que el panel de idioma
+    // se refresque en tiempo real sin depender de extractAsync.isLoading (que siempre
+    // es false en StreamProvider después del primer yield).
+    ref.listen(extractStreamProvider(ExtractParams(
+      url: _currentSourceUrl,
+      source: _currentSource,
+      category: widget.category,
+    )), (prev, next) {
+      if (!mounted) return;
+      next.whenData((result) {
+        final playableTracks = result.tracks.where((t) => !t.isDownload).toList();
+        final prevCount = prev?.value?.tracks.where((t) => !t.isDownload).length ?? 0;
+        // ¿Llegaron más tracks que antes? → actualizar lista visible
+        if (playableTracks.length > prevCount) {
+          setState(() {
+            _allTracks = playableTracks;
+            _extractTracks = playableTracks.where((t) => !t.isEmbed).toList();
+            _isTrackStreaming = true;
+          });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            ref.read(activePlayerProvider.notifier).updateSession(tracks: playableTracks);
+          });
+        } else if (_isTrackStreaming && playableTracks.length == prevCount && prevCount > 0) {
+          // Sin cambio nuevo → el stream SSE cerró (evento done recibido)
+          setState(() => _isTrackStreaming = false);
+        }
+      });
+    });
 
     // Senior Session Sync: Sincronizar lista de episodios con el provider global
     final episodesAsync = (widget.isLive || widget.source == 'YouTube' || widget.sourceUrl.contains('youtube.com') || widget.sourceUrl.contains('youtu.be'))
@@ -4512,6 +4781,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           if (!_hasInitialized) {
             _hasInitialized = true;
             _selectedTrackIndex = _indexForLanguage(playableTracks);
+            _allTracks = playableTracks;
+            _extractTracks = playableTracks.where((t) => !t.isEmbed).toList();
+            _isTrackStreaming = true; // SSE acaba de entregar el primer batch
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
               final safeIdx = _selectedTrackIndex < playableTracks.length ? _selectedTrackIndex : 0;
@@ -4522,15 +4794,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 else _initPlayer(initialTrack.url, initialTrack.headers);
               } else if (result.url.isNotEmpty) _initPlayer(result.url, result.headers);
               if (mounted) {
-              _allTracks = playableTracks;
-              setState(() => _extractTracks = playableTracks.where((t) => !t.isEmbed).toList());
-
-              // Senior Session Sync: Persistir tracks en el provider global
-              ref.read(activePlayerProvider.notifier).updateSession(
-                tracks: playableTracks,
-                selectedIndex: _selectedTrackIndex,
-              );
-            }
+                // Senior Session Sync: Persistir tracks en el provider global
+                ref.read(activePlayerProvider.notifier).updateSession(
+                  tracks: playableTracks,
+                  selectedIndex: _selectedTrackIndex,
+                );
+              }
             });
           }
           return _playerView(tracks: tracks, settings: settings);
@@ -5416,40 +5685,59 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildSkipVisual(bool isRight) {
     final bool isMobile = ResponsiveUtils.isMobile(context);
+    final double screenWidth = MediaQuery.sizeOf(context).width;
     
     return Align(
       alignment: isRight ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        width: MediaQuery.sizeOf(context).width / 4,
-        height: double.infinity,
-        // Solo mostramos un fondo sutil en móvil para delimitar la zona táctil
-        decoration: isMobile ? BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.only(
-            topLeft: isRight ? const Radius.circular(500) : Radius.zero,
-            bottomLeft: isRight ? const Radius.circular(500) : Radius.zero,
-            topRight: !isRight ? const Radius.circular(500) : Radius.zero,
-            bottomRight: !isRight ? const Radius.circular(500) : Radius.zero,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 150),
+        opacity: (_showLeftSkip || _showRightSkip) ? 1.0 : 0.0,
+        child: Container(
+          width: screenWidth * 0.35,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.only(
+              topLeft: isRight ? const Radius.circular(500) : Radius.zero,
+              bottomLeft: isRight ? const Radius.circular(500) : Radius.zero,
+              topRight: !isRight ? const Radius.circular(500) : Radius.zero,
+              bottomRight: !isRight ? const Radius.circular(500) : Radius.zero,
+            ),
           ),
-        ) : null,
-        child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!isRight) AurisIcon(AurisIcons.chevronLeft, color: Colors.white, size: 36),
-              const SizedBox(width: 4),
-              Text(
-                '${isRight ? "+" : "-"}${_lastSkipValue}',
-                style: GoogleFonts.poppins(
-                  color: Colors.white, 
-                  fontWeight: FontWeight.w500, 
-                  fontSize: isMobile ? 22 : 32,
-                  shadows: const [Shadow(color: Colors.black45, blurRadius: 8)],
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isRight) AurisIcon(AurisIcons.rewind, color: Colors.white, size: 28),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${isRight ? "+" : "-"}${_lastSkipValue}s',
+                      style: TextStyle(
+                        color: Colors.white, 
+                        fontWeight: FontWeight.w700, 
+                        fontSize: isMobile ? 22 : 28,
+                        letterSpacing: 0.5,
+                        shadows: const [Shadow(color: Colors.black54, blurRadius: 10)],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    if (isRight) AurisIcon(AurisIcons.fastForward, color: Colors.white, size: 28),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 4),
-              if (isRight) AurisIcon(AurisIcons.chevronRight, color: Colors.white, size: 36),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  isRight ? 'adelantar' : 'retroceder',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -5458,24 +5746,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildSpeedIndicator() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.black.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white24, width: 1),
+        boxShadow: const [
+          BoxShadow(color: Colors.black38, blurRadius: 10, spreadRadius: 1),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            "2x",
-            style: GoogleFonts.poppins(
+            "2X VELOCIDAD",
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1,
             ),
           ),
           const SizedBox(width: 8),
-          AurisIcon(AurisIcons.fastForward, color: Colors.white, size: 20),
+          AurisIcon(AurisIcons.fastForwardFilled, color: const Color(0xFFEF7A1E), size: 18),
         ],
       ),
     );
@@ -5509,7 +5802,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             const SizedBox(height: 24),
             Text(
               timeStr,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: isMobile ? 32 : 48,
                 fontWeight: FontWeight.w900,
@@ -5524,7 +5817,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ),
               child: Text(
                 diffStr,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: isMobile ? 16 : 22,
                   fontWeight: FontWeight.bold,
@@ -5538,6 +5831,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   }
 
   Widget _buildMobilePlayer(List<VideoTrackOption> playableTracks, UserSettings settings) {
+    final double topInset = MediaQuery.paddingOf(context).top;
     final bool isAnyGestureActive = _isBrightnessGesture != null || _showSeekIndicator || _isLongPressSpeedActive;
     final bool showAnyway = (_showControls || (_autoplayCountdown >= 0 && _isAutoplayResume) || _activeOverlay != PlayerOverlay.none) && !isAnyGestureActive;
     // Modo nativo: un único overlay opaco cubre TODO el arranque (open,
@@ -5591,9 +5885,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           else if (_controller != null)
             RepaintBoundary(
               child: AnimatedOpacity(
-                // Senior Visual Shield: Opacidad 0 hasta que el seek de reanudación sea estable.
-                // Más gate de primer frame en videos nuevos (ver campo).
-                opacity: ((!_hasResetPosition && _resumePosition > 3000) || _holdingFirstFrame) ? 0.0 : 1.0,
+                // Senior Visual Shield: Opacidad 1.0 inmediata en modo textura para evitar pantalla negra al pasar de WatchScreen
+                opacity: (_holdingFirstFrame && !_hasInitialized) ? 0.0 : 1.0,
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeIn,
                 child: Video(
@@ -5634,9 +5927,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ),
 
           // EL DETECTOR UNIVERSAL DE GESTOS Y CAPA DE CONTROLES
-          // Senior Elite Fix: Unificamos todo bajo un solo PointerInterceptor para evitar que
-          // las capas de UI bloqueen el GestureDetector de fondo en Web.
-          Positioned.fill(
+          // Senior Elite Fix: Inicia debajo del topInset para dejar la franja de notificaciones limpia en el OS
+          Positioned(
+            top: topInset > 0 ? topInset : 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             child: PointerInterceptor(
               child: Stack(
                 fit: StackFit.expand,
@@ -5768,6 +6064,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         },
                         onVerticalDragStart: (details) {
                           if (_isLocked || !ResponsiveUtils.isNative) return;
+                          final double topPadding = MediaQuery.paddingOf(context).top;
+                          final double topEdgeThreshold = topPadding > 0 ? topPadding + 16 : 38.0;
+                          
+                          // Exclusión de borde superior: Ceder el gesto al OS para la barra de notificaciones/centro de control
+                          if (details.globalPosition.dy < topEdgeThreshold) {
+                            _isBrightnessGesture = null;
+                            return;
+                          }
+
                           final width = MediaQuery.sizeOf(context).width;
                           _isBrightnessGesture = details.globalPosition.dx < width / 2;
                           setState(() => _showControls = false);
@@ -6055,7 +6360,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             ),
             panelOpen: _activeOverlay != PlayerOverlay.none,
             panelTitle: switch (_activeOverlay) {
-              PlayerOverlay.language => 'Fuentes Disponibles (${_getLanguageOptions().length})',
+              PlayerOverlay.language => _isTrackStreaming && _getLanguageOptions().isEmpty
+                  ? 'Buscando fuentes...'
+                  : 'Fuentes Disponibles (${_getLanguageOptions().length})',
               PlayerOverlay.server => 'Servidores (${_groupedSources.keys.length})',
               PlayerOverlay.quality => 'Calidad de Video',
               PlayerOverlay.episodes => 'Episodios',
@@ -6279,9 +6586,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     final double hPadding = isTwoPanelOpen ? 8 : (useMobileLayout ? 24 : 48);
     final double vPadding = isTwoPanelOpen ? 0 : (useMobileLayout ? (isLandscape ? 6 : 12) : 12);
+    final double topInset = MediaQuery.paddingOf(context).top;
 
     return Positioned(
-      top: 0, 
+      top: topInset > 0 ? topInset : 0, 
       left: 0, 
       right: 0, 
       child: Padding(
@@ -7014,6 +7322,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       child: Slider(
                         value: currentMs,
                         max: maxMs,
+                        onChangeStart: (_) {
+                          _startHideTimer();
+                        },
                         onChanged: (value) {
                           final int targetMs = value.toInt();
                           _isStabilizing = true;
@@ -7023,7 +7334,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                           _lastStablePositionMs = targetMs;
                           _player?.seek(Duration(milliseconds: targetMs));
                           _startStabilizationTimer();
+                          _updateHistory(positionMs: targetMs, durationMs: duration.inMilliseconds, force: false);
+                        },
+                        onChangeEnd: (value) {
+                          final int targetMs = value.toInt();
                           _updateHistory(positionMs: targetMs, durationMs: duration.inMilliseconds, force: true);
+                          _startHideTimer();
                         },
                       ),
                     ),

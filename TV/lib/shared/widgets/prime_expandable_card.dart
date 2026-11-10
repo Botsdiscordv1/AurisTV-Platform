@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart' hide MarqueeText;
 import '../../core/theme/editorial_themes.dart';
 import 'marquee_text.dart';
@@ -127,7 +126,7 @@ class _PrimeExpandableCardState extends ConsumerState<PrimeExpandableCard> with 
                               widget.media.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

@@ -113,7 +113,7 @@ class _SeasonSelectorState extends State<SeasonSelector> {
                                 color: Colors.white,
                                 fontSize: widget.data.fontSize ?? _sp(context, widget.data.compact ? 14 : 16),
                                 fontWeight: FontWeight.bold,
-                                fontFamily: 'Poppins',
+                                fontFamily: 'NetflixSans',
                               ),
                             ),
                             if (widget.data.totalEpisodes != null && widget.data.totalEpisodes! > 0)
@@ -123,7 +123,7 @@ class _SeasonSelectorState extends State<SeasonSelector> {
                                   color: const Color(0xFFB2B4BC),
                                   fontSize: widget.data.fontSize ?? _sp(context, widget.data.compact ? 13 : 15),
                                   fontWeight: FontWeight.w500,
-                                  fontFamily: 'Poppins',
+                                  fontFamily: 'NetflixSans',
                                 ),
                               ),
                           ],

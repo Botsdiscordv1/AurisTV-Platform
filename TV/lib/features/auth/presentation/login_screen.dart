@@ -7,7 +7,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:auris_core/auris_core.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 
 // -----------------------------------------------------------------------------
@@ -53,7 +52,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _showPassword = false;
 
   // Evita mostrar el collage a medio cargar cuando Login es la pantalla de
-  // arranque: se pinta SOLO cuando sus imágenes están decodificadas.
+  // arranque: se pinta SOLO cuando sus imÃ¡genes estÃ¡n decodificadas.
   bool _collageReady = false;
   bool _showLoginControls = false;
 
@@ -123,7 +122,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ref.read(authProvider.notifier).loginWithUserAccount(userAccount);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Dispositivo activado con éxito! Iniciando sesión...'),
+            content: Text('Â¡Dispositivo activado con Ã©xito! Iniciando sesiÃ³n...'),
             backgroundColor: Color(0xFFEF7A1E),
           ),
         );
@@ -275,7 +274,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                         ),
 
-                        // Content – left half
+                        // Content Â– left half
                         Positioned(
                           left: 0,
                           top: 0,
@@ -304,9 +303,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       width: 520,
                                       child: Text(
                                         'Al usar AurisTV muestras tu conformidad con nuestras\n'
-                                        'Condiciones de Uso [auristv.dpdns.org/terms] y nuestra Política de\n'
-                                        'Privacidad [auristv.dpdns.org/privacy], confirmando además que\n'
-                                        'tienes 16 años o más.',
+                                        'Condiciones de Uso [auristv.dpdns.org/terms] y nuestra PolÃ­tica de\n'
+                                        'Privacidad [auristv.dpdns.org/privacy], confirmando ademÃ¡s que\n'
+                                        'tienes 16 aÃ±os o mÃ¡s.',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: Colors.white70,
@@ -449,7 +448,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          'Iniciar sesión en AurisTV',
+          'Iniciar sesiÃ³n en AurisTV',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white,
@@ -475,7 +474,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         SizedBox(
           width: 420,
           child: Text(
-            'Escanea el código QR con la cámara de tu teléfono para iniciar sesión automáticamente.',
+            'Escanea el cÃ³digo QR con la cÃ¡mara de tu telÃ©fono para iniciar sesiÃ³n automÃ¡ticamente.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.95),
@@ -497,7 +496,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          'Iniciar sesión en AurisTV',
+          'Iniciar sesiÃ³n en AurisTV',
           style: TextStyle(
             color: Colors.white,
             fontSize: 28,
@@ -513,7 +512,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         const SizedBox(height: 14),
         const _StepRow(
           n: '2',
-          text: 'Introduce este código:',
+          text: 'Introduce este cÃ³digo:',
         ),
         const SizedBox(height: 6),
         Padding(
@@ -537,7 +536,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         const SizedBox(height: 14),
         const _StepRow(
           n: '3',
-          text: 'Permanece en esta pantalla y la TV iniciará sesión automáticamente.',
+          text: 'Permanece en esta pantalla y la TV iniciarÃ¡ sesiÃ³n automÃ¡ticamente.',
         ),
       ],
     );
@@ -551,7 +550,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          'Iniciar sesión en AurisTV',
+          'Iniciar sesiÃ³n en AurisTV',
           style: TextStyle(
             color: Colors.white,
             fontSize: 28,
@@ -563,7 +562,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
         // Email Address Label
         const Text(
-          'Correo electrónico',
+          'Correo electrÃ³nico',
           style: TextStyle(
             color: Colors.white,
             fontSize: 14,
@@ -584,7 +583,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
         // Password Label
         const Text(
-          'Contraseña',
+          'ContraseÃ±a',
           style: TextStyle(
             color: Colors.white,
             fontSize: 14,
@@ -598,7 +597,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               child: _TVCleanTextField(
                 focusNode: _passInputFocus,
                 controller: _passwordController,
-                hintText: '••••••••',
+                hintText: 'Â•Â•Â•Â•Â•Â•Â•Â•',
                 obscureText: !_showPassword,
                 textInputAction: TextInputAction.done,
                 prevFocus: _emailInputFocus,
@@ -623,7 +622,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         // LOG IN Button
         _BigButton(
           focusNode: _submitBtnFocus,
-          label: 'INICIAR SESIÓN',
+          label: 'INICIAR SESIÃ“N',
           filled: true,
           prevFocus: _passInputFocus,
           onPressed: _performManualLogin,
@@ -669,7 +668,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          '¿Olvidaste tu contraseña?',
+          'Â¿Olvidaste tu contraseÃ±a?',
           style: TextStyle(
             color: Colors.white,
             fontSize: 28,
@@ -679,7 +678,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 24),
         Text(
-          'Visita auristv.dpdns.org/reset para restablecer tu contraseña y recuperar el acceso a tu cuenta.',
+          'Visita auristv.dpdns.org/reset para restablecer tu contraseÃ±a y recuperar el acceso a tu cuenta.',
           style: TextStyle(
             color: Colors.white.withOpacity(0.85),
             fontSize: 18,
@@ -697,7 +696,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Por favor ingresa tu correo y contraseña.'),
+          content: Text('Por favor ingresa tu correo y contraseÃ±a.'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -712,7 +711,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Sesión iniciada con éxito!'),
+            content: Text('Â¡SesiÃ³n iniciada con Ã©xito!'),
             backgroundColor: Color(0xFFEF7A1E),
           ),
         );
@@ -722,7 +721,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error de autenticación: ${e.toString()}'),
+            content: Text('Error de autenticaciÃ³n: ${e.toString()}'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -774,7 +773,7 @@ class _LoginSidebar extends StatelessWidget {
           const SizedBox(height: 36),
           _SidebarMenuItem(
             focusNode: scanQrFocus,
-            label: 'Escanear código QR',
+            label: 'Escanear cÃ³digo QR',
             isSelected: currentStep == _LoginStep.scanQR,
             prevFocus: backFocus,
             nextFocus: activateCodeFocus,
@@ -784,7 +783,7 @@ class _LoginSidebar extends StatelessWidget {
           const SizedBox(height: 12),
           _SidebarMenuItem(
             focusNode: activateCodeFocus,
-            label: 'Activar con código',
+            label: 'Activar con cÃ³digo',
             isSelected: currentStep == _LoginStep.activateCode,
             prevFocus: scanQrFocus,
             nextFocus: loginEmailFocus,
@@ -794,7 +793,7 @@ class _LoginSidebar extends StatelessWidget {
           const SizedBox(height: 12),
           _SidebarMenuItem(
             focusNode: loginEmailFocus,
-            label: 'Iniciar sesión con email',
+            label: 'Iniciar sesiÃ³n con email',
             isSelected: currentStep == _LoginStep.loginEmail,
             prevFocus: activateCodeFocus,
             nextFocus: createAccountFocus,
@@ -814,7 +813,7 @@ class _LoginSidebar extends StatelessWidget {
           const SizedBox(height: 12),
           _SidebarMenuItem(
             focusNode: forgotPassFocus,
-            label: '¿Olvidaste tu contraseña?',
+            label: 'Â¿Olvidaste tu contraseÃ±a?',
             isSelected: currentStep == _LoginStep.forgotPassword,
             prevFocus: createAccountFocus,
             onFocus: () => onSelectStep(_LoginStep.forgotPassword),

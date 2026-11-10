@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 import '../providers/remote_control_provider.dart';
 import '../../data/models/remote_device.dart';
@@ -40,7 +39,7 @@ class DeviceSelectorDialog extends ConsumerWidget {
                     'Conectar a un dispositivo',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),
                 Container(

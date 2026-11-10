@@ -33,8 +33,6 @@ flutter:
   assets:
     - assets/branding/
     - assets/data/
-    - assets/fonts/
-    - assets/fonts/netflix_sans/
     - assets/icons/
     - assets/images/
     - assets/intro/

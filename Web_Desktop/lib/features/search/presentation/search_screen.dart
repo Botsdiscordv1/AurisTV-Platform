@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:collection/collection.dart';
 
 import 'package:auris_core/auris_core.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_web_desktop/core/router/app_router.dart';
 import 'package:auris_web_desktop/core/utils/responsive_utils.dart';
 import 'package:auris_web_desktop/core/utils/url_utils.dart';
@@ -597,7 +596,7 @@ class _SearchResultsGrid extends ConsumerWidget {
                       child: MarqueeText(
                         text: cardTitle,
                         animate: isMobile,
-                        style: GoogleFonts.poppins(
+                        style: TextStyle(
                           color: Colors.white.withOpacity(0.95),
                           fontSize: ResponsiveUtils.posterTitleFontSize(context),
                           fontWeight: FontWeight.w700,

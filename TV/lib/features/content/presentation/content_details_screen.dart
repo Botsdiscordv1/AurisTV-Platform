@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 
 import 'episodes_detail_overlay.dart';
@@ -129,7 +128,7 @@ class ContentDetailsScreen extends StatelessWidget {
                               logoReady: true,
                               maxWidth: MediaQuery.sizeOf(context).width * 0.4,
                               maxHeight: 80,
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 32,
                                 fontWeight: FontWeight.w900,
@@ -199,7 +198,7 @@ class ContentDetailsScreen extends StatelessWidget {
                                   ),
                                   child: Text(
                                     'Dolby Atmos',
-                                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
@@ -279,7 +278,7 @@ class _AceptarButtonState extends State<_AceptarButton> {
           ),
           child: Text(
             'Aceptar',
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: Colors.black,
               fontSize: 15,
               fontWeight: FontWeight.w700,

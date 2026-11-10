@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'auris_icon.dart';
 
 /// Fila de opción para los menús del panel lateral (TV / Móvil / Web).
@@ -110,7 +109,7 @@ class AurisOptionCard extends StatelessWidget {
                           children: [
                             Text(
                               title,
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 color: isFocused
                                     ? Colors.black
                                     : (isAvailable ? Colors.white : Colors.white38),
@@ -122,7 +121,7 @@ class AurisOptionCard extends StatelessWidget {
                               const SizedBox(height: 2),
                               Text(
                                 subtitle,
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
                                   color: isFocused
                                       ? Colors.black54
                                       : (isAvailable ? Colors.white60 : Colors.white24),

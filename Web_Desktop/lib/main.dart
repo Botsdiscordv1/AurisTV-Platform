@@ -48,6 +48,17 @@ Future<void> main() async {
   await Hive.openBox('home_cache'); // Senior: Cache para el inicio instantáneo
   await Hive.openBox('media_slug_cache'); // Senior: Mapeo de Slugs -> Metadata para URLs limpias
 
+  // ============================================
+  // VERIFICACIÓN DE SEGURIDAD - Supabase Credentials
+  // ============================================
+  if (!ApiEndpoints.isSupabaseConfigured) {
+    const fallbackKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyeHV6cXVkZGZlZ3B4amNmZnZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MjkwNTcsImV4cCI6MjEwMTEwNTA1N30.YiJVKqtNM1D4aZbgBaVSGkMczNIHGpxj0tzDVj95MY8';
+    debugPrint('🔴 SECURITY WARNING: SUPABASE_ANON_KEY not set in environment!');
+    debugPrint('📝 Using FALLBACK key with known credentials.');
+    debugPrint('⚠️  This is a security risk for production deployments.');
+    debugPrint('🔧 Set SUPABASE_ANON_KEY environment variable for secure configuration.');
+  }
+
   // Inicializa Supabase
   await Supabase.initialize(
     url: ApiEndpoints.supabaseUrl,
@@ -66,6 +77,30 @@ Future<void> main() async {
         // embed se abre en el navegador del sistema (mismo comportamiento
         // embed que PlayerScreen en estas plataformas).
         sportsChannelLauncherProvider.overrideWithValue(launchSportsChannel),
+        // Ficha del evento deportivo: en Web vive en la ruta limpia
+        // `/sports/<id>` (compartible y refrescable). Fuera de GoRouter
+        // (escritorio nativo, que usa un MaterialApp sin router) caemos al
+        // `MaterialPageRoute` de siempre.
+        sportsDetailOpenerProvider.overrideWithValue(
+          (context, event, onChannelSelected) {
+            if (onChannelSelected == null) {
+              try {
+                context.push(UrlUtils.buildSportsUri(event), extra: event);
+                return;
+              } catch (_) {
+                // Sin GoRouter por encima → camino antiguo.
+              }
+            }
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ContentSportScreen(
+                  event: event,
+                  onChannelSelected: onChannelSelected,
+                ),
+              ),
+            );
+          },
+        ),
       ],
       child: const AurisApp(),
     ),

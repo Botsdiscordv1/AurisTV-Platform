@@ -79,7 +79,9 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     final bool isFullScreen = location.startsWith('/series') ||
         location.startsWith('/movie') ||
         location.startsWith('/detalles') ||
-        location.startsWith('/reproductor');
+        location.startsWith('/watch') ||
+        location.startsWith('/reproductor') || // alias legacy de /watch
+        location.startsWith('/sports');
 
     if (!isTactic) {
       return Scaffold(

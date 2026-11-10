@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart' hide MarqueeText;
 import '../../../core/utils/tv_responsive_utils.dart';
 import 'tv_focus_wrapper.dart';
@@ -203,7 +202,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                             widget.title,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: GoogleFonts.poppins(
+                                            style: TextStyle(
                                               color: Colors.white,
                                               fontSize: TVResponsiveUtils.grid(context, 24),
                                               fontWeight: FontWeight.w700,
@@ -224,7 +223,7 @@ class _FocusableWideCardState extends State<FocusableWideCard> {
                                     widget.title,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       color: Colors.white,
                                       fontSize: TVResponsiveUtils.grid(context, 24),
                                       fontWeight: FontWeight.w700,

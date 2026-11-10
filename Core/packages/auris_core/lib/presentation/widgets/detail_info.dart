@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 
 /// Bloque de información principal para la pantalla de detalles.
@@ -83,7 +82,7 @@ class AurisDetailInfo extends StatelessWidget {
       (overview != null && overview!.isNotEmpty) ? overview! : 'Sinopsis no disponible.', 
       maxLines: 6, 
       overflow: TextOverflow.ellipsis,
-      style: GoogleFonts.poppins(
+      style: TextStyle(
         color: Colors.white.withOpacity(0.9), 
         fontSize: 15, 
         height: 1.4, 

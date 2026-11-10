@@ -386,7 +386,7 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     }
   }
 
-  void updatePosterForContent({required String contentId, required String title, required String posterUrl, String? bannerUrl, String? logoUrl}) {
+  void updatePosterForContent({required String contentId, required String title, required String posterUrl, String? bannerUrl, String? backdropUrl, String? logoUrl}) {
     if (posterUrl.isEmpty) return;
     bool updatedAny = false;
 
@@ -405,22 +405,11 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
       final hContentId = h.contentId.toLowerCase().trim();
       final hUrl = (h.url ?? '').toLowerCase().trim();
 
-      // Match ESTRICTO: id/url exacto o título normalizado IDÉNTICO.
-      // Antes se comparaba con `contains` bidireccional, lo que aplicaba el
-      // póster/logo de la obra abierta a OTRAS cuyo título lo contiene
-      // (p.ej. "One Piece" → "One Piece Film Red"), mezclando logos entre
-      // tarjetas de Continuar Viendo. Igual con id/url vacío.
       final bool idMatch = cleanContentId.isNotEmpty &&
           (hContentId == cleanContentId || hUrl == cleanContentId);
       final bool titleMatch = cleanTitle.isNotEmpty && hTitle == cleanTitle;
 
       if (idMatch || titleMatch) {
-        // El banner de un EPISODIO (still) manda para series. En películas
-        // no hay still: si se conserva un banner viejo equivocado (venía
-        // del thumbnail del scraper o del matching laxo anterior) la
-        // tarjeta de Continuar Viendo mostraba logo correcto + imagen de
-        // otra película, y nunca se corregía porque aquí se "protegía"
-        // cualquier banner existente.
         final bool keepBanner = !_isMovieEntry(h) &&
             h.bannerUrl != null &&
             h.bannerUrl!.isNotEmpty;
@@ -431,15 +420,19 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
             : ((bannerUrl != null && bannerUrl.isNotEmpty)
                 ? bannerUrl
                 : h.bannerUrl);
-        // Antes todo dependía de que cambiara el póster: si el póster ya era
-        // el correcto, ni el banner ni el logo se corregían nunca.
+        final String? newBackdrop = (backdropUrl != null && backdropUrl.isNotEmpty)
+            ? backdropUrl
+            : h.backdropUrl;
+
         final bool changed = h.posterUrl != posterUrl ||
             h.bannerUrl != newBanner ||
+            h.backdropUrl != newBackdrop ||
             h.logoUrl != newLogo;
         if (changed) {
           _memoryCache[i] = h.copyWith(
             posterUrl: posterUrl,
             bannerUrl: newBanner,
+            backdropUrl: newBackdrop,
             logoUrl: newLogo,
           );
           updatedAny = true;
@@ -510,16 +503,20 @@ class PlaybackHistoryNotifier extends AsyncNotifier<List<PlaybackHistory>> {
     bool updated = false;
     final repository = ref.read(playbackHistoryRepositoryProvider);
     final cleanTargetTitle = title?.toLowerCase().trim() ?? '';
+    final cleanContentId = contentId.toLowerCase().trim();
 
     for (int i = 0; i < _memoryCache.length; i++) {
       final h = _memoryCache[i];
       final cleanHistoryTitle = h.title?.toLowerCase().trim() ?? '';
+      final hContentId = h.contentId.toLowerCase().trim();
+      final hUrl = (h.url ?? '').toLowerCase().trim();
       
-      final bool matches = h.contentId == contentId ||
-                           h.url == contentId ||
-                           contentId.contains(h.contentId) ||
-                           h.contentId.contains(contentId) ||
-                           (cleanTargetTitle.isNotEmpty && cleanHistoryTitle.isNotEmpty && (cleanHistoryTitle == cleanTargetTitle || cleanHistoryTitle.contains(cleanTargetTitle) || cleanTargetTitle.contains(cleanHistoryTitle)));
+      // Match ESTRICTO: URL exacta o contentId idéntico o título idéntico normalizado.
+      // NUNCA usar contains bidireccional porque sobrescribía alternativeSources
+      // de contenidos con URLs genéricas/distintas (ej. Ranma 2024 pisado por Ranma 1989).
+      final bool urlMatch = cleanContentId.isNotEmpty && (hUrl == cleanContentId || hContentId == cleanContentId);
+      final bool titleMatch = cleanTargetTitle.isNotEmpty && cleanHistoryTitle.isNotEmpty && cleanHistoryTitle == cleanTargetTitle;
+      final bool matches = urlMatch || titleMatch;
 
       if (matches) {
         if (h.alternativeSources == null || h.alternativeSources!.isEmpty || h.alternativeSources!.length < sources.length) {

@@ -12,7 +12,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:collection/collection.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 import 'package:auris_core/auris_core.dart';
@@ -305,7 +304,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 color: _isHovered ? const Color(0xFFEF7A1E) : Colors.white,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
@@ -319,7 +318,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white.withOpacity(0.5),
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -1020,29 +1019,26 @@ class _ThemeCardState extends State<_ThemeCard> {
 
             // Senior Web Fix: Para evitar colisiones y doble inicialización de audio en Web con media_kit,
             // abrimos la pantalla directamente pasándole los metadatos correctos sin pasar por la precarga redundante.
-            showGeneralDialog(
-              context: context,
-              barrierDismissible: false,
-              barrierColor: Colors.black,
-              transitionDuration: const Duration(milliseconds: 300),
-              pageBuilder: (context, animation, secondaryAnimation) => PlayerScreen(
-                contentId: widget.theme.title,
-                sourceUrl: url,
-                source: 'Themes',
-                episode: typeLabel,
-                serverName: 'Themes',
-                totalEpisodes: 1,
-                logoUrl: widget.logoUrl,
-                video720: url720.isNotEmpty ? url720 : null,
-                video1080: url1080.isNotEmpty ? url1080 : null,
-                title: widget.animeTitle, // Pasamos el título del anime a través del nuevo parámetro
-                episodeTitle: widget.theme.title, // El título del OP/ED es el IRIS OUT, etc.
-              ),
+            // UrlUtils.openPlayer lo abre en la ruta limpia `/watch` (URL compartible).
+            final player = PlayerScreen(
+              contentId: widget.theme.title,
+              sourceUrl: url,
+              source: 'Themes',
+              episode: typeLabel,
+              serverName: 'Themes',
+              totalEpisodes: 1,
+              logoUrl: widget.logoUrl,
+              video720: url720.isNotEmpty ? url720 : null,
+              video1080: url1080.isNotEmpty ? url1080 : null,
+              title: widget.animeTitle, // Pasamos el título del anime a través del nuevo parámetro
+              episodeTitle: widget.theme.title, // El título del OP/ED es el IRIS OUT, etc.
             );
+            UrlUtils.openPlayer(context, player);
           }
         }, 
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -1060,9 +1056,9 @@ class _ThemeCardState extends State<_ThemeCard> {
               children: [
                 // Imagen con Zoom (Estilo Home)
                 AnimatedScale(
-                  scale: isSelected ? 1.15 : 1.0, 
-                  duration: const Duration(milliseconds: 600),
-                  curve: Curves.easeOutQuart,
+                  scale: isSelected ? 1.15 : 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
                   child: LayoutBuilder(builder: (context, constraints) => CachedNetworkImage(
                     imageUrl: img!,
                     fit: BoxFit.cover,
@@ -1188,7 +1184,7 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
               const SizedBox(width: 8),
               Text(
                 widget.isLoading ? 'Cargando...' : widget.label,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white, 
                   fontSize: 13, 
                   fontWeight: FontWeight.w500,
@@ -1296,7 +1292,7 @@ class _CastCreditsModal extends ConsumerWidget {
                       children: [
                         Text(
                           person.name,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -1304,7 +1300,7 @@ class _CastCreditsModal extends ConsumerWidget {
                         ),
                         Text(
                           'Filmografía',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             color: const Color(0xFFEF7A1E),
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -1331,7 +1327,7 @@ class _CastCreditsModal extends ConsumerWidget {
                     return Center(
                       child: Text(
                         'No se encontró información disponible',
-                        style: GoogleFonts.poppins(color: Colors.white54, fontSize: 16),
+                        style: TextStyle(color: Colors.white54, fontSize: 16),
                       ),
                     );
                   }
@@ -1370,7 +1366,7 @@ class _CastCreditsModal extends ConsumerWidget {
                                 if (response.biography != null) ...[
                                   Text(
                                     'Biografía',
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -1379,7 +1375,7 @@ class _CastCreditsModal extends ConsumerWidget {
                                   const SizedBox(height: 8),
                                   Text(
                                     response.biography!,
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       color: Colors.white.withOpacity(0.7),
                                       fontSize: 15,
                                       height: 1.5,
@@ -1389,7 +1385,7 @@ class _CastCreditsModal extends ConsumerWidget {
                                 ],
                                 Text(
                                   'Conocido por',
-                                  style: GoogleFonts.poppins(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -1467,7 +1463,7 @@ class _CastCreditsModal extends ConsumerWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: const Color(0xFFEF7A1E),
             fontSize: 11,
             fontWeight: FontWeight.w800,
@@ -1477,7 +1473,7 @@ class _CastCreditsModal extends ConsumerWidget {
         const SizedBox(height: 2),
         Text(
           value,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: Colors.white.withOpacity(0.9),
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -1620,7 +1616,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       ),
       child: Text(
         text.toUpperCase(),
-        style: GoogleFonts.poppins(
+        style: TextStyle(
           color: Colors.white,
           fontSize: ResponsiveUtils.sp(context, small ? 10 : 13),
           fontWeight: FontWeight.w800,
@@ -1675,7 +1671,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
       ),
       child: Text(
         text,
-        style: GoogleFonts.poppins(
+        style: TextStyle(
           color: Colors.white,
           fontSize: ResponsiveUtils.sp(context, small ? 10 : 13),
           fontWeight: FontWeight.w600,
@@ -1735,6 +1731,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
   bool _isTrailerLoading = false;
   bool _useHtmlIframeFallback = false;
   Timer? _timeoutFallbackTimer;
+  bool _hasOpenedPlayer = false;
 
   Widget _buildEpisodesSkeleton(BuildContext context, bool isMobile) {
     try {
@@ -1781,6 +1778,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
   }
 
 void _openPlayer(PlayerScreen player) {
+  _hasOpenedPlayer = true;
   // Pausa directa + reanudar al cerrar (el player abre por diálogo
   // showGeneralDialog, que RouteObserver ignora por no ser PageRoute).
   _pauseTrailerForNav();
@@ -2206,7 +2204,7 @@ void _openPlayer(PlayerScreen player) {
             final leftPainter = TextPainter(
               text: TextSpan(
                 text: leftText,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: isCompact ? 15 : 17,
                   fontWeight: FontWeight.w500,
                 ),
@@ -2229,7 +2227,7 @@ void _openPlayer(PlayerScreen player) {
               for (final genre in g) {
                 final textSpan = TextSpan(
                   text: genre.toString().toUpperCase(),
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: isCompact ? 13 : 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2254,7 +2252,7 @@ void _openPlayer(PlayerScreen player) {
             return SizedBox(
               width: metaWidth,
               child: DefaultTextStyle(
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: const Color(0xFFD1D1D6),
                   fontSize: isCompact ? 15 : 17,
                   fontWeight: FontWeight.w500,
@@ -2323,7 +2321,7 @@ void _openPlayer(PlayerScreen player) {
                   _getWarningText(cert),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     color: const Color(0xFFA5A5AA),
                     fontSize: isCompact ? 14 : 16,
                     fontWeight: FontWeight.w500,
@@ -2359,7 +2357,7 @@ void _openPlayer(PlayerScreen player) {
             : (isTablet ? 15.0 : (screenW * 0.0095).clamp(13.5, 16.0));
         final double lineHeight = isMobile ? 1.35 : 1.45;
 
-        final style = GoogleFonts.poppins(
+        final style = TextStyle(
           color: isMobile ? const Color(0xFFA5A5AA) : Colors.white.withOpacity(0.9),
           fontSize: fontSize,
           height: lineHeight,
@@ -2418,7 +2416,7 @@ void _openPlayer(PlayerScreen player) {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     'Ver más...',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       color: const Color(0xFFEF7A1E),
                       fontWeight: FontWeight.bold,
                       fontSize: isCompact ? 14 : 16,
@@ -2433,7 +2431,7 @@ void _openPlayer(PlayerScreen player) {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     'Ver menos',
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       color: const Color(0xFFEF7A1E).withOpacity(0.7),
                       fontWeight: FontWeight.bold,
                       fontSize: isCompact ? 14 : 16,
@@ -2582,7 +2580,7 @@ void _openPlayer(PlayerScreen player) {
             const SizedBox(width: 8),
             Text(
               label.toUpperCase(),
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 color: Colors.black,
                 fontSize: fontSize,
                 fontWeight: FontWeight.w600,
@@ -3268,7 +3266,11 @@ void _openPlayer(PlayerScreen player) {
       final history = historyAsync.maybeWhen(data: (d) => d, orElse: () => const <dynamic>[]);
       final detailLoading = detailAsync.isLoading && detailAsync.maybeWhen(data: (d) => d == null, orElse: () => true);
 
-      if (currentSource != null && _showContent) {
+      final activePlayer = ref.watch(activePlayerProvider);
+      final isPlayerActive = activePlayer.uiState != PlayerUIState.none;
+
+      // Pre-fetch solo si el usuario no ha abierto el reproductor aún (evita re-extracts al cerrar).
+      if (currentSource != null && _showContent && !isPlayerActive && !_hasOpenedPlayer) {
         String? prefetchUrl;
         if (isMovieCategory) {
           prefetchUrl = currentSource.url;
@@ -4065,10 +4067,16 @@ void _openPlayer(PlayerScreen player) {
     );
   }
 
-  /// Senior Helper: Une datos de fuentes locales con metadatos globales y elimina duplicados
-  /// Senior Helper: Une datos de fuentes locales con metadatos globales y elimina duplicados
-  String _cleanRelatedTitle(String t) =>
-      t.replaceAll(RegExp(r'\s*\([Ss]erie\)'), '').trim();
+  /// Senior Helper: Limpia etiquetas de formato entre paréntesis al final del título
+  /// sin alterar años ni números de temporada (ej. Ranma 1/2 (2024), Youjo Senki II, Season 2).
+  String _cleanRelatedTitle(String t) => t
+      .replaceAll(
+        RegExp(
+          r'\s*\((?:[Pp]el[ií]cula|[Mm]ovie|[Ss]erie|[Tt][Vv]|[Oo][Vv][Aa]|[Oo][Nn][Aa]|[Ee]special|[Aa]udio\s+[Ll]atino)\)\s*$',
+        ),
+        '',
+      )
+      .trim();
 
   List<_RelatedCardData> _unifyAndDeduplicate({
     required List<RelatedInfo> sourceItems,
@@ -4083,10 +4091,18 @@ void _openPlayer(PlayerScreen player) {
     for (var r in sourceItems) {
       final displayTitle = _cleanRelatedTitle(r.title);
       final key = normalize(displayTitle);
+      final badgeText = RelationBadgeHelper.getBadgeText(
+        rawTitle: r.title,
+        relation: r.relation,
+        type: r.type,
+      );
+      final badgeColor = RelationBadgeHelper.getBadgeColor(badgeText);
       unifiedMap[key] = _RelatedCardData(
         title: displayTitle,
         poster: r.cover,
         subtitle: r.relation,
+        badge: badgeText,
+        badgeColor: badgeColor,
         onTap: () {
           final sName = r.source ?? currentSource?.source ?? widget.source;
           final result = SearchResult(
@@ -4338,7 +4354,7 @@ void _openPlayer(PlayerScreen player) {
           padding: EdgeInsets.fromLTRB(hPadding, 32, hPadding, 16), 
           child: Text(
             'Personajes y Actores de Voz', 
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: isMobile ? 20 : 26,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -4388,7 +4404,7 @@ void _openPlayer(PlayerScreen player) {
           padding: EdgeInsets.fromLTRB(hPadding, 32, hPadding, 16), 
           child: Text(
             'Elenco Principal', 
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: isMobile ? 20 : 26,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -4422,9 +4438,19 @@ class _RelatedCardData {
   final String poster;
   final String subtitle;
   final String? rating;
+  final String? badge;
+  final Color? badgeColor;
   final VoidCallback onTap;
 
-  _RelatedCardData({required this.title, required this.poster, required this.subtitle, this.rating, required this.onTap});
+  _RelatedCardData({
+    required this.title,
+    required this.poster,
+    required this.subtitle,
+    this.rating,
+    this.badge,
+    this.badgeColor,
+    required this.onTap,
+  });
 }
 
 class _RelatedCarouselRow extends StatefulWidget {
@@ -4484,7 +4510,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
   void _scroll(double offset) {
     if (!_scrollController.hasClients) return;
     final target = (_scrollController.offset + offset).clamp(0.0, _scrollController.position.maxScrollExtent);
-    _scrollController.animateTo(target, duration: const Duration(milliseconds: 600), curve: Curves.easeOutQuart);
+    _scrollController.animateTo(target, duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
   }
 
   @override
@@ -4512,7 +4538,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
           padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
           child: Text(
             widget.title, 
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               fontSize: ResponsiveUtils.rowTitleFontSize(context),
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -4568,6 +4594,8 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                                   title: item.title,
                                   posterUrl: item.poster,
                                   rating: item.rating,
+                                  badge: item.badge,
+                                  badgeColor: item.badgeColor,
                                   showInfo: false,
                                   onTap: item.onTap,
                                 ),
@@ -4581,7 +4609,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                                 child: MarqueeText(
                                   text: item.title,
                                   animate: isMobile,
-                                  style: GoogleFonts.poppins(
+                                  style: TextStyle(
                                     color: Colors.white.withOpacity(0.95),
                                     fontSize: ResponsiveUtils.posterTitleFontSize(context),
                                     fontWeight: FontWeight.w700,
@@ -4605,7 +4633,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                   height: posterZoneHeight, 
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 200),
                     child: IgnorePointer(
                       ignoring: !(_isHovered && _canScrollLeft),
                       child: Center(child: NavArrow(icon: AurisIcons.chevronLeft, useBackground: true, onTap: () => _scroll(-cardWidth * 3))),
@@ -4618,7 +4646,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                   height: posterZoneHeight, 
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 200),
                     child: IgnorePointer(
                       ignoring: !(_isHovered && _canScrollRight),
                       child: Center(child: NavArrow(icon: AurisIcons.chevronRight, useBackground: true, onTap: () => _scroll(cardWidth * 3))),
@@ -4762,7 +4790,7 @@ class _HorizontalInfoCarouselState<T> extends State<_HorizontalInfoCarousel<T>> 
   void _scroll(double offset) {
     if (!_scrollController.hasClients) return;
     final target = (_scrollController.offset + offset).clamp(0.0, _scrollController.position.maxScrollExtent);
-    _scrollController.animateTo(target, duration: const Duration(milliseconds: 600), curve: Curves.easeOutQuart);
+    _scrollController.animateTo(target, duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
   }
 
   @override
@@ -4817,7 +4845,7 @@ class _HorizontalInfoCarouselState<T> extends State<_HorizontalInfoCarousel<T>> 
               child: Center(
                 child: AnimatedOpacity(
                   opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 200),
                   child: NavArrow(icon: AurisIcons.chevronLeft, useBackground: true, onTap: () => _scroll(-cardWidth * 3)),
                 ),
               ),
@@ -4827,7 +4855,7 @@ class _HorizontalInfoCarouselState<T> extends State<_HorizontalInfoCarousel<T>> 
               child: Center(
                 child: AnimatedOpacity(
                   opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 200),
                   child: NavArrow(icon: AurisIcons.chevronRight, useBackground: true, onTap: () => _scroll(cardWidth * 3)),
                 ),
               ),

@@ -1,7 +1,6 @@
 // AurisTV Avatar Selector Screen
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/avatar_catalog.dart';
@@ -442,7 +441,7 @@ class _CategoryPillBar extends StatelessWidget {
     final TextPainter textPainter = TextPainter(
       text: TextSpan(
         text: text,
-        style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700),
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
       ),
       maxLines: 1,
       textDirection: TextDirection.ltr,
@@ -480,8 +479,8 @@ class _CategoryPillBar extends StatelessWidget {
         children: [
           // LA PILDORA (El fondo que desliza)
           AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOutCubic,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
             left: leftOffset,
             child: Container(
               width: itemWidths[activeIndex],
@@ -563,7 +562,7 @@ class _PillNavItemState extends State<_PillNavItem> {
           ),
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: widget.isActive ? Colors.black : Colors.white,
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -693,7 +692,7 @@ class _AvatarFranchiseRowState extends ConsumerState<_AvatarFranchiseRow> {
                   left: 0, top: 0, height: 120, // Senior Fix: Centrado exacto con el círculo de 120px
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollLeft) ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 200),
                     child: Center(
                       child: NavArrow(
                         icon: AurisIcons.chevronLeft,
@@ -707,7 +706,7 @@ class _AvatarFranchiseRowState extends ConsumerState<_AvatarFranchiseRow> {
                   right: 0, top: 0, height: 120, // Senior Fix: Centrado exacto con el círculo de 120px
                   child: AnimatedOpacity(
                     opacity: (_isHovered && _canScrollRight) ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 200),
                     child: Center(
                       child: NavArrow(
                         icon: AurisIcons.chevronRight,

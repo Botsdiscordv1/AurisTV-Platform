@@ -16,6 +16,7 @@ class PlaybackHistory {
   final String? metadataTitle;
   final String? posterUrl;
   final String? bannerUrl;
+  final String? backdropUrl;
   final String? logoUrl;
   final String? category;
   final String? source;
@@ -53,6 +54,7 @@ class PlaybackHistory {
     this.metadataTitle,
     this.posterUrl,
     this.bannerUrl,
+    this.backdropUrl,
     this.logoUrl,
     this.category,
     this.source,
@@ -86,6 +88,7 @@ class PlaybackHistory {
       'metadataTitle': metadataTitle,
       'posterUrl': posterUrl,
       'bannerUrl': bannerUrl,
+      'backdropUrl': backdropUrl,
       'logoUrl': logoUrl,
       'category': category,
       'source': source,
@@ -127,6 +130,7 @@ class PlaybackHistory {
       metadataTitle: json['metadataTitle'] as String?,
       posterUrl: json['posterUrl'] as String?,
       bannerUrl: json['bannerUrl'] as String?,
+      backdropUrl: json['backdropUrl'] as String?,
       logoUrl: json['logoUrl'] as String?,
       category: json['category'] as String?,
       source: json['source'] as String?,
@@ -173,6 +177,7 @@ class PlaybackHistory {
     String? metadataTitle,
     String? posterUrl,
     String? bannerUrl,
+    String? backdropUrl,
     String? logoUrl,
     String? category,
     String? source,
@@ -200,6 +205,7 @@ class PlaybackHistory {
       metadataTitle: metadataTitle ?? this.metadataTitle,
       posterUrl: posterUrl ?? this.posterUrl,
       bannerUrl: bannerUrl ?? this.bannerUrl,
+      backdropUrl: backdropUrl ?? this.backdropUrl,
       logoUrl: logoUrl ?? this.logoUrl,
       category: category ?? this.category,
       source: source ?? this.source,

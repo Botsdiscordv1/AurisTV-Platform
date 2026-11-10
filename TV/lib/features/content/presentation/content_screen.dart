@@ -12,7 +12,6 @@ import 'package:flutter/foundation.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart' hide FocusablePosterCard, FocusableWideCard;
 import '../../../shared/widgets/focusable_poster_card.dart';
@@ -89,7 +88,7 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
     ),
     child: Text(
       text.toUpperCase(),
-      style: GoogleFonts.poppins(
+      style: TextStyle(
         color: Colors.white, 
         fontSize: small ? 11 : 14, 
         fontWeight: FontWeight.w800,
@@ -1176,7 +1175,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                   const SizedBox(height: 6),
                   Text(
                     d.originalTitle!,
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       color: Colors.white.withOpacity(0.5),
                       fontSize: titleSize * 0.65,
                       fontWeight: FontWeight.w500,
@@ -1445,7 +1444,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DefaultTextStyle(
-          style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
           child: Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 12,
@@ -1466,7 +1465,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         ),
         const SizedBox(height: 4),
         if (!_revealed) _SkeletonBox(width: ResponsiveUtils.sp(context, 200), height: ResponsiveUtils.sp(context, 16))
-        else Row(children: [_buildAgeBadge(context, cert, small: true), const SizedBox(width: 12), Expanded(child: Text(_getWarningText(cert), maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(color: const Color(0xFFA5A5AA), fontSize: 11, fontWeight: FontWeight.w500)))]),
+        else Row(children: [_buildAgeBadge(context, cert, small: true), const SizedBox(width: 12), Expanded(child: Text(_getWarningText(cert), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: 11, fontWeight: FontWeight.w500)))]),
       ],
     );
   }
@@ -1483,7 +1482,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.end,
         text: TextSpan(
-          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+          style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
           children: [
             const TextSpan(text: 'Cast: ', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
             TextSpan(text: castText),
@@ -1527,9 +1526,16 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
         ];
         if (all.isEmpty) return const SizedBox.shrink();
 
-        String normalize(String t) => t
-            .replaceAll(RegExp(r'\s*\([Ss]erie\)'), '')
-            .trim()
+        String cleanTitle(String t) => t
+            .replaceAll(
+              RegExp(
+                r'\s*\((?:[Pp]el[ií]cula|[Mm]ovie|[Ss]erie|[Tt][Vv]|[Oo][Vv][Aa]|[Oo][Nn][Aa]|[Ee]special|[Aa]udio\s+[Ll]atino)\)\s*$',
+              ),
+              '',
+            )
+            .trim();
+
+        String normalize(String t) => cleanTitle(t)
             .toLowerCase()
             .replaceAll(RegExp(r'[^a-z0-9]'), '');
 
@@ -1954,7 +1960,7 @@ class _MoreButtonState extends State<_MoreButton> {
           ),
           child: Text(
             'Más',
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: _focused ? Colors.black : Colors.white,
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -2142,6 +2148,7 @@ class ContentScreen extends ConsumerStatefulWidget {
 class _ContentScreenState extends ConsumerState<ContentScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showContent = false; Timer? _loadTimer;
+  bool _hasNavigatedToPlayer = false;
   @override void initState() { super.initState(); _loadTimer = Timer(ApiEndpoints.pageLoadTimeout, () { if (mounted) setState(() => _showContent = true); }); }
   @override void dispose() { _loadTimer?.cancel(); _scrollController.dispose(); super.dispose(); }
 
@@ -2212,10 +2219,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final history = ref.watch(playbackHistoryStateProvider).valueOrNull ?? [];
 
     // Senior Pre-fetch Strategy:
+    final activePlayer = ref.watch(activePlayerProvider);
+    final isPlayerActive = activePlayer.uiState != PlayerUIState.none;
+
     // Al abrir detalles, disparamos la extracción de la fuente seleccionada en segundo plano
     // (ya sea película o el episodio a reanudar). Así, al pulsar "Reproducir", 
     // el stream ya estará caliente en el caché de Riverpod.
-    if (currentSource != null && _showContent) {
+    // Pre-fetch solo si el reproductor no está activo ni se ha navegado a él
+    if (currentSource != null && _showContent && !isPlayerActive && !_hasNavigatedToPlayer) {
       String? prefetchUrl;
       if (detailState.isMovieish) {
         prefetchUrl = currentSource.url;
@@ -2272,6 +2283,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           final epSource = detailState.episodes.valueOrNull?.sourceForNumber(epNum) ?? currentSource;
           final ep = epData?.episodes.firstWhereOrNull((e) => e.number == epNum);
           final epThumb = ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? '';
+          _hasNavigatedToPlayer = true;
           context.push('/player/${Uri.encodeComponent(widget.title)}?source=${epSource?.source ?? effectiveSrc}&url=${_episodeUrlFor(ep, epSource?.url ?? widget.url, epSource?.source ?? effectiveSrc, epNum)}&episode=$epNum&season=${latest?.season ?? detailState.currentSeason}&serverName=${simplifySourceName(epSource?.source ?? effectiveSrc)}&startPosition=${latest?.positionInMilliseconds ?? ''}&category=$playCategory&totalEpisodes=${epData?.total ?? 0}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}${playKind != null && playKind.isNotEmpty ? '&kind=${Uri.encodeComponent(playKind)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
         }
       ),
@@ -2505,6 +2517,18 @@ class _RelatedCarouselState extends State<_RelatedCarousel> {
                                   },
                                   title: widget.items[index].title,
                                   posterUrl: widget.items[index].cover,
+                                  badge: RelationBadgeHelper.getBadgeText(
+                                    rawTitle: widget.items[index].title,
+                                    relation: widget.items[index].relation,
+                                    type: widget.items[index].type,
+                                  ),
+                                  badgeColor: RelationBadgeHelper.getBadgeColor(
+                                    RelationBadgeHelper.getBadgeText(
+                                      rawTitle: widget.items[index].title,
+                                      relation: widget.items[index].relation,
+                                      type: widget.items[index].type,
+                                    ),
+                                  ),
                                   showInfo: true,
                                   onTap: () => _openRelated(widget.items[index]),
                                 ),

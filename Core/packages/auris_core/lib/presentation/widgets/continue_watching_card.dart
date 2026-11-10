@@ -249,11 +249,28 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
     final isDesktopOrWeb = kIsWeb || MediaQuery.of(context).size.width >= 800;
 
     final double effectiveWidth = widget.width ?? ResponsiveUtils.bannerWidth(context);
-    final String? imageUrl = widget.history.bannerUrl ?? widget.history.posterUrl;
-    final String? logoUrl = widget.history.logoUrl;
+    final bool isMovie = isMovieLike(widget.history.category, widget.history.title, widget.history.durationInMilliseconds);
+
+    // ── Lógica de imágenes para Películas vs Series ──
+    // En Películas:
+    //   1. Si tiene bannerUrl: se usa de fondo. Al tener título tipográfico integrado, NO se muestra logo ni título.
+    //   2. Si bannerUrl es null: se usa backdropUrl (o posterUrl) + superposición de logoUrl (o texto).
+    // En Series/Anime por episodios:
+    //   Fondo = thumbnail del episodio (posterUrl o still). Superposición = logoUrl (o texto de episodio).
+    final bool movieHasBanner = isMovie && widget.history.bannerUrl != null && widget.history.bannerUrl!.isNotEmpty;
+
+    final String? imageUrl = isMovie
+        ? (movieHasBanner
+            ? widget.history.bannerUrl
+            : (widget.history.backdropUrl ?? widget.history.posterUrl))
+        : (widget.history.posterUrl ?? widget.history.bannerUrl);
+
+    final String? logoUrl = movieHasBanner ? null : widget.history.logoUrl;
+    final bool showTitleOverlay = !movieHasBanner;
+
     final remainingMs = widget.history.durationInMilliseconds - widget.history.positionInMilliseconds;
 
-    final String titleText = isMovieLike(widget.history.category, widget.history.title, widget.history.durationInMilliseconds)
+    final String titleText = isMovie
         ? (widget.history.title ?? '').replaceAll(RegExp(r'^[Ee]p\s*\d+\s*[.\-•]\s*'), '').trim()
         : '${widget.history.episode != null ? 'Ep ${widget.history.episode} • ' : ''}${widget.history.title ?? ''}';
 
@@ -338,50 +355,52 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
                                   ),
                                 ),
 
-                                if (logoUrl != null && logoUrl.isNotEmpty)
-                                  Positioned(
-                                    bottom: 16, left: 12,
-                                    child: Container(
-                                      height: (effectiveWidth / 1.77) * 0.35,
-                                      width: effectiveWidth * 0.65,
-                                      alignment: Alignment.bottomLeft,
-                                    child: LogoToneFilter(
-                                      imageUrl: ApiEndpoints.proxyImage(logoUrl),
-                                      child: CachedNetworkImage(
+                                if (showTitleOverlay) ...[
+                                  if (logoUrl != null && logoUrl.isNotEmpty)
+                                    Positioned(
+                                      bottom: 16, left: 12,
+                                      child: Container(
+                                        height: (effectiveWidth / 1.77) * 0.35,
+                                        width: effectiveWidth * 0.65,
+                                        alignment: Alignment.bottomLeft,
+                                      child: LogoToneFilter(
                                         imageUrl: ApiEndpoints.proxyImage(logoUrl),
-                                        fit: BoxFit.contain,
-                                        filterQuality: FilterQuality.medium,
-                                        // Sin logo (404/red): título como fallback
-                                        errorWidget: (context, __, ___) => Text(
-                                          titleText,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: textPrimary,
-                                            fontSize: ResponsiveUtils.bannerTitleFontSize(context),
-                                            fontWeight: FontWeight.w700,
-                                            shadows: const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 2))],
+                                        child: CachedNetworkImage(
+                                          imageUrl: ApiEndpoints.proxyImage(logoUrl),
+                                          fit: BoxFit.contain,
+                                          filterQuality: FilterQuality.medium,
+                                          // Sin logo (404/red): título como fallback
+                                          errorWidget: (context, __, ___) => Text(
+                                            titleText,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: textPrimary,
+                                              fontSize: ResponsiveUtils.bannerTitleFontSize(context),
+                                              fontWeight: FontWeight.w700,
+                                              shadows: const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 2))],
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    ),
-                                  )
-                                else
-                                  Positioned(
-                                    bottom: 12, left: 12, right: 12,
-                                    child: Text(
-                                      titleText,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: textPrimary,
-                                        fontSize: ResponsiveUtils.bannerTitleFontSize(context),
-                                        fontWeight: FontWeight.w700,
-                                        shadows: const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 2))],
+                                      ),
+                                    )
+                                  else
+                                    Positioned(
+                                      bottom: 12, left: 12, right: 12,
+                                      child: Text(
+                                        titleText,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: textPrimary,
+                                          fontSize: ResponsiveUtils.bannerTitleFontSize(context),
+                                          fontWeight: FontWeight.w700,
+                                          shadows: const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(0, 2))],
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                ],
 
                                 if (widget.history.progress > 0)
                                   Positioned(

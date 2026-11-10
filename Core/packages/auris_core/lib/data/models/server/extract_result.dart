@@ -1,4 +1,4 @@
-﻿import '../../../core/api/api_endpoints.dart';
+import '../../../core/api/api_endpoints.dart';
 
 class QualityOption {
   final String key;
@@ -85,6 +85,20 @@ class ExtractResult {
     this.tracks = const [],
     this.qualities = const [],
   });
+
+  ExtractResult copyWith({
+    String? url,
+    Map<String, String>? headers,
+    List<VideoTrackOption>? tracks,
+    List<QualityOption>? qualities,
+  }) {
+    return ExtractResult(
+      url: url ?? this.url,
+      headers: headers ?? this.headers,
+      tracks: tracks ?? this.tracks,
+      qualities: qualities ?? this.qualities,
+    );
+  }
 
   factory ExtractResult.fromJson(Map<String, dynamic> json) {
     final rawUrl = json['url'] as String? ?? '';

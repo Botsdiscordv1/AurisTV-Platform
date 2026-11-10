@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
@@ -505,7 +504,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ),
                                     child: Text(
                                       currentCategory[0].toUpperCase() + currentCategory.substring(1),
-                                      style: GoogleFonts.poppins(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w700),
+                                      style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w700),
                                     ),
                                   ),
                                 ],
@@ -671,7 +670,7 @@ class _AuthButtonState extends State<_AuthButton> {
               ),
               child: Text(
                 'Iniciar sesión', 
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w800, fontSize: widget.isCompactDesktop ? 13 : 15, letterSpacing: 0.5),
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: widget.isCompactDesktop ? 13 : 15, letterSpacing: 0.5),
               ),
             ),
           ),
@@ -700,7 +699,7 @@ class _PillNavBar extends StatelessWidget {
     // Senior: Ajuste de fuente para el modo ultra-compacto (Vertical tablets)
     final double fontSize = isUltraCompact ? 13.5 : (isCompact ? 14 : 15);
     final TextPainter textPainter = TextPainter(
-      text: TextSpan(text: text, style: GoogleFonts.poppins(fontSize: fontSize, fontWeight: FontWeight.w700)),
+      text: TextSpan(text: text, style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w700)),
       maxLines: 1,
       textDirection: TextDirection.ltr,
     )..layout();
@@ -809,7 +808,7 @@ class _PillNavItemState extends State<_PillNavItem> {
           ),
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
-            style: GoogleFonts.poppins(color: widget.isActive ? Colors.black : Colors.white, fontSize: widget.fontSize, fontWeight: FontWeight.w700),
+            style: TextStyle(color: widget.isActive ? Colors.black : Colors.white, fontSize: widget.fontSize, fontWeight: FontWeight.w700),
             child: Text(widget.label),
           ),
         ),
@@ -899,7 +898,7 @@ class _LanguageSelector extends StatelessWidget {
       value: label,
       child: Text(
         label,
-        style: GoogleFonts.poppins(
+        style: TextStyle(
           color: Colors.white.withOpacity(0.9),
           fontSize: 14,
           fontWeight: FontWeight.w600,
@@ -940,7 +939,7 @@ class _LanguageButtonState extends State<_LanguageButton> {
             children: [
               Text(
                 'ES', 
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white, 
                   fontSize: 12, 
                   fontWeight: FontWeight.w700
@@ -1012,6 +1011,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
+      isBannerFallback: true,
       progress: h.progress,
       subtitle: sub.line1.isNotEmpty ? sub.line1 : null,
       subtitle2: sub.line2,

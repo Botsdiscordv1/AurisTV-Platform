@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/prime_expandable_card.dart';
@@ -129,7 +128,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
                   children: [
                     Text(
                       widget.title,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: ResponsiveUtils.rowTitleFontSize(context),
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -155,7 +154,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               child: Text(
                 widget.subtitle!,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Colors.white.withOpacity(0.5),
@@ -239,7 +238,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               children: [
                 Text(
                   widget.title,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     fontSize: ResponsiveUtils.rowTitleFontSize(context),
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -263,7 +262,7 @@ class _EditorialContentRowState extends State<EditorialContentRow> with Automati
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               child: Text(
                 widget.subtitle!,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Colors.white.withOpacity(0.5),

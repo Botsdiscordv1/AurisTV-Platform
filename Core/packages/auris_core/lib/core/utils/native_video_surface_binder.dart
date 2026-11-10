@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
-/// Engancha la `SurfaceView` nativa de Android a mpv.
+/// Engancha la superficie nativa de Android (`TextureView`) a mpv.
 ///
 /// Es el único punto que escribe `vo`, `wid` y `android-surface-size`, de modo
 /// que el player grande, el mini player y PiP comparten el mismo estado. El
@@ -34,12 +34,20 @@ class NativeVideoSurfaceBinder {
   }) async {
     // El primer PlatformView de Flutter tiene id 0: es válido. Solo un id
     // negativo indica que la vista aún no está registrada.
-    if (viewId < 0 || wid <= 0 || width <= 0 || height <= 0) return;
+    if (viewId < 0 || wid <= 0) return;
+
+    // Senior HLS Fix: En HLS el `open()` puede llegar antes de que la TextureView
+    // tenga tamaño (primer layout). Si width/height son 0 y devolvemos sin
+    // hacer nada, mpv queda con vo=null y sin wid -> audio sí, video negro.
+    // Usamos un tamaño de seguridad (1920x1080) mientras no lo sepamos; mpv
+    // lo sobrescribe con los datos reales cuando llegan por updateVideoSize.
+    final int safeW = width > 0 ? width : 1920;
+    final int safeH = height > 0 ? height : 1080;
 
     final bool sameSurface = _wid == wid && identical(_player, player);
     debugPrint(
         '[native-surface] attach view=$viewId wid=$wid ${width}x$height '
-        'same=$sameSurface player=${player.hashCode}');
+        '(safe=${safeW}x${safeH}) same=$sameSurface player=${player.hashCode}');
     _player = player;
     _viewId = viewId;
     _wid = wid;
@@ -50,15 +58,11 @@ class NativeVideoSurfaceBinder {
 
     try {
       final dynamic platform = player.platform;
-      if (!sameSurface) {
-        await platform.setProperty('vo', 'null');
-      }
-      await platform.setProperty('android-surface-size', '${width}x$height');
-      if (!sameSurface) {
-        await platform.setProperty('wid', wid.toString());
-        await platform.setProperty('vo', 'mediacodec_embed');
-        await platform.setProperty('vid', 'auto');
-      }
+      await platform.setProperty('vo', 'null');
+      await platform.setProperty('android-surface-size', '${safeW}x${safeH}');
+      await platform.setProperty('wid', wid.toString());
+      await platform.setProperty('vo', 'mediacodec_embed');
+      await platform.setProperty('vid', 'auto');
     } catch (e) {
       debugPrint('[native-surface] attach error: $e');
     }

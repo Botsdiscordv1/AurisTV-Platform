@@ -17,7 +17,7 @@ typedef MobileSurfaceReady = void Function(
 
 typedef MobileSurfaceDestroyed = void Function(int viewId, int? wid);
 
-/// Superficie de video nativa (Android `SurfaceView`) para el player de Móvil.
+/// Superficie de video nativa (Android `TextureView`) para el player de Móvil.
 ///
 /// Igual que `TvVideoSurface` en TV: entrega a mpv el `android.view.Surface`
 /// como `--wid` para que el frame vaya directo al display, sin la textura de

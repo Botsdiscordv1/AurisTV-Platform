@@ -144,27 +144,34 @@ class AnimeDetail {
             root['overview'] as String?,
       ),
       poster: ApiEndpoints.proxyImage(
+        root['posterUrl'] as String? ??
+        visuals?['posterUrl'] as String? ??
         visuals?['poster'] as String? ??
         root['poster'] as String? ??
-        visuals?['posterUrl'] as String? ??
-        root['posterUrl'] as String? ??
         root['thumbnail'] as String?,
         policy: ImageSize.poster
       ),
       backdrop: ApiEndpoints.proxyImage(
+        root['backdropUrl'] as String? ??
+        visuals?['backdropUrl'] as String? ??
         visuals?['backdrop'] as String? ??
-        root['backdrop'] as String? ??
-        visuals?['backdrop_url'] as String? ??
-        root['backdrop_url'] as String? ??
-        root['banner'] as String?, 
+        root['backdrop'] as String?, 
         policy: ImageSize.full
       ),
       banner: ApiEndpoints.proxyImage(
-        visuals?['banner'] as String? ?? root['banner'] as String? ??
-        visuals?['backdrop'] as String? ?? root['backdrop'] as String?, 
+        root['bannerUrl'] as String? ??
+        visuals?['bannerUrl'] as String? ??
+        visuals?['banner'] as String? ??
+        root['banner'] as String?, 
         policy: ImageSize.banner
       ),
-      logo: ApiEndpoints.proxyImage(visuals?['logo'] as String? ?? root['logo'] as String?, policy: ImageSize.tiny),
+      logo: ApiEndpoints.proxyImage(
+        root['logoUrl'] as String? ??
+        visuals?['logoUrl'] as String? ??
+        visuals?['logo'] as String? ??
+        root['logo'] as String?,
+        policy: ImageSize.tiny
+      ),
       rating: (anime['score'] as num? ?? anime['rating'] as num? ?? root['score'] as num? ?? root['rating'] as num?)?.toDouble(),
       score: (anime['score'] as num? ?? anime['rating'] as num? ?? root['score'] as num? ?? root['rating'] as num?)?.toDouble(),
       episodes: anime['episodes'] as int?,

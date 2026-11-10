@@ -62,6 +62,8 @@ export 'core/utils/section_composer.dart';
 export 'core/utils/user_event_tracker.dart';
 export 'core/utils/personalization_monitor.dart';
 export 'core/utils/safe_tap.dart';
+export 'core/utils/url_security_validator.dart';
+export 'core/utils/signed_token_manager.dart';
 export 'core/utils/release_countdown_logic.dart';
 export 'core/playback/media_category.dart';
 export 'core/playback/playback_policy.dart';
@@ -136,5 +138,17 @@ export 'presentation/widgets/playlist_lists_content.dart';
 export 'presentation/widgets/playlist_channels_content.dart';
 export 'presentation/widgets/tv_dialog_action.dart';
 
+// Componentes Adaptativos de WatchScreen
+export 'presentation/watch/watch_screen.dart';
+export 'presentation/watch/watch_screen_base.dart';
+export 'presentation/watch/adaptive_watch_layout.dart';
+export 'presentation/watch/widgets/clean_embedded_player.dart';
+export 'presentation/watch/widgets/watch_episode_metadata.dart';
+export 'presentation/watch/widgets/watch_action_bar.dart';
+export 'presentation/watch/widgets/watch_synopsis.dart';
+export 'presentation/watch/widgets/watch_nav_card.dart';
+export 'presentation/watch/widgets/watch_playlist_sidebar.dart';
+
 export 'data/services/device_activation_service.dart';
 export 'data/services/app_update_service.dart';
+export 'core/utils/relation_badge_helper.dart';

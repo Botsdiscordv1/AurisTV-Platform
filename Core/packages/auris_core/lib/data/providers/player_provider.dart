@@ -189,6 +189,7 @@ final unifiedContentDetailProvider =
       type: params.type,
       server: effectiveBaseUrl,
       imgSize: 'original',
+      
     );
   } else {
     movie = await repo.getMovieDetail(
@@ -261,6 +262,31 @@ class ExtractParams {
   @override
   int get hashCode => Object.hash(url, source, category);
 }
+
+final extractStreamProvider =
+    StreamProvider.autoDispose.family<ExtractResult, ExtractParams>((ref, params) {
+  if (params.source == 'ppv' || params.source == 'sport' || params.source == 'live' ||
+      params.url.contains('/embed/') ||
+      params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
+    return Stream.value(ExtractResult(url: params.url, headers: const {}));
+  }
+  final CancelToken cancelToken = CancelToken();
+  ref.onDispose(() => cancelToken.cancel('Provider disposed'));
+
+  final repo = ref.watch(aurisRepositoryProvider);
+  final settings = ref.watch(settingsProvider);
+  final String pref = settings.preferredLanguage.toLowerCase();
+  final String targetLang = pref == 'latino' ? 'LAT' : (pref == 'castellano' ? 'CAST' : 'SUB');
+
+  return repo.extractVideoStream(
+    params.url,
+    params.source,
+    category: params.category,
+    preferredLang: targetLang,
+    direct: !kIsWeb,
+    cancelToken: cancelToken,
+  );
+});
 
 final extractProvider =
     FutureProvider.autoDispose.family<ExtractResult, ExtractParams>((ref, params) async {

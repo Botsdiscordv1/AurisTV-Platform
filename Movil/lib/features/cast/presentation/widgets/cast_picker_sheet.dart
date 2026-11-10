@@ -1,6 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart';
 import 'package:auristv_mobile/features/remote_control/data/models/remote_device.dart';
@@ -112,7 +111,7 @@ class CastPickerContent extends ConsumerWidget {
             children: [
               Text(
                 'Transmitir a un dispositivo',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                     color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
               ),
               if (onClose != null)
@@ -568,7 +567,7 @@ class _LocalPairDialogState extends ConsumerState<_LocalPairDialog> {
             children: [
               Text(
                 'Vincular con ${widget.tv.name}',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: isLandscape ? 15 : 16,

@@ -8,7 +8,6 @@ import '../widgets/library_media_card.dart';
 import '../../home/widgets/wide_content_row.dart';
 
 import 'dart:ui';
-import 'package:google_fonts/google_fonts.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -57,6 +56,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
+      isBannerFallback: true,
       progress: h.progress,
       subtitle: remainingText,
       onDelete: () {
@@ -114,7 +114,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 onPressed: () => context.pop(),
               ),
               title: Text('Mi biblioteca', 
-                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20)),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
               backgroundColor: _isScrolled ? const Color(0xFF000000).withValues(alpha: 0.6) : Colors.transparent,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
@@ -242,7 +242,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Text(title, style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+      Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
       const SizedBox(width: 12),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/auris_bottom_bar.dart';
@@ -106,7 +105,7 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
     ),
     child: Text(
       text.toUpperCase(),
-      style: GoogleFonts.poppins(
+      style: TextStyle(
         color: Colors.white, 
         fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
         fontWeight: FontWeight.w800,
@@ -995,7 +994,7 @@ class _DetailIconButtonState extends State<_DetailIconButton> {
               const SizedBox(width: 8),
               Text(
                 widget.isLoading ? 'Cargando...' : widget.label,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white, 
                   fontSize: 13, 
                   fontWeight: FontWeight.w500,
@@ -1089,7 +1088,7 @@ class _CastCreditsModal extends ConsumerWidget {
                       children: [
                         Text(
                           person.name,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -1097,7 +1096,7 @@ class _CastCreditsModal extends ConsumerWidget {
                         ),
                         Text(
                           'Filmografía',
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             color: const Color(0xFFEF7A1E),
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -1124,7 +1123,7 @@ class _CastCreditsModal extends ConsumerWidget {
                     return Center(
                       child: Text(
                         'No se encontró información disponible',
-                        style: GoogleFonts.poppins(color: Colors.white54, fontSize: 14),
+                        style: TextStyle(color: Colors.white54, fontSize: 14),
                       ),
                     );
                   }
@@ -1163,7 +1162,7 @@ class _CastCreditsModal extends ConsumerWidget {
                                 if (response.biography != null) ...[
                                   Text(
                                     'Biografía',
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -1172,7 +1171,7 @@ class _CastCreditsModal extends ConsumerWidget {
                                   const SizedBox(height: 6),
                                   Text(
                                     response.biography!,
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       color: Colors.white.withOpacity(0.7),
                                       fontSize: 13,
                                       height: 1.4,
@@ -1182,7 +1181,7 @@ class _CastCreditsModal extends ConsumerWidget {
                                 ],
                                 Text(
                                   'Conocido por',
-                                  style: GoogleFonts.poppins(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -1254,7 +1253,7 @@ class _CastCreditsModal extends ConsumerWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: const Color(0xFFEF7A1E),
             fontSize: 10,
             fontWeight: FontWeight.w800,
@@ -1264,7 +1263,7 @@ class _CastCreditsModal extends ConsumerWidget {
         const SizedBox(height: 1),
         Text(
           value,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: Colors.white.withOpacity(0.9),
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -1331,6 +1330,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   bool _revealed = false;
   Timer? _revealTimeout;
   bool _isTrailerLoading = false;
+  bool _hasNavigatedToPlayer = false;
+  bool _hasPrefetched = false;
   YoutubePlayerController? _ytController;
   StreamSubscription? _ytSubscription;
   Timer? _fadeTimer;
@@ -1591,6 +1592,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final posterParam = '&title=${Uri.encodeComponent(state.seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
     final meta = _effectivePlayerMeta(isMovieCategory);
     
+    _hasNavigatedToPlayer = true;
     context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource.source}&url=${Uri.encodeComponent(playUrl)}&episode=$episodeLabel&season=$currentSeason&serverName=${simplifySourceName(tapSource.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${meta.category}&totalEpisodes=${state.episodes.valueOrNull?.response.total ?? 1}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${meta.kind != null && meta.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(meta.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}${castTargetId != null ? '&castTarget=${Uri.encodeComponent(castTargetId)}' : ''}');
   }
 
@@ -2085,14 +2087,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final history = historyAsync.valueOrNull ?? [];
     final detailLoading = detailAsync.isLoading && detailAsync.valueOrNull == null;
 
-    // Pre-fetch Strategy
-    if (currentSource != null && _showContent) {
+    // Pre-fetch Strategy de Carga Inicial Única (Guarded por _hasPrefetched)
+    final activePlayer = ref.watch(activePlayerProvider);
+    final isPlayerActive = activePlayer.uiState != PlayerUIState.none;
+
+    if (!_hasPrefetched && currentSource != null && _showContent && !isPlayerActive && !_hasNavigatedToPlayer) {
       String? prefetchUrl;
       if (isMovieCategory) {
         prefetchUrl = currentSource.url;
       } else {
-        // Episodio a prefetch: sin historial → E1; con progreso a medias →
-        // ese episodio; terminado → el siguiente (clamp al total).
         final latest = history.where((h) => h.contentId == widget.title).firstOrNull;
         int epNum = 1;
         final latestEp = latest != null ? int.tryParse(latest.episode ?? '') : null;
@@ -2107,8 +2110,9 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         prefetchUrl = _episodeUrlFor(ep, epSource.url, epSource.source, epNum);
       }
 
-      if (prefetchUrl.isNotEmpty) {
-        ref.watch(extractProvider(ExtractParams(
+      if (prefetchUrl != null && prefetchUrl.isNotEmpty) {
+        _hasPrefetched = true; // Marcar como procesado para no repetir la petición al cerrar el reproductor
+        ref.read(extractProvider(ExtractParams(
           url: prefetchUrl,
           source: currentSource.source,
           category: widget.category,
@@ -2339,7 +2343,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                                 final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                                 final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
                                 final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                                context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
+                                context.push('/watch/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}${certification != null && certification.isNotEmpty ? '&certification=${Uri.encodeComponent(certification)}' : ''}');
                               });
                             },
                           );
@@ -2360,7 +2364,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                                 final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
                                 final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
                                 final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                                context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}');
+                                context.push('/watch/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}${certification != null && certification.isNotEmpty ? '&certification=${Uri.encodeComponent(certification)}' : ''}');
                               });
                             },
                           );
@@ -2735,10 +2739,16 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     );
   }
 
-  /// Senior Helper: Une datos de fuentes locales con metadatos globales y elimina duplicados
-  /// Senior Helper: Une datos de fuentes locales con metadatos globales y elimina duplicados
-  String _cleanRelatedTitle(String t) =>
-      t.replaceAll(RegExp(r'\s*\([Ss]erie\)'), '').trim();
+  /// Senior Helper: Limpia etiquetas de formato entre paréntesis al final del título
+  /// sin alterar años ni números de temporada (ej. Ranma 1/2 (2024), Youjo Senki II, Season 2).
+  String _cleanRelatedTitle(String t) => t
+      .replaceAll(
+        RegExp(
+          r'\s*\((?:[Pp]el[ií]cula|[Mm]ovie|[Ss]erie|[Tt][Vv]|[Oo][Vv][Aa]|[Oo][Nn][Aa]|[Ee]special|[Aa]udio\s+[Ll]atino)\)\s*$',
+        ),
+        '',
+      )
+      .trim();
 
   List<_RelatedCardData> _unifyAndDeduplicate({
     required List<RelatedInfo> sourceItems,
@@ -2753,10 +2763,18 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     for (var r in sourceItems) {
       final displayTitle = _cleanRelatedTitle(r.title);
       final key = normalize(displayTitle);
+      final badgeText = RelationBadgeHelper.getBadgeText(
+        rawTitle: r.title,
+        relation: r.relation,
+        type: r.type,
+      );
+      final badgeColor = RelationBadgeHelper.getBadgeColor(badgeText);
       unifiedMap[key] = _RelatedCardData(
         title: displayTitle,
         poster: r.cover,
         subtitle: r.relation,
+        badge: badgeText,
+        badgeColor: badgeColor,
         onTap: () {
           final sName = r.source ?? currentSource?.source ?? widget.source;
           final result = SearchResult(
@@ -2989,9 +3007,19 @@ class _RelatedCardData {
   final String poster;
   final String subtitle;
   final String? rating;
+  final String? badge;
+  final Color? badgeColor;
   final VoidCallback onTap;
 
-  _RelatedCardData({required this.title, required this.poster, required this.subtitle, this.rating, required this.onTap});
+  _RelatedCardData({
+    required this.title,
+    required this.poster,
+    required this.subtitle,
+    this.rating,
+    this.badge,
+    this.badgeColor,
+    required this.onTap,
+  });
 }
 
 class _RelatedCarouselRow extends StatefulWidget {
@@ -3072,7 +3100,7 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
             padding: EdgeInsets.symmetric(horizontal: widget.hPadding),
             child: Text(
               widget.title, 
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: ResponsiveUtils.rowTitleFontSize(context),
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -3108,6 +3136,8 @@ class _RelatedCarouselRowState extends State<_RelatedCarouselRow> {
                             title: item.title,
                             posterUrl: item.poster,
                             rating: item.rating,
+                            badge: item.badge,
+                            badgeColor: item.badgeColor,
                             showInfo: true,
                             onTap: item.onTap,
                           ),
@@ -3274,7 +3304,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 color: _isHovered ? const Color(0xFFEF7A1E) : Colors.white,
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
@@ -3287,7 +3317,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white.withOpacity(0.5),
                   fontSize: 10,
                   fontWeight: FontWeight.w500,

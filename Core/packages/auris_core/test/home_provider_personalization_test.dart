@@ -36,6 +36,7 @@ class MockPersonalizedRepo implements AurisRepository {
   @override Future<AnimeTitleInfo> getAnimeTitles(String query) async => const AnimeTitleInfo();
   @override Future<MovieTitleInfo> getMovieTitles(String query) async => const MovieTitleInfo();
   @override Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken}) async => const ExtractResult(url: '', headers: {});
+  @override Stream<ExtractResult> extractVideoStream(String url, String source, {String? category, String? preferredLang, bool direct = false, CancelToken? cancelToken}) async* {}
   @override Future<String> resolveEpisodeUrl(String url, String source, int episode, {String? category}) async => '';
   @override Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year, bool fast = false}) async => EpisodesResponse(episodes: const [], source: source, url: url, slug: '', total: 0);
   @override Future<List<CastInfo>> getCast(String url, {String? source, String? category, int? tmdbId, String? mediaType, String? title, int? year}) async => [];
@@ -178,7 +179,7 @@ void main() {
     final wideSection = layout.firstWhere((s) => s.title == 'Section Forced Wide');
     final top10Section = layout.firstWhere((s) => s.title == 'Section Forced Top10');
 
-    expect(wideSection.presentation, SectionPresentation.posterLarge);
+    expect(wideSection.presentation, SectionPresentation.wide);
     expect(top10Section.presentation, SectionPresentation.top10);
   });
 

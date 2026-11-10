@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../core/utils/responsive_utils.dart';
 
@@ -132,6 +131,7 @@ class _FocusableExpandablePosterCardState extends ConsumerState<FocusableExpanda
       source: widget.mediaItem?.source,
       channels: widget.mediaItem?.channels,
       subtitle: widget.subtitle,
+      id: widget.mediaItem?.id,
     );
   }
 
@@ -242,7 +242,7 @@ class _FocusableExpandablePosterCardState extends ConsumerState<FocusableExpanda
                                   widget.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.poppins(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontSize: ResponsiveUtils.bannerTitleFontSize(context),
                                     fontWeight: FontWeight.bold,
@@ -254,7 +254,7 @@ class _FocusableExpandablePosterCardState extends ConsumerState<FocusableExpanda
                                     widget.subtitle!,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       color: Colors.white70,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
@@ -276,7 +276,7 @@ class _FocusableExpandablePosterCardState extends ConsumerState<FocusableExpanda
                               ),
                               child: Text(
                                 widget.badge!,
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,

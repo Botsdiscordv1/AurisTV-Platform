@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 
 /// Builder de la superficie nativa del mini player.
@@ -860,14 +859,14 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                   item.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, decoration: TextDecoration.none),
+                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, decoration: TextDecoration.none),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   state.source ?? 'AurisTV',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w500, decoration: TextDecoration.none),
+                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w500, decoration: TextDecoration.none),
                 ),
               ],
             ),
@@ -1180,9 +1179,9 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_getEpisodeDisplayTitle(ep), maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white, fontSize: 12, fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal, decoration: TextDecoration.none)),
+                  Text(_getEpisodeDisplayTitle(ep), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white, fontSize: 12, fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal, decoration: TextDecoration.none)),
                   if (ep.duration != null && ep.duration!.isNotEmpty)
-                    Text(ep.duration!, style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10, decoration: TextDecoration.none)),
+                    Text(ep.duration!, style: TextStyle(color: Colors.white54, fontSize: 10, decoration: TextDecoration.none)),
                 ],
               ),
             ),
@@ -1201,7 +1200,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
         final dur = state.player?.state.duration ?? Duration.zero;
         return Text(
           '${_formatDuration(pos)} / ${_formatDuration(dur)}',
-          style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.none, shadows: const [Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1))]),
+          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.none, shadows: const [Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1))]),
         );
       },
     );

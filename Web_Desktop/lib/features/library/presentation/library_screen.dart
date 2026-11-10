@@ -7,7 +7,6 @@ import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/url_utils.dart';
 
 import 'dart:ui';
-import 'package:google_fonts/google_fonts.dart';
 import '../../home/widgets/unified_section.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -81,6 +80,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: h.logoUrl != null ? ApiEndpoints.proxyImage(h.logoUrl!) : null,
+      isBannerFallback: true,
       type: isMovieish ? MediaType.movie : MediaType.anime,
       subtitle: remainingText,
       playbackHistory: h,
@@ -118,7 +118,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 },
               ),
               title: Text('Mi biblioteca', 
-                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20)),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
               backgroundColor: _isScrolled ? const Color(0xFF0B0B0D).withOpacity(0.5) : Colors.transparent,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
@@ -240,7 +240,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Text(title, style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+      Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
       const SizedBox(width: 12),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

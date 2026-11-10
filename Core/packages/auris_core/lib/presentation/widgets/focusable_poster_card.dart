@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../core/utils/responsive_utils.dart';
 import 'marquee_text.dart';
@@ -177,7 +176,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                           widget.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -193,7 +192,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                   const Divider(color: Colors.white12, height: 24),
                   ListTile(
                     leading: AurisIcon(AurisIcons.info, color: Colors.white, size: 24),
-                    title: Text('Ver detalles y más', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
+                    title: Text('Ver detalles y más', style: TextStyle(color: Colors.white, fontSize: 15)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
                       Navigator.pop(context);
@@ -202,7 +201,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                   ),
                   ListTile(
                     leading: AurisIcon(AurisIcons.download, color: Colors.white, size: 24),
-                    title: Text('Descargar', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
+                    title: Text('Descargar', style: TextStyle(color: Colors.white, fontSize: 15)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
                       Navigator.pop(context);
@@ -213,7 +212,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                   ),
                   ListTile(
                     leading: AurisIcon(AurisIcons.close, color: Colors.white, size: 24),
-                    title: Text('No es para mí', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
+                    title: Text('No es para mí', style: TextStyle(color: Colors.white, fontSize: 15)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
                       Navigator.pop(context);
@@ -235,7 +234,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                         ref.watch(favoritesProvider).any((f) => f.id == widget.favoriteItem!.id)
                             ? 'Quitar de Mi lista'
                             : 'Mi lista',
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+                        style: TextStyle(color: Colors.white, fontSize: 15),
                       ),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
@@ -252,7 +251,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                     const Divider(color: Colors.white12, height: 16),
                     ListTile(
                       leading: AurisIcon(AurisIcons.close, color: Colors.white, size: 24),
-                      title: Text('Quitar de la fila', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                      title: Text('Quitar de la fila', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
                         Navigator.pop(context);
@@ -293,7 +292,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
             children: [
               AurisIcon(AurisIcons.info, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
-              Text('Ver detalles y más', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+              Text('Ver detalles y más', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
           ),
         ),
@@ -303,7 +302,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
             children: [
               AurisIcon(AurisIcons.download, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
-              Text('Descargar', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+              Text('Descargar', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
           ),
         ),
@@ -313,7 +312,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
             children: [
               AurisIcon(AurisIcons.close, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
-              Text('No es para mí', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+              Text('No es para mí', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
           ),
         ),
@@ -324,7 +323,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
               children: [
                 AurisIcon(AurisIcons.addCircleOutline, color: Colors.white70, size: 20),
                 const SizedBox(width: 12),
-                Text('Mi lista', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                Text('Mi lista', style: TextStyle(color: Colors.white, fontSize: 13)),
               ],
             ),
           ),
@@ -335,7 +334,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
               children: [
                 AurisIcon(AurisIcons.close, color: Colors.white70, size: 20),
                 const SizedBox(width: 12),
-                Text('Quitar de la fila', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                Text('Quitar de la fila', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -394,12 +393,17 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
 
     final isMobile = context.useMobileLayout;
     final isDesktopOrWeb = kIsWeb || MediaQuery.of(context).size.width >= 800;
-    final double cardWidth = widget.width ??
-        (widget.isLarge
-            ? ResponsiveUtils.largePosterWidth(context)
-            : ResponsiveUtils.posterWidth(context));
 
-    return MouseRegion(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double cardWidth = widget.width ??
+            (constraints.hasBoundedWidth
+                ? constraints.maxWidth
+                : (widget.isLarge
+                    ? ResponsiveUtils.largePosterWidth(context)
+                    : ResponsiveUtils.posterWidth(context)));
+
+        return MouseRegion(
       hitTestBehavior: HitTestBehavior.opaque,
       onEnter: (_) { if (!isMobile && mounted) _hovered.value = true; },
       onExit: (_) { if (!isMobile && mounted) _hovered.value = false; },
@@ -504,7 +508,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                                             ),
                                             child: Text(
                                               widget.badge!,
-                                              style: GoogleFonts.poppins(
+                                              style: TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w800,
@@ -534,7 +538,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                                               widget.subtitle!,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: GoogleFonts.poppins(
+                                              style: TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.w700,
@@ -580,7 +584,7 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                           child: MarqueeText(
                             text: widget.title,
                             animate: isMobile ? true : isActive,
-                            style: GoogleFonts.poppins(
+                            style: TextStyle(
                               color: isActive ? Colors.white : Colors.white.withOpacity(0.95),
                               fontSize: widget.isLarge
                                   ? ResponsiveUtils.largePosterTitleFontSize(context)
@@ -600,6 +604,8 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
           },
         ),
       ),
+    );
+      },
     );
   }
 }

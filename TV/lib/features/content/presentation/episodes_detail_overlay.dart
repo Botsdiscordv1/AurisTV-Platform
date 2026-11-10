@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 
 class EpisodesDetailOverlay extends ConsumerStatefulWidget {
@@ -151,7 +150,7 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
           logoReady: true,
           maxWidth: MediaQuery.sizeOf(context).width * 0.24,
           maxHeight: 64,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: Colors.white,
             fontSize: 24,
             fontWeight: FontWeight.w900,
@@ -162,7 +161,7 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
           const SizedBox(height: 4),
           Text(
             d.originalTitle!,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: Colors.white.withOpacity(0.5),
               fontSize: 20,
               fontWeight: FontWeight.w500,
@@ -359,7 +358,7 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
     return ListView(
       children: [
         if (ops.isNotEmpty) ...[
-          Text('Openings', style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          Text('Openings', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           ...ops.map((th) => Padding(
                 padding: const EdgeInsets.only(bottom: 24),
@@ -368,7 +367,7 @@ class _EpisodesDetailOverlayState extends ConsumerState<EpisodesDetailOverlay> {
           const SizedBox(height: 16),
         ],
         if (eds.isNotEmpty) ...[
-          Text('Endings', style: GoogleFonts.poppins(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          Text('Endings', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           ...eds.map((th) => Padding(
                 padding: const EdgeInsets.only(bottom: 24),
@@ -548,7 +547,7 @@ class ContentDetailsPanel extends StatelessWidget {
 
   static Widget _sectionTitle(String text) => Text(
     text,
-    style: GoogleFonts.poppins(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
   );
 
   static Widget _detailRow(String label, String value) => Padding(

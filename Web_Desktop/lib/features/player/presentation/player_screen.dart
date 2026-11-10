@@ -15,7 +15,6 @@ import 'package:volume_controller/volume_controller.dart';
 import 'package:collection/collection.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart' as yt;
 
 import 'package:auris_core/auris_core.dart';
@@ -42,6 +41,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
   /// Kind granular + a�o para historial fiel (ver Movil).
   final String? kind;
   final int? year;
+  final String? certification;
   final int? totalEpisodes;
   final String? title;
   final String? metadataTitle;
@@ -69,6 +69,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.category,
     this.kind,
     this.year,
+    this.certification,
     this.totalEpisodes,
     this.title,
     this.metadataTitle,
@@ -4015,7 +4016,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               const SizedBox(width: 4),
               Text(
                 '${isRight ? "+" : "-"}${_lastSkipValue}',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white, 
                   fontWeight: FontWeight.w500, 
                   fontSize: useMobileLayout ? 18 : 32,
@@ -4061,7 +4062,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             SizedBox(height: useMobileLayout ? 8 : 24),
             Text(
               timeStr,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: useMobileLayout ? 24 : 48,
                 fontWeight: FontWeight.w900,
@@ -4076,7 +4077,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ),
               child: Text(
                 diffStr,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: useMobileLayout ? 13 : 22,
                   fontWeight: FontWeight.bold,

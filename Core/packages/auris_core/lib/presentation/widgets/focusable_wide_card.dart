@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 
 /// Widget de tarjeta panorámica (16:9) enfocado en la experiencia de usuario premium.
@@ -131,7 +130,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                           widget.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -147,7 +146,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                   const Divider(color: Colors.white12, height: 24),
                   ListTile(
                     leading: AurisIcon(AurisIcons.info, color: Colors.white, size: 24),
-                    title: Text('Ver detalles y más', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
+                    title: Text('Ver detalles y más', style: TextStyle(color: Colors.white, fontSize: 15)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
                       Navigator.pop(context);
@@ -156,7 +155,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                   ),
                   ListTile(
                     leading: AurisIcon(AurisIcons.download, color: Colors.white, size: 24),
-                    title: Text('Descargar', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
+                    title: Text('Descargar', style: TextStyle(color: Colors.white, fontSize: 15)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
                       Navigator.pop(context);
@@ -167,7 +166,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                   ),
                   ListTile(
                     leading: AurisIcon(AurisIcons.close, color: Colors.white, size: 24),
-                    title: Text('No es para mí', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15)),
+                    title: Text('No es para mí', style: TextStyle(color: Colors.white, fontSize: 15)),
                     contentPadding: EdgeInsets.zero,
                     onTap: () {
                       Navigator.pop(context);
@@ -189,7 +188,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                         ref.watch(favoritesProvider).any((f) => f.id == widget.favoriteItem!.id)
                             ? 'Quitar de Mi lista'
                             : 'Mi lista',
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
+                        style: TextStyle(color: Colors.white, fontSize: 15),
                       ),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
@@ -206,7 +205,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                     const Divider(color: Colors.white12, height: 16),
                     ListTile(
                       leading: AurisIcon(AurisIcons.close, color: Colors.white, size: 24),
-                      title: Text('Quitar de la fila', style: GoogleFonts.poppins(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                      title: Text('Quitar de la fila', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
                       contentPadding: EdgeInsets.zero,
                       onTap: () {
                         Navigator.pop(context);
@@ -247,7 +246,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
             children: [
               AurisIcon(AurisIcons.info, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
-              Text('Ver detalles y más', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+              Text('Ver detalles y más', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
           ),
         ),
@@ -257,7 +256,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
             children: [
               AurisIcon(AurisIcons.download, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
-              Text('Descargar', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+              Text('Descargar', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
           ),
         ),
@@ -267,7 +266,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
             children: [
               AurisIcon(AurisIcons.close, color: Colors.white70, size: 20),
               const SizedBox(width: 12),
-              Text('No es para mí', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+              Text('No es para mí', style: TextStyle(color: Colors.white, fontSize: 13)),
             ],
           ),
         ),
@@ -278,7 +277,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
               children: [
                 AurisIcon(AurisIcons.addCircleOutline, color: Colors.white70, size: 20),
                 const SizedBox(width: 12),
-                Text('Mi lista', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                Text('Mi lista', style: TextStyle(color: Colors.white, fontSize: 13)),
               ],
             ),
           ),
@@ -289,7 +288,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
               children: [
                 AurisIcon(AurisIcons.close, color: Colors.white, size: 20),
                 const SizedBox(width: 12),
-                Text('Quitar de la fila', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                Text('Quitar de la fila', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -457,7 +456,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                                   widget.title,
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
-                                                  style: GoogleFonts.poppins(
+                                                  style: TextStyle(
                                                     color: Colors.white,
                                                     fontSize: ResponsiveUtils
                                                         .bannerTitleFontSize(context),
@@ -484,7 +483,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                         widget.title,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.poppins(
+                                        style: TextStyle(
                                           color: Colors.white,
                                           fontSize: ResponsiveUtils.bannerTitleFontSize(context),
                                           fontWeight: FontWeight.w700,

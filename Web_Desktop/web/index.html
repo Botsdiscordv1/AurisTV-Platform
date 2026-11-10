@@ -21,6 +21,51 @@
   <meta name="description" content="AurisTV — Tu plataforma personal de entretenimiento.">
   <link rel="canonical" href="https://auristv.dpdns.org/" />
 
+  <!-- SEO / OpenGraph (taste-skill: share tags + theme-color) -->
+  <meta name="page-type" content="software">
+  <meta name="site-kind" content="software">
+  <meta name="theme-color" content="#EF7A1E">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- OpenGraph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="AurisTV">
+  <meta property="og:description" content="AurisTV — Tu plataforma personal de entretenimiento.">
+  <meta property="og:image" content="https://auristv.dpdns.org/share.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="es_ES">
+  <meta property="og:site_name" content="AurisTV">
+  <meta property="og:url" content="https://auristv.dpdns.org/">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AurisTV">
+  <meta name="twitter:description" content="AurisTV — Tu plataforma personal de entretenimiento.">
+  <meta name="twitter:image" content="https://auristv.dpdns.org/share.jpg">
+
+  <!-- Fuentes Netflix Sans (TTF empaquetados por Flutter; preload + swap para
+       evitar FOUT en el loader antes de que Flutter cargue) -->
+  <link rel="preload" as="font" href="assets/packages/auris_core/assets/fonts/netflix_sans/NetflixSans-Regular.ttf" type="font/ttf" crossorigin>
+  <link rel="preload" as="font" href="assets/packages/auris_core/assets/fonts/netflix_sans/NetflixSans-Bold.ttf" type="font/ttf" crossorigin>
+  <style>
+    @font-face {
+      font-family: 'NetflixSans';
+      font-style: normal;
+      font-weight: 400;
+      src: url('assets/packages/auris_core/assets/fonts/netflix_sans/NetflixSans-Regular.ttf') format('truetype');
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'NetflixSans';
+      font-style: normal;
+      font-weight: 700;
+      src: url('assets/packages/auris_core/assets/fonts/netflix_sans/NetflixSans-Bold.ttf') format('truetype');
+      font-display: swap;
+    }
+    body { font-family: 'NetflixSans', sans-serif; }
+  </style>
+
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">

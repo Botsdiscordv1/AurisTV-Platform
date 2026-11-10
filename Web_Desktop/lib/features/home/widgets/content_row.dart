@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/utils/responsive_utils.dart';
 import 'package:auris_core/auris_core.dart';
@@ -141,7 +140,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
                   children: [
                     Text(
                       widget.title,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         fontSize: ResponsiveUtils.rowTitleFontSize(context),
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -167,7 +166,7 @@ class _ContentRowState extends State<ContentRow> with AutomaticKeepAliveClientMi
               padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
               child: Text(
                 widget.subtitle!,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Colors.white.withOpacity(0.5),
@@ -334,7 +333,7 @@ class _SeeMoreButtonState extends State<_SeeMoreButton> {
             if (!widget.isMobile) ...[
               Text(
                 'Ver más',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontSize: ResponsiveUtils.rowTitleFontSize(context),
                   fontWeight: FontWeight.bold,
                   color: _isHovered ? const Color(0xFFFF7A1E) : Colors.white,

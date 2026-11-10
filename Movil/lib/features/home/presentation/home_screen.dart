@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'package:auris_core/auris_core.dart';
 import '../../cast/presentation/widgets/cast_picker_sheet.dart';
@@ -667,7 +666,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: [
                   Text(
                     greetingName,
-                    style: GoogleFonts.poppins(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -822,7 +821,7 @@ class _AuthButtonState extends State<_AuthButton> {
               ),
               child: Text(
                 'Iniciar sesión', 
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   fontWeight: FontWeight.w800, 
                   fontSize: widget.isCompactDesktop ? 13 : 15,
                   letterSpacing: 0.5,
@@ -935,7 +934,7 @@ class _PillNavBar extends StatelessWidget {
     final TextPainter textPainter = TextPainter(
       text: TextSpan(
         text: text,
-        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700),
+        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
       ),
       maxLines: 1,
       textDirection: TextDirection.ltr,
@@ -955,15 +954,15 @@ class _PillNavBar extends StatelessWidget {
       items: [
         PopupMenuItem(
           value: 'animes',
-          child: Text('Animes', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          child: Text('Animes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
         PopupMenuItem(
           value: 'kdrama',
-          child: Text('KDramas', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          child: Text('KDramas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
         PopupMenuItem(
           value: 'live',
-          child: Text('Live', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          child: Text('Live', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
       ],
     ).then((value) {
@@ -1112,7 +1111,7 @@ class _PillNavItemState extends State<_PillNavItem> {
           ),
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: widget.isActive ? Colors.black : Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -1321,7 +1320,7 @@ class _FocusTextButtonState extends State<_FocusTextButton> {
               children: [
                 Text(
                   widget.label, 
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     color: isSelected ? Colors.black : Colors.white, 
                     fontSize: 13, 
                     fontWeight: FontWeight.w700,
@@ -1372,7 +1371,7 @@ class _LanguageItemState extends State<_LanguageItem> {
           ),
           child: Text(
             widget.label,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: _isHovered ? Colors.white : Colors.white.withOpacity(0.7),
               fontSize: 14,
               fontWeight: _isHovered ? FontWeight.w700 : FontWeight.w500,
@@ -1436,6 +1435,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
         width: isMovieish ? 1280 : 800,
       ),
       logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
+      isBannerFallback: true,
       progress: h.progress,
       subtitle: sub.line1.isNotEmpty ? sub.line1 : null,
       subtitle2: sub.line2,
@@ -1494,27 +1494,27 @@ class _CategoriesDropdownPill extends StatelessWidget {
       items: [
         PopupMenuItem(
           value: 'inicio',
-          child: Text('Inicio', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          child: Text('Inicio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
         PopupMenuItem(
           value: 'series',
-          child: Text('Series', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          child: Text('Series', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
         PopupMenuItem(
           value: 'películas',
-          child: Text('Películas', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          child: Text('Películas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
         PopupMenuItem(
           value: 'animes',
-          child: Text('Animes', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          child: Text('Animes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
         PopupMenuItem(
           value: 'kdrama',
-          child: Text('KDramas', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          child: Text('KDramas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
         PopupMenuItem(
           value: 'live',
-          child: Text('Live', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
+          child: Text('Live', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         ),
       ],
     ).then((value) {
@@ -1552,7 +1552,7 @@ class _CategoriesDropdownPill extends StatelessWidget {
           children: [
             Text(
               label,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,

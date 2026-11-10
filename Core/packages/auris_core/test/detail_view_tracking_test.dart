@@ -33,6 +33,7 @@ class MockAurisRepository implements AurisRepository {
   @override Future<SearchResponse> searchAnimeVariants({required String q, String? display, String? english, String? native_, String? collapsed, List<String>? synonyms}) async => SearchResponse(results: [], query: q, category: 'anime', count: 0);
   @override Future<MovieDetail?> getMovieDetail({required String title, int? year, String? metadataTitle, String? url, String? type, String category = 'movie', String? server, String? kind, String? imgSize}) async => null;
   @override Future<List<MediaItem>> getHomeHero({String category = 'anime', String? imgSize}) async => [];
+  @override Stream<ExtractResult> extractVideoStream(String url, String source, {String? category, String? preferredLang, bool direct = false, CancelToken? cancelToken}) async* {}
   @override Future<List<ContentSports>> getSportsEventsUpcoming() async => [];
   @override Future<List<Map<String, dynamic>>> getHomeSections() async => [];
   @override Future<HomeResponse> getUserHome({required String userId, String? category}) async => HomeResponse(userId: userId, maturityLevel: 'cold', sections: [], generatedAt: '');

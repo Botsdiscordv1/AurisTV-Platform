@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 
 /// Header adaptativo para la pantalla de detalles.

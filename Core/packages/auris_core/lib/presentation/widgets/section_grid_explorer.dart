@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 
 /// Proveedor de Estado para gestionar la acumulación de páginas y scroll infinito.
@@ -240,7 +239,7 @@ class _SectionGridExplorerState extends ConsumerState<SectionGridExplorer> {
         ),
         title: Text(
           widget.args.title,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: Colors.white,
             fontSize: ResponsiveUtils.rowTitleFontSize(context), // Prominente pero unificado
             fontWeight: FontWeight.w700,

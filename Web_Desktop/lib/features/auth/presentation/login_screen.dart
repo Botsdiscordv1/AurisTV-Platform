@@ -108,8 +108,8 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
           // 2. Native collage grid background (Welcome screen only)
           AnimatedOpacity(
             opacity: isWelcome ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOut,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
             child: Stack(
               children: [
                 _collageReady
@@ -584,10 +584,10 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
   void initState() {
     super.initState();
 
-    _panelCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
+    _panelCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 250));
     _panelFade = CurvedAnimation(parent: _panelCtrl, curve: Curves.easeOut);
     _panelSlide = Tween<Offset>(begin: const Offset(1.0, 0), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _panelCtrl, curve: Curves.easeOutCubic));
+        .animate(CurvedAnimation(parent: _panelCtrl, curve: Curves.easeOut));
 
     // Garantiza el collage lleno desde el frame 1 aunque Login se abra como
     // primera pantalla: precarga y solo entonces habilita el collage.

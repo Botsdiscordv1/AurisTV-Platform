@@ -22,7 +22,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // Precarga el collage del Login mientras se ve el Splash para que, al
     // entrar (ahora o cuando Login sea la pantalla de arranque), aparezca
-    // LLENO desde el primer frame sin tarjetas vacías.
+    // LLENO desde el primer frame sin tarjetas vacÃ­as.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) CollageGridBackground.precache(context);
     });
@@ -38,20 +38,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
   }
 
-  /// Navegación al terminar la intro del logo.
+  /// NavegaciÃ³n al terminar la intro del logo.
   ///
   /// Nuevo flujo de TV: splash ? Login (con el collage/carrusel ya precargado
-  /// desde initState) cuando NO hay sesión; splash ? Home cuando sí la hay.
+  /// desde initState) cuando NO hay sesiÃ³n; splash ? Home cuando sÃ­ la hay.
   /// `authProvider` restaura el usuario local (Hive) en un microtask al
-  /// construirse, así que para este punto (tras la animación del logo) ya
-  /// resolvió el estado o sigue siendo invitado.
+  /// construirse, asÃ­ que para este punto (tras la animaciÃ³n del logo) ya
+  /// resolviÃ³ el estado o sigue siendo invitado.
   void _onAnimationFinished() {
     if (!mounted) return;
     final config = appRouter.routerDelegate.currentConfiguration;
     final matches = config.matches;
     final String current = matches.isNotEmpty ? matches.last.matchedLocation : config.uri.path;
 
-    // Si un Cast o DeepLink abrió el reproductor sobre el splash, no lo pisamos
+    // Si un Cast o DeepLink abriÃ³ el reproductor sobre el splash, no lo pisamos
     if (current != '/splash') return;
 
     final user = ref.read(authProvider);

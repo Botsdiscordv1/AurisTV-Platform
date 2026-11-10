@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:auris_core/auris_core.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/utils/responsive_utils.dart';
 import '../../data/models/search_history.dart';
 import '../providers/search_provider.dart';
@@ -109,7 +108,7 @@ class SearchCategorySelector extends StatelessWidget {
                         ),
                         child: AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 250),
-                          style: GoogleFonts.poppins(
+                          style: TextStyle(
                             color: isSelected ? Colors.black : Colors.white70,
                             fontSize: fontSize,
                             fontWeight: FontWeight.w700,

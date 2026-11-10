@@ -1,8 +1,65 @@
+import 'dart:io' as io;
 import 'package:flutter/foundation.dart';
-import 'dart:io';
 import 'image_policy.dart';
 
+/// Senior Config: Carga configuración sensible desde variables de entorno.
+/// Para desarrollo local, cree un archivo .env con:
+///   SUPABASE_URL=https://...supabase.co
+///   SUPABASE_ANON_KEY=eyJ...
+/// 
+/// IMPORTANTE: Nunca commit el archivo .env al repositorio.
+// ignore: avoid_classes_with_only_static_members
 class ApiEndpoints {
+  // ============================================
+  // --- CONFIGURACIÓN SUPABASE (Segura) ---
+  // ============================================
+  
+  /// URL del proyecto Supabase - cargado desde variable de entorno
+  static String get supabaseUrl {
+    // En web, usamos build-time env vars
+    // En mobile/desktop, usamos platform environment
+    if (kIsWeb) {
+      return const String.fromEnvironment('SUPABASE_URL', 
+        defaultValue: 'https://vrxuzquddfegpxjcffvf.supabase.co',
+      );
+    }
+    // Para mobile/desktop, leemos del entorno del sistema
+    try {
+      // ignore: avoid_dynamic
+      final Map<String, String> env = io.Platform.environment;
+      return env['SUPABASE_URL'] ?? 
+             const String.fromEnvironment('SUPABASE_URL', 
+               defaultValue: 'https://vrxuzquddfegpxjcffvf.supabase.co');
+    } catch (_) {
+      return const String.fromEnvironment('SUPABASE_URL', 
+        defaultValue: 'https://vrxuzquddfegpxjcffvf.supabase.co');
+    }
+  }
+  
+  /// Anon Key de Supabase - CRÍTICO: Mover a variable de entorno
+  static String get supabaseAnonKey {
+    if (kIsWeb) {
+      return const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+    }
+    try {
+      // ignore: avoid_dynamic
+      final Map<String, String> env = io.Platform.environment;
+      return env['SUPABASE_ANON_KEY'] ?? 
+             const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+    } catch (_) {
+      return const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+    }
+  }
+  
+  /// Verifica si las credenciales están configuradas correctamente
+  static bool get isSupabaseConfigured {
+    final key = supabaseAnonKey;
+    // Verificamos que el key no sea el fallback conocido
+    return key.isNotEmpty && 
+           !key.contains('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyeHV6cXVkZGZlZ3B4amNmZnZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MjkwNTcsImV4cCI6MjEwMTEwNTA1N30.YiJVKqtNM1D4aZbgBaVSGkMczNIHGpxj0tzDVj95MY8');
+  }
+  // ----------------------------------
+
   static const Map<String, String> _servers = {
     'anime':   'anime.auristv.dpdns.org',
     'movies_series':  'movies-series.auristv.dpdns.org',
@@ -63,11 +120,6 @@ class ApiEndpoints {
   static String _baseUrlForCategory(String category, String port) {
     return _baseUrlForDomain(_domainFor(category), port);
   }
-
-  // --- CONFIGURACIÓN SUPABASE ---
-  static const String supabaseUrl = 'https://vrxuzquddfegpxjcffvf.supabase.co';
-  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyeHV6cXVkZGZlZ3B4amNmZnZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MjkwNTcsImV4cCI6MjEwMTEwNTA1N30.YiJVKqtNM1D4aZbgBaVSGkMczNIHGpxj0tzDVj95MY8';
-  // ----------------------------------
 
   // --- TIMEOUTS DE UX (Sincronizados entre plataformas) ---
   static const Duration detailRevealTimeout = Duration(seconds: 30);
@@ -195,7 +247,7 @@ class ApiEndpoints {
     }
 
     // Guard para evitar crash en Web al acceder a Platform
-    if (Platform.isAndroid && (lower.contains('127.0.0.1') || lower.contains('localhost'))) {
+    if (io.Platform.isAndroid && (lower.contains('127.0.0.1') || lower.contains('localhost'))) {
       return url.replaceAll('127.0.0.1', _defaultDomain).replaceAll('localhost', _defaultDomain);
     }
     
@@ -289,7 +341,7 @@ class ApiEndpoints {
 
     const sensitiveCDNs = ['anilist.co', 'wp.com', 'animed23.com'];
     if (sensitiveCDNs.any((k) => lowerUrl.contains(k))) {
-      if (kIsWeb) return '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+      if (kIsWeb) return '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}&output=webp';
       return workingUrl;
     }
 
@@ -299,7 +351,7 @@ class ApiEndpoints {
     // imágenes nunca cargan en la app aunque existan.
     const weservBlockedHosts = ['doramasyt.com', 'ppvservices.st', 'static.ppvservices.st'];
     if (weservBlockedHosts.any((k) => lowerUrl.contains(k))) {
-      return '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+      return '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}&output=webp';
     }
 
     if (workingUrl.startsWith('http')) {
@@ -308,7 +360,7 @@ class ApiEndpoints {
       // igual carga. Un fallbackUrl explícito (otra imagen) tiene prioridad.
       final String effectiveFallback = (fallbackUrl != null && fallbackUrl.isNotEmpty)
           ? fallbackUrl
-          : '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}';
+          : '${_fallbackBase()}/api/proxy/image?url=${Uri.encodeComponent(workingUrl)}&output=webp';
       final String fallbackParam = '&errorredirect=${Uri.encodeComponent(effectiveFallback)}';
       
       String params = '&output=webp&q=$targetQuality';
@@ -352,6 +404,7 @@ class ApiEndpoints {
   static const String titlesMovie = '/api/titles/movie';
   static const String catalogSources = '/api/catalog/sources';
   static const String extract = '/api/extract';
+  static const String extractStream = '/api/extract/stream';
   static const String episodes = '/api/episodes';
   static const String cast = '/api/cast';
   static const String relations = '/api/relations';

@@ -67,6 +67,7 @@ abstract class AurisRepository {
     String? type,
     String? server,
     String? imgSize,
+    
   });
   /// OP/ED (opening/ending): se piden aparte del detail para no bloquear la
   /// ficha (AnimeThemes puede colgar y estaba dentro del frío de la ficha).
@@ -112,6 +113,7 @@ abstract class AurisRepository {
   Future<AnimeTitleInfo> getAnimeTitles(String query);
   Future<MovieTitleInfo> getMovieTitles(String query);
   Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken});
+  Stream<ExtractResult> extractVideoStream(String url, String source, {String? category, String? preferredLang, bool direct = false, CancelToken? cancelToken});
   Future<String> resolveEpisodeUrl(String url, String source, int episode, {String? category});
   Future<EpisodesResponse> getEpisodes(String url, String source, {String? category, String? title, String? fullTitle, String? altTitle, int? tmdbId, int? season, int? year, bool fast = false});
   Future<List<CastInfo>> getCast(String url, {String? source, String? category, int? tmdbId, String? mediaType, String? title, int? year});

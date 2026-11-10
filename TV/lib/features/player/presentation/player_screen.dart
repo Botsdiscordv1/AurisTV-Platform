@@ -18,7 +18,6 @@ import 'package:volume_controller/volume_controller.dart';
 import 'package:collection/collection.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 
 import 'package:auris_core/auris_core.dart';
@@ -207,6 +206,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   WebViewController? _webViewController;
     bool _hasInitialized = false;
+    /// Indica que la extraccion aun esta en progreso.
+    bool _isTrackStreaming = false;
     // Clave del �ltimo sync de episodios al provider global (evita re-syncs
     // en cada rebuild: el whenData dispara por cada frame mientras hay data).
     String? _episodesSyncKey;
@@ -1424,7 +1425,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildLanguageSelectorContent({bool isSidebar = false}) {
     final sourceOptions = _getLanguageOptions();
+    // Sin fuentes: spinner si aun estamos cargando, mensaje si ya termino
     if (sourceOptions.isEmpty) {
+      if (_isTrackStreaming) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFFEF7A1E)),
+                ),
+                SizedBox(height: 12),
+                Text('Buscando fuentes...', style: TextStyle(color: Colors.white54, fontSize: 13)),
+              ],
+            ),
+          ),
+        );
+      }
       return const Center(child: Padding(
         padding: EdgeInsets.all(32.0),
         child: Text('No hay fuentes disponibles', style: TextStyle(color: Colors.white54)),
@@ -3984,7 +4005,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               const SizedBox(height: 24),
               Text(
                 'Cargando contenido...',
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -3994,7 +4015,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               Text(
                 'Preparando tu reproducci�n, un momento por favor.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white54,
                   fontSize: 14,
                 ),
@@ -4031,6 +4052,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // Fondo: negro puro en reproducci�n; gris del panel solo con men� abierto.
     final bg = _activeOverlay != PlayerOverlay.none ? const Color(0xFF0F0F0F) : Colors.black;
 
+    // Senior Fix: Al salir del player (_isExiting=true), el setState dispara un
+    // rebuild. Sin este guard, el rebuild ejecuta ref.watch(extractProvider)
+    // y relanza la peticion de extraccion innecesariamente al cerrar.
+    if (_isExiting) return Material(color: bg);
+
     // Senior Direct Flow: Fuentes que ya entregan el stream directo o proxied
     final bool isDirectSource = _currentSource == 'Themes' || _currentSource == 'YouTube';
 
@@ -4045,6 +4071,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       source: _currentSource,
       category: widget.category,
     )));
+
+    // Sincronizar _isTrackStreaming con el estado del FutureProvider
+    if (extractAsync.isLoading && !_isTrackStreaming) {
+      _isTrackStreaming = true;
+    } else if (!extractAsync.isLoading && _isTrackStreaming && extractAsync.hasValue) {
+      _isTrackStreaming = false;
+    }
 
     return Material(
       color: bg,
@@ -4065,8 +4098,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 else _initPlayer(initialTrack.url, initialTrack.headers);
               } else if (result.url.isNotEmpty) _initPlayer(result.url, result.headers);
               if (mounted) {
-              _allTracks = playableTracks;
-              setState(() => _extractTracks = playableTracks.where((t) => !t.isEmbed).toList());
+              setState(() {
+                _allTracks = playableTracks;
+                _extractTracks = playableTracks.where((t) => !t.isEmbed).toList();
+              });
               // Core session: registrar item/episodio/fuente/pistas (triggerOpen
               // false: TV mantiene el control del hardware, igual que Movil).
               // Sin esto, stop()/saves del provider eran no-op en TV.
@@ -4708,7 +4743,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             const SizedBox(height: 24),
             Text(
               timeStr,
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: isMobile ? 32 : 48,
                 fontWeight: FontWeight.w900,
@@ -4723,7 +4758,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ),
               child: Text(
                 diffStr,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: isMobile ? 16 : 22,
                   fontWeight: FontWeight.bold,
@@ -4995,7 +5030,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ],
               panelOpen: isMenuOpen,
               panelTitle: switch (_activeOverlay) {
-                PlayerOverlay.language => 'Audio y subt�tulos',
+                PlayerOverlay.language => _isTrackStreaming && _getLanguageOptions().isEmpty ? 'Buscando fuentes...' : 'Audio y subs',
                 PlayerOverlay.server => 'Servidor',
                 PlayerOverlay.quality => 'Calidad',
                 PlayerOverlay.speed => 'Velocidad',

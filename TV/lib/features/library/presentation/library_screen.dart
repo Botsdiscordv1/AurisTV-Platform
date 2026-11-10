@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/tv_scroll.dart';
@@ -68,7 +67,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 },
               ),
               title: Text('Mi biblioteca', 
-                style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20)),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
               backgroundColor: _isScrolled ? const Color(0xFF000000).withValues(alpha: 0.5) : Colors.transparent,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
@@ -213,7 +212,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Text(title, style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+      Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
       const SizedBox(width: 12),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

@@ -23,7 +23,6 @@ dependencies:
   youtube_explode_dart: ^2.2.0
   pointer_interceptor: ^0.10.1+1
   visibility_detector: ^0.4.0+2
-  google_fonts: ^6.2.1
 
   # Reproductor Nativo para Trailers (Mobile/TV)
   media_kit: ^1.1.11
@@ -71,3 +70,21 @@ flutter:
     - assets/collage/Kdrama/
     - assets/collage/Pelicula/
     - assets/collage/Serie/
+
+  # Fuente de marca única de la plataforma (TTF; los .woff2 de la misma
+  # carpeta no los usa Flutter y no se empaquetan).
+  fonts:
+    - family: NetflixSans
+      fonts:
+        - asset: assets/fonts/netflix_sans/NetflixSans-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/netflix_sans/NetflixSans-Light.ttf
+          weight: 300
+        - asset: assets/fonts/netflix_sans/NetflixSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/netflix_sans/NetflixSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/netflix_sans/NetflixSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/netflix_sans/NetflixSans-Black.ttf
+          weight: 900

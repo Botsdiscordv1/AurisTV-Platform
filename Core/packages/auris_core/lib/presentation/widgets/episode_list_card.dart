@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../data/models/server/episodes_response.dart';
 
@@ -185,7 +184,7 @@ class AurisEpisodeListCard extends StatelessWidget {
                               displayTitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
+                              style: TextStyle(
                                 color: titleColor,
                                 fontSize: titleSize,
                                 fontWeight: FontWeight.w700,
@@ -197,7 +196,7 @@ class AurisEpisodeListCard extends StatelessWidget {
                                 ep.description!,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.poppins(
+                                style: TextStyle(
                                   color: subColor,
                                   fontSize: subtitleSize,
                                   fontWeight: FontWeight.w400,

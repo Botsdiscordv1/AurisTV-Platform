@@ -108,8 +108,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _onContentTap(SearchResult result) {
     final rawTitle = result.scrapedTitle ?? result.metadataTitle ?? result.title;
-    final displayTitle = cleanTitleForDisplay(rawTitle);
-    final metaTitle = cleanTitleForDisplay(result.metadataTitle ?? result.scrapedTitle ?? result.title);
+    final displayTitle = rawTitle;
+    final metaTitle = result.metadataTitle ?? result.scrapedTitle ?? result.title;
     ref.read(searchHistoryProvider.notifier).addQuery(result.title);
     final openCategory = inferOpenCategory(result, _selectedCategory);
 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 
 /// Helper para construir etiquetas (Action, Sci-Fi, etc.)
@@ -20,7 +19,7 @@ Widget buildDetailBadge(BuildContext context, String? text, {bool small = false}
     ),
     child: Text(
       text.toUpperCase(),
-      style: GoogleFonts.poppins(
+      style: TextStyle(
         color: Colors.white, 
         fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
         fontWeight: FontWeight.w800,
@@ -48,7 +47,7 @@ Widget buildAgeBadge(BuildContext context, String? text, {bool small = false}) {
     ),
     child: Text(
       text,
-      style: GoogleFonts.poppins(
+      style: TextStyle(
         color: Colors.white, 
         fontSize: ResponsiveUtils.sp(context, small ? 10 : 13), 
         fontWeight: FontWeight.w600,
@@ -180,7 +179,7 @@ class _DetailActionButtonState extends State<DetailActionButton> {
               const SizedBox(width: 8),
               Text(
                 widget.isLoading ? 'Cargando...' : widget.label,
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white, 
                   fontSize: 13, 
                   fontWeight: FontWeight.w500,

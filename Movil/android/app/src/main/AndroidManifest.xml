@@ -141,6 +141,16 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- HCPP (Hybrid Composition++ / SurfaceControl): sin esta bandera el
+             motor arranca con enable_surface_control=false y la PlatformView
+             del vídeo cae en Hybrid Composition clásico, lo que obliga a
+             Flutter a renderizar todo el UI en un ImageReader (copia de
+             HardwareBuffer por frame = UI del player lenta). Solo tiene
+             efecto en Android 14+ con Impeller/Vulkan. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableHcpp"
+            android:value="true" />
+
         <!-- Comparte el APK descargado con el instalador del sistema (actualizaciones in-app) -->
         <provider
             android:name="androidx.core.content.FileProvider"

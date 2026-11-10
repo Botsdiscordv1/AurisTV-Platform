@@ -177,6 +177,7 @@ void main() {
           const HomeLayoutSection(
             type: HomeSectionType.editorial,
             title: 'Catalog Section',
+            serverFormat: 'expandable_poster',
             data: EditorialRow(badge: EditorialBadge.essential, title: 'Catalog', items: [
               MediaItem(id: '1', title: 'T', posterUrl: '', type: MediaType.anime),
             ]),
@@ -197,6 +198,7 @@ void main() {
           (i) => HomeLayoutSection(
             type: HomeSectionType.editorial,
             title: 'Catalog $i',
+            serverFormat: 'expandable_poster',
             data: EditorialRow(badge: EditorialBadge.essential, title: 'Cat $i', items: [
               MediaItem(id: '$i', title: 'T', posterUrl: '', type: MediaType.anime),
             ]),

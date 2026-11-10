@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 import '../../core/utils/responsive_utils.dart';
 
@@ -25,12 +24,16 @@ class ComposedSectionRow extends ConsumerWidget {
     double rowHeight;
     if (section.presentation == SectionPresentation.wide) {
       rowHeight = ResponsiveUtils.bannerRowHeight(context);
-    } else if (section.presentation == SectionPresentation.posterLarge || section.presentation == SectionPresentation.expandablePoster) {
+    } else if (section.presentation == SectionPresentation.posterLarge) {
+      rowHeight = ResponsiveUtils.largePosterRowHeight(context, hasInfo: true);
+    } else if (section.presentation == SectionPresentation.expandablePoster) {
       rowHeight = ResponsiveUtils.largePosterRowHeight(context, hasInfo: false);
     } else if (section.presentation == SectionPresentation.top10Wide) {
       rowHeight = ResponsiveUtils.bannerHeight(context) + 20;
-    } else {
+    } else if (section.presentation == SectionPresentation.top10) {
       rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: false);
+    } else {
+      rowHeight = ResponsiveUtils.rowHeight(context, hasInfo: true);
     }
 
     return Column(
@@ -42,7 +45,7 @@ class ComposedSectionRow extends ConsumerWidget {
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Text(
             section.title,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: Colors.white,
               fontSize: ResponsiveUtils.rowTitleFontSize(context),
               fontWeight: FontWeight.w700,
@@ -90,8 +93,18 @@ class ComposedSectionRow extends ConsumerWidget {
                   width: ResponsiveUtils.bannerWidth(context),
                   height: ResponsiveUtils.bannerHeight(context),
                 );
-              } else if (section.presentation == SectionPresentation.posterLarge || section.presentation == SectionPresentation.expandablePoster) {
-                // Expandable Poster / Large Poster
+              } else if (section.presentation == SectionPresentation.posterLarge) {
+                // Large Poster (con título debajo)
+                cardWidget = FocusableLargePosterCard(
+                  title: item.title,
+                  posterUrl: item.posterUrl,
+                  onTap: () => onItemTap?.call(item),
+                  subtitle: item.subtitle,
+                  rating: formatRating(item.rating),
+                  mediaItem: item,
+                );
+              } else if (section.presentation == SectionPresentation.expandablePoster) {
+                // Expandable Poster (sin título debajo)
                 cardWidget = FocusableExpandablePosterCard(
                   title: item.title,
                   posterUrl: item.posterUrl,

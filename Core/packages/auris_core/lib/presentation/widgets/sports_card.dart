@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auris_core.dart';
 import 'disney_focus.dart';
 
 /// Tarjeta visual compartida para eventos deportivos (`ContentSports`) con el estándar exacto
 /// de Disney+ (DisneyFocusShell, DisneyFocusTokens, sombras duales, escala 1.03, anillo de focus
 /// y comportamiento responsive idéntico a SportsBrandCarousel).
-class SportsCard extends StatefulWidget {
+class SportsCard extends ConsumerStatefulWidget {
   final ContentSports event;
   final VoidCallback? onTap;
   final ValueChanged<Map<String, dynamic>>? onChannelSelected;
@@ -24,10 +25,10 @@ class SportsCard extends StatefulWidget {
   });
 
   @override
-  State<SportsCard> createState() => _SportsCardState();
+  ConsumerState<SportsCard> createState() => _SportsCardState();
 }
 
-class _SportsCardState extends State<SportsCard> {
+class _SportsCardState extends ConsumerState<SportsCard> {
   bool _localFocused = false;
   bool _hovered = false;
 
@@ -73,13 +74,11 @@ class _SportsCardState extends State<SportsCard> {
         child: GestureDetector(
           onTap: widget.onTap ?? () {
             debugPrint('[SportsCard] Tapped sports card -> Opening ContentSportScreen for: "${widget.event.title}"');
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ContentSportScreen(
-                  event: widget.event,
-                  onChannelSelected: widget.onChannelSelected,
-                ),
-              ),
+            // La app decide la ruta (en Web, `/sports/<id>` con URL limpia).
+            ref.read(sportsDetailOpenerProvider)(
+              context,
+              widget.event,
+              widget.onChannelSelected,
             );
           },
           child: Container(

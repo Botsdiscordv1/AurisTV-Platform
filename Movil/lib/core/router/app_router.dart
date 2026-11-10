@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:auris_core/auris_core.dart';
+import 'package:auris_core/auris_core.dart' hide WatchScreen;
 import '../../features/intro/presentation/splash_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
@@ -11,6 +11,7 @@ import '../../features/explore/presentation/explore_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/content/presentation/content_screen.dart';
 import '../../features/player/presentation/player_screen.dart';
+import '../../features/watch/presentation/watch_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/settings/presentation/playlists_screen.dart';
 import '../../features/settings/presentation/playlist_channels_screen.dart';
@@ -298,6 +299,45 @@ final GoRouter appRouter = GoRouter(
       path: '/detalles/:token',
       builder: (context, state) =>
           _buildContentFromDeepLink(context, state, isMovie: false),
+    ),
+    GoRoute(
+      path: '/watch/:contentId',
+      builder: (context, state) {
+        final contentId = state.pathParameters['contentId']!;
+        final sourceUrl = state.uri.queryParameters['url'] ?? '';
+        final source = state.uri.queryParameters['source'] ?? '';
+        final episode = state.uri.queryParameters['episode'];
+        final seasonStr = state.uri.queryParameters['season'];
+        final season = (seasonStr != null && seasonStr.isNotEmpty) ? int.tryParse(seasonStr) : null;
+        final serverName = state.uri.queryParameters['serverName'];
+        final category = state.uri.queryParameters['category'];
+        final title = state.uri.queryParameters['title'];
+        final metadataTitle = state.uri.queryParameters['metadataTitle'];
+        final episodeTitle = state.uri.queryParameters['episodeTitle'];
+        final posterUrl = state.uri.queryParameters['posterUrl'];
+        final bannerUrl = state.uri.queryParameters['bannerUrl'];
+        final logoUrl = state.uri.queryParameters['logoUrl'];
+        final year = int.tryParse(state.uri.queryParameters['year'] ?? '');
+        final certification = state.uri.queryParameters['certification'];
+
+        return WatchScreen(
+          contentId: contentId,
+          sourceUrl: sourceUrl,
+          source: source,
+          episode: episode,
+          season: season,
+          serverName: serverName,
+          category: category,
+          title: title,
+          metadataTitle: metadataTitle,
+          episodeTitle: episodeTitle,
+          posterUrl: posterUrl,
+          bannerUrl: bannerUrl,
+          logoUrl: logoUrl,
+          year: year,
+          certification: certification,
+        );
+      },
     ),
     GoRoute(
       path: '/player/:contentId',

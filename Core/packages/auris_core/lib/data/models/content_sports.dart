@@ -1,7 +1,8 @@
 import 'server/search_result.dart';
 import 'media_item.dart';
 import 'package:flutter/material.dart';
-import '../../presentation/widgets/content_sport_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/providers/sports_playback.dart';
 import '../../core/utils/safe_tap.dart';
 
 /// Modelo exclusivo para eventos deportivos en vivo y próximos (`content_sports`),
@@ -241,11 +242,9 @@ void handleCardTapOrSportsNavigation(BuildContext context, {
       source: source ?? 'ppv',
       league: subtitle,
     );
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ContentSportScreen(event: sportsEvent),
-      ),
-    );
+    // La app decide la ruta (en Web, `/sports/<id>` con URL limpia).
+    ProviderScope.containerOf(context)
+        .read(sportsDetailOpenerProvider)(context, sportsEvent, null);
     return;
   }
   if (onTap != null) {

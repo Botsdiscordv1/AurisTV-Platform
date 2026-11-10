@@ -28,6 +28,18 @@ String cleanSeriesUrl(String url) {
     return url.replaceAllMapped(jkEp, (m) => '${m.group(1)}/');
   }
 
+  // 3. VerAnime: /ver/<slug>-episodio-N/ -> /anime/<slug>/
+  final verAnimeEp = RegExp(r'(https?://veranime\.ninja)/ver/([^/]+)-episodio-\d+/?', caseSensitive: false);
+  if (verAnimeEp.hasMatch(url)) {
+    return url.replaceAllMapped(verAnimeEp, (m) => '${m.group(1)}/anime/${m.group(2)}/');
+  }
+
+  // 4. LatinoYT: /episodio/<slug>-(temporada-N-)?capitulo-N/ -> /anime/<slug>/
+  final latinoYtEp = RegExp(r'(https?://latinoyt\.pro)/episodio/([^/]+?)(?:-temporada-\d+)?-capitulo-\d+/?', caseSensitive: false);
+  if (latinoYtEp.hasMatch(url)) {
+    return url.replaceAllMapped(latinoYtEp, (m) => '${m.group(1)}/anime/${m.group(2)}/');
+  }
+
   return url;
 }
 

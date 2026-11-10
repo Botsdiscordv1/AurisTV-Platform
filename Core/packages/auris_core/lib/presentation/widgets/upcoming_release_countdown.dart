@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../auris_core.dart';
 import '../../core/utils/release_countdown_logic.dart';
 
@@ -218,7 +217,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
         const SizedBox(width: 8),
         Text(
           titleText,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: const Color(0xFFEF7A1E),
             fontSize: 13,
             fontWeight: FontWeight.w700,
@@ -272,7 +271,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
               const SizedBox(width: 8),
               Text(
                 ReleaseCountdownLogic.formatDate(_targetDateTime!),
-                style: GoogleFonts.poppins(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -287,7 +286,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
         Text(
           'Los episodios estarán disponibles cuando comience su emisión.',
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: const Color(0xFFA5A5AA),
             fontSize: 13,
             fontWeight: FontWeight.w400,
@@ -310,7 +309,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
         children: [
           Text(
             value,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: Colors.white,
               fontSize: 24,
               fontWeight: FontWeight.w700,
@@ -320,7 +319,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
           const SizedBox(height: 2),
           Text(
             label,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
               color: const Color(0xFFA5A5AA),
               fontSize: 10,
               fontWeight: FontWeight.w600,
@@ -337,7 +336,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
       padding: const EdgeInsets.only(top: 16),
       child: Text(
         ':',
-        style: GoogleFonts.poppins(
+        style: TextStyle(
           color: Colors.white.withOpacity(0.4),
           fontSize: 22,
           fontWeight: FontWeight.bold,
@@ -353,7 +352,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
         Text(
           'El contenido ya fue estrenado,\npero los episodios todavía no están disponibles.',
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: Colors.white.withOpacity(0.9),
             fontSize: 15,
             fontWeight: FontWeight.w500,
@@ -364,7 +363,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
         Text(
           'Vuelve a consultar más tarde para ver los nuevos capítulos.',
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: const Color(0xFFA5A5AA),
             fontSize: 13,
             fontWeight: FontWeight.w400,
@@ -381,7 +380,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
         Text(
           'Aún no hay una fecha de estreno confirmada.',
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: Colors.white.withOpacity(0.9),
             fontSize: 15,
             fontWeight: FontWeight.w500,
@@ -392,7 +391,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
         Text(
           'Mantén este contenido en tu lista para enterarte cuando se anuncien novedades.',
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
+          style: TextStyle(
             color: const Color(0xFFA5A5AA),
             fontSize: 13,
             fontWeight: FontWeight.w400,

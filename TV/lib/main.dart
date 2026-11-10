@@ -44,6 +44,15 @@ Future<void> main() async {
   await Hive.openBox('home_cache');
   await Hive.openBox('local_pairings');
 
+  // ============================================
+  // VERIFICACIÓN DE SEGURIDAD - Supabase Credentials
+  // ============================================
+  if (!ApiEndpoints.isSupabaseConfigured) {
+    debugPrint('🔴 SECURITY WARNING: SUPABASE_ANON_KEY not set in environment!');
+    debugPrint('⚠️  This is a security risk for production deployments.');
+    debugPrint('🔧 Set SUPABASE_ANON_KEY environment variable for secure configuration.');
+  }
+
   // Inicializa Supabase
   await Supabase.initialize(
     url: ApiEndpoints.supabaseUrl,

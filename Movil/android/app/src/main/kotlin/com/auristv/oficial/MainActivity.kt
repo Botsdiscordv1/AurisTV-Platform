@@ -50,7 +50,7 @@ class MainActivity: AudioServiceFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Prototipo de video nativo (SurfaceView + vo=mediacodec_embed).
+        // Prototipo de video nativo (TextureView + vo=mediacodec_embed).
         // Solo se usa si Dart compila con NATIVE_VIDEO_SURFACE=true.
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "auris/mobile-video-surface",

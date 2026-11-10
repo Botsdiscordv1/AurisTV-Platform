@@ -228,6 +228,57 @@ final multiSourceRelationsProvider = StateNotifierProvider.autoDispose<
   return _MultiSourceRelationsNotifier(ref);
 });
 
+/// Notifier multi-fuente de temporadas: sondea livianamente (`fast=1`) el total
+/// de temporadas de todas las fuentes descubiertas en paralelo para detectar
+/// reactivamente si alguna fuente suplementaria (ej. VerAnime) trae `totalSeasons > 1`.
+class _MultiSourceSeasonsNotifier extends StateNotifier<int> {
+  final Ref ref;
+  final Set<String> _launched = {};
+  int _maxSeasons = 1;
+
+  _MultiSourceSeasonsNotifier(this.ref) : super(1);
+
+  void updateSources(List<SearchResult> sources, {
+    required String category,
+    required String title,
+    String? fullTitle,
+    int? year,
+  }) {
+    if (!mounted) return;
+    final repo = ref.read(aurisRepositoryProvider);
+    for (final src in sources) {
+      if (src.url.isEmpty) continue;
+      final key = '${src.source}|${src.url}';
+      if (!_launched.add(key)) continue;
+
+      repo.getEpisodes(
+        src.url,
+        src.source,
+        category: category,
+        title: title,
+        fullTitle: fullTitle,
+        year: year,
+        fast: true,
+      ).timeout(const Duration(seconds: 10)).then((epRes) {
+        if (!mounted) return;
+        final epSeasonsCount = epRes.seasons.isNotEmpty
+            ? epRes.seasons.map((s) => s.number).fold(epRes.seasons.length, max)
+            : (epRes.totalSeasons ?? 1);
+        final discoveredSeasons = max(epRes.totalSeasons ?? 1, epSeasonsCount);
+        if (discoveredSeasons > _maxSeasons) {
+          _maxSeasons = discoveredSeasons;
+          state = _maxSeasons;
+        }
+      }).catchError((_) {});
+    }
+  }
+}
+
+final multiSourceSeasonsProvider = StateNotifierProvider.autoDispose<
+    _MultiSourceSeasonsNotifier, int>((ref) {
+  return _MultiSourceSeasonsNotifier(ref);
+});
+
 /// --- PROVEEDOR MAESTRO UNIFICADO (V14 - SELECTION LOCK) ---
 final unifiedContentProvider = Provider.autoDispose
     .family<UnifiedContentState, UnifiedDetailParams>((ref, params) {
@@ -318,6 +369,8 @@ final unifiedContentProvider = Provider.autoDispose
   AsyncValue<List<CastInfo>> castAsync = const AsyncValue.loading();
   final AsyncValue<UnifiedRelationsMap> relationsAsync =
       ref.watch(multiSourceRelationsProvider);
+  final int discoveredMaxSeasons =
+      ref.watch(multiSourceSeasonsProvider);
 
   final isAnimeCat = params.category.toLowerCase().contains('anime') ||
       params.category.toLowerCase().contains('movie_anime');
@@ -329,6 +382,13 @@ final unifiedContentProvider = Provider.autoDispose
               category: params.category,
               isAnimeCategory: isAnimeCat,
             );
+        ref.read(multiSourceSeasonsProvider.notifier).updateSources(
+              allSources,
+              category: params.category,
+              title: params.title,
+              fullTitle: params.metadataTitle ?? params.title,
+              year: params.year,
+            );
       } catch (_) {}
     });
   }
@@ -339,6 +399,15 @@ final unifiedContentProvider = Provider.autoDispose
                        params.kind?.toLowerCase().contains('movie') == true || 
                        params.kind?.toLowerCase().contains('pelicula') == true ||
                        params.type?.toLowerCase().contains('movie') == true);
+
+    // Buscar URL de JKAnime en las fuentes disponibles (aunque no sea la activa).
+    // Se limpia el hash de temporada (#season-N) para obtener la URL canónica.
+    final jkSource = allSources.firstWhereOrNull(
+      (s) => s.source.toLowerCase().contains('jkanime'),
+    );
+    final String? jkUrl = (jkSource != null && !selected.source.toLowerCase().contains('jkanime'))
+        ? jkSource.url.split('#')[0]
+        : null;
 
     final progParams = ProgressiveParams(
       url: selected.url,
@@ -352,6 +421,7 @@ final unifiedContentProvider = Provider.autoDispose
       year: params.year,
       tmdbId: detailData?.anime?.tmdbId ?? int.tryParse(detailData?.movie?.tmdbId ?? ''),
       isMovieish: isMovieish,
+      jkUrl: jkUrl,
     );
 
     final progState = ref.watch(progressiveContentProvider(progParams));
@@ -389,9 +459,29 @@ final unifiedContentProvider = Provider.autoDispose
 
   // 2. Si alguna de las otras fuentes (allSources) tiene totalSeasons > 1, lo tomamos en cuenta
   // para que el usuario pueda ver el SeasonSelector y cambiar de temporada/fuente.
-  final sourcesMaxSeasons = allSources
-      .map((s) => s.totalSeasons ?? 1)
-      .fold(1, max);
+  // Se lee:
+  // - Sondeo multi-fuente en background (/api/episodes).
+  // - Relaciones de franquicia/secuela de las fuentes (p. ej. LatinoYT reporta sus temporadas en /api/relations).
+  // - totalSeasons explícito > s.season > extractSeason(title/url).
+  final relationsMaxSeasons = relationsAsync.valueOrNull?['franchise']
+          ?.where((r) => isTitleCompatible(params.title, r.title, metadataTitle: params.metadataTitle))
+          .map((r) => [
+                extractSeason(r.title) ?? 1,
+                extractSeason(r.url) ?? 1,
+              ].fold<int>(1, max))
+          .fold<int>(1, max) ??
+      1;
+
+  final sourcesMaxSeasons = [
+    discoveredMaxSeasons,
+    relationsMaxSeasons,
+    ...allSources.map((s) => [
+          s.totalSeasons ?? 1,
+          s.season ?? 1,
+          extractSeason(s.title) ?? 1,
+          extractSeason(s.url) ?? 1,
+        ].fold<int>(1, max)),
+  ].fold<int>(1, max);
 
   resolvedTotalSeasons = max(activeSourceSeasons, sourcesMaxSeasons);
 
@@ -495,6 +585,10 @@ class ProgressiveParams {
   final int? year;
   final int? tmdbId;
   final bool isMovieish;
+  /// URL canónica de JKAnime si está disponible como fuente alternativa.
+  /// Permite enriquecer el cast con personajes de JKAnime aunque no sea
+  /// la fuente activa (source 1 = otro proveedor).
+  final String? jkUrl;
 
   const ProgressiveParams({
     required this.url,
@@ -506,6 +600,7 @@ class ProgressiveParams {
     this.year,
     this.tmdbId,
     this.isMovieish = false,
+    this.jkUrl,
   });
 
   @override
@@ -520,7 +615,8 @@ class ProgressiveParams {
           season == other.season &&
           year == other.year &&
           tmdbId == other.tmdbId &&
-          isMovieish == other.isMovieish;
+          isMovieish == other.isMovieish &&
+          jkUrl == other.jkUrl;
 
   @override
   int get hashCode => Object.hash(
@@ -533,6 +629,7 @@ class ProgressiveParams {
         year,
         tmdbId,
         isMovieish,
+        jkUrl,
       );
 }
 
@@ -1015,19 +1112,42 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       }
     }();
 
-    // B) Cast → /api/cast: url (scrape de fuente) + tmdbId/mediaType/title/year
-    //    (fallback TMDB cuando la fuente no trae cast; ambos servidores).
+    // B) Cast → /api/cast:
+    //    Si la fuente activa es JKAnime o si JKAnime está disponible en las fuentes (jkUrl),
+    //    consultamos directamente a JKAnime para obtener personajes nativos sin gastar requests a TMDB.
+    //    Solo si JKAnime no está disponible o falla/está vacío, se recurre a la fuente primaria / TMDB.
     final castTask = () async {
       try {
-        final castList = await repo.getCast(
-          _params.url,
-          source: _params.source,
-          category: _params.category,
-          tmdbId: effectiveTmdbId,
-          mediaType: _params.isMovieish ? 'movie' : 'tv',
-          title: _params.title,
-          year: _params.year,
-        ).timeout(const Duration(seconds: 10));
+        List<CastInfo> castList = [];
+
+        final effectiveJkUrl = _params.source.toLowerCase().contains('jkanime')
+            ? _params.url
+            : _params.jkUrl;
+
+        if (effectiveJkUrl != null && effectiveJkUrl.isNotEmpty) {
+          try {
+            castList = await repo.getCast(
+              effectiveJkUrl,
+              source: 'JKAnime',
+              category: _params.category,
+            ).timeout(const Duration(seconds: 8));
+          } catch (e) {
+            debugPrint('[ProgressiveContent] JKAnime cast failed, trying fallback: $e');
+          }
+        }
+
+        // Si no había JKAnime o si JKAnime devolvió lista vacía, recurrimos a TMDB / fuente primaria
+        if (castList.isEmpty) {
+          castList = await repo.getCast(
+            _params.url,
+            source: _params.source,
+            category: _params.category,
+            tmdbId: effectiveTmdbId,
+            mediaType: _params.isMovieish ? 'movie' : 'tv',
+            title: _params.title,
+            year: _params.year,
+          ).timeout(const Duration(seconds: 10));
+        }
 
         if (!mounted) return;
         state = state.copyWith(cast: AsyncValue.data(castList));

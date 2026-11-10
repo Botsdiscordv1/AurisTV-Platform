@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/utils/responsive_utils.dart';
 
 class CategoryShortcutsRow extends StatelessWidget {
@@ -33,7 +32,7 @@ class CategoryShortcutsRow extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: Text(
               'Explorar por Categoría',
-              style: GoogleFonts.poppins(
+              style: TextStyle(
                 fontSize: isMobile ? 18 : 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.white70,
@@ -135,7 +134,7 @@ class _ShortcutCardState extends State<_ShortcutCard> {
                 const SizedBox(height: 8),
                 Text(
                   widget.label,
-                  style: GoogleFonts.poppins(
+                  style: TextStyle(
                     color: isSelected ? Colors.white : Colors.white70,
                     fontSize: isMobile ? 12 : 14,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,

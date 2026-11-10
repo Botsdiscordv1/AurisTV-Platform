@@ -1500,6 +1500,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
                 width: isMovieish ? 1280 : 800,
               ),
               logoUrl: logoUrl != null ? ApiEndpoints.proxyImage(logoUrl) : null,
+      isBannerFallback: true,
               progress: h.progressPercentage,
               subtitle: sub.line1.isNotEmpty ? sub.line1 : null,
               subtitle2: sub.line2,

@@ -8,6 +8,7 @@ import '../../../core/api/image_policy.dart';
 import '../../../core/utils/category_utils.dart';
 import '../../../core/utils/content_logic.dart';
 import '../../../core/utils/source_utils.dart';
+import '../../../core/utils/url_security_validator.dart';
 import '../../models/server/anilist_media.dart';
 import '../../models/server/anime_detail.dart';
 import '../../models/server/episodes_response.dart';
@@ -473,6 +474,7 @@ class AurisRepositoryImpl implements AurisRepository {
     String? type,
     String? server,
     String? imgSize, // Senior Fix: Soporte para el nuevo parámetro &img del servidor
+    
   }) async {
     final normalizedTitle = cleanTitleForDisplay(stripSeasonSuffix(title)).toLowerCase().trim();
     final normalizedUrl = url?.split('?').first.split('#').first ?? '';
@@ -490,6 +492,10 @@ class AurisRepositoryImpl implements AurisRepository {
     final int? detailSeason = seasonForRequest(season, url);
     if (detailSeason != null) params['season'] = detailSeason;
     if (kind != null) params['kind'] = kind;
+    if (url != null && url.isNotEmpty) {
+      params['url'] = url;
+      params['sourceUrl'] = url;
+    }
     if (type != null) params['type'] = type;
     if (imgSize != null) params['img'] = imgSize;
     params['metadataOnly'] = '1';
@@ -1007,6 +1013,17 @@ class AurisRepositoryImpl implements AurisRepository {
 
   @override
   Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken}) async {
+    // ============================================
+    // VALIDACIÓN DE SEGURIDAD - SSRF Prevention
+    // ============================================
+    if (!ExtractParamsValidator.validate(url: url, source: source, category: category)) {
+      debugPrint('[SECURITY] extractVideo: URL o source no pasaron validación: url=$url, source=$source');
+      // Retornar un ExtractResult vacío seguro en lugar de lanzar error
+      // Esto evita que aplicaciones cliente manejen errores inesperados
+      return ExtractResult(url: '', headers: {}, qualities: [], tracks: []);
+    }
+    // ============================================
+    
     final params = <String, dynamic>{'url': url, 'source': source};
     if (direct) params['native'] = '1';
     final response = await _client.get(
@@ -1016,6 +1033,124 @@ class AurisRepositoryImpl implements AurisRepository {
       cancelToken: cancelToken,
     );
     return ExtractResult.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Stream<ExtractResult> extractVideoStream(
+    String url,
+    String source, {
+    String? category,
+    String? preferredLang,
+    bool direct = false,
+    CancelToken? cancelToken,
+  }) async* {
+    // ============================================
+    // VALIDACIÓN DE SEGURIDAD - SSRF Prevention
+    // ============================================
+    if (!ExtractParamsValidator.validate(url: url, source: source, category: category)) {
+      debugPrint('[SECURITY] extractVideoStream: URL o source no pasaron validación: url=$url, source=$source');
+      // Emitir un resultado vacío seguro
+      yield ExtractResult(url: '', headers: {}, qualities: [], tracks: []);
+      return;
+    }
+    // ============================================
+    
+    final params = <String, dynamic>{'url': url, 'source': source};
+    if (direct) params['native'] = '1';
+    if (preferredLang != null && preferredLang.isNotEmpty) {
+      params['preferredLang'] = preferredLang;
+    }
+
+    final baseUrl = ApiEndpoints.baseUrlForSource(source, category);
+    final uri = Uri.parse(baseUrl).replace(
+      path: ApiEndpoints.extractStream,
+      queryParameters: params,
+    );
+
+    final dio = Dio();
+    Response<ResponseBody> response;
+    try {
+      response = await dio.get<ResponseBody>(
+        uri.toString(),
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: {'Accept': 'text/event-stream'},
+        ),
+        cancelToken: cancelToken,
+      );
+    } catch (e) {
+      // Fallback inmediato a extract normal si SSE no estuviera disponible
+      final fallback = await extractVideo(url, source, category: category, direct: direct, cancelToken: cancelToken);
+      yield fallback;
+      return;
+    }
+
+    final stream = response.data?.stream;
+    if (stream == null) {
+      final fallback = await extractVideo(url, source, category: category, direct: direct, cancelToken: cancelToken);
+      yield fallback;
+      return;
+    }
+
+    final List<VideoTrackOption> accumulatedTracks = [];
+    String? primaryUrl;
+    Map<String, String> primaryHeaders = const {};
+    List<QualityOption> primaryQualities = const [];
+
+    String buffer = '';
+    await for (final Uint8List chunk in stream) {
+      if (cancelToken != null && cancelToken.isCancelled) break;
+      buffer += utf8.decode(chunk);
+      final parts = buffer.split('\n\n');
+      buffer = parts.removeLast();
+
+      for (final part in parts) {
+        if (part.trim().isEmpty) continue;
+        final lines = part.split('\n');
+        String? eventName;
+        String? dataStr;
+
+        for (final l in lines) {
+          if (l.startsWith('event: ')) {
+            eventName = l.substring(7).trim();
+          } else if (l.startsWith('data: ')) {
+            dataStr = l.substring(6).trim();
+          }
+        }
+
+        if (eventName == 'stream_ready' && dataStr != null && dataStr.isNotEmpty) {
+          try {
+            final Map<String, dynamic> trackJson = jsonDecode(dataStr) as Map<String, dynamic>;
+            final track = VideoTrackOption.fromJson(trackJson);
+
+            // Evitar duplicados por URL
+            final exists = accumulatedTracks.any((t) => t.url == track.url);
+            if (!exists) {
+              accumulatedTracks.add(track);
+              if (primaryUrl == null && track.url.isNotEmpty) {
+                primaryUrl = track.url;
+                primaryHeaders = track.headers;
+                primaryQualities = track.qualities;
+              }
+
+              yield ExtractResult(
+                url: primaryUrl ?? track.url,
+                headers: primaryHeaders.isNotEmpty ? primaryHeaders : track.headers,
+                tracks: List.unmodifiable(accumulatedTracks),
+                qualities: primaryQualities.isNotEmpty ? primaryQualities : track.qualities,
+              );
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    // Si terminó el stream pero nunca llegó ningún stream_ready (ej. error del scraper),
+    // intentamos extract estándar
+    if (accumulatedTracks.isEmpty) {
+      final fallback = await extractVideo(url, source, category: category, direct: direct, cancelToken: cancelToken);
+      yield fallback;
+    }
   }
 
   @override

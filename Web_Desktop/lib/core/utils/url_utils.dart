@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
+import 'package:auris_core/data/models/content_sports.dart';
 import '../../features/player/presentation/player_screen.dart';
 
 /// Utilidades senior para URLs ultra-limpias, encriptadas, comprimidas y estilo Crunchyroll.
@@ -10,23 +12,63 @@ class UrlUtils {
   /// abra por su propio _openPlayer (mini, control remoto, notificaciones).
   static final ValueNotifier<int> playerOpenedTick = ValueNotifier<int>(0);
 
-  /// Abre el reproductor como un diálogo a pantalla completa
-  static Future<T?> openPlayer<T>(BuildContext context, PlayerScreen player) {
+  /// Abre el reproductor a pantalla completa en la ruta `/watch/:token/:slug`.
+  ///
+  /// No es un diálogo: la URL refleja que hay algo reproduciéndose (se puede
+  /// compartir y refrescar) y el botón atrás del navegador cierra el player.
+  /// El [PlayerScreen] viaja como `extra`, así que el router lo recibe y lo
+  /// transforma en [WatchScreen] con layout adaptativo.
+  static Future<T?> openPlayer<T>(BuildContext context, PlayerScreen player) async {
     playerOpenedTick.value++;
-    return showGeneralDialog<T>(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black,
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, animation, secondaryAnimation) => player,
+    
+    // Normalizar slug del título para URL amigable
+    final slug = (player.title ?? '')
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9\s-_]'), '')
+        .replaceAll(RegExp(r'\s+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+
+    // Generar token auto-contenido (similar a buildShareableUri)
+    final token = encodeShareableToken(
+      title: player.title ?? '',
+      source: player.source,
+      url: player.sourceUrl,
+      category: player.category,
+      season: player.season,
     );
+
+    try {
+      // Usar goNamed con el nombre de la ruta 'watch' y pasar token y slug como pathParameters
+      GoRouter.of(context).goNamed(
+        'watch',
+        pathParameters: {
+          'token': token,
+          'slug': slug,
+        },
+        extra: player,
+      );
+      // goNamed is synchronous, so we complete the Future with null
+      // The navigation happens immediately via GoRouter
+      return null;
+    } catch (_) {
+      // Sin GoRouter por encima (contexto de diálogo): camino antiguo.
+      return showGeneralDialog<T>(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black,
+        transitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (context, animation, secondaryAnimation) => player,
+      );
+    }
   }
 
   /// Cache en memoria de acceso ultrarrápido (0 ms) para IDs cortos y slugs
   static final Map<String, Map<String, dynamic>> _memoryCache = {};
 
   /// Guarda en memoria y en Hive ('media_slug_cache') para persistir tras F5
-  static void _saveToCache(String shortId, String slug, Map<String, dynamic> data) {
+  static void _saveToCache(
+      String shortId, String slug, Map<String, dynamic> data) {
     _memoryCache[shortId] = data;
     if (slug.isNotEmpty) _memoryCache[slug] = data;
     try {
@@ -98,10 +140,38 @@ class UrlUtils {
 
   /// Semilla de cifrado interna para generar tokens opacos seguros (estilo Crunchyroll)
   static const List<int> _cipherKey = [
-    0x41, 0x75, 0x72, 0x69, 0x73, 0x54, 0x56, 0x5F,
-    0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x65,
-    0x64, 0x5F, 0x53, 0x6F, 0x75, 0x72, 0x63, 0x65,
-    0x5F, 0x32, 0x30, 0x32, 0x36, 0x21, 0x24, 0x2A
+    0x41,
+    0x75,
+    0x72,
+    0x69,
+    0x73,
+    0x54,
+    0x56,
+    0x5F,
+    0x45,
+    0x6E,
+    0x63,
+    0x72,
+    0x79,
+    0x70,
+    0x74,
+    0x65,
+    0x64,
+    0x5F,
+    0x53,
+    0x6F,
+    0x75,
+    0x72,
+    0x63,
+    0x65,
+    0x5F,
+    0x32,
+    0x30,
+    0x32,
+    0x36,
+    0x21,
+    0x24,
+    0x2A
   ];
 
   /// Genera un ID corto y elegante de 9 caracteres alfanuméricos (idéntico a Crunchyroll: G4PH0WXVJ)
@@ -137,8 +207,11 @@ class UrlUtils {
 
   /// Slugify estándar mejorado para preservar caracteres unicode (acentos, etc)
   static String slugify(String text) {
-    return text.toLowerCase().trim()
-        .replaceAll(RegExp(r'[^\p{L}\p{N}\s-]', unicode: true), '') // Mantiene letras unicode, números y espacios
+    return text
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[^\p{L}\p{N}\s-]', unicode: true),
+            '') // Mantiene letras unicode, números y espacios
         .replaceAll(RegExp(r'\s+'), '-'); // Convierte espacios a guiones
   }
 
@@ -146,7 +219,8 @@ class UrlUtils {
   /// - 'anime' -> 'anime'
   /// - 'movie', 'movie_anime', 'movie_kdrama' -> 'movie'
   /// - 'kdrama', 'series' y demás -> 'serie'
-  static String determineRoutePrefix({String? kind, String? category, String? type}) {
+  static String determineRoutePrefix(
+      {String? kind, String? category, String? type}) {
     final k = (kind ?? category ?? type ?? '').toLowerCase().trim();
     if (k == 'anime') {
       return 'anime';
@@ -199,7 +273,8 @@ class UrlUtils {
     // [source, url, kind, year, season, title, category]
     final effectiveKind = kind ?? category ?? type ?? '';
     final effectiveYear = (year != null && year > 0) ? year.toString() : '';
-    final effectiveSeason = (season != null && season > 0) ? season.toString() : '';
+    final effectiveSeason =
+        (season != null && season > 0) ? season.toString() : '';
     final effectiveCat = category ?? '';
 
     final packed = [
@@ -225,7 +300,8 @@ class UrlUtils {
   }
 
   /// Desencripta un token de URL auto-contenido o lo recupera por su Short ID / Slug desde la caché.
-  static Map<String, dynamic>? decodeShareableToken(String token, {String? slug}) {
+  static Map<String, dynamic>? decodeShareableToken(String token,
+      {String? slug}) {
     try {
       if (token.isEmpty && (slug == null || slug.isEmpty)) return null;
 
@@ -330,12 +406,16 @@ class UrlUtils {
                   'source': rawSource,
                   'url': rawUrl,
                   'category': (parsed['c'] as String?) ?? 'all',
-                  'year': parsed['y'] is int ? parsed['y'] as int : int.tryParse(parsed['y']?.toString() ?? ''),
+                  'year': parsed['y'] is int
+                      ? parsed['y'] as int
+                      : int.tryParse(parsed['y']?.toString() ?? ''),
                   'quality': parsed['q'] as String?,
                   'type': parsed['ty'] as String?,
                   'kind': parsed['k'] as String?,
                   'metadataTitle': parsed['mt'] as String?,
-                  'season': parsed['se'] is int ? parsed['se'] as int : int.tryParse(parsed['se']?.toString() ?? ''),
+                  'season': parsed['se'] is int
+                      ? parsed['se'] as int
+                      : int.tryParse(parsed['se']?.toString() ?? ''),
                   'sectionId': parsed['sec'] as String?,
                   'from': parsed['f'] as String?,
                 };
@@ -396,9 +476,10 @@ class UrlUtils {
     String? sectionId,
     String? from,
   }) {
-    final prefix = determineRoutePrefix(kind: kind, category: category, type: type);
+    final prefix =
+        determineRoutePrefix(kind: kind, category: category, type: type);
     final slug = slugify(title.isNotEmpty ? title : 'media');
-    
+
     // Generar token auto-contenido
     final token = encodeShareableToken(
       title: title,
@@ -424,7 +505,8 @@ class UrlUtils {
       if (quality != null && quality.isNotEmpty) 'quality': quality,
       if (type != null && type.isNotEmpty) 'type': type,
       if (kind != null && kind.isNotEmpty) 'kind': kind,
-      if (metadataTitle != null && metadataTitle.isNotEmpty) 'metadataTitle': metadataTitle,
+      if (metadataTitle != null && metadataTitle.isNotEmpty)
+        'metadataTitle': metadataTitle,
       if (season != null && season > 0) 'season': season,
       if (sectionId != null && sectionId.isNotEmpty) 'sectionId': sectionId,
       if (from != null && from.isNotEmpty) 'from': from,
@@ -436,7 +518,7 @@ class UrlUtils {
     return '/$prefix/$token/$slug';
   }
 
-  /// Genera una URL de reproductor simple
+  /// Genera una URL de reproductor con token y slug para URLs compartibles
   static String buildPlayerUri({
     required String title,
     required String contentId,
@@ -451,6 +533,23 @@ class UrlUtils {
     String? posterUrl,
     String? bannerUrl,
   }) {
+    // Slug amigable para URL: título normalizado (lowercase, sin símbolos especiales)
+    final slug = title
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9\s-_]'), '')
+        .replaceAll(RegExp(r'\s+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+
+    // Generar token auto-contenido (similar a buildShareableUri)
+    final token = encodeShareableToken(
+      title: title,
+      source: source,
+      url: url,
+      category: category,
+      season: season,
+    );
+
     final queryParams = {
       'title': title,
       'contentId': contentId,
@@ -466,6 +565,37 @@ class UrlUtils {
       if (bannerUrl != null) 'bannerUrl': bannerUrl,
     };
 
-    return Uri(path: '/reproductor', queryParameters: queryParams).toString();
+    final path = slug.isNotEmpty ? '/watch/$token/$slug' : '/watch/$token';
+    return Uri(path: path, queryParameters: queryParams).toString();
+  }
+
+  /// URL limpia de la ficha de un evento deportivo: `/sports/<id>`.
+  ///
+  /// Solo lleva en la query lo necesario para pintar la pantalla si el
+  /// enlace se abre "en frío" (F5 o compartido); el detalle de los canales
+  /// lo completa la propia pantalla.
+  static String buildSportsUri(ContentSports event) {
+    final query = <String, String>{
+      if (event.title.isNotEmpty) 'title': event.title,
+      if (event.sport != null && event.sport!.isNotEmpty) 'sport': event.sport!,
+      if (event.sportLabel != null && event.sportLabel!.isNotEmpty)
+        'sportLabel': event.sportLabel!,
+      if (event.league != null && event.league!.isNotEmpty)
+        'league': event.league!,
+      if (event.teams.isNotEmpty) 'teams': event.teams.join(','),
+      if (event.posterUrl.isNotEmpty) 'poster': event.posterUrl,
+      if (event.bannerUrl.isNotEmpty) 'banner': event.bannerUrl,
+      if (event.synopsis != null && event.synopsis!.isNotEmpty)
+        'synopsis': event.synopsis!,
+      if (event.startsAt != null && event.startsAt!.isNotEmpty)
+        'startsAt': event.startsAt!,
+      if (event.effectiveIsLive) 'live': '1',
+      if (event.status != null && event.status!.isNotEmpty)
+        'status': event.status!,
+    };
+
+    final rawId = event.id.isNotEmpty ? event.id : event.title;
+    final id = Uri.encodeComponent(rawId.isEmpty ? 'evento' : rawId);
+    return Uri(path: '/sports/$id', queryParameters: query).toString();
   }
 }

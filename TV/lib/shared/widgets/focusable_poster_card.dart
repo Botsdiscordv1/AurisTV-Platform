@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:auris_core/auris_core.dart' hide MarqueeText;
 import 'marquee_text.dart';
 import 'tv_focus_wrapper.dart';
@@ -248,7 +247,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                                   ),
                                   child: Text(
                                     widget.badge!, 
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       color: Colors.white, 
                                       fontSize: 10, 
                                       fontWeight: FontWeight.w800, 
@@ -277,7 +276,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                                     widget.subtitle!,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.poppins(
+                                    style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
@@ -304,7 +303,7 @@ class _FocusablePosterCardState extends State<FocusablePosterCard> {
                     child: MarqueeText(
                       text: widget.title,
                       animate: isMobile ? true : _isActive,
-                      style: GoogleFonts.poppins(
+                      style: TextStyle(
                         color: _isActive ? Colors.white : Colors.white.withOpacity(0.95),
                         fontSize: widget.titleFontSize ?? (isMobile ? ResponsiveUtils.sp(context, 13) : TVResponsiveUtils.grid(context, 20)),
                         fontWeight: FontWeight.w700,

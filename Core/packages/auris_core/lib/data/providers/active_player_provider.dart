@@ -570,7 +570,33 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     } else {
       try {
         final repo = ref.read(aurisRepositoryProvider);
-        extract = await repo.extractVideo(pageUrl, state.source!, category: category);
+        final settings = ref.read(settingsProvider);
+        final String pref = settings.preferredLanguage.toLowerCase();
+        final String targetLang = pref == 'latino' ? 'LAT' : (pref == 'castellano' ? 'CAST' : 'SUB');
+
+        // Consumir el primer stream que llegue vía SSE de inmediato
+        extract = await repo.extractVideoStream(
+          pageUrl,
+          state.source!,
+          category: category,
+          preferredLang: targetLang,
+          direct: !kIsWeb,
+        ).first.timeout(const Duration(seconds: 8), onTimeout: () async {
+          return await repo.extractVideo(pageUrl, state.source!, category: category);
+        });
+
+        // En background, escuchar los streams que sigan llegando y actualizar las pistas
+        repo.extractVideoStream(
+          pageUrl,
+          state.source!,
+          category: category,
+          preferredLang: targetLang,
+          direct: !kIsWeb,
+        ).listen((updatedExtract) {
+          if (mounted && updatedExtract.tracks.length > state.availableTracks.length) {
+            updateSession(tracks: updatedExtract.tracks);
+          }
+        }, onError: (_) {});
       } catch (e) {
         debugPrint('[player_session] switchEpisode fail: $e');
         return;

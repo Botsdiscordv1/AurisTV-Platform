@@ -425,7 +425,7 @@ final omdbSeasonProvider = FutureProvider.family<List<OmdbEpisode>, OmdbSeasonPa
   return repo.getOmdbSeason(title: params.title, season: params.season ?? 1);
 });
 
-final AutoDisposeFutureProviderFamily<EpisodesResponse?, EpisodesParams> episodesProvider = FutureProvider.autoDispose.family<EpisodesResponse?, EpisodesParams>((AutoDisposeFutureProviderRef<EpisodesResponse?> ref, EpisodesParams params) async {
+final FutureProviderFamily<EpisodesResponse?, EpisodesParams> episodesProvider = FutureProvider.family<EpisodesResponse?, EpisodesParams>((Ref ref, EpisodesParams params) async {
   if (params.url.isEmpty || params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
     return EpisodesResponse(episodes: const [], source: params.source, url: params.url, slug: '', total: 0);
   }
