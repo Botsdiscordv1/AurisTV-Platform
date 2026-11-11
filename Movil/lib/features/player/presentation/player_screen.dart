@@ -3862,24 +3862,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // --- FLUJO SEQUENCIAL DE ALTA ESTABILIDAD (SOLO NATIVO) ---
     if (!kIsWeb) {
-      // Senior Fix: NO llamamos player.stop() antes de open(). stop() destruye
-      // el contexto de vídeo (vo/EGL) y open() no logra recrearlo, provocando
-      // "Failed initializing any suitable GPU context" y rompiendo el seek/play
-      // en el cambio de episodio. open() gestiona la transición internamente
-      // reutilizando la salida de vídeo.
-      //
-      // Senior Fix: Si NO hay que reanudar (video nuevo desde 0) abrimos con
-      // play: true para que arranque directo. Abrir con play: false y luego
-      // llamar play() dejaba el episodio en pausa en HLS nativo.
-      final bool needsResumeSeek = _resumePosition > 3000;
-      debugPrint('[player] 2. OPEN NEW SOURCE (play: ${!needsResumeSeek})');
-      await player.open(
-        Media(
-          videoUrl,
-          httpHeaders: finalHeaders,
-        ), 
-        play: !needsResumeSeek
-      );
+      final bool isAlreadyPlayingThisUrl = player.state.playing && player.state.duration > Duration.zero;
+      final bool needsResumeSeek = !isAlreadyPlayingThisUrl && _resumePosition > 3000;
+
+      if (!isAlreadyPlayingThisUrl) {
+        debugPrint('[player] 2. OPEN NEW SOURCE (play: ${!needsResumeSeek})');
+        await player.open(
+          Media(
+            videoUrl,
+            httpHeaders: finalHeaders,
+          ), 
+          play: !needsResumeSeek
+        );
+      } else {
+        debugPrint('[player] 2. REUSING ALREADY PLAYING SINGLE PLAYER SOURCE: $videoUrl');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _holdingFirstFrame = false;
+            _hasResetPosition = true;
+          });
+        }
+      }
 
       // Senior Surface Fix: Conectar la superficie nativa tras open() para forzar
       // a mpv/mediacodec_embed a recrear la instancia del decodificador MediaCodec

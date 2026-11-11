@@ -68,10 +68,12 @@ class WatchScreen extends ConsumerStatefulWidget {
 }
 
 class _WatchScreenState extends ConsumerState<WatchScreen> {
-  Player? _player;
-  VideoController? _videoController;
   Timer? _hideControlsTimer;
   String _lastOpenedUrl = '';
+  StreamSubscription? _posSubscription;
+  StreamSubscription? _playSubscription;
+  StreamSubscription? _bufSubscription;
+  StreamSubscription? _durSubscription;
 
   bool _showControls = false;
   bool _isPlaying = false;
@@ -88,40 +90,21 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   @override
   void initState() {
     super.initState();
-    _initPlayer();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(activePlayerProvider.notifier).initPlayerIfNeeded();
+      ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
+      _setupPlayerListeners();
+    });
   }
 
-  void _initPlayer() {
-    _player = Player();
+  void _setupPlayerListeners() {
+    final active = ref.read(activePlayerProvider);
+    final player = active.player;
+    if (player == null) return;
 
-    // Configuración MPV de Alto Rendimiento para HLS en Android (Aceleración HW + Cache de lectura previa)
-    try {
-      if (!kIsWeb && Platform.isAndroid) {
-        final platform = _player!.platform as dynamic;
-        platform.setProperty('ao', 'audiotrack');
-        platform.setProperty('hwdec', 'auto-safe');
-        platform.setProperty('vo', 'gpu');
-        platform.setProperty('cache', 'yes');
-        platform.setProperty('demuxer-readahead-secs', '20');
-        platform.setProperty('hr-seek', 'yes');
-        platform.setProperty('hr-seek-demuxer-offset', '0');
-        platform.setProperty('video-sync', 'display-resample');
-        platform.setProperty('audio-buffer', '0.2');
-      }
-    } catch (_) {}
-
-    _videoController = VideoController(
-      _player!,
-      configuration: const VideoControllerConfiguration(
-        androidAttachSurfaceAfterVideoParameters: false,
-      ),
-    );
-
-    if (widget.sourceUrl.isNotEmpty) {
-      _player?.open(Media(widget.sourceUrl));
-    }
-
-    _player?.stream.playing.listen((playing) {
+    _playSubscription?.cancel();
+    _playSubscription = player.stream.playing.listen((playing) {
       if (mounted) {
         setState(() {
           _isPlaying = playing;
@@ -132,13 +115,15 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       }
     });
 
-    _player?.stream.buffering.listen((buffering) {
+    _bufSubscription?.cancel();
+    _bufSubscription = player.stream.buffering.listen((buffering) {
       if (mounted) {
         setState(() => _isBuffering = buffering);
       }
     });
 
-    _player?.stream.position.listen((pos) {
+    _posSubscription?.cancel();
+    _posSubscription = player.stream.position.listen((pos) {
       if (mounted) {
         setState(() {
           _position = pos;
@@ -154,7 +139,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       }
     });
 
-    _player?.stream.duration.listen((dur) {
+    _durSubscription?.cancel();
+    _durSubscription = player.stream.duration.listen((dur) {
       if (mounted) setState(() => _duration = dur);
     });
 
@@ -201,17 +187,20 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   @override
   void dispose() {
     _hideControlsTimer?.cancel();
+    _posSubscription?.cancel();
+    _playSubscription?.cancel();
+    _bufSubscription?.cancel();
+    _durSubscription?.cancel();
     if (_isFullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     }
-    _player?.dispose();
     super.dispose();
   }
 
   void _navigateToFullscreen() {
-    final int currentPosMs = _player?.state.position.inMilliseconds ?? 0;
-    _player?.pause();
+    final active = ref.read(activePlayerProvider);
+    final int currentPosMs = active.player?.state.position.inMilliseconds ?? _position.inMilliseconds;
 
     final queryParams = <String, String>{
       if (widget.sourceUrl.isNotEmpty) 'url': widget.sourceUrl,
@@ -240,9 +229,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
   Future<void> _cargarEpisodioHlsSeguro(String urlStream, Map<String, String> headers) async {
     try {
-      await _player?.stop();
+      final notifier = ref.read(activePlayerProvider.notifier);
+      notifier.initPlayerIfNeeded();
 
-      // Consultar historial para reanudación inteligente de progreso
       final String seriesTitle = widget.title ?? widget.metadataTitle ?? widget.contentId;
       final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(
         seriesTitle,
@@ -251,28 +240,29 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       );
       final int resumeMs = widget.startPosition ?? (hist?.positionInMilliseconds ?? 0);
       final bool shouldResume = resumeMs > 3000 && !(hist?.isCompleted ?? false);
-      final Duration startDur = shouldResume ? Duration(milliseconds: resumeMs) : Duration.zero;
 
-      if (shouldResume) {
-        debugPrint('[WatchScreen] Reanudando progreso guardado en ${resumeMs ~/ 1000}s para "$seriesTitle" E${widget.episode}');
-      }
-
-      // Abrir en modo pausado para permitir que la textura de Flutter (1920x1080) se estabilice
-      await _player?.open(
-        Media(urlStream, httpHeaders: headers, start: startDur),
-        play: false,
+      await notifier.play(
+        item: MediaItem(
+          id: seriesTitle,
+          title: seriesTitle,
+          posterUrl: widget.posterUrl ?? widget.bannerUrl ?? '',
+          bannerUrl: widget.bannerUrl,
+          detailUrl: widget.sourceUrl,
+          type: widget.category == 'movie' ? MediaType.movie : MediaType.series,
+        ),
+        url: urlStream,
+        episode: widget.episode ?? '1',
+        season: widget.season ?? 1,
+        source: widget.source,
+        episodeTitle: widget.episodeTitle,
       );
 
-      if (Platform.isAndroid) {
-        await Future.delayed(const Duration(milliseconds: 350));
-        if (shouldResume) {
-          await _player?.seek(startDur);
-        } else {
-          await _player?.seek(Duration.zero);
-        }
-      }
+      _setupPlayerListeners();
 
-      await _player?.play();
+      if (shouldResume) {
+        final active = ref.read(activePlayerProvider);
+        await active.player?.seek(Duration(milliseconds: resumeMs));
+      }
     } catch (e) {
       debugPrint('[WatchScreen] Error al cargar HLS seguro: $e');
     }
@@ -333,23 +323,27 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   }
 
   void _rewind10() {
+    final active = ref.read(activePlayerProvider);
     final target = _position - const Duration(seconds: 10);
     final clamped = target < Duration.zero ? Duration.zero : target;
     setState(() => _position = clamped); // UI optimista en 0ms
-    _player?.seek(clamped);
+    active.player?.seek(clamped);
     _startHideTimer();
   }
 
   void _fastForward10() {
+    final active = ref.read(activePlayerProvider);
     final target = _position + const Duration(seconds: 10);
     final maxDur = _duration > Duration.zero ? _duration : const Duration(hours: 10);
     final clamped = target > maxDur ? maxDur : target;
     setState(() => _position = clamped); // UI optimista en 0ms
-    _player?.seek(clamped);
+    active.player?.seek(clamped);
     _startHideTimer();
   }
 
   Widget _buildEmbeddedPlayer() {
+    final active = ref.watch(activePlayerProvider);
+    final controller = active.controller;
     final bool isInitialLoading = !_hasLoadedFirstFrame;
 
     return GestureDetector(
@@ -362,9 +356,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         fit: StackFit.expand,
         children: [
           // Capa de Video real
-          if (_videoController != null)
+          if (controller != null)
             Video(
-              controller: _videoController!,
+              controller: controller,
               controls: NoVideoControls,
               fit: BoxFit.contain,
             )
@@ -409,10 +403,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                               size: 38,
                             ),
                             onPressed: () {
+                              final active = ref.read(activePlayerProvider);
                               if (_isPlaying) {
-                                _player?.pause();
+                                active.player?.pause();
                               } else {
-                                _player?.play();
+                                active.player?.play();
                               }
                               _startHideTimer();
                             },
@@ -509,7 +504,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                                 if (targetSec >= 0) {
                                   final target = Duration(seconds: targetSec);
                                   setState(() => _position = target); // UI optimista en 0ms
-                                  _player?.seek(target);
+                                  ref.read(activePlayerProvider).player?.seek(target);
                                   _startHideTimer();
                                 }
                               },

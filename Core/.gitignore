@@ -15,3 +15,12 @@ web/.dart_tool/
 local.properties
 *.log
 .artifacts/
+
+# ===========================================
+# Variables de entorno sensibles
+# ===========================================
+.env
+.env.production
+.env.local
+*.env
+!/.env.example
