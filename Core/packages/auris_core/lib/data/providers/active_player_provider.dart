@@ -131,20 +131,24 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
       ),
     );
     
-    // Senior Tuning: Optimizamos el motor para carga estable
+    // Senior Tuning: Optimizamos el motor para salida de video GPU por textura en Android
     try {
       if (!kIsWeb) {
         final platform = player.platform as dynamic;
+        platform.setProperty('vo', 'gpu');
         platform.setProperty('hwdec', 'auto-safe');
+        platform.setProperty('ao', 'audiotrack');
       }
     } catch (_) {}
 
     // Móvil puede usar SurfaceView nativo; TV/Web conservan la textura de
     // media_kit. La decisión la toma el entrypoint de cada plataforma.
-    final bool nativeAndroidSurface = !kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.android &&
-        VideoSurfaceConfig.nativeAndroidSurface;
-    final controller = nativeAndroidSurface ? null : VideoController(player);
+    final controller = VideoController(
+      player,
+      configuration: const VideoControllerConfiguration(
+        androidAttachSurfaceAfterVideoParameters: false,
+      ),
+    );
     
     // Senior Strategy: Actualizamos el estado síncronamente para evitar que llamadas rápidas
     // sucesivas a initPlayerIfNeeded creen múltiples instancias de hardware (Audio Doble).

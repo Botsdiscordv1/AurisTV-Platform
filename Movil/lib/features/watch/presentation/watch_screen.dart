@@ -108,7 +108,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       if (mounted) {
         setState(() {
           _isPlaying = playing;
-          if (playing && _position.inMilliseconds > 0) {
+          if (playing) {
             _hasLoadedFirstFrame = true;
           }
         });
@@ -127,7 +127,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       if (mounted) {
         setState(() {
           _position = pos;
-          if (pos.inMilliseconds > 0 && _isPlaying) {
+          if (pos.inMilliseconds > 0) {
             _hasLoadedFirstFrame = true;
           }
         });
@@ -195,6 +195,15 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     }
+
+    // Si salimos de WatchScreen mientras el video se reproduce, acoplar al MiniPlayer flotante (Estilo YouTube)
+    try {
+      final active = ref.read(activePlayerProvider);
+      if (active.player?.state.playing == true) {
+        ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
+      }
+    } catch (_) {}
+
     super.dispose();
   }
 
@@ -343,7 +352,15 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
   Widget _buildEmbeddedPlayer() {
     final active = ref.watch(activePlayerProvider);
-    final controller = active.controller;
+    final controller = active.controller ??
+        (active.player != null
+            ? VideoController(
+                active.player!,
+                configuration: const VideoControllerConfiguration(
+                  androidAttachSurfaceAfterVideoParameters: false,
+                ),
+              )
+            : null);
     final bool isInitialLoading = !_hasLoadedFirstFrame;
 
     return GestureDetector(
@@ -365,13 +382,10 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
           else
             Container(color: Colors.black),
 
-          // 1. Fase de Carga Inicial Única (Solo antes de reproducir el primer frame del episodio)
+          // 1. Fase de Carga Inicial Única (Spinner sobre el video)
           if (isInitialLoading)
-            Container(
-              color: Colors.black,
-              child: const Center(
-                child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
-              ),
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
             ),
 
           // 2. Overlay de Controles (Disponible cuando el primer frame ya cargó)
@@ -548,7 +562,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         _lastOpenedUrl = resolvedUrl;
         setState(() {
           _hasLoadedFirstFrame = false;
-          _isBuffering = true;
           _showControls = false;
           _position = Duration.zero;
         });
@@ -559,7 +572,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         debugPrint('[WatchScreen STREAM LOG] HLS = $isHls');
         debugPrint('====================================================');
 
-        _cargarEpisodioHlsSeguro(resolvedUrl, resolvedHeaders);
+        // Senior Fix (Riverpod 2.x): modificar providers dentro de build() está prohibido.
+        // Usar Future.microtask para retrasar la carga después de que el árbol de widgets
+        // termine de construirse.
+        Future.microtask(() {
+          if (!mounted) return;
+          _cargarEpisodioHlsSeguro(resolvedUrl, resolvedHeaders);
+        });
       }
     });
 
@@ -615,6 +634,15 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop && _isFullscreen) {
           _toggleFullscreen();
+        } else if (didPop) {
+          try {
+            final active = ref.read(activePlayerProvider);
+            if (active.player?.state.playing == true) {
+              Future.microtask(() {
+                ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
+              });
+            }
+          } catch (_) {}
         }
       },
       child: _isFullscreen

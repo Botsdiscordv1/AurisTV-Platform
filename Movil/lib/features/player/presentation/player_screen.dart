@@ -4552,35 +4552,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   void _exitPlayer({bool minimizing = false}) async {
     if (!mounted || _isExiting) return;
 
-    // Senior Safety Flush: Guardar historial ANTES de cualquier cambio de estado
+    // Guardar historial de progreso
     try {
       final ms = _player?.state.position.inMilliseconds ?? 0;
       final duration = _player?.state.duration.inMilliseconds ?? 0;
-      
       if (_hasResetPosition && ms > 3000 && duration > 0) {
         _historyNotifier?.flush();
       }
     } catch (e) {
-      debugPrint('[player] Error during safety flush: $e');
+      debugPrint('[player] Error durante guardado de historial: $e');
     }
-    
-    // Senior Fix: Marcar como saliendo ANTES de cualquier otra acción
+
     setState(() => _isExiting = true);
-    
-    if (!minimizing) {
-      // Si cerramos de verdad, detenemos todo
-      final p = _player;
-      _player = null;
-      try {
-        p?.setVolume(0);
-        await p?.stop();
-      } catch (e) {
-        debugPrint('[player] Error killing native instance: $e');
-      }
-      ref.read(activePlayerProvider.notifier).stop();
-    }
-    
-    // 2. Forzar restauración del sistema (Orientación + UI)
+
+    // Restaurar orientación a Portrait y barras del sistema
     if (_isMobileDevice) {
       _volumeControlChannel.invokeMethod('setIntercept', {'enabled': false});
       if (Platform.isAndroid) {
@@ -4588,28 +4573,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           _orientationChannel.invokeMethod('resetOrientation');
         } catch (_) {}
       }
-      // Senior Fix: Disparar de forma paralela sin 'await' para evitar retrasos en transiciones
-      // y eliminar el efecto de estiramiento visual en pantallas móviles de refresco rápido.
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      // Fuera del player se sigue al sensor (móvil vertical -> portrait,
-      // tablet horizontal -> landscape): el retorno de PiP restaura esta
-      // forma (ver PipService.noteWindowMetrics). No forzar portraitUp.
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
       ]);
       VolumeController().showSystemUI = true;
       ScreenBrightnessController.resetBrightness();
     }
 
-    // 3. Salida limpia usando GoRouter para asegurar consistencia
+    // Regresar limpiamente a WatchScreen conservando el reproductor único activo y reproduciéndose
     if (mounted) {
       if (context.canPop()) {
         context.pop();
       } else {
-        context.go('/'); 
+        context.go('/');
       }
     }
   }

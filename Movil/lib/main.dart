@@ -316,29 +316,28 @@ class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverla
                 );
               }
             : null,
-        onExpand: () {          final state = ref.read(activePlayerProvider);
+        onExpand: () {
+          final state = ref.read(activePlayerProvider);
           if (state.currentItem != null) {
-            // Senior: Sincroniza uiState antes del push para que PlayerScreen vea isFull=true y no oculte extract
             ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
-            final posterParam = '&posterUrl=${Uri.encodeComponent(state.currentItem!.posterUrl)}&bannerUrl=${Uri.encodeComponent(state.currentItem!.bannerUrl ?? '')}&logoUrl=${Uri.encodeComponent(state.currentItem!.logoUrl ?? '')}';
+            final posterParam = '&posterUrl=${Uri.encodeComponent(state.currentItem!.posterUrl)}'
+                '${state.currentItem!.bannerUrl != null ? '&bannerUrl=${Uri.encodeComponent(state.currentItem!.bannerUrl!)}' : ''}'
+                '${state.currentItem!.logoUrl != null ? '&logoUrl=${Uri.encodeComponent(state.currentItem!.logoUrl!)}' : ''}';
             final serverParam = state.source != null ? '&serverName=${Uri.encodeComponent(simplifySourceName(state.source!))}' : '';
-            // kind/year viajan para que el player reabierto guarde historial fiel
-            // aunque tenga que re-ejecutar play() (p. ej. motor muerto en background).
             final kindYearParam = '${state.currentItem!.kind != null && state.currentItem!.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(state.currentItem!.kind!)}' : ''}${state.currentItem!.year != null ? '&year=${state.currentItem!.year}' : ''}';
-            final uri = '/player/${Uri.encodeComponent(state.currentItem!.title)}'
+            
+            final uri = '/watch/${Uri.encodeComponent(state.currentItem!.id)}'
                 '?source=${Uri.encodeComponent(state.source ?? '')}'
                 '&url=${Uri.encodeComponent(state.url ?? '')}'
                 '&episode=${Uri.encodeComponent(state.episode ?? '')}'
                 '&season=${state.season ?? ''}'
                 '&category=${state.currentItem!.type.name}'
+                '&title=${Uri.encodeComponent(state.currentItem!.title)}'
                 '$posterParam$serverParam$kindYearParam';
-            
+
             appRouter.push(uri).catchError((_) {
-              // Si el push falla, revertir a mini: si no, queda audio sin UI.
               try {
-                ref
-                    .read(activePlayerProvider.notifier)
-                    .setUiState(PlayerUIState.mini);
+                ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
               } catch (_) {}
               return null;
             });
