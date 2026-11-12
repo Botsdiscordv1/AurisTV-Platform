@@ -4,12 +4,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../cast/presentation/widgets/cast_picker_sheet.dart';
 import 'package:auris_core/presentation/watch/adaptive_watch_layout.dart';
 import 'package:auris_core/presentation/watch/widgets/watch_episode_metadata.dart';
 import 'package:auris_core/presentation/watch/widgets/watch_action_bar.dart';
@@ -86,6 +88,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   bool _isDisliked = false;
   int _likeCount = 20412;
   int _dislikeCount = 142;
+
+  // Ajustes Estilo YouTube (Modo Ambiente, Temporizador, Velocidad, Calidad)
+  bool _ambientModeEnabled = true;
+  int _sleepTimerMinutes = 0;
+  Timer? _sleepTimer;
 
   @override
   void initState() {
@@ -350,6 +357,271 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     _startHideTimer();
   }
 
+  void _showSettingsSheet() {
+    final active = ref.read(activePlayerProvider);
+    final String currentSpeedLabel = '${(active.player?.state.rate ?? 1.0)}x';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF212121),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Top Pill Handle (YouTube Style)
+                    Container(
+                      width: 32,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Ajustes de Reproducción',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // 1. Velocidad de Reproducción
+                    ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      leading: const Icon(Icons.speed_outlined, color: Colors.white, size: 22),
+                      title: const Text('Velocidad de reproducción', style: TextStyle(color: Colors.white, fontSize: 15)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(currentSpeedLabel, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+                        ],
+                      ),
+                      onTap: () {
+                        Navigator.pop(bottomSheetContext);
+                        _showSpeedSheet();
+                      },
+                    ),
+
+                    // 2. Modo Ambiente (Switch idéntico a PlayerScreen)
+                    SwitchListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      secondary: const Icon(Icons.vignette_outlined, color: Colors.white, size: 22),
+                      title: const Text('Modo ambiente', style: TextStyle(color: Colors.white, fontSize: 15)),
+                      activeColor: const Color(0xFFEF7A1E),
+                      value: _ambientModeEnabled,
+                      onChanged: (val) {
+                        setSheetState(() => _ambientModeEnabled = val);
+                        setState(() => _ambientModeEnabled = val);
+                      },
+                    ),
+
+                    // 3. Temporizador de Apagado
+                    ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      leading: const Icon(Icons.bedtime_outlined, color: Colors.white, size: 22),
+                      title: const Text('Temporizador de apagado', style: TextStyle(color: Colors.white, fontSize: 15)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _sleepTimerMinutes > 0 ? '${_sleepTimerMinutes}m' : 'Desactivado',
+                            style: const TextStyle(color: Colors.white54, fontSize: 13),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+                        ],
+                      ),
+                      onTap: () {
+                        Navigator.pop(bottomSheetContext);
+                        _showSleepTimerSheet();
+                      },
+                    ),
+
+                    const Divider(color: Colors.white12, height: 1),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      child: Text(
+                        'AurisTV Player Engine',
+                        style: TextStyle(color: Colors.white38, fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSpeedSheet() {
+    final active = ref.read(activePlayerProvider);
+    final presetRows = [
+      [0.25, 0.5, 0.75, 1.0, 1.25],
+      [1.5, 1.75, 2.0, 2.5, 3.0],
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF212121),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSpeedState) {
+            final double currentRate = active.player?.state.rate ?? 1.0;
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.speed_outlined, color: Colors.white, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${currentRate.toStringAsFixed(currentRate % 1 == 0 ? 1 : 2)}x',
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    ...presetRows.map((row) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: row.map((r) {
+                            final bool isSel = (currentRate - r).abs() < 0.01;
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () {
+                                active.player?.setRate(r);
+                                setSpeedState(() {});
+                                setState(() {});
+                                Navigator.pop(context);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSel ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${r}x',
+                                  style: TextStyle(
+                                    color: isSel ? Colors.black : Colors.white,
+                                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSleepTimerSheet() {
+    final options = [
+      {'minutes': 0, 'label': 'Desactivado'},
+      {'minutes': 15, 'label': '15 minutos'},
+      {'minutes': 30, 'label': '30 minutos'},
+      {'minutes': 45, 'label': '45 minutos'},
+      {'minutes': 60, 'label': '60 minutos'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF212121),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Temporizador de Apagado', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ...options.map((opt) {
+                  final int mins = opt['minutes'] as int;
+                  final String label = opt['label'] as String;
+                  final bool isSelected = _sleepTimerMinutes == mins;
+
+                  return ListTile(
+                    leading: SizedBox(
+                      width: 24,
+                      child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
+                    ),
+                    title: Text(label, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                    onTap: () {
+                      _sleepTimer?.cancel();
+                      setState(() => _sleepTimerMinutes = mins);
+                      if (mins > 0) {
+                        _sleepTimer = Timer(Duration(minutes: mins), () {
+                          final active = ref.read(activePlayerProvider);
+                          active.player?.pause();
+                          if (mounted) setState(() => _sleepTimerMinutes = 0);
+                        });
+                      }
+                      Navigator.pop(context);
+                    },
+                  );
+                }),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildEmbeddedPlayer() {
     final active = ref.watch(activePlayerProvider);
     final controller = active.controller ??
@@ -436,35 +708,66 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                       ),
                     ),
 
-                    // Cabecera Fullscreen (Título y Botón Salir)
-                    if (_isFullscreen)
-                      Positioned(
-                        top: MediaQuery.paddingOf(context).top + 8,
-                        left: 16,
-                        right: 16,
-                        child: Row(
-                          children: [
-                            IconButton(
-                              icon: AurisIcon(AurisIcons.arrowLeft, color: Colors.white, size: 24),
-                              onPressed: _toggleFullscreen,
-                            ),
+                    // Botón Atrás en la esquina superior izquierda (Dentro del Reproductor)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                            onPressed: () {
+                              if (_isFullscreen) {
+                                _toggleFullscreen();
+                              } else {
+                                context.pop();
+                              }
+                            },
+                          ),
+                          if (_isFullscreen) ...[
                             const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '${widget.title ?? widget.metadataTitle ?? "AurisTV"} - ${widget.episodeTitle ?? "Episodio ${widget.episode ?? "1"}"}',
-                                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                            Text(
+                              '${widget.title ?? widget.metadataTitle ?? "AurisTV"} - ${widget.episodeTitle ?? "Episodio ${widget.episode ?? "1"}"}',
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
-                        ),
+                        ],
                       ),
+                    ),
+
+                    // Botones Cast y Ajustes en la Esquina Superior Derecha
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                backgroundColor: Colors.transparent,
+                                isScrollControlled: true,
+                                builder: (_) => const CastPickerSheet(),
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+                            onPressed: _showSettingsSheet,
+                          ),
+                        ],
+                      ),
+                    ),
 
                     // Botón Circular de Pantalla Completa (Navega a PlayerScreen con todos los controles completos)
                     Positioned(
                       right: 12,
-                      bottom: 46,
+                      bottom: 30,
                       child: InkWell(
                         onTap: _navigateToFullscreen,
                         borderRadius: BorderRadius.circular(20),
@@ -486,17 +789,17 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                       ),
                     ),
 
-                    // Barra Inferior: Tiempo y Slider de Progreso
+                    // Barra Inferior: Tiempo y Slider de Progreso Pegados al Borde
                     Positioned(
-                      left: 12,
-                      right: 12,
-                      bottom: 6,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.only(left: 6, bottom: 2),
+                            padding: const EdgeInsets.only(left: 12, bottom: 0),
                             child: Text(
                               '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
                               style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
@@ -504,8 +807,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                           ),
                           SliderTheme(
                             data: const SliderThemeData(
-                              trackHeight: 3,
-                              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+                              trackHeight: 2,
+                              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 4.5),
+                              overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
                               activeTrackColor: Color(0xFFEF7A1E),
                               inactiveTrackColor: Colors.white24,
                               thumbColor: Color(0xFFEF7A1E),
@@ -580,6 +884,29 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
           _cargarEpisodioHlsSeguro(resolvedUrl, resolvedHeaders);
         });
       }
+    });
+
+    // Senior Fix (SSE): ref.listen para capturar CADA evento SSE del StreamProvider
+    // y actualizar activePlayerProvider con los tracks acumulados. Sin esto, cuando
+    // llegan más streams después del primero, los tracks se ignoran y el reproductor
+    // fullscreen no los ve.
+    ref.listen(extractStreamProvider(ExtractParams(
+      url: widget.sourceUrl,
+      source: widget.source,
+      category: widget.category,
+    )), (prev, next) {
+      if (!mounted) return;
+      next.whenData((result) {
+        final playableTracks = result.tracks.where((t) => !t.isDownload).toList();
+        final prevCount = prev?.value?.tracks.where((t) => !t.isDownload).length ?? 0;
+        if (playableTracks.length > prevCount) {
+          debugPrint('[WatchScreen SSE] Tracks actualizados: $prevCount → ${playableTracks.length}');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            ref.read(activePlayerProvider.notifier).updateSession(tracks: playableTracks);
+          });
+        }
+      });
     });
 
     // Consultar lista de episodios de la serie desde el provider de datos reales
@@ -657,26 +984,24 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
             )
           : Scaffold(
               backgroundColor: Colors.black,
-              appBar: AppBar(
-                backgroundColor: Colors.black,
-                elevation: 0,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => context.pop(),
-                ),
-                title: Text(
-                  seriesTitle,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              body: AdaptiveWatchLayout(
-                // Reproductor embebido 16:9 real
-                playerWidget: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: _buildEmbeddedPlayer(),
-                ),
+              body: SafeArea(
+                bottom: false,
+                child: AdaptiveWatchLayout(
+                  // Reproductor embebido 16:9 real con Modo Ambiente Cinematográfico (YouTube Style)
+                  playerWidget: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: _ambientModeEnabled
+                        ? CinematicAmbientLighting(
+                            player: ref.watch(activePlayerProvider).player,
+                            imageProvider: (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
+                                ? CachedNetworkImageProvider(widget.bannerUrl!)
+                                : (widget.posterUrl != null && widget.posterUrl!.isNotEmpty)
+                                    ? CachedNetworkImageProvider(widget.posterUrl!)
+                                    : null,
+                            child: _buildEmbeddedPlayer(),
+                          )
+                        : _buildEmbeddedPlayer(),
+                  ),
 
                 // Metadatos Reales
                 metadataWidget: WatchEpisodeMetadata(
@@ -782,6 +1107,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                     : null,
               ),
             ),
+          ),
     );
   }
 }

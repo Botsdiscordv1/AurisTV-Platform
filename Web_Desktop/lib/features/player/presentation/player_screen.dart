@@ -4104,6 +4104,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             video: Stack(
               fit: StackFit.expand,
               children: [
+          // Capa Modo Ambiente Cinematográfico (YouTube Style)
+          Positioned.fill(
+            child: CinematicAmbientLighting(
+              player: _player,
+              imageProvider: (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
+                  ? CachedNetworkImageProvider(widget.bannerUrl!)
+                  : (widget.posterUrl != null && widget.posterUrl!.isNotEmpty)
+                      ? CachedNetworkImageProvider(widget.posterUrl!)
+                      : null,
+              intensity: 0.45,
+              blurSigma: 60.0,
+            ),
+          ),
           if (_webViewController != null)
             RepaintBoundary(child: WebViewWidget(controller: _webViewController!))
           else if (_controller != null)

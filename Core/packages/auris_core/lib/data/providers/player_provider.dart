@@ -270,8 +270,13 @@ final extractStreamProvider =
       params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
     return Stream.value(ExtractResult(url: params.url, headers: const {}));
   }
+
+  // Senior Fix (SSE): NO cancelar el cancelToken al dispose del provider.
+  // El provider se destruye y recrea durante rebuilds (p.ej. cuando el player
+  // se inicializa con el 1er track), lo que mataba la conexión SSE y perdía
+  // los streams restantes. El stream SSE se cierra solo cuando el servidor
+  // envía el evento "done".
   final CancelToken cancelToken = CancelToken();
-  ref.onDispose(() => cancelToken.cancel('Provider disposed'));
 
   final repo = ref.watch(aurisRepositoryProvider);
   final settings = ref.watch(settingsProvider);

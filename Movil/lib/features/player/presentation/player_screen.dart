@@ -107,7 +107,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-enum PlayerOverlay { none, language, server, quality, episodes, cast }
+enum PlayerOverlay { none, language, server, quality, episodes, cast, settings, speedSubMenu, qualitySubMenu, sleepTimerSubMenu }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBindingObserver {
   bool get _isMovie => widget.category == 'movie' || widget.category == 'movie_anime' || widget.kind == 'movie_anime' || widget.episode == 'Trailer';
@@ -226,6 +226,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// "fullscreen" no cambia la ventana sino el formato/ajuste del video:
   /// contain (default) → fill (estira a los bordes) → cover (rellena sin
   /// estirar) → contain.
+  bool _ambientModeEnabled = true;
+  int _sleepTimerMinutes = 0;
+  Timer? _sleepTimer;
+
   BoxFit _videoFit = BoxFit.contain;
 
   bool get _useVideoFitCycle => true;
@@ -1716,12 +1720,535 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     );
   }
 
+  Widget _buildYouTubeStyleServerDialog() {
+    final servers = _groupedSources.keys.toList()
+      ..sort((a, b) => sourceDisplayRank(a).compareTo(sourceDisplayRank(b)));
+
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 380,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.8,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFF212121),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 16,
+                spreadRadius: 2,
+              )
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              // Top Pill Handle (YouTube Style)
+              Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              const Text(
+                'Servidores Disponibles',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  itemCount: servers.length,
+                  itemBuilder: (context, index) {
+                    final sName = servers[index];
+                    final isCurrent = sName == simplifySourceName(_currentSource);
+
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () {
+                        setState(() => _activeOverlay = PlayerOverlay.none);
+                        if (!isCurrent) {
+                          _switchSource(_groupedSources[sName]!.first);
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              child: isCurrent
+                                  ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                  : const SizedBox.shrink(),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                sName,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const Divider(color: Colors.white12, height: 1),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Text(
+                  'Servidores de alta velocidad para AurisTV',
+                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showServerSelector() {
     setState(() {
       _activeOverlay = _activeOverlay == PlayerOverlay.server ? PlayerOverlay.none : PlayerOverlay.server;
       _showControls = true;
       _startHideTimer();
     });
+  }
+
+  void _showSettingsDialog() {
+    setState(() {
+      _activeOverlay = _activeOverlay == PlayerOverlay.settings ? PlayerOverlay.none : PlayerOverlay.settings;
+      _showControls = true;
+      _startHideTimer();
+    });
+  }
+
+  Widget _buildYouTubeStyleSettingsDialog() {
+    final active = ref.read(activePlayerProvider);
+    final String currentSpeedLabel = '${(active.player?.state.rate ?? 1.0)}x';
+    final String currentQualityLabel = _selectedQuality == 'auto'
+        ? 'Auto (${_currentTrackQuality.isNotEmpty ? _currentTrackQuality : "1080p"})'
+        : _selectedQuality;
+
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 380,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFF212121),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 16,
+                spreadRadius: 2,
+              )
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              // Top Pill Handle (YouTube Style)
+              Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              const Text(
+                'Ajustes del Reproductor',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  children: [
+                    // 1. Calidad
+                    if (_hasQualityOptions)
+                      ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        leading: const Icon(Icons.tune_outlined, color: Colors.white, size: 22),
+                        title: const Text('Calidad', style: TextStyle(color: Colors.white, fontSize: 15)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(currentQualityLabel, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+                          ],
+                        ),
+                        onTap: () {
+                          setState(() => _activeOverlay = PlayerOverlay.qualitySubMenu);
+                        },
+                      ),
+
+                    // 2. Velocidad de Reproducción
+                    ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      leading: const Icon(Icons.speed_outlined, color: Colors.white, size: 22),
+                      title: const Text('Velocidad de reproducción', style: TextStyle(color: Colors.white, fontSize: 15)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(currentSpeedLabel, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+                        ],
+                      ),
+                      onTap: () {
+                        setState(() => _activeOverlay = PlayerOverlay.speedSubMenu);
+                      },
+                    ),
+
+                    // 3. Modo Ambiente (Switch)
+                    SwitchListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      secondary: const Icon(Icons.vignette_outlined, color: Colors.white, size: 22),
+                      title: const Text('Modo ambiente', style: TextStyle(color: Colors.white, fontSize: 15)),
+                      activeColor: const Color(0xFFEF7A1E),
+                      value: _ambientModeEnabled,
+                      onChanged: (val) {
+                        setState(() => _ambientModeEnabled = val);
+                      },
+                    ),
+
+                    // 4. Temporizador de Apagado
+                    ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      leading: const Icon(Icons.bedtime_outlined, color: Colors.white, size: 22),
+                      title: const Text('Temporizador de apagado', style: TextStyle(color: Colors.white, fontSize: 15)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _sleepTimerMinutes > 0 ? '${_sleepTimerMinutes}m' : 'Desactivado',
+                            style: const TextStyle(color: Colors.white54, fontSize: 13),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+                        ],
+                      ),
+                      onTap: () {
+                        setState(() => _activeOverlay = PlayerOverlay.sleepTimerSubMenu);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(color: Colors.white12, height: 1),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Text(
+                  'AurisTV Player Engine',
+                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpeedSubMenuDialog() {
+    final active = ref.read(activePlayerProvider);
+    final double currentRate = active.player?.state.rate ?? 1.0;
+
+    final presetRows = [
+      [0.25, 0.5, 0.75, 1.0, 1.25],
+      [1.5, 1.75, 2.0, 2.5, 3.0],
+      [4.0, 5.0, 6.0, 7.0, 8.0],
+    ];
+
+    void setRate(double newRate) {
+      final clamped = newRate.clamp(0.25, 8.0);
+      active.player?.setRate(clamped);
+      setState(() {});
+    }
+
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 380,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF212121),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 16,
+                spreadRadius: 2,
+              )
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Top Pill Handle
+              Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Speed Icon + Speed Text
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.speed_outlined, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${currentRate.toStringAsFixed(currentRate % 1 == 0 ? 1 : 2)}x',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Precision Slider with (-) and (+) buttons
+              Row(
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => setRate((currentRate - 0.25).clamp(0.25, 8.0)),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: Colors.white12,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(child: Icon(Icons.remove, color: Colors.white, size: 20)),
+                    ),
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: const SliderThemeData(
+                        trackHeight: 2,
+                        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+                        activeTrackColor: Colors.white,
+                        inactiveTrackColor: Colors.white24,
+                        thumbColor: Colors.white,
+                      ),
+                      child: Slider(
+                        value: currentRate.clamp(0.25, 8.0),
+                        min: 0.25,
+                        max: 8.0,
+                        onChanged: (val) {
+                          final rounded = (val * 4).round() / 4;
+                          setRate(rounded);
+                        },
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => setRate((currentRate + 0.25).clamp(0.25, 8.0)),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: Colors.white12,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(child: Icon(Icons.add, color: Colors.white, size: 20)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Preset Speed Chips Grid
+              ...presetRows.map((row) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: row.map((r) {
+                      final bool isSelected = (currentRate - r).abs() < 0.05;
+                      final bool isNormal = r == 1.0;
+
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () => setRate(r),
+                            child: Container(
+                              width: 58,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFFEF7A1E) : Colors.white12,
+                                borderRadius: BorderRadius.circular(17),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${r == r.toInt() ? r.toInt() : r}x',
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.black : Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (isNormal) ...[
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Normal',
+                              style: TextStyle(color: Colors.white54, fontSize: 10),
+                            ),
+                          ],
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQualitySubMenuDialog() {
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 380,
+          decoration: BoxDecoration(
+            color: const Color(0xFF212121),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 16),
+              const Text('Calidad de Video', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              ..._qualityMenuOptions.map((opt) {
+                final String key = opt['key'] as String;
+                final String label = opt['label'] as String;
+                final bool isSelected = _selectedQuality == key;
+
+                return ListTile(
+                  leading: SizedBox(
+                    width: 24,
+                    child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
+                  ),
+                  title: Text(label, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                  onTap: () {
+                    _changeQuality(key);
+                    setState(() => _activeOverlay = PlayerOverlay.settings);
+                  },
+                );
+              }),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSleepTimerSubMenuDialog() {
+    final options = [
+      {'minutes': 0, 'label': 'Desactivado'},
+      {'minutes': 15, 'label': '15 minutos'},
+      {'minutes': 30, 'label': '30 minutos'},
+      {'minutes': 45, 'label': '45 minutos'},
+      {'minutes': 60, 'label': '60 minutos'},
+    ];
+
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 380,
+          decoration: BoxDecoration(
+            color: const Color(0xFF212121),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 16),
+              const Text('Temporizador de Apagado', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              ...options.map((opt) {
+                final int mins = opt['minutes'] as int;
+                final String label = opt['label'] as String;
+                final bool isSelected = _sleepTimerMinutes == mins;
+
+                return ListTile(
+                  leading: SizedBox(
+                    width: 24,
+                    child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
+                  ),
+                  title: Text(label, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                  onTap: () {
+                    _sleepTimer?.cancel();
+                    setState(() {
+                      _sleepTimerMinutes = mins;
+                      _activeOverlay = PlayerOverlay.settings;
+                    });
+                    if (mins > 0) {
+                      _sleepTimer = Timer(Duration(minutes: mins), () {
+                        _player?.pause();
+                        setState(() => _sleepTimerMinutes = 0);
+                      });
+                    }
+                  },
+                );
+              }),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _changeQuality(String quality) {
@@ -1989,6 +2516,189 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // cambia _currentSourceUrl, el extractProvider re-extrae y su rama data
     // llama _initPlayer, que REUTILIZA el _player actual (if (_player == null)),
     // igual que _switchTrack/_switchSource — así nunca hay dos players.
+  }
+
+  Widget _buildYouTubeStyleEpisodeOverlay() {
+    final episodesAsync = ref.watch(episodesProvider(EpisodesParams(
+      url: _seriesListUrl,
+      source: _currentSource,
+      title: widget.title ?? '',
+      season: widget.season ?? 1,
+    )));
+
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.88),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Bar: Título de la Serie + Botón Cierre (X)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${widget.title ?? _displayTitle} (Temporada ${widget.season ?? 1})',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 26),
+                      onPressed: () {
+                        setState(() => _activeOverlay = PlayerOverlay.none);
+                        _startHideTimer();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              const Spacer(),
+
+              // Carrusel Horizontal de Tarjetas de Episodios Estilo YouTube (Alineado al Borde Inferior)
+              SizedBox(
+                height: 200,
+                child: episodesAsync.when(
+                  data: (data) {
+                    if (data == null || data.episodes.isEmpty) {
+                      return const Center(
+                        child: Text('No hay episodios disponibles', style: TextStyle(color: Colors.white54)),
+                      );
+                    }
+                    final eps = _enrichedEpisodes(data.episodes);
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: eps.length,
+                      itemBuilder: (context, index) {
+                        final ep = eps[index];
+                        final isCurrent = ep.number.toString() == _activeEpisode;
+                        final String thumbUrl = ep.thumbnail ?? widget.bannerUrl ?? widget.posterUrl ?? '';
+                        final String epTitle = (ep.title != null && ep.title!.isNotEmpty) ? ep.title! : 'Episodio ${ep.number}';
+                        final String durationStr = ep.duration ?? (ep.runtime != null ? '${ep.runtime}m' : '24 min');
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () {
+                              setState(() => _activeOverlay = PlayerOverlay.none);
+                              _selectEpisodeFromPanel(ep);
+                            },
+                            child: SizedBox(
+                              width: 240,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Contenedor 16:9 de la Miniatura con borde naranja en el episodio activo
+                                  AspectRatio(
+                                    aspectRatio: 16 / 9,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: isCurrent
+                                            ? Border.all(color: const Color(0xFFEF7A1E), width: 2.5)
+                                            : Border.all(color: Colors.white12, width: 0.5),
+                                        image: thumbUrl.isNotEmpty
+                                            ? DecorationImage(
+                                                image: NetworkImage(thumbUrl),
+                                                fit: BoxFit.cover,
+                                              )
+                                            : null,
+                                        color: Colors.white10,
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          // Badge de Duración abajo a la derecha
+                                          Positioned(
+                                            right: 8,
+                                            bottom: 8,
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black87,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                durationStr,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+
+                                          // Indicador "EN CURSO" para el episodio activo
+                                          if (isCurrent)
+                                            Positioned(
+                                              top: 8,
+                                              left: 8,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFEF7A1E),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text(
+                                                  'EN CURSO',
+                                                  style: TextStyle(
+                                                    color: Colors.black,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 8),
+
+                                  // Título del Episodio
+                                  Text(
+                                    'E${ep.number} - $epTitle',
+                                    style: TextStyle(
+                                      color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+                  ),
+                  error: (err, _) => Center(
+                    child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildEpisodesSelectorContent({bool isSidebar = false}) {
@@ -4713,8 +5423,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       next.whenData((result) {
         final playableTracks = result.tracks.where((t) => !t.isDownload).toList();
         final prevCount = prev?.value?.tracks.where((t) => !t.isDownload).length ?? 0;
+        debugPrint('[SSE-Listen] prev=$prevCount next=${playableTracks.length} total=${result.tracks.length} url=${result.url.substring(0, result.url.length.clamp(0, 60))}...');
         // ¿Llegaron más tracks que antes? → actualizar lista visible
         if (playableTracks.length > prevCount) {
+          debugPrint('[SSE-Listen] ✅ Actualizando _allTracks: $prevCount → ${playableTracks.length}');
           setState(() {
             _allTracks = playableTracks;
             _extractTracks = playableTracks.where((t) => !t.isEmbed).toList();
@@ -5845,6 +6557,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             video: Stack(
               fit: StackFit.expand,
               children: [
+          // Capa Modo Ambiente Cinematográfico (YouTube Style)
+          if (_ambientModeEnabled)
+            Positioned.fill(
+              child: CinematicAmbientLighting(
+                player: _player,
+                imageProvider: (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
+                    ? CachedNetworkImageProvider(widget.bannerUrl!)
+                    : (widget.posterUrl != null && widget.posterUrl!.isNotEmpty)
+                        ? CachedNetworkImageProvider(widget.posterUrl!)
+                        : null,
+                intensity: 0.45,
+                blurSigma: 60.0,
+              ),
+            ),
           if (_webViewController != null)
             RepaintBoundary(child: WebViewWidget(controller: _webViewController!))
           else if (_useNativeMobileSurface && _mobileSurfaceMounted)
@@ -6339,7 +7065,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               ),
               ],
             ),
-            panelOpen: _activeOverlay != PlayerOverlay.none,
+            panelOpen: _activeOverlay != PlayerOverlay.none &&
+                _activeOverlay != PlayerOverlay.server &&
+                _activeOverlay != PlayerOverlay.episodes &&
+                _activeOverlay != PlayerOverlay.settings &&
+                _activeOverlay != PlayerOverlay.speedSubMenu &&
+                _activeOverlay != PlayerOverlay.qualitySubMenu &&
+                _activeOverlay != PlayerOverlay.sleepTimerSubMenu,
             panelTitle: switch (_activeOverlay) {
               PlayerOverlay.language => _isTrackStreaming && _getLanguageOptions().isEmpty
                   ? 'Buscando fuentes...'
@@ -6366,6 +7098,87 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             lockAspect: false,
             railWidth: 340,
           ),
+
+          // Overlay de Servidores Estilo YouTube (Centrado con Píllora Superior)
+          if (_activeOverlay == PlayerOverlay.server)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _activeOverlay = PlayerOverlay.none);
+                  _startHideTimer();
+                },
+                child: Container(
+                  color: Colors.black54,
+                  child: _buildYouTubeStyleServerDialog(),
+                ),
+              ),
+            ),
+
+          // Overlay Horizontal de Episodios Estilo YouTube (Carrusel de Tarjetas 16:9)
+          if (_activeOverlay == PlayerOverlay.episodes)
+            _buildYouTubeStyleEpisodeOverlay(),
+
+          // Overlay de Ajustes Estilo YouTube (Calidad, Velocidad, Modo Ambiente, Temporizador)
+          if (_activeOverlay == PlayerOverlay.settings)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _activeOverlay = PlayerOverlay.none);
+                  _startHideTimer();
+                },
+                child: Container(
+                  color: Colors.black54,
+                  child: _buildYouTubeStyleSettingsDialog(),
+                ),
+              ),
+            ),
+
+          if (_activeOverlay == PlayerOverlay.speedSubMenu)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _activeOverlay = PlayerOverlay.settings);
+                  _startHideTimer();
+                },
+                child: Container(
+                  color: Colors.black54,
+                  child: _buildSpeedSubMenuDialog(),
+                ),
+              ),
+            ),
+
+          if (_activeOverlay == PlayerOverlay.qualitySubMenu)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _activeOverlay = PlayerOverlay.settings);
+                  _startHideTimer();
+                },
+                child: Container(
+                  color: Colors.black54,
+                  child: _buildQualitySubMenuDialog(),
+                ),
+              ),
+            ),
+
+          if (_activeOverlay == PlayerOverlay.sleepTimerSubMenu)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() => _activeOverlay = PlayerOverlay.settings);
+                  _startHideTimer();
+                },
+                child: Container(
+                  color: Colors.black54,
+                  child: _buildSleepTimerSubMenuDialog(),
+                ),
+              ),
+            ),
             
             if (_playbackError != null) 
              Positioned.fill(
@@ -6684,6 +7497,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
+              icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 20),
+              onPressed: _showCastPicker,
+            ),
+            const SizedBox(width: 12),
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+              onPressed: _showSettingsDialog,
+            ),
+            const SizedBox(width: 12),
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
               icon: AurisIcon(_isLocked ? AurisIcons.lockClosed : AurisIcons.lockOpen, color: Colors.white, size: 20),
               onPressed: () { 
                 setState(() { 
@@ -6833,11 +7660,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
   Widget _buildUnifiedControlsCapsule(bool hasPrevious, bool hasNext) {
     final useMobileLayout = ResponsiveUtils.isMobile(context);
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     
     // Senior Visual Normalization: Ajustamos tamaños base y pesos para armonía visual
     final double baseIconSize = useMobileLayout ? 22 : 28;
-    const double iconWeight = 300.0; // Más fino para matchear con el timeline de 2px
 
     return Container(
       height: 44,
@@ -6847,25 +7672,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(width: 6),
-          // Rotar (Visualmente tiende a verse grande, bajamos un poco)
-          _buildCapsuleIconButton(
-            icon: AurisIcons.phoneRotate,
-            onTap: () {
-              setState(() {
-                _isLandscapeOnly = !_isLandscapeOnly;
-                if (_isLandscapeOnly) lockAppOrientation();
-                else unlockAppOrientation();
-              });
-            },
-            size: baseIconSize - 2,
-            minWidth: 40,
-          ),
-          
-          Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
-          
-          // Anterior (Sólido suele verse pequeño, subimos un poco)
-          // Solo el icono se oculta en películas (no toda la capsula)
+          const SizedBox(width: 4),
+
+          // Anterior
           if (hasPrevious && !_isMovie)
             _buildCapsuleIconButton(
               icon: AurisIcons.backwardStep,
@@ -6875,8 +7684,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               minWidth: 40,
             ),
           
-          // Siguiente (Sólido suele verse pequeño, subimos un poco)
-          // Solo el icono se oculta en películas (no toda la capsula)
+          // Siguiente
           if (hasNext && !_isMovie)
             _buildCapsuleIconButton(
               icon: AurisIcons.forwardStep,
@@ -6885,48 +7693,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               fill: true,
               minWidth: 40,
             ),
-          
-          if ((hasPrevious || hasNext) && !_isMovie)
-            Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
-
-          // Velocidad (Icono + Texto)
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  const speeds = [0.5, 0.7, 1.0, 1.2, 1.5, 1.7, 2.0];
-                  int currentIndex = speeds.indexOf(_playbackSpeed);
-                  if (currentIndex == -1) currentIndex = 2; 
-                  _playbackSpeed = speeds[(currentIndex + 1) % speeds.length];
-                  _player?.setRate(_playbackSpeed);
-                });
-              },
-              borderRadius: BorderRadius.circular(18),
-              child: Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AurisIcon(AurisIcons.speedometer, color: Colors.white, size: baseIconSize - 1),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${_playbackSpeed.toStringAsFixed(1)}x', 
-                      style: TextStyle(
-                        color: Colors.white, 
-                        fontSize: useMobileLayout ? 12 : 14, 
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.5
-                      )
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          Container(width: 1, height: 14, color: Colors.white.withValues(alpha: 0.1)),
 
           // Servidor (oculto en vivo/directo M3U: no hay servidores alternativos)
           if (!_isOpEd && !_isLiveStream)
@@ -6945,17 +7711,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               size: baseIconSize - 2,
               minWidth: 40,
             ),
-
-          // Cast (solo visible en películas, al final de la capsula)
-          if (!_isOpEd && !_isTrailer && _isMovie)
-            _buildCapsuleIconButton(
-              icon: AurisIcons.cast,
-              onTap: _showCastPicker,
-              size: baseIconSize - 2,
-              minWidth: 40,
-            ),
           
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
         ],
       ),
     );
@@ -7184,17 +7941,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       
                       Row(
                         children: [
-                          if (_hasQualityOptions) ...[
-                            _PlayerTextButton(
-                              onPressed: _showQualitySelector,
-                              icon: AurisIcons.hd,
-                              label: _selectedQuality == 'auto'
-                                  ? 'Calidad'
-                                  : (_qualityMenuOptions.firstWhereOrNull((o) => o['key'] == _selectedQuality)?['label'] as String? ?? 'Calidad'),
-                              useBackground: true,
-                            ),
-                            SizedBox(width: spacing),
-                          ],
                           if (!_isOpEd && !_isMovie && !_isTrailer)
                           IconButton(
                             iconSize: iconSize, 
@@ -7206,9 +7952,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             SizedBox(width: spacing),
                             _PlayerTextButton(onPressed: _skipOpEd, icon: AurisIcons.fastForward, label: 'OP / ED', useBackground: true),
                           ],
-                          // Cast: visible a la derecha en series/animes, dentro de la capsula en películas
-                          if (!_isMovie)
-                            _buildCastIcon(iconSize),
                         ],
                       ),
                     ],

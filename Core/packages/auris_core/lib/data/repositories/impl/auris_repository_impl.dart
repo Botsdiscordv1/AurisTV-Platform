@@ -1097,12 +1097,24 @@ class AurisRepositoryImpl implements AurisRepository {
     Map<String, String> primaryHeaders = const {};
     List<QualityOption> primaryQualities = const [];
 
+    debugPrint('[SSE-Repo] Conectado a SSE: ${uri.toString().substring(0, uri.toString().length.clamp(0, 120))}...');
     String buffer = '';
     await for (final Uint8List chunk in stream) {
-      if (cancelToken != null && cancelToken.isCancelled) break;
+      if (cancelToken != null && cancelToken.isCancelled) {
+        debugPrint('[SSE-Repo] Cancelado por cancelToken');
+        break;
+      }
+      debugPrint('[SSE-Repo] Chunk recibido: ${chunk.length} bytes');
       buffer += utf8.decode(chunk);
       final parts = buffer.split('\n\n');
       buffer = parts.removeLast();
+
+      // DEBUG: Mostrar contenido raw del buffer para diagnosticar
+      debugPrint('[SSE-Repo] Buffer raw (${buffer.length} chars leftover): ${buffer.replaceAll('\n', '\\n').substring(0, buffer.length.clamp(0, 500))}');
+      debugPrint('[SSE-Repo] Parts encontrados: ${parts.length}');
+      for (int pi = 0; pi < parts.length; pi++) {
+        debugPrint('[SSE-Repo] Part[$pi]: ${parts[pi].replaceAll('\n', '\\n').substring(0, parts[pi].length.clamp(0, 300))}');
+      }
 
       for (final part in parts) {
         if (part.trim().isEmpty) continue;
@@ -1125,6 +1137,7 @@ class AurisRepositoryImpl implements AurisRepository {
 
             // Evitar duplicados por URL
             final exists = accumulatedTracks.any((t) => t.url == track.url);
+            debugPrint('[SSE-Repo] stream_ready: exists=$exists accumulated=${accumulatedTracks.length} label=${track.label} url=${track.url.substring(0, track.url.length.clamp(0, 60))}...');
             if (!exists) {
               accumulatedTracks.add(track);
               if (primaryUrl == null && track.url.isNotEmpty) {
@@ -1147,6 +1160,7 @@ class AurisRepositoryImpl implements AurisRepository {
 
     // Si terminó el stream pero nunca llegó ningún stream_ready (ej. error del scraper),
     // intentamos extract estándar
+    debugPrint('[SSE-Repo] Stream terminado. tracks acumulados=${accumulatedTracks.length}');
     if (accumulatedTracks.isEmpty) {
       final fallback = await extractVideo(url, source, category: category, direct: direct, cancelToken: cancelToken);
       yield fallback;
