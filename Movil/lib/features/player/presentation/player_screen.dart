@@ -6562,11 +6562,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             Positioned.fill(
               child: CinematicAmbientLighting(
                 player: _player,
-                imageProvider: (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
-                    ? CachedNetworkImageProvider(widget.bannerUrl!)
-                    : (widget.posterUrl != null && widget.posterUrl!.isNotEmpty)
-                        ? CachedNetworkImageProvider(widget.posterUrl!)
-                        : null,
                 intensity: 0.45,
                 blurSigma: 60.0,
               ),

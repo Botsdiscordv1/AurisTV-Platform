@@ -993,11 +993,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                     child: _ambientModeEnabled
                         ? CinematicAmbientLighting(
                             player: ref.watch(activePlayerProvider).player,
-                            imageProvider: (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
-                                ? CachedNetworkImageProvider(widget.bannerUrl!)
-                                : (widget.posterUrl != null && widget.posterUrl!.isNotEmpty)
-                                    ? CachedNetworkImageProvider(widget.posterUrl!)
-                                    : null,
                             child: _buildEmbeddedPlayer(),
                           )
                         : _buildEmbeddedPlayer(),

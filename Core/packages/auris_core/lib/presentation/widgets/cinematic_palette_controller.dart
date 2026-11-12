@@ -22,10 +22,16 @@ class CinematicPaletteController extends ChangeNotifier {
 
   Player? player;
   Timer? _sampleTimer;
+  StreamSubscription? _playingSub;
+  StreamSubscription? _posSub;
   bool _isProcessing = false;
+  bool _hasExtractedVideoFrame = false;
 
-  Color _startColor = const Color(0xFF1E2A38);
-  Color _endColor = const Color(0xFF0F151C);
+  Color _startColor = Colors.transparent;
+  Color _endColor = Colors.transparent;
+
+  /// Indica si ya se extrajo al menos un fotograma real del video.
+  bool get hasExtractedVideoFrame => _hasExtractedVideoFrame;
 
   /// Color primario superior del gradiente (Start Color).
   Color get startColor => _startColor;
@@ -37,8 +43,21 @@ class CinematicPaletteController extends ChangeNotifier {
   void startSampling(Player targetPlayer) {
     player = targetPlayer;
     _sampleTimer?.cancel();
+    _playingSub?.cancel();
+    _posSub?.cancel();
+
+    // Reaccionar inmediatamente cuando empiece a reproducir o cambie de posición/frame
+    _playingSub = targetPlayer.stream.playing.listen((playing) {
+      if (playing) _captureAndExtract();
+    });
+
+    _posSub = targetPlayer.stream.position.listen((pos) {
+      if (!_hasExtractedVideoFrame && pos.inMilliseconds > 0) {
+        _captureAndExtract();
+      }
+    });
+
     _sampleTimer = Timer.periodic(sampleInterval, (_) => _captureAndExtract());
-    // Muestreo inicial inmediato
     _captureAndExtract();
   }
 
@@ -46,6 +65,10 @@ class CinematicPaletteController extends ChangeNotifier {
   void stopSampling() {
     _sampleTimer?.cancel();
     _sampleTimer = null;
+    _playingSub?.cancel();
+    _playingSub = null;
+    _posSub?.cancel();
+    _posSub = null;
   }
 
   @override
@@ -56,7 +79,11 @@ class CinematicPaletteController extends ChangeNotifier {
 
   Future<void> _captureAndExtract() async {
     final p = player;
-    if (p == null || !p.state.playing || _isProcessing) return;
+    // Si no hay player o ya se está procesando un frame, salir
+    if (p == null || _isProcessing) return;
+
+    // Solo capturar si el video tiene duración/frames cargados
+    if (p.state.duration == Duration.zero && p.state.position == Duration.zero) return;
 
     _isProcessing = true;
     try {
@@ -68,6 +95,7 @@ class CinematicPaletteController extends ChangeNotifier {
       if (pair != null) {
         _startColor = pair.$1;
         _endColor = pair.$2;
+        _hasExtractedVideoFrame = true;
         notifyListeners();
       }
     } catch (e) {

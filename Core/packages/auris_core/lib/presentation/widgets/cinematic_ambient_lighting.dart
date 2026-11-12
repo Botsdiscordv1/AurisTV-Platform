@@ -66,9 +66,8 @@ class CinematicAmbientLighting extends StatefulWidget {
 
 class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
   CinematicPaletteController? _paletteController;
-  Color _topColor = const Color(0xFF1E2A38);
-  Color _bottomColor = const Color(0xFF0F151C);
-  ImageProvider? _lastResolvedProvider;
+  Color _topColor = Colors.transparent;
+  Color _bottomColor = Colors.transparent;
 
   @override
   void initState() {
@@ -81,12 +80,8 @@ class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.player != widget.player) {
       _initSampling();
-    } else if (widget.player == null) {
-      if (oldWidget.primaryColor != widget.primaryColor ||
-          oldWidget.secondaryColor != widget.secondaryColor ||
-          oldWidget.imageProvider != widget.imageProvider) {
-        _updateFallbackColors();
-      }
+    } else if (widget.player == null && (oldWidget.primaryColor != widget.primaryColor || oldWidget.secondaryColor != widget.secondaryColor)) {
+      _applyExplicitColors();
     }
   }
 
@@ -96,7 +91,7 @@ class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
       _paletteController = CinematicPaletteController(player: widget.player!)
         ..addListener(_onPaletteUpdated);
     } else {
-      _updateFallbackColors();
+      _applyExplicitColors();
     }
   }
 
@@ -108,36 +103,17 @@ class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
     });
   }
 
-  void _updateFallbackColors() {
+  void _applyExplicitColors() {
     if (widget.primaryColor != null) {
       setState(() {
         _topColor = widget.primaryColor!;
         _bottomColor = widget.secondaryColor ?? widget.primaryColor!.withValues(alpha: 0.6);
       });
-      return;
-    }
-
-    if (widget.imageProvider != null && widget.imageProvider != _lastResolvedProvider) {
-      _lastResolvedProvider = widget.imageProvider;
-      _extractFromImage(widget.imageProvider!);
-    }
-  }
-
-  Future<void> _extractFromImage(ImageProvider provider) async {
-    try {
-      final scheme = await ColorScheme.fromImageProvider(
-        provider: provider,
-        brightness: Brightness.dark,
-      );
-      if (!mounted) return;
+    } else {
       setState(() {
-        _topColor = scheme.primary;
-        _bottomColor = scheme.secondary;
+        _topColor = Colors.transparent;
+        _bottomColor = Colors.transparent;
       });
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('[CinematicAmbientLighting] Fallback paleta imagen: $e');
-      }
     }
   }
 

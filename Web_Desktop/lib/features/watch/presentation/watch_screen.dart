@@ -159,11 +159,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
             key: _playerKey,
             child: CinematicAmbientLighting(
               player: ref.watch(activePlayerProvider).player,
-              imageProvider: (widget.bannerUrl != null && widget.bannerUrl!.isNotEmpty)
-                  ? CachedNetworkImageProvider(widget.bannerUrl!)
-                  : (widget.posterUrl != null && widget.posterUrl!.isNotEmpty)
-                      ? CachedNetworkImageProvider(widget.posterUrl!)
-                      : null,
               child: CleanEmbeddedPlayer(
                 key: ValueKey(resolvedUrl),
                 sourceUrl: resolvedUrl,
