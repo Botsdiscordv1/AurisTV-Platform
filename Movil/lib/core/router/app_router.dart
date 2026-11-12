@@ -319,6 +319,7 @@ final GoRouter appRouter = GoRouter(
         final logoUrl = state.uri.queryParameters['logoUrl'];
         final year = int.tryParse(state.uri.queryParameters['year'] ?? '');
         final certification = state.uri.queryParameters['certification'];
+        final startPosition = int.tryParse(state.uri.queryParameters['startPosition'] ?? '');
 
         return WatchScreen(
           contentId: contentId,
@@ -336,6 +337,7 @@ final GoRouter appRouter = GoRouter(
           logoUrl: logoUrl,
           year: year,
           certification: certification,
+          startPosition: startPosition,
         );
       },
     ),

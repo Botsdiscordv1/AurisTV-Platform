@@ -1,23 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:auris_core/auris_core.dart';
+import '../../../core/utils/pip_service.dart';
 import '../../cast/presentation/widgets/cast_picker_sheet.dart';
-import 'package:auris_core/presentation/watch/adaptive_watch_layout.dart';
-import 'package:auris_core/presentation/watch/widgets/watch_episode_metadata.dart';
-import 'package:auris_core/presentation/watch/widgets/watch_action_bar.dart';
-import 'package:auris_core/presentation/watch/widgets/watch_synopsis.dart';
-import 'package:auris_core/presentation/watch/widgets/watch_nav_card.dart';
-import 'package:auris_core/presentation/watch/widgets/watch_playlist_sidebar.dart';
 
 /// Pantalla WatchScreen (Previa al Player Fullscreen - Crunchyroll Style).
 ///
@@ -79,10 +69,19 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
   bool _showControls = false;
   bool _isPlaying = false;
+  // ignore: unused_field
   bool _isBuffering = true;
   bool _hasLoadedFirstFrame = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+
+  // --- Resume state ---
+  int _pendingResumeMs = 0;
+  bool _resumeApplied = false;
+
+  // --- Seek stabilization (Bug 2) ---
+  bool _isSeeking = false;
+  Timer? _seekTimeoutTimer;
 
   bool _isLiked = false;
   bool _isDisliked = false;
@@ -93,15 +92,35 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   bool _ambientModeEnabled = true;
   int _sleepTimerMinutes = 0;
   Timer? _sleepTimer;
+  bool _isMinimizing = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      final active = ref.read(activePlayerProvider);
       ref.read(activePlayerProvider.notifier).initPlayerIfNeeded();
       ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
       _setupPlayerListeners();
+
+      // Si venimos del MiniPlayer para el mismo contenido/episodio, recuperar el estado
+      final bool isSameContent = active.currentItem?.id == widget.contentId ||
+          active.currentItem?.title == (widget.title ?? widget.metadataTitle);
+      final bool isSameEp = active.episode == widget.episode;
+      if (isSameContent && isSameEp && active.player != null) {
+        final pos = active.player!.state.position;
+        final dur = active.player!.state.duration;
+        final playing = active.player!.state.playing;
+        setState(() {
+          _position = pos;
+          if (dur > Duration.zero) _duration = dur;
+          _isPlaying = playing;
+          if (pos.inMilliseconds > 0 || playing) {
+            _hasLoadedFirstFrame = true;
+          }
+        });
+      }
     });
   }
 
@@ -124,31 +143,63 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     _bufSubscription?.cancel();
     _bufSubscription = player.stream.buffering.listen((buffering) {
-      if (mounted) {
-        setState(() => _isBuffering = buffering);
-      }
+      if (!mounted) return;
+      // Bug 2 fix: si estamos en medio de un seek manual, NO mostramos el
+      // spinner de buffering; el _seekTimeoutTimer lo limpiará en 2.5 s.
+      if (_isSeeking) return;
+      setState(() => _isBuffering = buffering);
     });
 
     _posSubscription?.cancel();
     _posSubscription = player.stream.position.listen((pos) {
-      if (mounted) {
-        setState(() {
-          _position = pos;
-          if (pos.inMilliseconds > 0) {
-            _hasLoadedFirstFrame = true;
-          }
-        });
+      if (!mounted) return;
 
-        // Guardar progreso en el historial cada 5 segundos de reproducción
-        if (pos.inSeconds > 0 && pos.inSeconds % 5 == 0 && _duration.inSeconds > 0) {
-          _updateHistory(pos.inMilliseconds, _duration.inMilliseconds);
+      // Bug 2 fix: cuando la posición avanza después de un seek, apagamos el
+      // flag de seek y cancelamos el timeout de seguridad.
+      if (_isSeeking && pos.inMilliseconds > 0) {
+        _seekTimeoutTimer?.cancel();
+        _isSeeking = false;
+        if (mounted) setState(() => _isBuffering = false);
+      }
+
+      setState(() {
+        if (!_isSeeking) _position = pos;
+        if (pos.inMilliseconds > 0) _hasLoadedFirstFrame = true;
+      });
+
+      // Bug 1 fix: aplicar resume pendiente en cuanto el demuxer reporta
+      // duración > 0 (pipeline lista). Solo se aplica una vez por carga.
+      if (!_resumeApplied && _pendingResumeMs > 3000) {
+        final dur = player.state.duration;
+        if (dur > Duration.zero) {
+          _resumeApplied = true;
+          final target = Duration(milliseconds: _pendingResumeMs);
+          debugPrint('[WatchScreen] Resume seek → ${_pendingResumeMs}ms (dur=${dur.inSeconds}s)');
+          player.seek(target);
         }
+      }
+
+      // Guardar progreso en el historial cada 5 segundos de reproducción
+      if (pos.inSeconds > 0 && pos.inSeconds % 5 == 0 && _duration.inSeconds > 0) {
+        _updateHistory(pos.inMilliseconds, _duration.inMilliseconds);
       }
     });
 
     _durSubscription?.cancel();
+    if (player.state.duration > Duration.zero) {
+      _duration = player.state.duration;
+    }
     _durSubscription = player.stream.duration.listen((dur) {
       if (mounted) setState(() => _duration = dur);
+
+      // Bug 1 fix: en cuanto llega la duración real (demuxer listo), aplicamos
+      // el resume pendiente si aún no se aplicó desde el listener de posición.
+      if (!_resumeApplied && _pendingResumeMs > 3000 && dur > Duration.zero) {
+        _resumeApplied = true;
+        final target = Duration(milliseconds: _pendingResumeMs);
+        debugPrint('[WatchScreen] Resume seek (dur trigger) → ${_pendingResumeMs}ms');
+        player.seek(target);
+      }
     });
 
     _startHideTimer();
@@ -194,53 +245,45 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   @override
   void dispose() {
     _hideControlsTimer?.cancel();
+    _seekTimeoutTimer?.cancel();
     _posSubscription?.cancel();
     _playSubscription?.cancel();
     _bufSubscription?.cancel();
     _durSubscription?.cancel();
+    _sleepTimer?.cancel();
     if (_isFullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     }
 
-    // Si salimos de WatchScreen mientras el video se reproduce, acoplar al MiniPlayer flotante (Estilo YouTube)
+    // Si el usuario eligió minimizar explícitamente, pasar a miniplayer.
+    // De lo contrario (Back normal), detener y cerrar el reproductor completamente.
     try {
       final active = ref.read(activePlayerProvider);
-      if (active.player?.state.playing == true) {
-        ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
+      final bool inPip = PipService.isPipMode.value;
+      if (_isMinimizing || inPip) {
+        if (active.player?.state.playing == true) {
+          ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
+        }
+      } else {
+        if (!inPip) {
+          ref.read(activePlayerProvider.notifier).stop();
+        }
       }
     } catch (_) {}
 
     super.dispose();
   }
 
-  void _navigateToFullscreen() {
-    final active = ref.read(activePlayerProvider);
-    final int currentPosMs = active.player?.state.position.inMilliseconds ?? _position.inMilliseconds;
-
-    final queryParams = <String, String>{
-      if (widget.sourceUrl.isNotEmpty) 'url': widget.sourceUrl,
-      if (widget.source.isNotEmpty) 'source': widget.source,
-      if (widget.episode != null) 'episode': widget.episode!,
-      if (widget.season != null) 'season': widget.season.toString(),
-      if (widget.serverName != null) 'serverName': widget.serverName!,
-      if (widget.category != null) 'category': widget.category!,
-      if (widget.title != null) 'title': widget.title!,
-      if (widget.metadataTitle != null) 'metadataTitle': widget.metadataTitle!,
-      if (widget.episodeTitle != null) 'episodeTitle': widget.episodeTitle!,
-      if (widget.posterUrl != null) 'posterUrl': widget.posterUrl!,
-      if (widget.bannerUrl != null) 'bannerUrl': widget.bannerUrl!,
-      if (widget.logoUrl != null) 'logoUrl': widget.logoUrl!,
-      if (widget.certification != null) 'certification': widget.certification!,
-      'startPosition': currentPosMs.toString(),
-    };
-
-    final uri = Uri(
-      path: '/player/${widget.contentId}',
-      queryParameters: queryParams,
-    );
-
-    context.push(uri.toString());
+  /// Minimiza el reproductor hacia el MiniPlayer global voluntariamente y vuelve atrás.
+  void _minimizeToMiniPlayer() {
+    _isMinimizing = true;
+    try {
+      ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
+    } catch (_) {}
+    if (mounted) {
+      context.pop();
+    }
   }
 
   Future<void> _cargarEpisodioHlsSeguro(String urlStream, Map<String, String> headers) async {
@@ -256,6 +299,18 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       );
       final int resumeMs = widget.startPosition ?? (hist?.positionInMilliseconds ?? 0);
       final bool shouldResume = resumeMs > 3000 && !(hist?.isCompleted ?? false);
+
+      // Bug 1 fix: guardamos la posición pendiente ANTES de llamar a play().
+      // Los listeners en _setupPlayerListeners() aplicarán el seek en cuanto
+      // el demuxer reporte duration > 0 (pipeline lista). Así nunca se hace
+      // un seek a ciegas sobre un pipeline sin inicializar.
+      if (shouldResume) {
+        _pendingResumeMs = resumeMs;
+        _resumeApplied = false;
+      } else {
+        _pendingResumeMs = 0;
+        _resumeApplied = true; // nada que aplicar
+      }
 
       await notifier.play(
         item: MediaItem(
@@ -275,10 +330,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
       _setupPlayerListeners();
 
-      if (shouldResume) {
-        final active = ref.read(activePlayerProvider);
-        await active.player?.seek(Duration(milliseconds: resumeMs));
-      }
+      // Ya no llamamos seek aquí; lo hace _setupPlayerListeners cuando el
+      // stream de duration/position emite su primer valor real.
     } catch (e) {
       debugPrint('[WatchScreen] Error al cargar HLS seguro: $e');
     }
@@ -342,9 +395,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     final active = ref.read(activePlayerProvider);
     final target = _position - const Duration(seconds: 10);
     final clamped = target < Duration.zero ? Duration.zero : target;
-    setState(() => _position = clamped); // UI optimista en 0ms
-    active.player?.seek(clamped);
-    _startHideTimer();
+    _performSeek(active, clamped);
   }
 
   void _fastForward10() {
@@ -352,8 +403,25 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     final target = _position + const Duration(seconds: 10);
     final maxDur = _duration > Duration.zero ? _duration : const Duration(hours: 10);
     final clamped = target > maxDur ? maxDur : target;
-    setState(() => _position = clamped); // UI optimista en 0ms
-    active.player?.seek(clamped);
+    _performSeek(active, clamped);
+  }
+
+  /// Bug 2 fix: seek robusto compartido por slider, +10/-10 y drag.
+  /// - Actualiza la UI de forma optimista.
+  /// - Activa _isSeeking para silenciar el spinner de buffering durante el seek.
+  /// - Arranca un timeout de seguridad de 2.5 s por si el stream de position
+  ///   no llega (HLS: algunos segments tardan más).
+  void _performSeek(dynamic active, Duration target) {
+    setState(() {
+      _position = target;
+      _isSeeking = true;
+      _isBuffering = false; // no mostrar spinner mientras esperamos
+    });
+    active.player?.seek(target);
+    _seekTimeoutTimer?.cancel();
+    _seekTimeoutTimer = Timer(const Duration(milliseconds: 2500), () {
+      if (mounted) setState(() { _isSeeking = false; _isBuffering = false; });
+    });
     _startHideTimer();
   }
 
@@ -416,7 +484,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       secondary: const Icon(Icons.vignette_outlined, color: Colors.white, size: 22),
                       title: const Text('Modo ambiente', style: TextStyle(color: Colors.white, fontSize: 15)),
-                      activeColor: const Color(0xFFEF7A1E),
+                      activeThumbColor: const Color(0xFFEF7A1E),
+                      activeTrackColor: const Color(0xFFEF7A1E).withValues(alpha: 0.5),
                       value: _ambientModeEnabled,
                       onChanged: (val) {
                         setSheetState(() => _ambientModeEnabled = val);
@@ -738,13 +807,20 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                       ),
                     ),
 
-                    // Botones Cast y Ajustes en la Esquina Superior Derecha
+                    // Botones Cast, Miniplayer y Ajustes en la Esquina Superior Derecha
                     Positioned(
                       top: 8,
                       right: 8,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Botón MiniPlayer / Picture-in-Picture voluntario
+                          if (!_isFullscreen)
+                            IconButton(
+                              icon: const Icon(Icons.picture_in_picture_alt_outlined, color: Colors.white, size: 22),
+                              tooltip: 'Minimizar',
+                              onPressed: _minimizeToMiniPlayer,
+                            ),
                           IconButton(
                             icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
                             onPressed: () {
@@ -764,12 +840,12 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                       ),
                     ),
 
-                    // Botón Circular de Pantalla Completa (Navega a PlayerScreen con todos los controles completos)
+                    // Botón Circular de Pantalla Completa (Alterna modo fullscreen internamente sin saltos de ruta)
                     Positioned(
                       right: 12,
                       bottom: 30,
                       child: InkWell(
-                        onTap: _navigateToFullscreen,
+                        onTap: _toggleFullscreen,
                         borderRadius: BorderRadius.circular(20),
                         child: Container(
                           width: 36,
@@ -780,7 +856,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                           ),
                           child: Center(
                             child: AurisIcon(
-                              AurisIcons.expand,
+                              _isFullscreen ? AurisIcons.minimize : AurisIcons.expand,
                               color: Colors.white,
                               size: 18,
                             ),
@@ -817,14 +893,22 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                             child: Slider(
                               value: _position.inSeconds.toDouble().clamp(0, (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble()),
                               max: (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
+                              onChangeStart: (_) {
+                                // Iniciar modo seek: silencia el buffering listener durante el arrastre
+                                setState(() => _isSeeking = true);
+                                _seekTimeoutTimer?.cancel();
+                              },
                               onChanged: (value) {
-                                final targetSec = value.toInt();
-                                if (targetSec >= 0) {
-                                  final target = Duration(seconds: targetSec);
-                                  setState(() => _position = target); // UI optimista en 0ms
-                                  ref.read(activePlayerProvider).player?.seek(target);
-                                  _startHideTimer();
-                                }
+                                // Solo actualizar UI (preview optimista), sin llamar seek()
+                                final target = Duration(seconds: value.toInt());
+                                setState(() => _position = target);
+                                _startHideTimer();
+                              },
+                              onChangeEnd: (value) {
+                                // Seek real solo al soltar el slider
+                                final target = Duration(seconds: value.toInt());
+                                final active = ref.read(activePlayerProvider);
+                                _performSeek(active, target);
                               },
                             ),
                           ),
@@ -864,6 +948,24 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
       if (resolvedUrl.isNotEmpty && _lastOpenedUrl != resolvedUrl) {
         _lastOpenedUrl = resolvedUrl;
+
+        // Si el player ya está activo reproduciendo esta misma URL (ej: venimos del MiniPlayer)
+        final active = ref.read(activePlayerProvider);
+        final bool isAlreadyPlayingThisStream = active.url == resolvedUrl &&
+            active.player != null &&
+            (active.player!.state.playing || active.player!.state.position.inMilliseconds > 0);
+
+        if (isAlreadyPlayingThisStream) {
+          final activeDur = active.player!.state.duration;
+          setState(() {
+            _hasLoadedFirstFrame = true;
+            _position = active.player!.state.position;
+            if (activeDur > Duration.zero) _duration = activeDur;
+            _isPlaying = active.player!.state.playing;
+          });
+          return;
+        }
+
         setState(() {
           _hasLoadedFirstFrame = false;
           _showControls = false;
@@ -963,11 +1065,15 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
           _toggleFullscreen();
         } else if (didPop) {
           try {
-            final active = ref.read(activePlayerProvider);
-            if (active.player?.state.playing == true) {
-              Future.microtask(() {
-                ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
-              });
+            if (_isMinimizing) {
+              final active = ref.read(activePlayerProvider);
+              if (active.player?.state.playing == true) {
+                Future.microtask(() {
+                  ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.mini);
+                });
+              }
+            } else {
+              ref.read(activePlayerProvider.notifier).stop();
             }
           } catch (_) {}
         }
@@ -986,123 +1092,121 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               backgroundColor: Colors.black,
               body: SafeArea(
                 bottom: false,
-                child: AdaptiveWatchLayout(
-                  // Reproductor embebido 16:9 real con Modo Ambiente Cinematográfico (YouTube Style)
-                  playerWidget: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: _ambientModeEnabled
-                        ? CinematicAmbientLighting(
-                            player: ref.watch(activePlayerProvider).player,
-                            child: _buildEmbeddedPlayer(),
+                // Modo Ambiente: CinematicAmbientLighting envuelve TODO el body
+                // para que el glow se proyecte sobre el fondo negro de la pantalla
+                // sin ser clippeado por el AspectRatio del reproductor.
+                child: Builder(builder: (context) {
+                  final layout = AdaptiveWatchLayout(
+                    playerWidget: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: _buildEmbeddedPlayer(),
+                    ),
+                    metadataWidget: WatchEpisodeMetadata(
+                      seriesTitle: seriesTitle,
+                      episodeTitle: realEpTitle,
+                      episodeNumber: epNumStr,
+                      ratingBadge: realCertification,
+                      audioSubsBadge: realBadges,
+                      releaseDate: realReleaseDate,
+                      isBookmarked: isBookmarked,
+                      onBookmarkToggle: () {
+                        final favItem = FavoriteItem(
+                          id: widget.contentId,
+                          title: seriesTitle,
+                          posterUrl: widget.posterUrl ?? widget.bannerUrl ?? '',
+                          bannerUrl: widget.bannerUrl ?? '',
+                          category: widget.category ?? 'anime',
+                          source: widget.source,
+                          url: widget.sourceUrl,
+                          addedAt: DateTime.now(),
+                          profileId: 'guest_profile',
+                          year: widget.year,
+                        );
+                        ref.read(favoritesProvider.notifier).toggleFavorite(favItem);
+                      },
+                    ),
+                    actionBarWidget: WatchActionBar(
+                      likeCount: '${(_likeCount / 1000).toStringAsFixed(1)}K',
+                      dislikeCount: '$_dislikeCount',
+                      isLiked: _isLiked,
+                      isDisliked: _isDisliked,
+                      onLikePressed: () {
+                        setState(() {
+                          _isLiked = !_isLiked;
+                          if (_isLiked) {
+                            _likeCount++;
+                            if (_isDisliked) {
+                              _isDisliked = false;
+                              _dislikeCount--;
+                            }
+                          } else {
+                            _likeCount--;
+                          }
+                        });
+                      },
+                      onDislikePressed: () {
+                        setState(() {
+                          _isDisliked = !_isDisliked;
+                          if (_isDisliked) {
+                            _dislikeCount++;
+                            if (_isLiked) {
+                              _isLiked = false;
+                              _likeCount--;
+                            }
+                          } else {
+                            _dislikeCount--;
+                          }
+                        });
+                      },
+                      onSharePressed: () {},
+                    ),
+                    synopsisWidget: WatchSynopsis(
+                      synopsis: realSynopsis,
+                    ),
+                    nextEpisodeWidget: nextEp != null
+                        ? WatchNavCard(
+                            sectionLabel: 'Siguiente Episodio',
+                            episodeNumber: 'E${nextEp.number}',
+                            episodeTitle: (nextEp.title != null && nextEp.title!.isNotEmpty) ? nextEp.title! : 'Episodio ${nextEp.number}',
+                            thumbnailUrl: nextEp.thumbnail ?? widget.bannerUrl,
+                            duration: nextEp.duration ?? (nextEp.runtime != null ? '${nextEp.runtime}m' : '24m'),
+                            audioSubsBadge: nextEp.quality ?? 'Sub | Dob',
+                            onTap: () => _switchEpisode(nextEp!),
                           )
-                        : _buildEmbeddedPlayer(),
-                  ),
+                        : const SizedBox.shrink(),
+                    previousEpisodeWidget: prevEp != null
+                        ? WatchNavCard(
+                            sectionLabel: 'Episodio Anterior',
+                            episodeNumber: 'E${prevEp.number}',
+                            episodeTitle: (prevEp.title != null && prevEp.title!.isNotEmpty) ? prevEp.title! : 'Episodio ${prevEp.number}',
+                            thumbnailUrl: prevEp.thumbnail ?? widget.bannerUrl,
+                            duration: prevEp.duration ?? (prevEp.runtime != null ? '${prevEp.runtime}m' : '24m'),
+                            audioSubsBadge: prevEp.quality ?? 'Sub | Dob',
+                            onTap: () => _switchEpisode(prevEp!),
+                          )
+                        : const SizedBox.shrink(),
+                    playlistSidebarWidget: epList.isNotEmpty
+                        ? WatchPlaylistSidebar(
+                            episodes: epList,
+                            activeEpisode: widget.episode ?? '1',
+                            onEpisodeSelected: (ep) => _switchEpisode(ep),
+                          )
+                        : null,
+                  );
 
-                // Metadatos Reales
-                metadataWidget: WatchEpisodeMetadata(
-                  seriesTitle: seriesTitle,
-                  episodeTitle: realEpTitle,
-                  episodeNumber: epNumStr,
-                  ratingBadge: realCertification,
-                  audioSubsBadge: realBadges,
-                  releaseDate: realReleaseDate,
-                  isBookmarked: isBookmarked,
-                  onBookmarkToggle: () {
-                    final favItem = FavoriteItem(
-                      id: widget.contentId,
-                      title: seriesTitle,
-                      posterUrl: widget.posterUrl ?? widget.bannerUrl ?? '',
-                      bannerUrl: widget.bannerUrl ?? '',
-                      category: widget.category ?? 'anime',
-                      source: widget.source,
-                      url: widget.sourceUrl,
-                      addedAt: DateTime.now(),
-                      profileId: 'guest_profile',
-                      year: widget.year,
+                  if (_ambientModeEnabled) {
+                    return CinematicAmbientLighting(
+                      player: ref.read(activePlayerProvider).player,
+                      heightMultiplier: 1.0,
+                      percentageFromTop: 0.15,
+                      intensity: 0.65,
+                      child: layout,
                     );
-                    ref.read(favoritesProvider.notifier).toggleFavorite(favItem);
-                  },
-                ),
-
-                // Reacciones
-                actionBarWidget: WatchActionBar(
-                  likeCount: '${(_likeCount / 1000).toStringAsFixed(1)}K',
-                  dislikeCount: '$_dislikeCount',
-                  isLiked: _isLiked,
-                  isDisliked: _isDisliked,
-                  onLikePressed: () {
-                    setState(() {
-                      _isLiked = !_isLiked;
-                      if (_isLiked) {
-                        _likeCount++;
-                        if (_isDisliked) {
-                          _isDisliked = false;
-                          _dislikeCount--;
-                        }
-                      } else {
-                        _likeCount--;
-                      }
-                    });
-                  },
-                  onDislikePressed: () {
-                    setState(() {
-                      _isDisliked = !_isDisliked;
-                      if (_isDisliked) {
-                        _dislikeCount++;
-                        if (_isLiked) {
-                          _isLiked = false;
-                          _likeCount--;
-                        }
-                      } else {
-                        _dislikeCount--;
-                      }
-                    });
-                  },
-                  onSharePressed: () {},
-                ),
-
-                // Sinopsis Real
-                synopsisWidget: WatchSynopsis(
-                  synopsis: realSynopsis,
-                ),
-
-                // Siguiente Episodio Real
-                nextEpisodeWidget: nextEp != null
-                    ? WatchNavCard(
-                        sectionLabel: 'Siguiente Episodio',
-                        episodeNumber: 'E${nextEp.number}',
-                        episodeTitle: (nextEp.title != null && nextEp.title!.isNotEmpty) ? nextEp.title! : 'Episodio ${nextEp.number}',
-                        thumbnailUrl: nextEp.thumbnail ?? widget.bannerUrl,
-                        duration: nextEp.duration ?? (nextEp.runtime != null ? '${nextEp.runtime}m' : '24m'),
-                        audioSubsBadge: nextEp.quality ?? 'Sub | Dob',
-                        onTap: () => _switchEpisode(nextEp!),
-                      )
-                    : const SizedBox.shrink(),
-
-                // Episodio Anterior Real
-                previousEpisodeWidget: prevEp != null
-                    ? WatchNavCard(
-                        sectionLabel: 'Episodio Anterior',
-                        episodeNumber: 'E${prevEp.number}',
-                        episodeTitle: (prevEp.title != null && prevEp.title!.isNotEmpty) ? prevEp.title! : 'Episodio ${prevEp.number}',
-                        thumbnailUrl: prevEp.thumbnail ?? widget.bannerUrl,
-                        duration: prevEp.duration ?? (prevEp.runtime != null ? '${prevEp.runtime}m' : '24m'),
-                        audioSubsBadge: prevEp.quality ?? 'Sub | Dob',
-                        onTap: () => _switchEpisode(prevEp!),
-                      )
-                    : const SizedBox.shrink(),
-
-                // Cola lateral para Web/Tablet
-                playlistSidebarWidget: epList.isNotEmpty
-                    ? WatchPlaylistSidebar(
-                        episodes: epList,
-                        activeEpisode: widget.episode ?? '1',
-                        onEpisodeSelected: (ep) => _switchEpisode(ep),
-                      )
-                    : null,
+                  }
+                  return layout;
+                }),
               ),
             ),
-          ),
     );
   }
 }

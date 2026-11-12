@@ -273,10 +273,31 @@ class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverla
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    PipService.onPipActionNotifier.addListener(_handlePipNativeAction);
+  }
+
+  void _handlePipNativeAction() {
+    final action = PipService.onPipActionNotifier.value;
+    if (action == null || action.isEmpty) return;
+    PipService.onPipActionNotifier.value = null;
+
+    final state = ref.read(activePlayerProvider);
+    final player = state.player;
+    if (player == null) return;
+
+    if (action == 'playPause') {
+      if (player.state.playing) {
+        player.pause();
+      } else {
+        player.play();
+      }
+      PipService.updatePipActions(isPlaying: player.state.playing);
+    }
   }
 
   @override
   void dispose() {
+    PipService.onPipActionNotifier.removeListener(_handlePipNativeAction);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -326,9 +347,12 @@ class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverla
             final serverParam = state.source != null ? '&serverName=${Uri.encodeComponent(simplifySourceName(state.source!))}' : '';
             final kindYearParam = '${state.currentItem!.kind != null && state.currentItem!.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(state.currentItem!.kind!)}' : ''}${state.currentItem!.year != null ? '&year=${state.currentItem!.year}' : ''}';
             
+            final targetUrl = (state.currentItem!.detailUrl != null && state.currentItem!.detailUrl!.isNotEmpty)
+                ? state.currentItem!.detailUrl!
+                : (state.url ?? '');
             final uri = '/watch/${Uri.encodeComponent(state.currentItem!.id)}'
                 '?source=${Uri.encodeComponent(state.source ?? '')}'
-                '&url=${Uri.encodeComponent(state.url ?? '')}'
+                '&url=${Uri.encodeComponent(targetUrl)}'
                 '&episode=${Uri.encodeComponent(state.episode ?? '')}'
                 '&season=${state.season ?? ''}'
                 '&category=${state.currentItem!.type.name}'
@@ -381,12 +405,19 @@ class _GlobalMiniPlayerOverlayState extends ConsumerState<GlobalMiniPlayerOverla
   }
 
   void _syncPipState(ActivePlayerState s) {
-    PipService.setPipAllowed(
-      (s.uiState == PlayerUIState.mini ||
-              s.uiState == PlayerUIState.full) &&
-          s.currentItem != null &&
-          (s.url ?? '').isNotEmpty,
-    );
+    final bool allowed = (s.uiState == PlayerUIState.mini ||
+            s.uiState == PlayerUIState.full) &&
+        s.currentItem != null &&
+        (s.url ?? '').isNotEmpty;
+
+    PipService.setPipAllowed(allowed);
+    if (allowed && s.player != null) {
+      PipService.updatePipActions(
+        isPlaying: s.player!.state.playing,
+        hasPrev: true,
+        hasNext: true,
+      );
+    }
   }
 }
 

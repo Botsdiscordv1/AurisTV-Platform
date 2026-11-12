@@ -1,5 +1,4 @@
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'cinematic_palette_controller.dart';
@@ -11,7 +10,8 @@ import 'cinematic_palette_controller.dart';
 /// Características y configuración extraída de YouTube:
 /// 1. **Dos colores dominantes (`CinematicTwoColorGradient`)**: Color primario superior (`startColor`)
 ///    y color complementario inferior (`endColor`), extraídos **en tiempo real desde el video**
-///    o como respaldo desde una imagen estática.
+///    via `RepaintBoundary` (funciona con SurfaceView / hardware acceleration) o
+///    via `player.screenshot()` como fallback.
 /// 2. **Proyección Radial + Gradual Blur**:
 ///    - Gradiente radial centrado con expansión elíptica (`heightMultiplier` ~ 1.5 - 2.0).
 ///    - Gradiente vertical gradual que se funde suavemente al negro absoluto (`Colors.black`)
@@ -25,7 +25,6 @@ class CinematicAmbientLighting extends StatefulWidget {
     this.player,
     this.primaryColor,
     this.secondaryColor,
-    this.imageProvider,
     this.blurSigma = 45.0,
     this.intensity = 0.55,
     this.heightMultiplier = 1.6,
@@ -36,14 +35,11 @@ class CinematicAmbientLighting extends StatefulWidget {
   /// Instancia de [Player] para extraer la paleta cromática del video en tiempo de ejecución.
   final Player? player;
 
-  /// Color primario del resplandor (Start Color).
+  /// Color primario del resplandor (Start Color) — usado si no hay player.
   final Color? primaryColor;
 
-  /// Color secundario del resplandor (End Color).
+  /// Color secundario del resplandor (End Color) — usado si no hay player.
   final Color? secondaryColor;
-
-  /// Imagen de referencia (poster/thumbnail) para calcular la paleta de respaldo.
-  final ImageProvider? imageProvider;
 
   /// Nivel de difusión gaussiana (por defecto 45.0, emula el radial blur de YouTube).
   final double blurSigma;
@@ -65,6 +61,11 @@ class CinematicAmbientLighting extends StatefulWidget {
 }
 
 class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
+  /// GlobalKey del RepaintBoundary que envuelve al hijo (video widget).
+  /// CinematicPaletteController lo usa para capturar frames vía renderizado Flutter,
+  /// lo que funciona incluso con SurfaceView / hardware acceleration.
+  final GlobalKey _videoKey = GlobalKey();
+
   CinematicPaletteController? _paletteController;
   Color _topColor = Colors.transparent;
   Color _bottomColor = Colors.transparent;
@@ -80,16 +81,21 @@ class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.player != widget.player) {
       _initSampling();
-    } else if (widget.player == null && (oldWidget.primaryColor != widget.primaryColor || oldWidget.secondaryColor != widget.secondaryColor)) {
+    } else if (widget.player == null &&
+        (oldWidget.primaryColor != widget.primaryColor ||
+            oldWidget.secondaryColor != widget.secondaryColor)) {
       _applyExplicitColors();
     }
   }
 
   void _initSampling() {
     if (widget.player != null) {
+      _paletteController?.removeListener(_onPaletteUpdated);
       _paletteController?.dispose();
-      _paletteController = CinematicPaletteController(player: widget.player!)
-        ..addListener(_onPaletteUpdated);
+      _paletteController = CinematicPaletteController(
+        player: widget.player!,
+        videoKey: _videoKey,
+      )..addListener(_onPaletteUpdated);
     } else {
       _applyExplicitColors();
     }
@@ -186,10 +192,15 @@ class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
           ),
         ),
 
-        // 2. Capa Frontal: El reproductor de video u otro hijo
-        if (widget.child != null) widget.child!,
+        // 2. Capa Frontal: El reproductor de video u otro hijo,
+        //    envuelto en RepaintBoundary para que CinematicPaletteController
+        //    pueda capturar frames incluso con SurfaceView / hardware acceleration.
+        if (widget.child != null)
+          RepaintBoundary(
+            key: _videoKey,
+            child: widget.child!,
+          ),
       ],
     );
   }
 }
-

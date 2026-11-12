@@ -1,7 +1,14 @@
 package com.auristv.oficial
 
 import android.app.PictureInPictureParams
+import android.app.PendingIntent
+import android.app.RemoteAction
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
@@ -31,11 +38,96 @@ class MainActivity: AudioServiceFragmentActivity() {
     private var isPipAllowed = false
     private var currentAspectRatioWidth = 16
     private var currentAspectRatioHeight = 9
+    private var isPipPlaying = true
+    private var isPipHasPrev = true
+    private var isPipHasNext = true
     private var isInPlayer = false
     private var multicastLock: android.net.wifi.WifiManager.MulticastLock? = null
 
+    private val ACTION_PIP_CONTROL = "com.auristv.oficial.PIP_CONTROL"
+    private val EXTRA_CONTROL_TYPE = "control_type"
+    private val CONTROL_TYPE_PREV = 1
+    private val CONTROL_TYPE_PLAY_PAUSE = 2
+    private val CONTROL_TYPE_NEXT = 3
+
+    private val pipBroadcastReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            if (intent?.action == ACTION_PIP_CONTROL) {
+                val controlType = intent.getIntExtra(EXTRA_CONTROL_TYPE, 0)
+                val actionName = when (controlType) {
+                    CONTROL_TYPE_PREV -> "prev"
+                    CONTROL_TYPE_PLAY_PAUSE -> "playPause"
+                    CONTROL_TYPE_NEXT -> "next"
+                    else -> ""
+                }
+                if (actionName.isNotEmpty()) {
+                    flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                        MethodChannel(messenger, PIP_CHANNEL).invokeMethod("onPipAction", actionName)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun buildPipParams(): PictureInPictureParams? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+
+        val builder = PictureInPictureParams.Builder()
+            .setAspectRatio(Rational(currentAspectRatioWidth, currentAspectRatioHeight))
+
+        val actions = java.util.ArrayList<android.app.RemoteAction>()
+
+        // 1. Botón Anterior (⏮️)
+        if (isPipHasPrev) {
+            val intentPrev = android.content.Intent(ACTION_PIP_CONTROL).putExtra(EXTRA_CONTROL_TYPE, CONTROL_TYPE_PREV)
+            val pendingPrev = android.app.PendingIntent.getBroadcast(
+                this, CONTROL_TYPE_PREV, intentPrev,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+            val iconPrev = android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_media_previous)
+            actions.add(android.app.RemoteAction(iconPrev, "Anterior", "Episodio Anterior", pendingPrev))
+        }
+
+        // 2. Botón Reproducir / Pausar (⏯️)
+        val intentPlay = android.content.Intent(ACTION_PIP_CONTROL).putExtra(EXTRA_CONTROL_TYPE, CONTROL_TYPE_PLAY_PAUSE)
+        val pendingPlay = android.app.PendingIntent.getBroadcast(
+            this, CONTROL_TYPE_PLAY_PAUSE, intentPlay,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        val iconPlayRes = if (isPipPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+        val iconPlay = android.graphics.drawable.Icon.createWithResource(this, iconPlayRes)
+        val labelPlay = if (isPipPlaying) "Pausar" else "Reproducir"
+        actions.add(android.app.RemoteAction(iconPlay, labelPlay, labelPlay, pendingPlay))
+
+        // 3. Botón Siguiente (⏭️)
+        if (isPipHasNext) {
+            val intentNext = android.content.Intent(ACTION_PIP_CONTROL).putExtra(EXTRA_CONTROL_TYPE, CONTROL_TYPE_NEXT)
+            val pendingNext = android.app.PendingIntent.getBroadcast(
+                this, CONTROL_TYPE_NEXT, intentNext,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+            val iconNext = android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_media_next)
+            actions.add(android.app.RemoteAction(iconNext, "Siguiente", "Siguiente Episodio", pendingNext))
+        }
+
+        builder.setActions(actions)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setAutoEnterEnabled(isPipAllowed)
+        }
+
+        return builder.build()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val filter = android.content.IntentFilter(ACTION_PIP_CONTROL)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(pipBroadcastReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(pipBroadcastReceiver, filter)
+        }
 
         // Senior Immersive Elite: Forzar el dibujo detrás del Notch y barras de sistema
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
@@ -45,6 +137,11 @@ class MainActivity: AudioServiceFragmentActivity() {
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         )
+    }
+
+    override fun onDestroy() {
+        try { unregisterReceiver(pipBroadcastReceiver) } catch (_: Exception) {}
+        super.onDestroy()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -93,15 +190,12 @@ class MainActivity: AudioServiceFragmentActivity() {
                         currentAspectRatioWidth = width
                         currentAspectRatioHeight = height
 
-                        // Notificar a Flutter que prepare la UI para PiP
                         flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
                             MethodChannel(messenger, PIP_CHANNEL).invokeMethod("prepareForPip", null)
                         }
 
-                        val params = PictureInPictureParams.Builder()
-                            .setAspectRatio(Rational(width, height))
-                            .build()
-                        val success = enterPictureInPictureMode(params)
+                        val params = buildPipParams()
+                        val success = if (params != null) enterPictureInPictureMode(params) else false
                         result.success(success)
                     } else {
                         result.error("UNSUPPORTED", "PiP requires Android 8.0+", null)
@@ -114,12 +208,26 @@ class MainActivity: AudioServiceFragmentActivity() {
                     currentAspectRatioWidth = width
                     currentAspectRatioHeight = height
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        val params = PictureInPictureParams.Builder()
-                            .setAutoEnterEnabled(isPipAllowed)
-                            .setAspectRatio(Rational(width, height))
-                            .build()
-                        setPictureInPictureParams(params)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        try {
+                            buildPipParams()?.let { setPictureInPictureParams(it) }
+                        } catch (e: Exception) {
+                            android.util.Log.d("AurisPip", "setPipAllowed params error: ${e.message}")
+                        }
+                    }
+                    result.success(null)
+                }
+                "updatePipActions" -> {
+                    isPipPlaying = call.argument<Boolean>("isPlaying") ?: true
+                    isPipHasPrev = call.argument<Boolean>("hasPrev") ?: true
+                    isPipHasNext = call.argument<Boolean>("hasNext") ?: true
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        try {
+                            buildPipParams()?.let { setPictureInPictureParams(it) }
+                        } catch (e: Exception) {
+                            android.util.Log.d("AurisPip", "updatePipActions error: ${e.message}")
+                        }
                     }
                     result.success(null)
                 }
@@ -329,11 +437,11 @@ class MainActivity: AudioServiceFragmentActivity() {
             // (setAutoEnterEnabled) falla en varios OEMs; el manual es no-op
             // si el sistema ya esta entrando.
             try {
-                val params = PictureInPictureParams.Builder()
-                    .setAspectRatio(Rational(currentAspectRatioWidth, currentAspectRatioHeight))
-                    .build()
-                val ok = enterPictureInPictureMode(params)
-                android.util.Log.d("AurisPip", "manual enterPictureInPictureMode -> $ok")
+                val params = buildPipParams()
+                if (params != null) {
+                    val ok = enterPictureInPictureMode(params)
+                    android.util.Log.d("AurisPip", "manual enterPictureInPictureMode -> $ok")
+                }
             } catch (e: Exception) {
                 android.util.Log.d("AurisPip", "manual enter failed: ${e.message}")
             }

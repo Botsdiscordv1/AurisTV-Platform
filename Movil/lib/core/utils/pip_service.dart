@@ -43,9 +43,31 @@ class PipService {
     prePipWasLandscape = lastKnownLandscape;
   }
 
+  static final ValueNotifier<String?> onPipActionNotifier = ValueNotifier<String?>(null);
+
+  static Future<void> updatePipActions({
+    required bool isPlaying,
+    bool hasPrev = true,
+    bool hasNext = true,
+  }) async {
+    try {
+      await _channel.invokeMethod('updatePipActions', {
+        'isPlaying': isPlaying,
+        'hasPrev': hasPrev,
+        'hasNext': hasNext,
+      });
+    } catch (e) {
+      debugPrint('[PiP] updatePipActions error: $e');
+    }
+  }
+
   static void initialize() {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'prepareForPip') {
+      if (call.method == 'onPipAction') {
+        final String action = call.arguments as String? ?? '';
+        debugPrint('[PiP] Acción de control nativo recibida: $action');
+        onPipActionNotifier.value = action;
+      } else if (call.method == 'prepareForPip') {
         _recordPrePipOrientation();
         _entryConfirmed = false;
         _exitRevertTimer?.cancel();

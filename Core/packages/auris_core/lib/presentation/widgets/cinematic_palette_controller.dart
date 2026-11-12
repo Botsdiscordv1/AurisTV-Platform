@@ -2,15 +2,21 @@ import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:media_kit/media_kit.dart';
 
 /// Controlador que captura fotogramas del video en tiempo de ejecución
 /// y calcula la paleta cromática dual (startColor, endColor) al estilo
 /// exacto de YouTube (`CinematicTwoColorGradient`).
+///
+/// **Estrategia de captura (en orden de prioridad):**
+/// 1. `RepaintBoundary` via [videoKey] — funciona con SurfaceView / hardware acceleration.
+/// 2. `player.screenshot()` — solo funciona cuando el video renderiza en textura CPU-accesible.
 class CinematicPaletteController extends ChangeNotifier {
   CinematicPaletteController({
     this.sampleInterval = const Duration(seconds: 2),
     this.player,
+    this.videoKey,
   }) {
     if (player != null) {
       startSampling(player!);
@@ -21,6 +27,11 @@ class CinematicPaletteController extends ChangeNotifier {
   final Duration sampleInterval;
 
   Player? player;
+
+  /// GlobalKey del widget de video — permite capturar el frame renderizado
+  /// directamente desde el árbol de Flutter (funciona con hardware acceleration).
+  final GlobalKey? videoKey;
+
   Timer? _sampleTimer;
   StreamSubscription? _playingSub;
   StreamSubscription? _posSub;
@@ -79,35 +90,91 @@ class CinematicPaletteController extends ChangeNotifier {
 
   Future<void> _captureAndExtract() async {
     final p = player;
-    // Si no hay player o ya se está procesando un frame, salir
-    if (p == null || _isProcessing) return;
-
-    // Solo capturar si el video tiene duración/frames cargados
-    if (p.state.duration == Duration.zero && p.state.position == Duration.zero) return;
-
+    // Si no está reproduciendo o no hay video aún, no intentar extraer durante el buffering/carga inicial
+    if (p == null || !p.state.playing || p.state.position.inMilliseconds == 0) return;
+    if (_isProcessing) return;
     _isProcessing = true;
     try {
-      // Capturar screenshot a baja resolución en JPEG (ultra rápido y bajo consumo de CPU)
-      final Uint8List? bytes = await p.screenshot(format: 'image/jpeg');
-      if (bytes == null || bytes.isEmpty) return;
+      Uint8List? bytes;
+
+      // ── Estrategia 1: RepaintBoundary (funciona con SurfaceView / GPU) ──
+      bytes = await _captureViaRepaintBoundary();
+
+      // ── Estrategia 2: player.screenshot() (funciona con textura CPU) ──
+      if (bytes == null || bytes.isEmpty) {
+        final p = player;
+        if (p != null) {
+          try {
+            bytes = await p.screenshot(format: 'image/jpeg');
+          } catch (_) {
+            try {
+              bytes = await p.screenshot(format: null);
+            } catch (_) {}
+          }
+        }
+      }
+
+      if (bytes == null || bytes.isEmpty) {
+        return;
+      }
 
       final pair = await compute(_extractDualDominantColors, bytes);
       if (pair != null) {
         _startColor = pair.$1;
         _endColor = pair.$2;
         _hasExtractedVideoFrame = true;
+        debugPrint('[CinematicPaletteController] Colores: start=$_startColor end=$_endColor');
         notifyListeners();
       }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('[CinematicPaletteController] Error en muestreo: $e');
-      }
+    } catch (e, st) {
+      debugPrint('[CinematicPaletteController] Error en muestreo: $e\n$st');
     } finally {
       _isProcessing = false;
     }
   }
 
-  /// Asigna colores manuales o de fallback (ej: desde un poster/banner).
+  /// Captura el widget referenciado por [videoKey] via RepaintBoundary.
+  /// Escala a 64x36 para análisis rápido. Devuelve bytes PNG o null.
+  Future<Uint8List?> _captureViaRepaintBoundary() async {
+    try {
+      final key = videoKey;
+      if (key == null) return null;
+      final context = key.currentContext;
+      if (context == null) return null;
+
+      // Buscar el RenderRepaintBoundary más cercano
+      RenderRepaintBoundary? boundary;
+      context.visitAncestorElements((element) {
+        final ro = element.renderObject;
+        if (ro is RenderRepaintBoundary) {
+          boundary = ro;
+          return false; // detener
+        }
+        return true;
+      });
+
+      // Si no encontramos antecesor, intentar desde el propio renderObject
+      boundary ??= () {
+        final ro = context.findRenderObject();
+        if (ro is RenderRepaintBoundary) return ro;
+        return null;
+      }();
+
+      if (boundary == null || boundary!.debugNeedsPaint) return null;
+
+      // Capturar a pixelRatio bajo para ser rápido
+      final ui.Image image = await boundary!.toImage(pixelRatio: 0.1);
+      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (byteData == null) return null;
+      return byteData.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('[CinematicPaletteController] RepaintBoundary captura falló: $e');
+      return null;
+    }
+  }
+
+  /// Asigna colores manuales (ej: desde un poster/banner).
   void setColors(Color start, Color end) {
     _startColor = start;
     _endColor = end;
@@ -130,6 +197,7 @@ Future<(Color, Color)?> _extractDualDominantColors(Uint8List jpegBytes) async {
     final ui.Image image = frameInfo.image;
 
     final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    image.dispose();
     if (byteData == null) return null;
 
     final Uint8List pixels = byteData.buffer.asUint8List();
