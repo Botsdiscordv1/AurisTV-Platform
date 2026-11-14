@@ -114,7 +114,10 @@ final GoRouter appRouter = GoRouter(
           routes: [
             GoRoute(
               path: '/search',
-              builder: (context, state) => const SearchScreen(),
+              builder: (context, state) {
+                final q = state.uri.queryParameters['q'];
+                return SearchScreen(initialQuery: q);
+              },
             ),
           ],
         ),

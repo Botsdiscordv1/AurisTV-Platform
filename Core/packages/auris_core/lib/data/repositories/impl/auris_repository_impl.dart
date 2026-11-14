@@ -494,7 +494,6 @@ class AurisRepositoryImpl implements AurisRepository {
     if (kind != null) params['kind'] = kind;
     if (url != null && url.isNotEmpty) {
       params['url'] = url;
-      params['sourceUrl'] = url;
     }
     if (type != null) params['type'] = type;
     if (imgSize != null) params['img'] = imgSize;

@@ -170,6 +170,7 @@ Widget _buildWatchScreenFromToken(BuildContext context, GoRouterState state) {
   }
 
   return web_watch.WatchScreen(
+    key: ValueKey('${player.contentId}_${player.episode}_${player.sourceUrl}'),
     contentId: player.contentId,
     sourceUrl: player.sourceUrl,
     source: player.source,
@@ -189,18 +190,25 @@ Widget _buildWatchScreenFromToken(BuildContext context, GoRouterState state) {
     skipResume: player.skipResume,
     isLive: player.isLive,
     onEpisodeSelected: (ep) {
+      final targetUrl = ep.url.isNotEmpty
+          ? ep.url
+          : buildEpisodeUrl(player.sourceUrl, player.source, ep.number);
       final uri = UrlUtils.buildPlayerUri(
         title: player.title ?? '',
         contentId: player.contentId,
         episode: ep.number.toString(),
         source: player.source,
-        url: ep.url.isNotEmpty ? ep.url : player.sourceUrl,
+        url: targetUrl,
         season: player.season,
         serverName: player.serverName,
         category: player.category,
         totalEpisodes: player.totalEpisodes,
         posterUrl: ep.thumbnail ?? player.posterUrl,
         bannerUrl: player.bannerUrl,
+        logoUrl: player.logoUrl,
+        episodeTitle: ep.title,
+        certification: player.certification,
+        year: player.year,
       );
       context.pushReplacement(uri);
     },
@@ -539,6 +547,7 @@ final GoRouter appRouter = GoRouter(
               );
 
         return web_watch.WatchScreen(
+          key: ValueKey('${player.contentId}_${player.episode}_${player.sourceUrl}'),
           contentId: player.contentId,
           sourceUrl: player.sourceUrl,
           source: player.source,
@@ -558,18 +567,25 @@ final GoRouter appRouter = GoRouter(
           skipResume: player.skipResume,
           isLive: player.isLive,
           onEpisodeSelected: (ep) {
+            final targetUrl = ep.url.isNotEmpty
+                ? ep.url
+                : buildEpisodeUrl(player.sourceUrl, player.source, ep.number);
             final uri = UrlUtils.buildPlayerUri(
               title: player.title ?? '',
               contentId: player.contentId,
               episode: ep.number.toString(),
               source: player.source,
-              url: ep.url.isNotEmpty ? ep.url : player.sourceUrl,
+              url: targetUrl,
               season: player.season,
               serverName: player.serverName,
               category: player.category,
               totalEpisodes: player.totalEpisodes,
               posterUrl: ep.thumbnail ?? player.posterUrl,
               bannerUrl: player.bannerUrl,
+              logoUrl: player.logoUrl,
+              episodeTitle: ep.title,
+              certification: player.certification,
+              year: player.year,
             );
             context.pushReplacement(uri);
           },

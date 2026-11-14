@@ -1178,16 +1178,25 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     final bool isMovie = isMovieLike(widget.category, seriesTitle);
 
+    final cachedEpisodesData = isMovie
+        ? null
+        : ProgressiveContentNotifier.lookupCachedEpisodesResponse(
+            title: widget.title ?? widget.contentId,
+            metadataTitle: widget.metadataTitle,
+            season: widget.season ?? 1,
+          );
+
     // Consultar lista de episodios de la serie desde el provider de datos reales (solo para series)
     final EpisodesResponse? episodesData = isMovie
         ? null
-        : ref.watch(episodesProvider(EpisodesParams(
-            url: widget.sourceUrl,
-            source: widget.source,
-            category: widget.category,
-            title: seriesTitle,
-            season: widget.season,
-          ))).valueOrNull;
+        : (cachedEpisodesData ??
+            ref.watch(episodesProvider(EpisodesParams(
+              url: widget.sourceUrl,
+              source: widget.source,
+              category: widget.category,
+              title: seriesTitle,
+              season: widget.season,
+            ))).valueOrNull);
 
     final List<EpisodeInfo> epList = isMovie ? const [] : (episodesData?.episodes ?? []);
     final EpisodeInfo? currentEp = isMovie ? null : epList.firstWhereOrNull((ep) => ep.number == currentEpNum);
@@ -1343,7 +1352,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                         // Ocultar Siguiente Episodio si la lista in-line fue desplegada (_visibleEpisodesLimit > 0)
                         if (nextEp != null && _visibleEpisodesLimit == 0)
                           WatchNavCard(
-                            sectionLabel: 'Siguiente Episodio',
+                            sectionLabel: 'SIGUIENTE EPISODIO',
                             episodeNumber: 'E${nextEp.number}',
                             episodeTitle: (nextEp.title != null && nextEp.title!.isNotEmpty) ? nextEp.title! : 'Episodio ${nextEp.number}',
                             thumbnailUrl: nextEp.thumbnail ?? widget.bannerUrl,

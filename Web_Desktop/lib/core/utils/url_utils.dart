@@ -12,6 +12,11 @@ class UrlUtils {
   /// abra por su propio _openPlayer (mini, control remoto, notificaciones).
   static final ValueNotifier<int> playerOpenedTick = ValueNotifier<int>(0);
 
+  /// Guarda la última URI de ficha de contenido visitada antes de entrar al reproductor.
+  /// Permite que al dar atrás desde el reproductor (incluso habiendo navegado por
+  /// múltiples episodios) se retorne de forma limpia y directa a la ficha.
+  static String? lastContentUri;
+
   /// Abre el reproductor a pantalla completa en la ruta `/watch/:token/:slug`.
   ///
   /// No es un diálogo: la URL refleja que hay algo reproduciéndose (se puede
@@ -21,7 +26,11 @@ class UrlUtils {
   static Future<T?> openPlayer<T>(BuildContext context, PlayerScreen player) async {
     playerOpenedTick.value++;
     
-    // Normalizar slug del título para URL amigable
+    // Guardar la URI actual (la ficha de contenido) para poder retornar a ella al salir del player
+    final currentUri = GoRouterState.of(context).uri.toString();
+    if (!currentUri.startsWith('/watch')) {
+      lastContentUri = currentUri;
+    }
     final slug = (player.title ?? '')
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9\s-_]'), '')
@@ -40,14 +49,23 @@ class UrlUtils {
       season: player.season,
     );
 
+    final queryParams = <String, String>{
+      'episode': player.episode ?? '1',
+      if (player.season != null && player.season! > 1) 'season': player.season.toString(),
+      if (player.skipResume) 'skipResume': '1',
+      if (player.isLive) 'isLive': '1',
+    };
+
     try {
       // Usar goNamed con el nombre de la ruta 'watch' y pasar token y slug como pathParameters
+      // y queryParameters para que el router siempre reconstruya con los datos exactos del nuevo episodio
       GoRouter.of(context).goNamed(
         'watch',
         pathParameters: {
           'token': token,
           'slug': effectiveSlug,
         },
+        queryParameters: queryParams,
         extra: player,
       );
       // goNamed is synchronous, so we complete the Future with null
@@ -535,6 +553,10 @@ class UrlUtils {
     int? totalEpisodes,
     String? posterUrl,
     String? bannerUrl,
+    String? logoUrl,
+    String? episodeTitle,
+    String? certification,
+    int? year,
   }) {
     // Slug amigable para URL: título normalizado (lowercase, sin símbolos especiales)
     final slug = title
@@ -554,18 +576,8 @@ class UrlUtils {
     );
 
     final queryParams = {
-      'title': title,
-      'contentId': contentId,
       'episode': episode,
-      'source': source,
-      'url': url,
-      if (season != null) 'season': season.toString(),
-      if (serverName != null) 'serverName': serverName,
-      if (language != null) 'language': language,
-      if (category != null) 'category': category,
-      if (totalEpisodes != null) 'totalEpisodes': totalEpisodes.toString(),
-      if (posterUrl != null) 'posterUrl': posterUrl,
-      if (bannerUrl != null) 'bannerUrl': bannerUrl,
+      if (season != null && season > 1) 'season': season.toString(),
     };
 
     final path = slug.isNotEmpty ? '/watch/$token/$slug' : '/watch/$token';

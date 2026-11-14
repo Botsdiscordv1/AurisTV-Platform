@@ -47,7 +47,10 @@ class CleanEmbeddedPlayer extends ConsumerStatefulWidget {
     this.currentQualityLabel,
     this.currentSubtitleLabel,
     this.hasQualityOptions = true,
+    this.onBack,
   });
+
+  final VoidCallback? onBack;
 
   final String sourceUrl;
   final String source;
@@ -140,17 +143,17 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     final player = active.player;
 
     if (player != null) {
-      // Si el player está activo (reproduciendo o con posición > 0), reutilizamos
-      // independientemente de si la URL coincide exactamente.
-      // Esto cubre el caso de regreso desde PlayerScreen fullscreen donde active.url
-      // puede ser la page URL mientras widget.sourceUrl es la HLS URL.
+      // Comparar tanto el episodio como la serie y la URL para decidir si reutilizar.
+      // Si el episodio es distinto al que tiene el active player, NO se reutiliza (es un cambio de episodio)
+      final bool isSameContent = active.currentItem?.id == (widget.contentId ?? widget.title) ||
+          active.currentItem?.title == widget.title;
+      final bool isSameEp = active.episode == widget.episode;
       final bool isActivelyPlaying = player.state.playing || 
           player.state.position.inMilliseconds > 0;
       
-      // También comparamos URL por si hay coincidencia exacta (URL HLS en ambos)
       final bool isSameStream = active.url == widget.sourceUrl && isActivelyPlaying;
       
-      if (isSameStream || isActivelyPlaying) {
+      if (isSameContent && isSameEp && (isSameStream || isActivelyPlaying)) {
         setState(() {
           _position = player.state.position;
           if (player.state.duration > Duration.zero) {
@@ -470,6 +473,36 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                 ignoring: !(_showControls && !isInitialLoading),
                 child: Stack(
                   children: [
+                    // Botón Back superior izquierdo si está provisto (espejo de móvil)
+                    if (widget.onBack != null)
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: widget.onBack,
+                            borderRadius: BorderRadius.circular(20),
+                            hoverColor: Colors.white.withValues(alpha: 0.15),
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.40),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.arrow_back_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
                     // Gradiente sutil únicamente en la parte inferior tras los controles
                     Positioned(
                       left: 0,

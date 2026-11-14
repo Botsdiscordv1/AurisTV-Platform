@@ -88,9 +88,9 @@ String _formatRuntime(int? minutes) {
   return '$h h $m min';
 }
 
-Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
+Widget _buildBadge(BuildContext context, String? text, {bool small = false, VoidCallback? onTap}) {
   if (text == null || text.isEmpty) return const SizedBox.shrink();
-  return Container(
+  final badge = Container(
     padding: EdgeInsets.symmetric(
       horizontal: ResponsiveUtils.sp(context, small ? 5 : 8), 
       vertical: ResponsiveUtils.sp(context, small ? 1.5 : 3)
@@ -113,6 +113,14 @@ Widget _buildBadge(BuildContext context, String? text, {bool small = false}) {
       ),
     ),
   );
+  if (onTap != null) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: badge,
+    );
+  }
+  return badge;
 }
 
 Widget _buildAgeBadge(BuildContext context, String? text, {bool small = false}) {
@@ -1204,7 +1212,7 @@ class _CastCreditsModal extends ConsumerWidget {
                                     context.push('/detalles/${Uri.encodeComponent(item.title)}?source=${item.source}&url=${Uri.encodeComponent(item.url)}&category=$cat$posterParam', extra: item);
                                   } else {
                                     // Anime: los items NO traen url de scraper -> click en filmografía = search normal por title
-                                    context.push('/busqueda?q=${Uri.encodeComponent(item.title)}');
+                                    context.push('/search?q=${Uri.encodeComponent(item.title)}');
                                   }
                                 },
                               );
@@ -1579,7 +1587,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final year = (d is AnimeDetail) ? d.year?.toString() : (d is MovieDetail ? d.releaseDate?.split('-').first : null);
     final r = (d?.rating ?? sourceRating) as double?;
     final rating = formatRating(r);
-    List<String> genres = [];
+    List<NavigableItem> genres = [];
     if (d is AnimeDetail) genres = d.genres;
     else if (d is MovieDetail) genres = d.genres;
     final cert = (d != null && d.certification != null && d.certification!.isNotEmpty) ? d.certification : null;
@@ -1604,7 +1612,14 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                     ),
                   ...genres.map((g) => Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: _buildBadge(context, g.toUpperCase(), small: false),
+                    child: _buildBadge(
+                      context, 
+                      g.name.toUpperCase(), 
+                      small: false,
+                      onTap: () {
+                        context.push('/search?q=${Uri.encodeComponent(g.name)}');
+                      },
+                    ),
                   )),
                 ],
               ),
@@ -1650,11 +1665,11 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   }
 
   Widget _buildVerticalGenresRow(dynamic detail) {
-    List<String> genres = [];
+    List<NavigableItem> genres = [];
     if (detail is AnimeDetail) genres = detail.genres;
     else if (detail is MovieDetail) genres = detail.genres;
     
-    final text = genres.map((g) => g.toUpperCase()).join(' · ');
+    final text = genres.map((g) => g.name.toUpperCase()).join(' · ');
 
     return Center(
       child: Text(
@@ -2836,7 +2851,8 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final effectiveDate = _pickDisplayDate((detail is AnimeDetail ? detail.firstAirDate : detail.releaseDate), inferredSeasonAirDate);
     final year = effectiveDate?.split('-').first ?? 'N/A';
     String sInfo = _isMovieContent(detail, widget.result?.kind ?? widget.type) ? _formatRuntime(_getRuntime(detail)) : (detail is AnimeDetail ? '${detail.episodes ?? 0} episodios' : (detail is MovieDetail ? '${detail.totalSeasons ?? 1} temporadas' : ''));
-    List<String> dir = [], cast = [], std = [];
+    List<String> dir = [], cast = [];
+    List<dynamic> std = [];
     if (detail is MovieDetail) { dir = detail.directors; cast = detail.cast.take(5).map((e) => e.name).toList(); std = detail.productionCompanies; }
     else if (detail is AnimeDetail) { std = detail.studios; }
     final cert = (detail is MovieDetail ? detail.certification : (detail is AnimeDetail ? detail.certification : null)) ?? 'NR';
@@ -2860,7 +2876,20 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
           ),
         ],
         const SizedBox(height: 20),
-        if (detail.genres is List) Wrap(spacing: 8, runSpacing: 8, children: (detail.genres as List).map<Widget>((g) => _buildBadge(context, g.toString().toUpperCase())).toList()), 
+        if (detail.genres is List) Wrap(
+          spacing: 8, 
+          runSpacing: 8, 
+          children: (detail.genres as List).map<Widget>((g) {
+            final name = (g is NavigableItem) ? g.name : g.toString();
+            return _buildBadge(
+              context, 
+              name.toUpperCase(),
+              onTap: () {
+                context.push('/search?q=${Uri.encodeComponent(name)}');
+              },
+            );
+          }).toList(),
+        ), 
         const SizedBox(height: 24),
         if (platforms.isNotEmpty) ...[
           const Text('Disponible en', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -2910,7 +2939,26 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
         if (std.isNotEmpty) ...[
           const Text('Estudio', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text(std.join(', '), style: const TextStyle(color: Color(0xFFA5A5AA), fontSize: 14)),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: std.map<Widget>((s) {
+              final name = (s is NavigableItem) ? s.name : s.toString();
+              return GestureDetector(
+                onTap: () {
+                  context.push('/search?q=${Uri.encodeComponent(name)}');
+                },
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    color: Color(0xFF64B5F6),
+                    fontSize: 14,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ] 
       ]))),
     ];

@@ -656,6 +656,7 @@ class ProgressiveContentState {
 
 class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> {
   static final Map<String, Map<int, EpisodeInfo>> _seriesMetadataCache = {};
+  static final Map<String, EpisodesResponse> _seriesEpisodesResponseCache = {};
 
   String _getSeriesKey() {
     final title = (_params.metadataTitle ?? _params.title).trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
@@ -778,6 +779,18 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
     if (hit != null) return hit;
     if ((metadataTitle ?? '').trim().isNotEmpty) {
       return _seriesMetadataCache[seriesKeyFor(title: title, season: season)];
+    }
+    return null;
+  }
+
+  /// Lee la respuesta de episodios completa cacheada en memoria por la ficha.
+  /// Permite a [WatchScreen] reutilizar directamente los episodios cargados
+  /// en [ContentScreen] sin volver a disparar peticiones de red redundantes.
+  static EpisodesResponse? lookupCachedEpisodesResponse({String? title, String? metadataTitle, required int season}) {
+    final hit = _seriesEpisodesResponseCache[seriesKeyFor(title: title, metadataTitle: metadataTitle, season: season)];
+    if (hit != null) return hit;
+    if ((metadataTitle ?? '').trim().isNotEmpty) {
+      return _seriesEpisodesResponseCache[seriesKeyFor(title: title, season: season)];
     }
     return null;
   }
@@ -964,6 +977,7 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
       ),
       sources: List.filled(initialForEmit.length, selected),
     );
+    _seriesEpisodesResponseCache[_getSeriesKey()] = initialBundle.response;
 
     if (!mounted) return;
     state = state.copyWith(
@@ -1105,6 +1119,7 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
             season: currentBundle.response.season,
             seasonAirDate: fullRes.seasonAirDate ?? currentBundle.response.seasonAirDate,
           );
+          _seriesEpisodesResponseCache[_getSeriesKey()] = mergedResponse;
 
           state = state.copyWith(
             episodes: AsyncValue.data(GroupedEpisodesResult(

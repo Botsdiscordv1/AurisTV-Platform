@@ -11,7 +11,8 @@ import 'providers/search_provider.dart';
 import 'widgets/search_widgets.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  final String? initialQuery;
+  const SearchScreen({super.key, this.initialQuery});
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -29,12 +30,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialQuery != null && widget.initialQuery!.trim().isNotEmpty) {
+      _currentQuery = widget.initialQuery!.trim();
+      _searchController.text = _currentQuery;
+    }
     _focusNode.addListener(() {
       setState(() => _isFocused = _focusNode.hasFocus);
     });
-    // En móvil, el teclado se abre automático según la spec
+    // En móvil, el teclado se abre automático según la spec solo si no viene con query
     Future.delayed(Duration.zero, () {
-      if (mounted && ResponsiveUtils.isMobile(context)) {
+      if (mounted && ResponsiveUtils.isMobile(context) && _currentQuery.isEmpty) {
         FocusScope.of(context).requestFocus(_focusNode);
       }
     });

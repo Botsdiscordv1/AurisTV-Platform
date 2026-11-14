@@ -4242,7 +4242,7 @@ void _openPlayer(PlayerScreen player) {
     String sInfo = _isMovieContent(detail, widget.result?.kind ?? widget.type) ? _formatRuntime(_getRuntime(detail)) : (detail is AnimeDetail ? '${detail.episodes ?? 0} episodios' : (detail is MovieDetail ? '${detail.totalSeasons ?? 1} temporadas' : ''));
     List<String> dir = [], cast = [], std = [];
     if (detail is MovieDetail) { dir = detail.directors; cast = detail.cast.take(5).map((e) => e.name).toList(); std = detail.productionCompanies; }
-    else if (detail is AnimeDetail) { std = detail.studios; }
+    else if (detail is AnimeDetail) { std = detail.studios.map((s) => s.name).toList(); }
     final cert = (detail is MovieDetail ? detail.certification : (detail is AnimeDetail ? detail.certification : null)) ?? 'NR';
     final platforms = (detail is MovieDetail) ? detail.platforms : (detail is AnimeDetail ? detail.platforms : <PlatformInfo>[]);
     final status = detail is MovieDetail ? detail.status : (detail is AnimeDetail ? detail.status : null);

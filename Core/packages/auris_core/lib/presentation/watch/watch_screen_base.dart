@@ -83,6 +83,8 @@ class WatchScreenBase extends ConsumerStatefulWidget {
 }
 
 class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
+  int _visibleEpisodesLimit = 0;
+
   @override
   void dispose() {
     try {
@@ -102,6 +104,14 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
     final String seriesTitle = widget.metadataTitle ?? widget.title ?? widget.contentId;
     final bool isMovie = isMovieLike(widget.category, seriesTitle);
 
+    final cachedEpisodesData = isMovie
+        ? null
+        : ProgressiveContentNotifier.lookupCachedEpisodesResponse(
+            title: widget.title ?? widget.contentId,
+            metadataTitle: widget.metadataTitle,
+            season: widget.season ?? 1,
+          );
+
     final episodesParams = EpisodesParams(
       url: widget.sourceUrl,
       source: widget.source,
@@ -110,7 +120,9 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
       season: widget.season,
     );
 
-    final episodesData = isMovie ? null : ref.watch(episodesProvider(episodesParams)).valueOrNull;
+    final episodesData = isMovie
+        ? null
+        : (cachedEpisodesData ?? ref.watch(episodesProvider(episodesParams)).valueOrNull);
     final List<EpisodeInfo> episodesList = isMovie
         ? const []
         : (widget.playlistEpisodes ?? (episodesData?.episodes ?? []));
@@ -258,7 +270,236 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                     ],
                   )
                 : null),
+        mobileEpisodesWidget: (!isMovie && episodesList.isNotEmpty)
+            ? _buildMobileEpisodesSection(
+                context,
+                episodesList,
+                (activeEpisode?.number ?? currentEpNum).toString(),
+                widget.onEpisodeSelected ?? (_) {},
+                nextEpisodeWidget: nextEpisodeWidget,
+                previousEpisodeWidget: previousEpisodeWidget,
+              )
+            : null,
       ),
+    );
+  }
+
+  Widget _buildMobileEpisodesSection(
+    BuildContext context,
+    List<EpisodeInfo> episodesList,
+    String activeEpisodeNum,
+    ValueChanged<EpisodeInfo> onEpisodeSelected, {
+    Widget? nextEpisodeWidget,
+    Widget? previousEpisodeWidget,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // "Siguiente episodio" solo se muestra cuando la lista está colapsada
+        if (_visibleEpisodesLimit == 0) ...[
+          if (nextEpisodeWidget != null) nextEpisodeWidget,
+          if (previousEpisodeWidget != null) previousEpisodeWidget,
+        ],
+
+        // Lista in-line paginada de 28 en 28
+        if (_visibleEpisodesLimit > 0) ...[
+          Padding(
+            // Mismo padding que el label de WatchNavCard (top:12, bottom:8)
+            // para que "EPISODIOS" ocupe la posición exacta de "SIGUIENTE EPISODIO"
+            padding: const EdgeInsets.only(bottom: 8, top: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  'EPISODIOS',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    setState(() {
+                      _visibleEpisodesLimit = 0;
+                    });
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(4.0),
+                    child: Icon(
+                      Icons.keyboard_arrow_up,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...episodesList.take(_visibleEpisodesLimit).map((ep) {
+            final bool isCurrent = ep.number.toString() == activeEpisodeNum;
+            final String epTitle = (ep.title != null && ep.title!.isNotEmpty)
+                ? ep.title!
+                : 'Episodio ${ep.number}';
+            final String durationStr =
+                ep.duration ?? (ep.runtime != null ? '${ep.runtime}m' : '24m');
+            final String qualityStr = ep.quality ?? 'Sub | Dob';
+            final String thumbUrl =
+                ep.thumbnail ?? widget.bannerUrl ?? widget.posterUrl ?? '';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => onEpisodeSelected(ep),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Thumbnail 16:9 con Badge de Duración y REPRODUCIENDO
+                    SizedBox(
+                      width: 140,
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border:
+                                Border.all(color: Colors.white12, width: 0.5),
+                            image: thumbUrl.isNotEmpty
+                                ? DecorationImage(
+                                    image: NetworkImage(thumbUrl),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                            color: Colors.white10,
+                          ),
+                          child: Stack(
+                            children: [
+                              if (isCurrent)
+                                Positioned(
+                                  top: 6,
+                                  left: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEF7A1E),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: const Text(
+                                      'REPRODUCIENDO',
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              Positioned(
+                                right: 6,
+                                bottom: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black87,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: Text(
+                                    durationStr,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Título y Calidad
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          Text(
+                            'E${ep.number} - $epTitle',
+                            style: TextStyle(
+                              color: isCurrent
+                                  ? const Color(0xFFEF7A1E)
+                                  : Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              height: 1.25,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            qualityStr,
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+
+        // Botón VER MÁS EPISODIOS
+        if (_visibleEpisodesLimit < episodesList.length) ...[
+          const SizedBox(height: 12),
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFBBBBBB),
+              side: const BorderSide(color: Color(0xFFBBBBBB), width: 2.0),
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            onPressed: () {
+              setState(() {
+                _visibleEpisodesLimit += 28;
+              });
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AurisIcon(AurisIcons.episodes, color: const Color(0xFFBBBBBB), size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  _visibleEpisodesLimit == 0
+                      ? 'VER MÁS EPISODIOS'
+                      : 'VER MÁS EPISODIOS (${episodesList.length - _visibleEpisodesLimit})',
+                  style: const TextStyle(
+                    color: Color(0xFFBBBBBB),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 

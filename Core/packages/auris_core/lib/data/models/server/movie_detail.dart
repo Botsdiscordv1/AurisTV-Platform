@@ -38,7 +38,7 @@ class MovieDetail {
   final String? releaseDate;
   final int? runtime;
   final int? episodeRuntime;
-  final List<String> genres;
+  final List<NavigableItem> genres;
   final List<String> productionCompanies;
   final List<String> directors;
   final List<CastMember> cast;
@@ -75,7 +75,7 @@ class MovieDetail {
     this.releaseDate,
     this.runtime,
     this.episodeRuntime,
-    this.genres = const [],
+    this.genres = const <NavigableItem>[],
     this.productionCompanies = const [],
     this.directors = const [],
     this. cast = const [],
@@ -122,6 +122,8 @@ class MovieDetail {
             .toList() ??
         [];
 
+    final visuals = (root['visuals'] is Map) ? Map<String, dynamic>.from(root['visuals'] as Map) : null;
+
     final inferredReleaseDate = root['releaseDate'] as String? ?? 
                                 root['airDate'] as String? ?? 
                                 (seasons.isNotEmpty ? seasons.first.airDate : null);
@@ -131,24 +133,34 @@ class MovieDetail {
       mediaType: root['mediaType'] as String?,
       title: root['title'] as String? ?? '',
       originalTitle: root['originalTitle'] as String?,
-      overview: SynopsisCleaner.clean(root['overview'] as String?),
-      poster: ApiEndpoints.proxyImage(root['posterUrl'] as String? ?? root['poster'] as String?, policy: ImageSize.poster),
-      backdrop: ApiEndpoints.proxyImage(root['backdropUrl'] as String? ?? root['backdrop'] as String? ?? root['backdrop_url'] as String?, policy: ImageSize.full),
-      banner: ApiEndpoints.proxyImage(root['bannerUrl'] as String? ?? root['banner'] as String?, policy: ImageSize.banner),
-      logo: ApiEndpoints.proxyImage(root['logoUrl'] as String? ?? root['logo'] as String?, policy: ImageSize.tiny),
+      overview: SynopsisCleaner.clean(root['synopsis'] as String? ?? root['overview'] as String?),
+      poster: ApiEndpoints.proxyImage(visuals?['posterUrl'] as String? ?? root['posterUrl'] as String? ?? root['poster'] as String?, policy: ImageSize.poster),
+      backdrop: ApiEndpoints.proxyImage(visuals?['backdropUrl'] as String? ?? root['backdropUrl'] as String? ?? root['backdrop'] as String? ?? root['backdrop_url'] as String?, policy: ImageSize.full),
+      banner: ApiEndpoints.proxyImage(visuals?['bannerUrl'] as String? ?? root['bannerUrl'] as String? ?? root['banner'] as String?, policy: ImageSize.banner),
+      logo: ApiEndpoints.proxyImage(visuals?['logoUrl'] as String? ?? root['logoUrl'] as String? ?? root['logo'] as String?, policy: ImageSize.tiny),
       rating: (root['rating'] as num? ?? root['score'] as num?)?.toDouble(),
       score: (root['score'] as num? ?? root['rating'] as num?)?.toDouble(),
       voteCount: root['voteCount'] as int?,
       releaseDate: inferredReleaseDate,
       runtime: root['runtime'] as int?,
       episodeRuntime: root['episodeRuntime'] as int?,
-      genres: (root['genresTranslated'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          (root['genres'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
+      genres: () {
+        final seen = <String>{};
+        final result = <NavigableItem>[];
+        void add(dynamic g) {
+          final item = NavigableItem.fromJson(g);
+          if (item.name.isNotEmpty && seen.add(item.name.toLowerCase())) result.add(item);
+        }
+        // genresTranslated (legacy string list) → plain NavigableItem sin url
+        final translated = root['genresTranslated'] as List<dynamic>?;
+        final raw        = root['genres']           as List<dynamic>?;
+        if (translated != null && translated.isNotEmpty) {
+          for (final g in translated) add(g);
+        } else if (raw != null) {
+          for (final g in raw) add(g);
+        }
+        return result;
+      }(),
       productionCompanies: (root['productionCompanies'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

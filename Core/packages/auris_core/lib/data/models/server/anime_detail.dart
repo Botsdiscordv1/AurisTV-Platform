@@ -18,7 +18,7 @@ class AnimeDetail {
   final double? rating;
   final double? score;
   final int? episodes;
-  final List<String> genres;
+  final List<NavigableItem> genres;
   final String? format;
   final String? status;
   final String? season;
@@ -26,7 +26,7 @@ class AnimeDetail {
   final int? year;
   final int? duration;
   final List<String> tags;
-  final List<String> studios;
+  final List<NavigableItem> studios;
   final TrailerInfo? trailer;
   final List<RelationInfo> relations;
   final List<RecommendationInfo> recommendations;
@@ -56,7 +56,7 @@ class AnimeDetail {
     this.rating,
     this.score,
     this.episodes,
-    this.genres = const [],
+    this.genres = const <NavigableItem>[],
     this.format,
     this.status,
     this.season,
@@ -64,7 +64,7 @@ class AnimeDetail {
     this.year,
     this.duration,
     this.tags = const [],
-    this.studios = const [],
+    this.studios = const <NavigableItem>[],
     this.trailer,
     this.relations = const [],
     this.recommendations = const [],
@@ -81,7 +81,7 @@ class AnimeDetail {
   });
 
   String? get trailerKey => trailer?.videoId;
-  String? get firstAirDate => year?.toString();
+  String? get firstAirDate => releaseDate ?? year?.toString();
 
   factory AnimeDetail.fromJson(Map<dynamic, dynamic> json) {
     final root = (json.containsKey('data') && json['data'] is Map)
@@ -89,7 +89,7 @@ class AnimeDetail {
         : Map<String, dynamic>.from(json);
 
     final anime = (root['anime'] is Map) ? Map<String, dynamic>.from(root['anime'] as Map) : root;
-    final visuals = (root['visuals'] is Map) ? Map<String, dynamic>.from(root['visuals'] as Map) : root;
+    final visuals = (root['visuals'] is Map) ? Map<String, dynamic>.from(root['visuals'] as Map) : null;
     final themes = (root['themes'] as List<dynamic>?) ?? [];
 
     final trailerData =
@@ -128,9 +128,9 @@ class AnimeDetail {
 
     return AnimeDetail(
       id: (anime['id'] ?? '').toString(),
-      tmdbId: (root['tmdbId'] ?? anime['tmdbId'] ?? root['tmdb_id'] ?? anime['tmdb_id']) is num 
-          ? (root['tmdbId'] ?? anime['tmdbId'] ?? root['tmdb_id'] ?? anime['tmdb_id']).toInt() 
-          : null,
+      tmdbId: ((visuals?['tmdbId'] ?? root['tmdbId'] ?? anime['tmdbId'] ?? root['tmdb_id'] ?? anime['tmdb_id']) is num)
+          ? (visuals?['tmdbId'] ?? root['tmdbId'] ?? anime['tmdbId'] ?? root['tmdb_id'] ?? anime['tmdb_id']).toInt() 
+          : int.tryParse((visuals?['tmdbId'] ?? root['tmdbId'] ?? anime['tmdbId'])?.toString() ?? ''),
       title: anime['title'] as String? ?? '',
       titleEnglish: anime['titleEnglish'] as String?,
       titleJapanese: anime['titleJapanese'] as String?,
@@ -139,36 +139,41 @@ class AnimeDetail {
               .toList() ??
           [],
       overview: SynopsisCleaner.clean(
-        visuals?['overview'] as String? ??
+        anime['synopsis'] as String? ??
             anime['description'] as String? ??
+            visuals?['overview'] as String? ??
             root['overview'] as String?,
       ),
       poster: ApiEndpoints.proxyImage(
-        root['posterUrl'] as String? ??
         visuals?['posterUrl'] as String? ??
+        root['posterUrl'] as String? ??
         visuals?['poster'] as String? ??
+        anime['poster'] as String? ??
         root['poster'] as String? ??
         root['thumbnail'] as String?,
         policy: ImageSize.poster
       ),
       backdrop: ApiEndpoints.proxyImage(
-        root['backdropUrl'] as String? ??
         visuals?['backdropUrl'] as String? ??
+        root['backdropUrl'] as String? ??
         visuals?['backdrop'] as String? ??
+        anime['backdrop'] as String? ??
         root['backdrop'] as String?, 
         policy: ImageSize.full
       ),
       banner: ApiEndpoints.proxyImage(
-        root['bannerUrl'] as String? ??
         visuals?['bannerUrl'] as String? ??
+        root['bannerUrl'] as String? ??
         visuals?['banner'] as String? ??
+        anime['banner'] as String? ??
         root['banner'] as String?, 
         policy: ImageSize.banner
       ),
       logo: ApiEndpoints.proxyImage(
-        root['logoUrl'] as String? ??
         visuals?['logoUrl'] as String? ??
+        root['logoUrl'] as String? ??
         visuals?['logo'] as String? ??
+        anime['logo'] as String? ??
         root['logo'] as String?,
         policy: ImageSize.tiny
       ),
@@ -176,28 +181,26 @@ class AnimeDetail {
       score: (anime['score'] as num? ?? anime['rating'] as num? ?? root['score'] as num? ?? root['rating'] as num?)?.toDouble(),
       episodes: anime['episodes'] as int?,
       genres: () {
-        // genresTranslated vive en anime, debajo de genres (como movies).
-        final inAnime = anime['genresTranslated'];
-        if (inAnime is List && inAnime.isNotEmpty) {
-          return inAnime.map((e) => e.toString()).toList();
-        }
-        // Compat: respuestas con el campo a nivel root.
-        final translated = root['genresTranslated'];
+        // Géneros del nuevo API son Array<{name, url}>.
+        // Fallback legacy: genresTranslated (Array<String>) o genres (mixed).
+        final translated = anime['genresTranslated'] ?? root['genresTranslated'];
         if (translated is List && translated.isNotEmpty) {
-          return translated.map((e) => e.toString()).toList();
+          return translated.map((e) => NavigableItem.fromJson(e)).toSet().toList();
         }
-        // Combinar o priorizar la lista del root level (enriquecida por TMDB/servidor) 
-        // con la del nodo anime para asegurar paridad total (Móvil vs Web).
-        final Set<String> uniqueGenres = {};
-        final rootGenres = root['genres'] ?? root['genre'];
-        if (rootGenres is List) {
-          uniqueGenres.addAll(rootGenres.map((e) => e.toString()));
+        final animeGenres  = anime['genres'];
+        final rootGenres   = root['genres'];
+        final visualGenres = visuals?['genres'];
+
+        final seen = <String>{};
+        final result = <NavigableItem>[];
+        void add(dynamic g) {
+          final item = NavigableItem.fromJson(g);
+          if (item.name.isNotEmpty && seen.add(item.name.toLowerCase())) result.add(item);
         }
-        final animeGenres = anime['genres'] ?? anime['genre'];
-        if (animeGenres is List) {
-          uniqueGenres.addAll(animeGenres.map((e) => e.toString()));
-        }
-        return uniqueGenres.toList();
+        if (animeGenres is List) { for (final g in animeGenres) add(g); }
+        if (rootGenres  is List && rootGenres != animeGenres) { for (final g in rootGenres) add(g); }
+        if (visualGenres is List) { for (final g in visualGenres) add(g); }
+        return result;
       }(),
       format: anime['type'] as String?,
       status: anime['status'] as String?,
@@ -210,8 +213,8 @@ class AnimeDetail {
               .toList() ??
           [],
       studios: (anime['studios'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
+              ?.map((e) => NavigableItem.fromJson(e))
+              .toSet().toList() ??
           [],
       trailer: trailerData,
       relations: (anime['relations'] as List<dynamic>?)
@@ -225,24 +228,24 @@ class AnimeDetail {
           [],
       openings: openings,
       endings: endings,
-      certification: root['certification'] as String? ??
+      certification: anime['certification'] as String? ??
           visuals?['certification'] as String? ??
-          anime['certification'] as String?,
+          root['certification'] as String?,
       kind: root['kind'] as String?,
       characters: (root['characters'] as List<dynamic>?)
               ?.map((e) => CharacterInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      platforms: (root['platforms'] as List<dynamic>? ?? 
-                  anime['platforms'] as List<dynamic>? ?? 
+      platforms: (anime['platforms'] as List<dynamic>? ?? 
+                  root['platforms'] as List<dynamic>? ?? 
                   visuals?['platforms'] as List<dynamic>?)
               ?.map((e) => PlatformInfo.fromJson(Map<String, dynamic>.from(e as Map)))
               .toList() ??
           [],
       backdropsBySeason: backdropsBySeason,
-      releaseStatus: (root['releaseStatus'] ?? anime['releaseStatus'] ?? root['release_status'] ?? anime['release_status']) as String?,
-      releaseDate: (root['releaseDate'] ?? anime['releaseDate'] ?? root['release_date'] ?? anime['release_date'] ?? visuals?['releaseDate']) as String?,
-      releaseTimestamp: (root['releaseTimestamp'] ?? anime['releaseTimestamp'] ?? root['release_timestamp'] ?? anime['release_timestamp'] ?? root['airDate'] ?? anime['airDate']) as String?,
+      releaseStatus: (anime['releaseStatus'] ?? root['releaseStatus'] ?? anime['release_status'] ?? root['release_status']) as String?,
+      releaseDate: (anime['releaseDate'] ?? root['releaseDate'] ?? anime['release_date'] ?? root['release_date'] ?? visuals?['releaseDate']) as String?,
+      releaseTimestamp: (anime['releaseDate'] ?? root['releaseDate'] ?? root['releaseTimestamp'] ?? anime['releaseTimestamp'] ?? root['release_timestamp'] ?? anime['release_timestamp']) as String?,
     );
   }
 }

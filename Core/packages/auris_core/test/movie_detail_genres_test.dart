@@ -11,7 +11,7 @@ void main() {
         'genres': ['Animacion', 'Familia', 'Fantasia'],
         'genresTranslated': ['Animacion', 'Familia', 'Fantasia', 'Brujas', 'Magia'],
       });
-      expect(d.genres, ['Animacion', 'Familia', 'Fantasia', 'Brujas', 'Magia']);
+      expect(d.genres.map((g) => g.name).toList(), ['Animacion', 'Familia', 'Fantasia', 'Brujas', 'Magia']);
     });
 
     test('fallback a genres si no hay genresTranslated (respuestas viejas)', () {
@@ -20,7 +20,7 @@ void main() {
         'title': 'El viaje de Chihiro',
         'genres': ['Animación', 'Familia'],
       });
-      expect(d.genres, ['Animación', 'Familia']);
+      expect(d.genres.map((g) => g.name).toList(), ['Animación', 'Familia']);
     });
 
     test('lista vacía si no hay ninguno', () {
@@ -37,7 +37,7 @@ void main() {
           'genresTranslated': ['Animacion', 'Brujas'],
         },
       });
-      expect(d.genres, ['Animacion', 'Brujas']);
+      expect(d.genres.map((g) => g.name).toList(), ['Animacion', 'Brujas']);
     });
   });
 
@@ -48,7 +48,7 @@ void main() {
           'genresTranslated': ['Accion', 'Sobrenatural', 'Demonios', 'Maldiciones']},
         'visuals': {'genres': ['Animacion']},
       });
-      expect(d.genres, ['Accion', 'Sobrenatural', 'Demonios', 'Maldiciones']);
+      expect(d.genres.map((g) => g.name).toList(), ['Accion', 'Sobrenatural', 'Demonios', 'Maldiciones']);
     });
 
     test('compat con genresTranslated a nivel root', () {
@@ -56,7 +56,7 @@ void main() {
         'anime': {'id': '21', 'title': 'Jujutsu Kaisen', 'genres': ['Accion']},
         'genresTranslated': ['Accion', 'Sobrenatural'],
       });
-      expect(d.genres, ['Accion', 'Sobrenatural']);
+      expect(d.genres.map((g) => g.name).toList(), ['Accion', 'Sobrenatural']);
     });
 
     test('fallback al merge legacy sin genresTranslated', () {
@@ -64,7 +64,7 @@ void main() {
         'genres': ['Animacion'],
         'anime': {'id': '21', 'title': 'Jujutsu Kaisen', 'genres': ['Accion']},
       });
-      expect(d.genres, containsAll(['Accion', 'Animacion']));
+      expect(d.genres.map((g) => g.name).toList(), containsAll(['Accion', 'Animacion']));
     });
   });
 }

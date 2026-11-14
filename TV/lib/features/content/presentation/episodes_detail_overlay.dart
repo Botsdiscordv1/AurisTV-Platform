@@ -458,7 +458,7 @@ class ContentDetailsPanel extends StatelessWidget {
     final List<String> directors = isMovie ? d.directors : <String>[];
     final List<String> studios = isMovie
         ? d.productionCompanies
-        : (d is AnimeDetail ? d.studios : <String>[]);
+        : (d is AnimeDetail ? d.studios.map((s) => s.name).toList() : <String>[]);
     final List<String> cast = isMovie
         ? d.cast.take(8).map((c) => c.name).toList()
         : (d is AnimeDetail

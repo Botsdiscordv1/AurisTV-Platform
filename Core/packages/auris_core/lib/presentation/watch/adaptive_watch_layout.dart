@@ -17,6 +17,7 @@ class AdaptiveWatchLayout extends StatelessWidget {
     required this.previousEpisodeWidget,
     this.playlistSidebarWidget,
     this.rightColumnWidget,
+    this.mobileEpisodesWidget,
     this.isTheaterMode = false,
   });
 
@@ -28,6 +29,7 @@ class AdaptiveWatchLayout extends StatelessWidget {
   final Widget previousEpisodeWidget;
   final Widget? playlistSidebarWidget;
   final Widget? rightColumnWidget;
+  final Widget? mobileEpisodesWidget;
   final bool isTheaterMode;
 
   @override
@@ -82,7 +84,20 @@ class AdaptiveWatchLayout extends StatelessWidget {
                       const SizedBox(width: 24),
                       Expanded(
                         flex: 3,
-                        child: activeRightWidget,
+                        child: LayoutBuilder(
+                          builder: (context, colConstraints) {
+                            // Si la altura no está acotada (dentro de SingleChildScrollView),
+                            // calculamos una altura armónica igual a la del reproductor 16:9
+                            final double playerEstimatedHeight =
+                                (width - (isTheaterMode ? 0 : 48) - 24) * 0.7 * (9 / 16);
+                            final double calculatedHeight =
+                                playerEstimatedHeight > 200 ? playerEstimatedHeight : 450.0;
+                            return SizedBox(
+                              height: calculatedHeight,
+                              child: activeRightWidget,
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ],
@@ -190,8 +205,14 @@ class AdaptiveWatchLayout extends StatelessWidget {
                       const Divider(color: Colors.white10, height: 20),
                       synopsisWidget,
                       const SizedBox(height: 16),
-                      nextEpisodeWidget,
-                      previousEpisodeWidget,
+                      // Si mobileEpisodesWidget está activo, él gestiona
+                      // internamente "Siguiente/Anterior episodio" (los oculta al expandir)
+                      if (mobileEpisodesWidget == null) ...[
+                        nextEpisodeWidget,
+                        previousEpisodeWidget,
+                      ],
+                      if (mobileEpisodesWidget != null)
+                        mobileEpisodesWidget!,
                     ],
                   ),
                 ),

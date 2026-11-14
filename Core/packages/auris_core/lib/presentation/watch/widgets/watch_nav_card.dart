@@ -14,6 +14,9 @@ class WatchNavCard extends StatelessWidget {
     this.duration,
     this.audioSubsBadge = 'Dob | Sub',
     this.onTap,
+    this.labelFontSize = 12.0,
+    this.labelFontWeight = FontWeight.w800,
+    this.labelLetterSpacing = 1.2,
   });
 
   final String sectionLabel;
@@ -23,6 +26,9 @@ class WatchNavCard extends StatelessWidget {
   final String? duration;
   final String audioSubsBadge;
   final VoidCallback? onTap;
+  final double labelFontSize;
+  final FontWeight labelFontWeight;
+  final double labelLetterSpacing;
 
   @override
   Widget build(BuildContext context) {
@@ -35,9 +41,9 @@ class WatchNavCard extends StatelessWidget {
             sectionLabel.toUpperCase(),
             style: TextStyle(
               color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
+              fontSize: labelFontSize,
+              fontWeight: labelFontWeight,
+              letterSpacing: labelLetterSpacing,
             ),
           ),
         ),
