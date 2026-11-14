@@ -1,17 +1,31 @@
-# auristv_mobile
+# 🚀 AurisTV - Plataforma Multimedia Multiplataforma
 
-A new Flutter project.
+AurisTV es una aplicación multimedia personal moderna y adaptativa, desarrollada en **Flutter**, diseñada para ofrecer una experiencia fluida y unificada en múltiples plataformas:
+- 📱 **Móvil** (Android / iOS)
+- 📺 **Android TV / Google TV** (Optimizado para control remoto)
+- 💻 **Web & Desktop** (Navegadores y Windows)
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## ✨ Características Principales
 
-A few resources to get you started if this is your first Flutter project:
+- **Reproductor Multimedia Avanzado:** Soporte para múltiples fuentes, subtítulos personalizados, gestos de volumen/brillo y reproducción en segundo plano (PIP).
+- **Sistema de Casting Local y Remoto:** Transmisión fluida entre dispositivos, selector de dispositivos y control remoto virtual D-Pad.
+- **Gestión Avanzada de Perfiles y Avatares:** Creación, edición y selección de perfiles de usuario con avatares personalizados.
+- **Módulo de Deportes y Programación:** Gu guía de programación (`schedule_screen`) y eventos deportivos en vivo.
+- **Actualizador In-App:** Sistema integrado para verificar, descargar e instalar actualizaciones automáticamente desde GitHub Releases.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🛠️ Tecnologías
+
+- **Framework:** Flutter (Material Design 3)
+- **Gestión de Estado:** Riverpod
+- **Enrutamiento:** GoRouter
+- **Reproductor:** MediaKit
+- **Persistencia:** Hive CE, Flutter Secure Storage
+- **Backend / Auth:** Supabase
+
+---
+
+📥 *¡Disfruta de tu contenido favorito en cualquier pantalla con AurisTV!*
