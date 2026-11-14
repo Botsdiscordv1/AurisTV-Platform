@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:auris_core/auris_core.dart';
 
-enum SettingsView { main, speed, sleepTimer }
+enum SettingsView { main, speed, sleepTimer, quality }
 
 /// Reproductor de Video Embebido para WatchScreen en Web Desktop.
 /// 
@@ -114,6 +115,11 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   Timer? _sleepTimer;
   int _sleepTimerMinutes = 0;
   String _sleepTimerLabel = 'No';
+
+  // --- Quality options state ---
+  List<QualityOption> _discoveredQualities = [];
+  String _currentSelectedQuality = 'auto';
+  String? _masterStreamUrl;
 
   @override
   void initState() {
@@ -249,6 +255,9 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
       _position = Duration.zero;
     });
 
+    _masterStreamUrl = widget.sourceUrl;
+    _parseHlsVariantsIfNeeded(widget.sourceUrl, widget.headers);
+
     await notifier.play(
       item: MediaItem(
         id: seriesTitle,
@@ -296,6 +305,68 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     super.didUpdateWidget(oldWidget);
     if (widget.sourceUrl != oldWidget.sourceUrl) {
       _loadSource();
+    }
+  }
+
+  Future<void> _parseHlsVariantsIfNeeded(String url, Map<String, String> headers) async {
+    if (!HlsVariantParser.isHlsUrl(url)) {
+      if (mounted) {
+        setState(() {
+          _discoveredQualities = [];
+          _currentSelectedQuality = 'auto';
+        });
+      }
+      return;
+    }
+
+    try {
+      final qualities = await HlsVariantParser.parseFromUrl(url, headers: headers);
+      if (mounted) {
+        setState(() {
+          _discoveredQualities = qualities;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _changeQuality(String qualityKey) async {
+    if (_currentSelectedQuality == qualityKey) return;
+
+    final player = ref.read(activePlayerProvider).player;
+    if (player == null) return;
+
+    String? targetUrl;
+    Map<String, String> targetHeaders = widget.headers;
+
+    if (qualityKey == 'auto') {
+      targetUrl = _masterStreamUrl ?? widget.sourceUrl;
+    } else {
+      final match = _discoveredQualities.firstWhereOrNull((q) => q.key == qualityKey);
+      if (match != null) {
+        targetUrl = match.url;
+        if (match.headers.isNotEmpty) {
+          targetHeaders = match.headers;
+        }
+      }
+    }
+
+    if (targetUrl == null || targetUrl.isEmpty) return;
+
+    final currentPosition = player.state.position;
+    setState(() {
+      _currentSelectedQuality = qualityKey;
+      _showSettingsPanel = false;
+      _settingsView = SettingsView.main;
+    });
+
+    try {
+      await player.open(Media(targetUrl, httpHeaders: targetHeaders));
+      if (currentPosition > Duration.zero) {
+        await player.seek(currentPosition);
+      }
+      await player.play();
+    } catch (e) {
+      debugPrint('[CleanEmbeddedPlayer] _changeQuality error: $e');
     }
   }
 
@@ -822,17 +893,42 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                   },
                 ),
 
-                // 5. Calidad (si está habilitado)
-                if (widget.hasQualityOptions)
+                // 5. Calidad (si está habilitado o se detectaron variantes HLS)
+                if (widget.hasQualityOptions || _discoveredQualities.isNotEmpty)
                   _buildSettingsTile(
                     icon: Icons.tune_rounded,
                     title: 'Calidad',
-                    trailingText: widget.currentQualityLabel ?? 'Automática (720p)',
+                    trailingText: _currentSelectedQuality == 'auto'
+                        ? 'Automática'
+                        : (_discoveredQualities.firstWhereOrNull((q) => q.key == _currentSelectedQuality)?.label ?? _currentSelectedQuality),
                     onTap: () {
-                      setState(() => _showSettingsPanel = false);
-                      widget.onQualityPressed?.call();
+                      if (_discoveredQualities.isNotEmpty) {
+                        setState(() => _settingsView = SettingsView.quality);
+                      } else {
+                        setState(() => _showSettingsPanel = false);
+                        widget.onQualityPressed?.call();
+                      }
                     },
                   ),
+              ] else if (_settingsView == SettingsView.quality) ...[
+                _buildSubMenuHeader(
+                  title: 'Calidad de video',
+                  onBack: () => setState(() => _settingsView = SettingsView.main),
+                ),
+                _buildSubMenuOption(
+                  label: 'Automática (Recomendada)',
+                  isSelected: _currentSelectedQuality == 'auto',
+                  onTap: () => _changeQuality('auto'),
+                ),
+                ..._discoveredQualities.map((quality) {
+                  final bool isSelected = _currentSelectedQuality == quality.key;
+                  final String sub = quality.bandwidth != null ? ' (${(quality.bandwidth! / 1000).round()} kbps)' : '';
+                  return _buildSubMenuOption(
+                    label: '${quality.label}$sub',
+                    isSelected: isSelected,
+                    onTap: () => _changeQuality(quality.key),
+                  );
+                }),
               ] else if (_settingsView == SettingsView.speed) ...[
                 _buildSubMenuHeader(
                   title: 'Velocidad de reproducción',

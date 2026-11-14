@@ -9,6 +9,7 @@ class UserSettings {
   final double subtitleSize;
   final int subtitleColor;
   final bool externalSyncEnabled;
+  final bool ambientModeEnabled;
 
   const UserSettings({
     this.preferredQuality = 'auto',
@@ -19,6 +20,7 @@ class UserSettings {
     this.subtitleSize = 1.0,
     this.subtitleColor = 0xFFFFFFFF,
     this.externalSyncEnabled = false,
+    this.ambientModeEnabled = true,
   });
 
   UserSettings copyWith({
@@ -30,6 +32,7 @@ class UserSettings {
     double? subtitleSize,
     int? subtitleColor,
     bool? externalSyncEnabled,
+    bool? ambientModeEnabled,
   }) {
     return UserSettings(
       preferredQuality: preferredQuality ?? this.preferredQuality,
@@ -40,6 +43,7 @@ class UserSettings {
       subtitleSize: subtitleSize ?? this.subtitleSize,
       subtitleColor: subtitleColor ?? this.subtitleColor,
       externalSyncEnabled: externalSyncEnabled ?? this.externalSyncEnabled,
+      ambientModeEnabled: ambientModeEnabled ?? this.ambientModeEnabled,
     );
   }
 
@@ -53,6 +57,7 @@ class UserSettings {
       'subtitleSize': subtitleSize,
       'subtitleColor': subtitleColor,
       'externalSyncEnabled': externalSyncEnabled,
+      'ambientModeEnabled': ambientModeEnabled,
     };
   }
 
@@ -66,6 +71,7 @@ class UserSettings {
       subtitleSize: (json['subtitleSize'] as num?)?.toDouble() ?? 1.0,
       subtitleColor: json['subtitleColor'] ?? 0xFFFFFFFF,
       externalSyncEnabled: json['externalSyncEnabled'] ?? false,
+      ambientModeEnabled: json['ambientModeEnabled'] ?? true,
     );
   }
 }

@@ -95,7 +95,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   int _dislikeCount = 142;
 
   // Ajustes Estilo YouTube (Modo Ambiente, Temporizador, Velocidad, Calidad)
-  bool _ambientModeEnabled = true;
   final GlobalKey _embeddedVideoKey = GlobalKey();
   int _sleepTimerMinutes = 0;
   Timer? _sleepTimer;
@@ -237,6 +236,18 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   void _toggleControls() {
     setState(() => _showControls = !_showControls);
     if (_showControls) _startHideTimer();
+  }
+
+  void _skipOpEd() {
+    final active = ref.read(activePlayerProvider);
+    final current = active.player?.state.position ?? _position;
+    final target = current + const Duration(seconds: 85);
+    active.player?.seek(target);
+    _startHideTimer();
+    _updateHistory(
+      target.inMilliseconds,
+      active.player?.state.duration.inMilliseconds ?? _duration.inMilliseconds,
+    );
   }
 
   bool _isFullscreen = false;
@@ -547,17 +558,17 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                       },
                     ),
 
-                    // 2. Modo Ambiente (Switch idéntico a PlayerScreen)
+                    // 2. Modo Ambiente (Switch sincronizado con settingsProvider)
                     SwitchListTile(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       secondary: const Icon(Icons.vignette_outlined, color: Colors.white, size: 22),
                       title: const Text('Modo ambiente', style: TextStyle(color: Colors.white, fontSize: 15)),
                       activeThumbColor: const Color(0xFFEF7A1E),
                       activeTrackColor: const Color(0xFFEF7A1E).withValues(alpha: 0.5),
-                      value: _ambientModeEnabled,
+                      value: ref.watch(settingsProvider.select((s) => s.ambientModeEnabled)),
                       onChanged: (val) {
-                        setSheetState(() => _ambientModeEnabled = val);
-                        setState(() => _ambientModeEnabled = val);
+                        setSheetState(() {});
+                        ref.read(settingsProvider.notifier).setAmbientModeEnabled(val);
                       },
                     ),
 
@@ -953,6 +964,44 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                             onPressed: _showSettingsSheet,
                           ),
                         ],
+                      ),
+                    ),
+
+                    // Cápsula "Saltar OP/ED" (Fondo negro con opacidad 20% y bordes redondeados)
+                    Positioned(
+                      left: 12,
+                      bottom: 30,
+                      child: InkWell(
+                        onTap: _skipOpEd,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.20),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white24, width: 0.5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AurisIcon(
+                                AurisIcons.fastForward,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Saltar OP/ED',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
 
@@ -1488,7 +1537,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                         : null,
                   );
 
-                  if (_ambientModeEnabled) {
+                  final bool isAmbientEnabled = ref.watch(settingsProvider.select((s) => s.ambientModeEnabled));
+                  if (isAmbientEnabled) {
                     final Color posterColor = extractAmbientColorFromTitle(
                       widget.title ?? widget.metadataTitle ?? widget.contentId,
                     );

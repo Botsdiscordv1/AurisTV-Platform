@@ -226,7 +226,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
   /// "fullscreen" no cambia la ventana sino el formato/ajuste del video:
   /// contain (default) → fill (estira a los bordes) → cover (rellena sin
   /// estirar) → contain.
-  bool _ambientModeEnabled = true;
   int _sleepTimerMinutes = 0;
   Timer? _sleepTimer;
 
@@ -1563,7 +1562,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final newLang = trackQualityType(track.quality) == 'SUB' ? 'SUB' : trackQualityType(track.quality) == 'CAST' ? 'CAST' : 'LAT';
     ref.read(activePlayerProvider.notifier).updateSession(selectedIndex: index);
 
-    _initPlayer(track.url, track.headers);
+    if (track.isEmbed) {
+      _initEmbedPlayer(track.url, track.headers);
+    } else {
+      _initPlayer(track.url, track.headers);
+    }
     // Senior Surface Fix: reenganchar la misma superficie nativa al nuevo
     // player. Sin esto el video queda negro al cambiar de fuente. El delay
     // da tiempo a que el nuevo decoder inicialice antes de vencer el wid.
@@ -1931,15 +1934,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       },
                     ),
 
-                    // 3. Modo Ambiente (Switch)
+                    // 3. Modo Ambiente (Switch sincronizado con settingsProvider)
                     SwitchListTile(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       secondary: const Icon(Icons.vignette_outlined, color: Colors.white, size: 22),
                       title: const Text('Modo ambiente', style: TextStyle(color: Colors.white, fontSize: 15)),
                       activeColor: const Color(0xFFEF7A1E),
-                      value: _ambientModeEnabled,
+                      value: ref.watch(settingsProvider.select((s) => s.ambientModeEnabled)),
                       onChanged: (val) {
-                        setState(() => _ambientModeEnabled = val);
+                        ref.read(settingsProvider.notifier).setAmbientModeEnabled(val);
                       },
                     ),
 
@@ -4572,7 +4575,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // --- FLUJO SEQUENCIAL DE ALTA ESTABILIDAD (SOLO NATIVO) ---
     if (!kIsWeb) {
-      final bool isAlreadyPlayingThisUrl = player.state.playing && player.state.duration > Duration.zero;
+      final activeUrl = ref.read(activePlayerProvider).url;
+      final bool isAlreadyPlayingThisUrl = activeUrl == videoUrl &&
+          player.state.playing &&
+          player.state.duration > Duration.zero;
       final bool needsResumeSeek = !isAlreadyPlayingThisUrl && _resumePosition > 3000;
 
       if (!isAlreadyPlayingThisUrl) {
@@ -6558,7 +6564,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               fit: StackFit.expand,
               children: [
           // Capa Modo Ambiente Cinematográfico (YouTube Style)
-          if (_ambientModeEnabled)
+          if (ref.watch(settingsProvider.select((s) => s.ambientModeEnabled)))
             Positioned.fill(
               child: CinematicAmbientLighting(
                 player: _player,

@@ -1659,20 +1659,43 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     final newQualities = track.qualities;
     final settings = ref.read(settingsProvider);
 
-    setState(() {
-      _qualityOptions = newQualities;
-      if (newQualities.length <= 1) {
-        _selectedQuality = 'auto';
-      } else {
-        // Senior Fix: Intentar coincidir con la calidad preferida del usuario
-        final pref = settings.preferredQuality.replaceAll('p', '');
-        if (pref == 'auto') {
+    if (newQualities.isNotEmpty) {
+      setState(() {
+        _qualityOptions = newQualities;
+        if (newQualities.length <= 1) {
           _selectedQuality = 'auto';
         } else {
-          final found = newQualities.firstWhereOrNull((q) => q.key.contains(pref));
-          _selectedQuality = found?.key ?? 'auto';
+          final pref = settings.preferredQuality.replaceAll('p', '');
+          if (pref == 'auto') {
+            _selectedQuality = 'auto';
+          } else {
+            final found = newQualities.firstWhereOrNull((q) => q.key.contains(pref));
+            _selectedQuality = found?.key ?? 'auto';
+          }
         }
-      }
+      });
+      return;
+    }
+
+    if (HlsVariantParser.isHlsUrl(track.url)) {
+      HlsVariantParser.parseFromUrl(track.url, headers: track.headers).then((parsed) {
+        if (!mounted || parsed.isEmpty) return;
+        setState(() {
+          _qualityOptions = parsed;
+          final pref = settings.preferredQuality.replaceAll('p', '');
+          if (pref != 'auto') {
+            final found = parsed.firstWhereOrNull((q) => q.key.contains(pref));
+            if (found != null) {
+              _selectedQuality = found.key;
+            }
+          }
+        });
+      }).catchError((_) {});
+    }
+
+    setState(() {
+      _qualityOptions = const [];
+      _selectedQuality = 'auto';
     });
   }
 

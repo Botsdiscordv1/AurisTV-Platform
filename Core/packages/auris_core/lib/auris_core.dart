@@ -48,6 +48,7 @@ export 'data/repositories/playback_history_repository.dart';
 export 'core/utils/source_utils.dart';
 export 'core/utils/category_utils.dart';
 export 'core/utils/content_logic.dart';
+export 'core/utils/hls_variant_parser.dart';
 export 'core/utils/search_fuse.dart';
 export 'core/utils/content_metadata_resolver.dart';
 export 'core/utils/responsive_utils.dart';
