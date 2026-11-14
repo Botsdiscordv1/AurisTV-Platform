@@ -57,6 +57,11 @@ class PlayerScreen extends ConsumerStatefulWidget {
   /// ("Continuar viendo") ni propone reanudar.
   final bool isLive;
 
+  /// Cuando es true, este PlayerScreen es el fullscreen del CleanEmbeddedPlayer
+  /// de WatchScreen Web. Al cerrarse NO para el motor compartido (solo cambia
+  /// uiState a full para que el embed retome sin parpadeo).
+  final bool isEmbedFullscreen;
+
   const PlayerScreen({
     super.key,
     required this.contentId,
@@ -81,6 +86,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.video1080,
     this.skipResume = false,
     this.isLive = false,
+    this.isEmbedFullscreen = false,
   });
 
   @override
@@ -744,7 +750,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         }
 
         // Sincronizar el provider de fuentes para que otras pantallas lo vean si es necesario
-        if (activePlayer.availableSources.isNotEmpty) {
+        if (activePlayer.availableSources.isNotEmpty && currentSources.isEmpty) {
            ref.read(activeContentSourcesProvider.notifier).state = activePlayer.availableSources;
         }
 
@@ -3100,17 +3106,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     setState(() => _isExiting = true);
     
     if (!minimizing) {
-      // Si cerramos de verdad, detenemos todo
-      final p = _player;
-      _player = null;
-      try {
-        p?.setVolume(0);
-        await p?.stop();
-        // p?.dispose(); // No lo matamos nosotros, lo gestiona el Provider global si es necesario
-      } catch (e) {
-        debugPrint('[player] Error killing native instance: $e');
+      if (widget.isEmbedFullscreen) {
+        // Fullscreen desde WatchScreen Web: NO paramos el motor compartido.
+        // El CleanEmbeddedPlayer retomara automaticamente al reconectarse.
+        _player = null;
+        try {
+          ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
+        } catch (_) {}
+      } else {
+        // Si cerramos de verdad, detenemos todo
+        final p = _player;
+        _player = null;
+        try {
+          p?.setVolume(0);
+          await p?.stop();
+          // p?.dispose(); // No lo matamos nosotros, lo gestiona el Provider global si es necesario
+        } catch (e) {
+          debugPrint('[player] Error killing native instance: $e');
+        }
+        ref.read(activePlayerProvider.notifier).stop();
       }
-      ref.read(activePlayerProvider.notifier).stop();
     }
     
     // 2. Forzar restauraci�n del sistema (Orientaci�n + UI)

@@ -261,7 +261,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
     return resultsAsync.when(
       data: (response) {
-        final results = _deduplicate(response.results);
+        final results = deduplicateSearchResults(response.results);
         if (results.isEmpty) return _buildNoResultsState();
         
         final isMobile = ResponsiveUtils.isMobile(context);
@@ -524,58 +524,4 @@ class _StaggeredResultItemState extends State<_StaggeredResultItem> with SingleT
       ),
     );
   }
-}
-
-String _fuseKey(SearchResult r) {
-  final t = r.title.toLowerCase();
-  final typeRe = RegExp(r'\b(movie|pel[íi]cula|film|ova|special|oav)\b');
-  final isMovieish = typeRe.hasMatch(t);
-  final franchise = t.replaceAll(typeRe, '').replaceAll(RegExp(r'[^a-z0-9]'), '');
-  final cat = inferOpenCategory(r, isMovieish ? 'movie' : 'tv');
-  return '$franchise#$cat';
-}
-
-List<SearchResult> _deduplicate(List<SearchResult> results) {
-  final Map<String, SearchResult> grouped = {};
-  for (final r in results) {
-    final key = _fuseKey(r);
-    final existing = grouped[key];
-    if (existing == null) {
-      grouped[key] = r;
-    } else {
-      final mergedSources = List<SourceItem>.from(existing.sources);
-      for (final src in r.sources) {
-        if (!mergedSources.any((s) => s.source == src.source && s.url == src.url)) {
-          mergedSources.add(src);
-        }
-      }
-      SearchResult better = existing;
-      if (r.thumbnail.isNotEmpty && existing.thumbnail.isEmpty) {
-        better = r;
-      } else if ((existing.banner == null || existing.banner!.isEmpty) && (r.banner != null && r.banner!.isNotEmpty)) {
-        better = r;
-      }
-      grouped[key] = SearchResult(
-        title: better.title,
-        url: better.url,
-        quality: better.quality,
-        thumbnail: better.thumbnail,
-        banner: better.banner,
-        source: better.source,
-        year: better.year,
-        slug: better.slug,
-        scrapedTitle: better.scrapedTitle,
-        metadataTitle: better.metadataTitle,
-        forcedTitle: better.forcedTitle,
-        fromDiscovery: better.fromDiscovery,
-        score: better.score,
-        fullDate: better.fullDate,
-        status: better.status,
-        kind: better.kind,
-        type: better.type,
-        sources: mergedSources,
-      );
-    }
-  }
-  return grouped.values.toList();
 }

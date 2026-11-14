@@ -145,6 +145,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
       _isAppActive = false;
       _stopAutoPlay();
@@ -245,14 +246,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with WidgetsBindingObse
   }
 
   void _startCycle({Duration delay = const Duration(seconds: 2)}) {
-    if (!_isAppActive) return;
-    if (mounted) {
-      setState(() { _showTrailerLayer = false; _videoReady = false; });
-    }
+    if (!_isAppActive || !mounted) return;
+    setState(() { _showTrailerLayer = false; _videoReady = false; });
     
+    if (!mounted) return;
     final settings = ref.read(settingsProvider);
     if (!settings.autoPlayTrailers) { _disposeController(); return; }
 
+    if (!mounted) return;
     final bool isMobile = context.isMobile;
     if (isMobile) { _disposeController(); return; }
 

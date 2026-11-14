@@ -252,15 +252,20 @@ class ExtractParams {
   final String url;
   final String source;
   final String? category;
-  const ExtractParams({required this.url, required this.source, this.category});
+  final String? episode;
+  const ExtractParams({required this.url, required this.source, this.category, this.episode});
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ExtractParams && url == other.url && source == other.source && category == other.category;
+      other is ExtractParams &&
+          url == other.url &&
+          source == other.source &&
+          category == other.category &&
+          episode == other.episode;
 
   @override
-  int get hashCode => Object.hash(url, source, category);
+  int get hashCode => Object.hash(url, source, category, episode);
 }
 
 final extractStreamProvider =

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../features/watch/presentation/watch_screen.dart' as web_watch;
-import 'package:auris_core/presentation/watch/widgets/clean_embedded_player.dart';
 import '../utils/url_utils.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/content/presentation/content_screen.dart';
@@ -63,13 +62,29 @@ Widget _buildContentScreen(BuildContext context, GoRouterState state) {
     return const HomeScreen();
   }
 
-  final extraResult = state.extra is SearchResult ? state.extra as SearchResult : null;
-
   final yearVal = params['year'];
   final int? year = yearVal is int ? yearVal : int.tryParse(yearVal?.toString() ?? '');
 
   final seasonVal = params['season'];
   final int? season = seasonVal is int ? seasonVal : int.tryParse(seasonVal?.toString() ?? '');
+
+  final extraResult = state.extra is SearchResult
+      ? state.extra as SearchResult
+      : (source.isNotEmpty && url.isNotEmpty
+          ? SearchResult(
+              title: title,
+              source: source,
+              url: url,
+              quality: (params['quality'] as String?) ?? '',
+              thumbnail: (params['poster'] as String?) ?? (params['banner'] as String?) ?? '',
+              banner: params['banner'] as String?,
+              year: year,
+              season: season,
+              kind: params['kind'] as String?,
+              type: params['type'] as String?,
+              metadataTitle: params['metadataTitle'] as String?,
+            )
+          : null);
 
   return ContentScreen(
     title: title,
@@ -85,6 +100,110 @@ Widget _buildContentScreen(BuildContext context, GoRouterState state) {
     sectionId: params['sectionId'] as String?,
     result: extraResult,
     from: params['from'] as String?,
+  );
+}
+
+/// Constructor centralizado de WatchScreen para Web/Desktop soportando rutas
+/// `/watch/:token/:slug` y `/watch/:token`.
+Widget _buildWatchScreenFromToken(BuildContext context, GoRouterState state) {
+  final token = state.pathParameters['token'] ?? '';
+  final slug = state.pathParameters['slug'] ?? '';
+  final params = state.uri.queryParameters;
+  final extra = state.extra;
+
+  // ============================================
+  // VERIFICACIÓN DE TOKEN (HMAC o Legacy)
+  // ============================================
+  final verifiedPayload = SignedTokenManager.verifyToken(token);
+  Map<String, dynamic>? payload = verifiedPayload;
+
+  if (payload == null && token.isNotEmpty) {
+    final legacyPayload = UrlUtils.decodeShareableToken(token, slug: slug.isNotEmpty ? slug : null);
+    if (legacyPayload != null) {
+      payload = legacyPayload;
+      debugPrint('[SECURITY] Token de watch usando formato legacy (no HMAC)');
+    }
+  }
+
+  final PlayerScreen player = (extra is PlayerScreen)
+      ? extra
+      : PlayerScreen(
+          contentId: params['contentId'] ?? token,
+          sourceUrl: params['url'] ?? payload?['url'] ?? '',
+          source: params['source'] ?? payload?['source'] ?? '',
+          episode: params['episode'] ?? (payload?['episode']?.toString() ?? '1'),
+          season: int.tryParse(params['season'] ?? payload?['season']?.toString() ?? ''),
+          serverName: params['serverName'],
+          category: params['category'] ?? payload?['category'],
+          totalEpisodes: int.tryParse(params['totalEpisodes'] ?? ''),
+          title: params['title'] ?? (slug.isNotEmpty ? slug.replaceAll('-', ' ') : payload?['title']),
+          metadataTitle: params['title'] ?? (slug.isNotEmpty ? slug.replaceAll('-', ' ') : payload?['title']),
+          episodeTitle: params['episodeTitle'] ?? payload?['episodeTitle'],
+          posterUrl: params['posterUrl'] ?? payload?['posterUrl'],
+          bannerUrl: params['bannerUrl'] ?? payload?['bannerUrl'],
+          logoUrl: params['logoUrl'] ?? payload?['logoUrl'],
+          year: int.tryParse(params['year'] ?? payload?['year']?.toString() ?? ''),
+          certification: params['certification'] ?? payload?['certification'],
+          skipResume: params['skipResume'] == '1' || payload?['skipResume'] == true,
+          isLive: params['isLive'] == '1' || payload?['isLive'] == true,
+        );
+
+  // Si el token es válido pero faltan datos críticos, rechazar
+  if (player.sourceUrl.isEmpty || player.source.isEmpty) {
+    debugPrint('[SECURITY] WatchScreen: URL o source vacíos, token inválido');
+    return const Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error, size: 64, color: Colors.red),
+            SizedBox(height: 16),
+            Text(
+              'Enlace inválido o expirado',
+              style: TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  return web_watch.WatchScreen(
+    contentId: player.contentId,
+    sourceUrl: player.sourceUrl,
+    source: player.source,
+    episode: player.episode,
+    season: player.season,
+    serverName: player.serverName,
+    category: player.category,
+    title: player.title,
+    metadataTitle: player.title,
+    episodeTitle: player.episodeTitle,
+    posterUrl: player.posterUrl,
+    bannerUrl: player.bannerUrl,
+    logoUrl: player.logoUrl,
+    year: player.year,
+    certification: player.certification,
+    totalEpisodes: player.totalEpisodes,
+    skipResume: player.skipResume,
+    isLive: player.isLive,
+    onEpisodeSelected: (ep) {
+      final uri = UrlUtils.buildPlayerUri(
+        title: player.title ?? '',
+        contentId: player.contentId,
+        episode: ep.number.toString(),
+        source: player.source,
+        url: ep.url.isNotEmpty ? ep.url : player.sourceUrl,
+        season: player.season,
+        serverName: player.serverName,
+        category: player.category,
+        totalEpisodes: player.totalEpisodes,
+        posterUrl: ep.thumbnail ?? player.posterUrl,
+        bannerUrl: player.bannerUrl,
+      );
+      context.pushReplacement(uri);
+    },
   );
 }
 
@@ -376,120 +495,17 @@ final GoRouter appRouter = GoRouter(
       builder: _buildContentScreen,
     ),
 
-    // Reproductor (/watch/:token/:slug) — ahora con token y slug para URLs compartibles.
-    // El token identifica el contenido, el slug es para SEO/visibilidad.
-    // /reproductor sigue como alias legacy para retrocompatibilidad.
-    // 
-    // SEGURIDAD: Los tokens ahora usan firma HMAC-SHA256 con expiración de 24h.
-    // Los tokens antiguos (sin firma) aún son compatibles pero se deben migrar.
+    // Reproductor (/watch/:token/:slug o /watch/:token) — ahora con token y slug opcional para URLs compartibles.
     GoRoute(
       parentNavigatorKey: rootNavigatorKey,
       path: '/watch/:token/:slug',
       name: 'watch',
-      builder: (context, state) {
-        final token = state.pathParameters['token'] ?? '';
-        final slug = state.pathParameters['slug'] ?? '';
-        final params = state.uri.queryParameters;
-        final extra = state.extra;
-
-        // ============================================
-        // VERIFICACIÓN DE TOKEN (HMAC o Legacy)
-        // ============================================
-        // Primero intentar verificar con HMAC (token nuevo)
-        final verifiedPayload = SignedTokenManager.verifyToken(token);
-        Map<String, dynamic>? payload = verifiedPayload;
-        
-        // Si no es token firmado, intentar con el sistema legacy
-        if (payload == null && token.isNotEmpty) {
-          final legacyPayload = UrlUtils.decodeShareableToken(token, slug: slug.isNotEmpty ? slug : null);
-          if (legacyPayload != null) {
-            payload = legacyPayload;
-            // Advertencia de que se usa el sistema legacy
-            debugPrint('[SECURITY] Token de watch usando formato legacy (no HMAC)');
-          }
-        }
-
-        final PlayerScreen player = (extra is PlayerScreen)
-            ? extra
-            : PlayerScreen(
-                contentId: params['contentId'] ?? token,
-                sourceUrl: params['url'] ?? payload?['url'] ?? '',
-                source: params['source'] ?? payload?['source'] ?? '',
-                episode: params['episode'] ?? (payload?['episode']?.toString() ?? '1'),
-                season: int.tryParse(params['season'] ?? payload?['season']?.toString() ?? ''),
-                serverName: params['serverName'],
-                category: params['category'] ?? payload?['category'],
-                totalEpisodes: int.tryParse(params['totalEpisodes'] ?? ''),
-                title: params['title'] ?? (slug.isNotEmpty ? slug.replaceAll('-', ' ') : payload?['title']),
-                metadataTitle: params['title'] ?? slug.replaceAll('-', ' '),
-                episodeTitle: params['episodeTitle'] ?? payload?['episodeTitle'],
-                posterUrl: params['posterUrl'] ?? payload?['posterUrl'],
-                bannerUrl: params['bannerUrl'] ?? payload?['bannerUrl'],
-                logoUrl: params['logoUrl'] ?? payload?['logoUrl'],
-                year: int.tryParse(params['year'] ?? payload?['year']?.toString() ?? ''),
-                certification: params['certification'] ?? payload?['certification'],
-                skipResume: params['skipResume'] == '1' || payload?['skipResume'] == true,
-                isLive: params['isLive'] == '1' || payload?['isLive'] == true,
-              );
-
-        // Si el token es válido pero faltan datos críticos, rechazar
-        if (player.sourceUrl.isEmpty || player.source.isEmpty) {
-          debugPrint('[SECURITY] WatchScreen: URL o source vacíos, token inválido');
-          return const Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error, size: 64, color: Colors.red),
-                  SizedBox(height: 16),
-                  Text(
-                    'Enlace inválido o expirado',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        return web_watch.WatchScreen(
-          contentId: player.contentId,
-          sourceUrl: player.sourceUrl,
-          source: player.source,
-          episode: player.episode,
-          season: player.season,
-          serverName: player.serverName,
-          category: player.category,
-          title: player.title,
-          metadataTitle: player.title,
-          episodeTitle: player.episodeTitle,
-          posterUrl: player.posterUrl,
-          bannerUrl: player.bannerUrl,
-          logoUrl: player.logoUrl,
-          year: player.year,
-          certification: player.certification,
-          totalEpisodes: player.totalEpisodes,
-          skipResume: player.skipResume,
-          isLive: player.isLive,
-          onEpisodeSelected: (ep) {
-            final uri = UrlUtils.buildPlayerUri(
-              title: player.title ?? '',
-              contentId: player.contentId,
-              episode: ep.number.toString(),
-              source: player.source,
-              url: ep.url.isNotEmpty ? ep.url : player.sourceUrl,
-              season: player.season,
-              serverName: player.serverName,
-              category: player.category,
-              totalEpisodes: player.totalEpisodes,
-              posterUrl: ep.thumbnail ?? player.posterUrl,
-              bannerUrl: player.bannerUrl,
-            );
-            context.pushReplacement(uri);
-          },
-        );
-      },
+      builder: _buildWatchScreenFromToken,
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/watch/:token',
+      builder: _buildWatchScreenFromToken,
     ),
     // /watch sin token/slug (fallback legacy)
     GoRoute(
@@ -558,6 +574,40 @@ final GoRouter appRouter = GoRouter(
             context.pushReplacement(uri);
           },
         );
+      },
+    ),
+    GoRoute(
+      parentNavigatorKey: rootNavigatorKey,
+      path: '/player',
+      name: 'player',
+      pageBuilder: (context, state) {
+        final extra = state.extra;
+        final params = state.uri.queryParameters;
+
+        final PlayerScreen player = (extra is PlayerScreen)
+            ? extra
+            : PlayerScreen(
+                contentId: params['contentId'] ?? '',
+                sourceUrl: params['url'] ?? '',
+                source: params['source'] ?? '',
+                episode: params['episode'] ?? '1',
+                season: int.tryParse(params['season'] ?? ''),
+                serverName: params['serverName'],
+                category: params['category'],
+                totalEpisodes: int.tryParse(params['totalEpisodes'] ?? ''),
+                title: params['title'],
+                metadataTitle: params['title'],
+                episodeTitle: params['episodeTitle'],
+                posterUrl: params['posterUrl'],
+                bannerUrl: params['bannerUrl'],
+                logoUrl: params['logoUrl'],
+                year: int.tryParse(params['year'] ?? ''),
+                certification: params['certification'],
+                skipResume: params['skipResume'] == '1',
+                isLive: params['isLive'] == '1',
+              );
+
+        return _playerPage(state, player);
       },
     ),
     GoRoute(

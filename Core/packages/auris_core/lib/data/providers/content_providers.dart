@@ -430,6 +430,11 @@ final FutureProviderFamily<EpisodesResponse?, EpisodesParams> episodesProvider =
     return EpisodesResponse(episodes: const [], source: params.source, url: params.url, slug: '', total: 0);
   }
 
+  // Películas no tienen episodios: evitar llamada al endpoint /api/episodes
+  if (isMovieLike(params.category, params.title)) {
+    return EpisodesResponse(episodes: const [], source: params.source, url: params.url, slug: '', total: 0);
+  }
+
   // Directo de lista M3U (canales en vivo): la URL es un STREAM, no la ficha
   // de una serie/película. El backend no puede devolver episodios y abrir un
   // canal disparaba una llamada inútil a /api/episodes?url=<m3u8> (ruido y

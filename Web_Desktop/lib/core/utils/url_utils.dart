@@ -29,6 +29,8 @@ class UrlUtils {
         .replaceAll(RegExp(r'-+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
 
+    final String effectiveSlug = slug.isNotEmpty ? slug : 'media';
+
     // Generar token auto-contenido (similar a buildShareableUri)
     final token = encodeShareableToken(
       title: player.title ?? '',
@@ -44,7 +46,7 @@ class UrlUtils {
         'watch',
         pathParameters: {
           'token': token,
-          'slug': slug,
+          'slug': effectiveSlug,
         },
         extra: player,
       );
@@ -122,6 +124,7 @@ class UrlUtils {
     'OnlyPelis': 'op|https://onlypelis.net/',
     'PelisPedia': 'pp|https://www.pelispedia.li/',
     'RePelisHD': 'rh|https://repelishd.pics/',
+    'Cliver': 'cv|https://cliver.mom/',
     'TMDB': 'tm|tmdb://',
     'AniList': 'ai|anilist://',
   };

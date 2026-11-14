@@ -20,6 +20,7 @@ import '../providers/playback_history_provider.dart';
 import '../../core/api/providers.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../core/utils/content_logic.dart';
+import '../../core/utils/category_utils.dart';
 import '../../core/utils/source_utils.dart';
 
 /// Gestiona la entrada del usuario de forma ultra-estable.
@@ -839,6 +840,19 @@ class ProgressiveContentNotifier extends StateNotifier<ProgressiveContentState> 
   }
 
   Future<void> _startFlow() async {
+    // Si el contenido es película, no tiene episodios: evitar llamada al endpoint /api/episodes
+    if (_params.isMovieish || isMovieLike(_params.category, _params.title)) {
+      if (!mounted) return;
+      state = state.copyWith(
+        episodes: AsyncValue.data(GroupedEpisodesResult(
+          response: EpisodesResponse(episodes: const [], source: _params.source, url: _params.url, slug: '', total: 0),
+          sources: const [],
+        )),
+        cast: const AsyncValue.data([]),
+      );
+      return;
+    }
+
     final repo = _ref.read(aurisRepositoryProvider);
 
     // Paso 1 — Carga instantánea (bloqueante, solo esto)

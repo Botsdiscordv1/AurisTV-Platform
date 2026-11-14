@@ -519,15 +519,6 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                   ),
                 ],
               ),
-              if (widget.description.isNotEmpty) ...[
-                SizedBox(height: ResponsiveUtils.sp(context, 12)),
-                Text(
-                  widget.description,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: const Color(0xFFA5A5AA), fontSize: ResponsiveUtils.sp(context, 13), height: 1.3),
-                ),
-              ],
             ],
           ),
         ),
@@ -607,19 +598,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                   ),
                 ),
               ),
-            if (!widget.isCompact && (!_isSpecial || widget.description.isNotEmpty))
-              Text(
-                widget.description.isNotEmpty ? widget.description : 'Sin descripción disponible.',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: const Color(0xFFA5A5AA),
-                  fontSize: descFontSize,
-                  height: 1.4,
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            if (!widget.isCompact && !_isSpecial) const SizedBox(height: 6),
+            const SizedBox(height: 6),
             Row(
               children: [
                 if (widget.certification != null && widget.certification != 'NR') ...[
@@ -1593,7 +1572,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final meta = _effectivePlayerMeta(isMovieCategory);
     
     _hasNavigatedToPlayer = true;
-    context.push('/player/${Uri.encodeComponent(widget.title)}?source=${tapSource.source}&url=${Uri.encodeComponent(playUrl)}&episode=$episodeLabel&season=$currentSeason&serverName=${simplifySourceName(tapSource.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${meta.category}&totalEpisodes=${state.episodes.valueOrNull?.response.total ?? 1}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${meta.kind != null && meta.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(meta.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}${castTargetId != null ? '&castTarget=${Uri.encodeComponent(castTargetId)}' : ''}');
+    context.push('/watch/${Uri.encodeComponent(widget.title)}?source=${tapSource.source}&url=${Uri.encodeComponent(playUrl)}&episode=$episodeLabel&season=$currentSeason&serverName=${simplifySourceName(tapSource.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${meta.category}&totalEpisodes=${state.episodes.valueOrNull?.response.total ?? 1}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam${meta.kind != null && meta.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(meta.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}${castTargetId != null ? '&castTarget=${Uri.encodeComponent(castTargetId)}' : ''}');
   }
 
   Widget _buildMetaRow(dynamic d, {required bool isMobile, double? sourceRating, String? kind}) {
@@ -1977,7 +1956,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
     final hPadding = isMobile ? 20.0 : (width >= 800 && width < 1200 ? 24.0 : horizontalPadding);
     final episodesCrossAxisCount = isMobile ? 1 : (width < 700 ? 2 : (width < 1150 ? 3 : (width < 1550 ? 4 : (width < 2100 ? 5 : 6))));
-    final episodesAspectRatio = isMobile ? 1.15 : (width < 1150 ? 1.05 : 1.1);
+    final episodesAspectRatio = isMobile ? 1.35 : (width < 1150 ? 1.25 : 1.3);
 
     final detailParams = _detailParams;
 

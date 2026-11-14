@@ -80,6 +80,7 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
         location.startsWith('/movie') ||
         location.startsWith('/detalles') ||
         location.startsWith('/watch') ||
+        location.startsWith('/player') ||
         location.startsWith('/reproductor') || // alias legacy de /watch
         location.startsWith('/sports');
 

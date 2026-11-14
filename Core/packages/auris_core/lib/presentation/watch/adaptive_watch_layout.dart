@@ -16,6 +16,7 @@ class AdaptiveWatchLayout extends StatelessWidget {
     required this.nextEpisodeWidget,
     required this.previousEpisodeWidget,
     this.playlistSidebarWidget,
+    this.rightColumnWidget,
     this.isTheaterMode = false,
   });
 
@@ -26,10 +27,13 @@ class AdaptiveWatchLayout extends StatelessWidget {
   final Widget nextEpisodeWidget;
   final Widget previousEpisodeWidget;
   final Widget? playlistSidebarWidget;
+  final Widget? rightColumnWidget;
   final bool isTheaterMode;
 
   @override
   Widget build(BuildContext context) {
+    final Widget? activeRightWidget = rightColumnWidget ?? playlistSidebarWidget;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final double width = constraints.maxWidth;
@@ -38,105 +42,95 @@ class AdaptiveWatchLayout extends StatelessWidget {
         final bool isTabletWidth = width >= 768 && width < 1024;
 
         if (isDesktopWeb) {
-          if (isTheaterMode) {
-            // Modo Cinemático / Teatro estilo YouTube (> 1024px)
-            final double stageHeight = (height * 0.78).clamp(480.0, 850.0);
+          final double stageHeight = (height * 0.78).clamp(480.0, 850.0);
 
-            return SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Escenario de Video Cinemático al 100% del Ancho
-                  Container(
-                    width: double.infinity,
-                    height: stageHeight,
-                    color: Colors.black,
-                    child: playerWidget,
+          return SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: isTheaterMode ? 0 : 24,
+              vertical: isTheaterMode ? 0 : 24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Fila 1: Reproductor (Ancho 100% en Modo Teatro, 70% en Modo Normal)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: isTheaterMode ? 10 : 7,
+                      child: isTheaterMode
+                          ? Container(
+                              width: double.infinity,
+                              height: stageHeight,
+                              color: Colors.black,
+                              child: Center(
+                                child: AspectRatio(
+                                  aspectRatio: 16 / 9,
+                                  child: playerWidget,
+                                ),
+                              ),
+                            )
+                          : ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: AspectRatio(
+                                aspectRatio: 16 / 9,
+                                child: playerWidget,
+                              ),
+                            ),
+                    ),
+                    if (!isTheaterMode && activeRightWidget != null) ...[
+                      const SizedBox(width: 24),
+                      Expanded(
+                        flex: 3,
+                        child: activeRightWidget,
+                      ),
+                    ],
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // Fila 2: Detalles (flex 7) y Lista de Episodios (flex 3 solo en Modo Teatro)
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTheaterMode ? 32 : 0,
+                    vertical: isTheaterMode ? 12 : 0,
                   ),
-                  const SizedBox(height: 20),
-
-                  // Detalles e información a la izquierda, lista de episodios a la derecha
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 7,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              metadataWidget,
-                              actionBarWidget,
-                              const Divider(color: Colors.white10, height: 24),
-                              synopsisWidget,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 7,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            metadataWidget,
+                            actionBarWidget,
+                            const Divider(color: Colors.white10, height: 24),
+                            synopsisWidget,
+                            if (rightColumnWidget == null) ...[
                               const SizedBox(height: 24),
                               nextEpisodeWidget,
                               previousEpisodeWidget,
                             ],
-                          ),
-                        ),
-                        if (playlistSidebarWidget != null) ...[
-                          const SizedBox(width: 24),
-                          Expanded(
-                            flex: 3,
-                            child: SizedBox(
-                              height: 600,
-                              child: playlistSidebarWidget!,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          // Layout Normal Web / Desktop (> 1024px)
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Columna Izquierda: Reproductor + Metadatos
-              Expanded(
-                flex: 7,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Reproductor AspectRatio 16:9
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: AspectRatio(
-                          aspectRatio: 16 / 9,
-                          child: playerWidget,
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      metadataWidget,
-                      actionBarWidget,
-                      const Divider(color: Colors.white10, height: 24),
-                      synopsisWidget,
-                      const SizedBox(height: 24),
-                      nextEpisodeWidget,
-                      previousEpisodeWidget,
+                      if (isTheaterMode && activeRightWidget != null) ...[
+                        const SizedBox(width: 32),
+                        Expanded(
+                          flex: 3,
+                          child: SizedBox(
+                            height: 600,
+                            child: activeRightWidget,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ),
-
-              // Columna Derecha: Cola de episodios lateral (solo si hay)
-              if (playlistSidebarWidget != null)
-                Expanded(
-                  flex: 3,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 24, right: 24, bottom: 24),
-                    child: playlistSidebarWidget!,
-                  ),
-                ),
-            ],
+              ],
+            ),
           );
         } else if (isTabletWidth) {
           // Layout Tablet / Móvil Landscape (768px - 1024px)
@@ -158,6 +152,9 @@ class AdaptiveWatchLayout extends StatelessWidget {
                       metadataWidget,
                       actionBarWidget,
                       synopsisWidget,
+                      const SizedBox(height: 16),
+                      nextEpisodeWidget,
+                      previousEpisodeWidget,
                     ],
                   ),
                 ),

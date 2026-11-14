@@ -7,8 +7,7 @@ import '../repositories/auris_repository.dart';
 import 'favorites_provider.dart';
 import 'playback_history_provider.dart';
 import '../../core/api/providers.dart';
-import '../../core/utils/content_logic.dart';
-import '../../core/utils/category_utils.dart';
+import '../../core/utils/search_fuse.dart';
 
 class SearchParams {
   final String category;
@@ -211,7 +210,7 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
         banner: fav.bannerUrl ?? '',
         year: null,
       );
-      _accumulated[_fuseKey(res)] = res;
+      upsertSearchResult(_accumulated, res);
     }
 
     // 2. Filtrar Historial
@@ -239,7 +238,7 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
         progress: h.progress, // Inyectamos el progreso directamente
       );
       // Senior Fix: El historial tiene prioridad sobre la clave para mostrar progreso
-      _accumulated[_fuseKey(res)] = res;
+      upsertSearchResult(_accumulated, res);
     }
 
     if (_accumulated.isNotEmpty && mounted) {
@@ -271,28 +270,9 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
 
   void _processChunk(SearchResponse chunk) {
     for (final r in chunk.results) {
-      final key = _fuseKey(r);
-      final existing = _accumulated[key];
-
-      if (existing == null) {
-        _accumulated[key] = r;
-      } else {
-        // Fusión de fuentes: añadir nuevas fuentes al resultado existente
-        final mergedSources = List<SourceItem>.from(existing.sources);
-        for (final src in r.sources) {
-          if (!mergedSources.any((s) => s.source == src.source && s.url == src.url)) {
-            mergedSources.add(src);
-          }
-        }
-
-        // Mejora de metadatos: preferir el que tenga mejor imagen
-        SearchResult better = existing;
-        if (r.thumbnail.isNotEmpty && existing.thumbnail.isEmpty) {
-          better = r;
-        }
-
-        _accumulated[key] = better.copyWith(sources: mergedSources);
-      }
+      // Fusiona con el resultado que ya ocupaba su clave (misma obra venga
+      // de la fuente que venga) o crea una fila nueva si son distintas.
+      upsertSearchResult(_accumulated, r);
     }
 
     if (mounted) {
@@ -305,15 +285,6 @@ class _SearchResultsNotifier extends StateNotifier<AsyncValue<SearchResponse>> {
         results: _accumulated.values.toList(),
       ));
     }
-  }
-
-  String _fuseKey(SearchResult r) {
-    final t = r.title.toLowerCase();
-    final typeRe = RegExp(r'\b(movie|película|film|ova|special|oav)\b');
-    final isMovieish = typeRe.hasMatch(t);
-    final franchise = t.replaceAll(typeRe, '').replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final cat = inferOpenCategory(r, isMovieish ? 'movie' : 'tv');
-    return '$franchise#$cat';
   }
 
   @override

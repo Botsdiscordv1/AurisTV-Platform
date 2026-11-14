@@ -36,8 +36,8 @@ class AurisIcons {
   static String get trailer => reiconSvg(Reicon.outline.videoPlayH);
   static String get trailerFilled => reiconSvg(Reicon.filled.videoPlayH);
   static String get videoLib => reiconSvg(Reicon.outline.videoLib);
-  static String get episodes => reiconSvg(Reicon.outline.videoLib);
-  static String get episodesFilled => reiconSvg(Reicon.filled.videoLib);
+  static String get episodes => r'''<svg xmlns="http://w3.org" viewBox="0 0 24 24" width="24" height="24"><path d="M21 10a1 1 0 011 1v9a1 1 0 01-1 1H3a1 1 0 01-1-1v-9a1 1 0 011-1h18zm-1 2H4v7h16v-7zm0-5a1 1 0 010 2H4a1 1 0 110-2h16zm-2-3a1 1 0 010 2H6a1 1 0 110-2h12z" fill="white"/></svg>''';
+  static String get episodesFilled => episodes;
   static String get docText => reiconSvg(Reicon.outline.docText);
   static String get docTextFilled => reiconSvg(Reicon.filled.docText);
   static String get server => reiconSvg(Reicon.outline.ssd2);

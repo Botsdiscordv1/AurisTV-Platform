@@ -182,6 +182,7 @@ class ApiEndpoints {
     'lamovie',
     'repelishd',
     'cuevana',
+    'cliver',
   ];
 
   /// Servidor por nombre de fuente, o null si no hay hint conocido (el
@@ -189,10 +190,10 @@ class ApiEndpoints {
   /// fuente anime desconocida NO debe caer a movies por defecto aquí.
   static String? baseUrlForSourceOrNull(String source) {
     final s = source.toLowerCase();
-    if (s.contains('ppv') || s.contains('sport') || s.contains('live')) return sportsBaseUrl;
     if (kdramaSourceHints.any(s.contains)) return kdramasBaseUrl;
     if (movieSourceHints.any(s.contains)) return moviesSeriesBaseUrl;
     if (animeSourceHints.any(s.contains)) return animeBaseUrl;
+    if (s.contains('ppv') || s.contains('sport') || s.contains('live')) return sportsBaseUrl;
     return null;
   }
 

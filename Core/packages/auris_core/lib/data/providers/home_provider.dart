@@ -1305,6 +1305,7 @@ MediaItem _mapEditorialItemToMediaItem(EditorialItem result, {String? sectionId}
     else if (result.id.contains('doramasmp4')) effectiveSource = 'DoramasMP4';
     else if (result.id.contains('latinoyt')) effectiveSource = 'LatinoYT';
     else if (result.id.contains('veranime')) effectiveSource = 'Veranime';
+    else if (result.id.contains('cliver')) effectiveSource = 'Cliver';
   }
 
   // Senior Fix: Fallback de imagen horizontal para secciones WIDE editoriales
@@ -1398,6 +1399,7 @@ MediaItem _mapSearchResultToMediaItem(SearchResult result, String category) {
     else if (result.url.contains('doramasmp4')) effectiveSource = 'DoramasMP4';
     else if (result.url.contains('latinoyt')) effectiveSource = 'LatinoYT';
     else if (result.url.contains('veranime')) effectiveSource = 'Veranime';
+    else if (result.url.contains('cliver')) effectiveSource = 'Cliver';
   }
 
   // Senior Fix: Eliminamos el año como subtítulo por petición UX
@@ -1558,6 +1560,7 @@ final recentEpisodesProvider = FutureProvider<List<MediaItem>>((ref) async {
       else if (u.contains('tudorama')) effectiveSource = 'TuDorama';
       else if (u.contains('latinoyt')) effectiveSource = 'LatinoYT';
       else if (u.contains('veranime')) effectiveSource = 'Veranime';
+      else if (u.contains('cliver')) effectiveSource = 'Cliver';
     }
 
     final String? rawBanner = (item.banner != null && item.banner!.isNotEmpty) ? item.banner : item.coverImage;

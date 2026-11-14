@@ -113,6 +113,8 @@ final activePlayerProvider = StateNotifierProvider<ActivePlayerNotifier, ActiveP
   return ActivePlayerNotifier(ref);
 });
 
+final isGlobalMiniplayerActiveProvider = StateProvider<bool>((ref) => false);
+
 class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
   final Ref ref;
   StreamSubscription? _posSubscription;
@@ -137,7 +139,9 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
         final platform = player.platform as dynamic;
         platform.setProperty('vo', 'gpu');
         platform.setProperty('hwdec', 'auto-safe');
-        platform.setProperty('ao', 'audiotrack');
+        platform.setProperty('ao', 'opensles,audiotrack');
+        platform.setProperty('network-timeout', '8');
+        platform.setProperty('demuxer-readahead-secs', '15');
       }
     } catch (_) {}
 
@@ -292,6 +296,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     // Título ya resuelto por el player para el display T1:E1 "x": se guarda
     // tal cual en el historial al salir (sin depender del timing del sync).
     String? episodeTitle,
+    Map<String, String>? headers,
   }) async {
     if (createPlayer) initPlayerIfNeeded();
 
@@ -308,7 +313,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
 
       try {
         _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
-        await state.player?.open(Media(effectiveUrl));
+        await state.player?.open(Media(effectiveUrl, httpHeaders: headers ?? const {}));
         await state.player?.play();
 
         final auth = ref.read(authProvider);
@@ -328,6 +333,14 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     final bool isSameContent = state.currentItem?.id == item.id;
     final bool isSameUrl = state.url == url;
 
+    // "Mismo URL" solo ahorra reabrir si el motor sigue vivo con ese medio.
+    // Tras un stop() el player queda parado pero con la URL vieja registrada:
+    // sin este guard, reentrar al mismo episodio no llamaba a open() y la
+    // pantalla se quedaba en el spinner (no llegaba ni position ni playing).
+    final Player? engine = state.player;
+    final bool engineAlive = engine != null &&
+        (engine.state.playing || engine.state.position.inMilliseconds > 0);
+
     final List<SearchResult> activeRegisteredSources = ref.read(activeContentSourcesProvider);
 
     final List<SearchResult> mergedSources = (sources != null && sources.isNotEmpty)
@@ -337,7 +350,7 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
             : (isSameContent ? state.availableSources : (item.card != null ? [item.card!] : [])));
 
     // Si ya está reproduciendo lo mismo, solo expandimos
-    if (isSameContent && isSameUrl && state.uiState != PlayerUIState.none) {
+    if (isSameContent && isSameUrl && engineAlive && state.uiState != PlayerUIState.none) {
       setUiState(PlayerUIState.full);
       return;
     }
@@ -372,24 +385,27 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     // Si no necesitamos abrir el motor (porque la pantalla lo hará manualmente con headers/posiciones), paramos aquí.
     if (!triggerOpen) return;
 
-    // Senior Strategy: Diferimiento del motor para evitar errores de ciclo de vida en el hardware
-    Future(() async {
-      // Solo abrimos si el URL cambió para evitar parpadeos y errores src
-      if (!isSameUrl) {
-        _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
-        await state.player?.open(Media(url));
+    // Solo abrimos si el URL cambió o si el motor se quedó sin medio cargado
+    // (parado tras un stop): así evitamos parpadeos y errores src, pero nunca
+    // dejamos una sesión "viva" sin nada que reproducir.
+    if (!isSameUrl || !engineAlive) {
+      _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
+      final String freshUrl = url.contains('#')
+          ? '$url&_at=$_currentSessionId'
+          : '$url#_at=$_currentSessionId';
 
-        // [Intelligence] Reportar el inicio real de reproducción
-        final auth = ref.read(authProvider);
-        ref.read(userEventTrackerProvider).record(
-          userId: auth?.activeProfileId ?? auth?.id,
-          animeId: item.animeId,
-          event: 'play',
-          sectionId: item.sectionId,
-          playbackSessionId: _currentSessionId,
-        );
-      }
-    });
+      await state.player?.open(Media(freshUrl, httpHeaders: headers ?? const {}));
+
+      // [Intelligence] Reportar el inicio real de reproducción
+      final auth = ref.read(authProvider);
+      ref.read(userEventTrackerProvider).record(
+        userId: auth?.activeProfileId ?? auth?.id,
+        animeId: item.animeId,
+        event: 'play',
+        sectionId: item.sectionId,
+        playbackSessionId: _currentSessionId,
+      );
+    }
   }
 
   void setUiState(PlayerUIState uiState) {
@@ -511,14 +527,18 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     _posSubscription?.cancel();
     _posSubscription = null;
     try {
-      state = state.copyWith(
-        uiState: PlayerUIState.none, 
-        currentItem: null, 
-        url: null,
-        availableSources: [],
-        availableTracks: [],
-        availableEpisodes: [],
-        selectedTrackIndex: 0,
+      // Senior Fix: `copyWith` no sabe limpiar con null (`url ?? this.url`),
+      // así que stop() dejaba currentItem/url/episode de la sesión anterior.
+      // Al volver a tocar el MISMO episodio, `isSameUrl` salía `true` y
+      // `play()` se saltaba `player.open()` → el motor seguía parado, no
+      // emitía ni position ni playing y la WatchScreen se quedaba en el
+      // spinner para siempre (bug: 1ª vez reproduce, 2ª vez carga eterna).
+      // Se reconstruye el estado limpio conservando solo el motor (aquí no se
+      // dispose) y su GlobalKey (lo usan mini/full).
+      state = ActivePlayerState(
+        player: state.player,
+        controller: state.controller,
+        videoKey: state.videoKey,
       );
     } catch (_) {}
   }
@@ -650,6 +670,14 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     if (dur <= 0) return;
     final seekMs = (progress.clamp(0.0, 1.0) * dur).toInt();
     await state.player?.seek(Duration(milliseconds: seekMs));
+  }
+
+  Future<void> disposePlayer() async {
+    stop();
+    try {
+      await state.player?.dispose();
+    } catch (_) {}
+    state = ActivePlayerState();
   }
 
   @override

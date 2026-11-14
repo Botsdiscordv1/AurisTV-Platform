@@ -5,9 +5,11 @@ import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:flutter/foundation.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/pip_service.dart';
 import '../../cast/presentation/widgets/cast_picker_sheet.dart';
+import '../../player/presentation/mobile_video_surface.dart';
 
 /// Pantalla WatchScreen (Previa al Player Fullscreen - Crunchyroll Style).
 ///
@@ -36,6 +38,7 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.year,
     this.certification,
     this.startPosition,
+    this.synopsis,
   });
 
   final String contentId;
@@ -54,6 +57,7 @@ class WatchScreen extends ConsumerStatefulWidget {
   final int? year;
   final String? certification;
   final int? startPosition;
+  final String? synopsis;
 
   @override
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
@@ -66,9 +70,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   StreamSubscription? _playSubscription;
   StreamSubscription? _bufSubscription;
   StreamSubscription? _durSubscription;
+  StreamSubscription? _completedSub;
 
   bool _showControls = false;
   bool _isPlaying = false;
+  bool _isCompleted = false;
   // ignore: unused_field
   bool _isBuffering = true;
   bool _hasLoadedFirstFrame = false;
@@ -90,9 +96,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
   // Ajustes Estilo YouTube (Modo Ambiente, Temporizador, Velocidad, Calidad)
   bool _ambientModeEnabled = true;
+  final GlobalKey _embeddedVideoKey = GlobalKey();
   int _sleepTimerMinutes = 0;
   Timer? _sleepTimer;
   bool _isMinimizing = false;
+  int _visibleEpisodesLimit = 0;
 
   @override
   void initState() {
@@ -202,6 +210,18 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       }
     });
 
+    _completedSub?.cancel();
+    _completedSub = player.stream.completed.listen((completed) {
+      if (!mounted) return;
+      setState(() {
+        _isCompleted = completed;
+        if (completed) {
+          _isPlaying = false;
+          _showControls = true;
+        }
+      });
+    });
+
     _startHideTimer();
   }
 
@@ -231,15 +251,39 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-    } else {
-      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
       ]);
     }
     _startHideTimer();
+  }
+
+  void _navigateToFullscreen() {
+    final active = ref.read(activePlayerProvider);
+    final int currentPosMs = active.player?.state.position.inMilliseconds ?? _position.inMilliseconds;
+
+    final queryParams = <String, String>{
+      if (widget.sourceUrl.isNotEmpty) 'url': widget.sourceUrl,
+      if (widget.source.isNotEmpty) 'source': widget.source,
+      if (widget.episode != null) 'episode': widget.episode!,
+      if (widget.season != null) 'season': widget.season.toString(),
+      if (widget.serverName != null) 'serverName': widget.serverName!,
+      if (widget.category != null) 'category': widget.category!,
+      if (widget.title != null) 'title': widget.title!,
+      if (widget.metadataTitle != null) 'metadataTitle': widget.metadataTitle!,
+      if (widget.episodeTitle != null) 'episodeTitle': widget.episodeTitle!,
+      if (widget.posterUrl != null) 'posterUrl': widget.posterUrl!,
+      if (widget.bannerUrl != null) 'bannerUrl': widget.bannerUrl!,
+      if (widget.logoUrl != null) 'logoUrl': widget.logoUrl!,
+      if (widget.certification != null) 'certification': widget.certification!,
+      'startPosition': currentPosMs.toString(),
+    };
+
+    final uri = Uri(
+      path: '/player/${widget.contentId}',
+      queryParameters: queryParams,
+    );
+
+    context.push(uri.toString());
   }
 
   @override
@@ -250,6 +294,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     _playSubscription?.cancel();
     _bufSubscription?.cancel();
     _durSubscription?.cancel();
+    _completedSub?.cancel();
     _sleepTimer?.cancel();
     if (_isFullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -312,6 +357,16 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         _resumeApplied = true; // nada que aplicar
       }
 
+      // Inyección automática de cabeceras de seguridad Referer / User-Agent para Streamtape, Voe, etc.
+      final Map<String, String> effectiveHeaders = Map.from(headers);
+      if (urlStream.contains('streamtape.com')) {
+        effectiveHeaders['Referer'] = 'https://streamtape.com/';
+        effectiveHeaders['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+      } else if (urlStream.contains('voe.sx')) {
+        effectiveHeaders['Referer'] = 'https://voe.sx/';
+        effectiveHeaders['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+      }
+
       await notifier.play(
         item: MediaItem(
           id: seriesTitle,
@@ -326,6 +381,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         season: widget.season ?? 1,
         source: widget.source,
         episodeTitle: widget.episodeTitle,
+        headers: effectiveHeaders,
       );
 
       _setupPlayerListeners();
@@ -359,7 +415,19 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
 
   void _switchEpisode(EpisodeInfo ep) {
-    final String targetUrl = ep.url.isNotEmpty ? ep.url : widget.sourceUrl;
+    final String targetUrl = ep.url.isNotEmpty
+        ? ep.url
+        : buildEpisodeUrl(widget.sourceUrl, widget.source, ep.number);
+
+    setState(() {
+      _hasLoadedFirstFrame = false;
+      _showControls = false;
+      _lastOpenedUrl = '';
+      _position = Duration.zero;
+      _pendingResumeMs = 0;
+      _resumeApplied = false;
+    });
+
     final queryParams = <String, String>{
       'url': targetUrl,
       'source': widget.source,
@@ -693,15 +761,27 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
   Widget _buildEmbeddedPlayer() {
     final active = ref.watch(activePlayerProvider);
-    final controller = active.controller ??
-        (active.player != null
-            ? VideoController(
-                active.player!,
-                configuration: const VideoControllerConfiguration(
-                  androidAttachSurfaceAfterVideoParameters: false,
-                ),
-              )
-            : null);
+    final String currentSourceLower = (widget.source.toLowerCase()) + (widget.serverName?.toLowerCase() ?? '');
+    final bool isZillaHls = currentSourceLower.contains('zilla') &&
+        (_lastOpenedUrl.contains('.m3u8') || _lastOpenedUrl.contains('/hls/'));
+
+    final bool useSurface = VideoSurfaceConfig.nativeAndroidSurface &&
+        isZillaHls &&
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android;
+
+    final controller = useSurface
+        ? null
+        : (active.controller ??
+            (active.player != null
+                ? VideoController(
+                    active.player!,
+                    configuration: const VideoControllerConfiguration(
+                      androidAttachSurfaceAfterVideoParameters: false,
+                    ),
+                  )
+                : null));
+
     final bool isInitialLoading = !_hasLoadedFirstFrame;
 
     return GestureDetector(
@@ -713,12 +793,38 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Capa de Video real
-          if (controller != null)
-            Video(
-              controller: controller,
-              controls: NoVideoControls,
-              fit: BoxFit.contain,
+          // Capa de Video real: SurfaceView exclusivo para ZILLA HLS, Textura para todo lo demás
+          if (useSurface && active.player != null)
+            RepaintBoundary(
+              key: _embeddedVideoKey,
+              child: FittedMobileVideoSurface(
+                player: active.player!,
+                onSurface: (viewId, wid, width, height) {
+                  unawaited(NativeVideoSurfaceBinder.attach(
+                    player: active.player!,
+                    viewId: viewId,
+                    wid: wid,
+                    width: width,
+                    height: height,
+                  ));
+                },
+                onSurfaceDestroyed: (viewId, wid) {
+                  unawaited(NativeVideoSurfaceBinder.detach(
+                    active.player!,
+                    viewId: viewId,
+                    wid: wid,
+                  ));
+                },
+              ),
+            )
+          else if (controller != null)
+            RepaintBoundary(
+              key: _embeddedVideoKey,
+              child: Video(
+                controller: controller,
+                controls: NoVideoControls,
+                fit: BoxFit.contain,
+              ),
             )
           else
             Container(color: Colors.black),
@@ -753,13 +859,23 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                           IconButton(
                             iconSize: 38,
                             icon: AurisIcon(
-                              _isPlaying ? AurisIcons.pauseFilled : AurisIcons.playFilled,
+                              _isCompleted
+                                  ? AurisIcons.restart
+                                  : (_isPlaying ? AurisIcons.pauseFilled : AurisIcons.playFilled),
                               color: const Color(0xFFEF7A1E),
                               size: 38,
                             ),
                             onPressed: () {
                               final active = ref.read(activePlayerProvider);
-                              if (_isPlaying) {
+                              if (_isCompleted) {
+                                setState(() {
+                                  _isCompleted = false;
+                                  _position = Duration.zero;
+                                  _isPlaying = true;
+                                });
+                                active.player?.seek(Duration.zero);
+                                active.player?.play();
+                              } else if (_isPlaying) {
                                 active.player?.pause();
                               } else {
                                 active.player?.play();
@@ -840,12 +956,12 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                       ),
                     ),
 
-                    // Botón Circular de Pantalla Completa (Alterna modo fullscreen internamente sin saltos de ruta)
+                    // Botón Circular de Pantalla Completa (Navega a PlayerScreen)
                     Positioned(
                       right: 12,
                       bottom: 30,
                       child: InkWell(
-                        onTap: _toggleFullscreen,
+                        onTap: _navigateToFullscreen,
                         borderRadius: BorderRadius.circular(20),
                         child: Container(
                           width: 36,
@@ -856,7 +972,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                           ),
                           child: Center(
                             child: AurisIcon(
-                              _isFullscreen ? AurisIcons.minimize : AurisIcons.expand,
+                              AurisIcons.expand,
                               color: Colors.white,
                               size: 18,
                             ),
@@ -941,7 +1057,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     extractAsync.whenData((extractRes) {
       final String resolvedUrl = extractRes.url.isNotEmpty
           ? extractRes.url
-          : (extractRes.tracks.firstOrNull?.url ?? widget.sourceUrl);
+          : (extractRes.tracks.firstOrNull?.url ?? '');
       final Map<String, String> resolvedHeaders = extractRes.headers.isNotEmpty
           ? extractRes.headers
           : (extractRes.tracks.firstOrNull?.headers ?? const {});
@@ -1011,25 +1127,34 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       });
     });
 
-    // Consultar lista de episodios de la serie desde el provider de datos reales
-    final episodesData = ref.watch(episodesProvider(EpisodesParams(
-      url: widget.sourceUrl,
-      source: widget.source,
-      title: seriesTitle,
-      season: widget.season,
-    ))).valueOrNull;
+    final bool isMovie = isMovieLike(widget.category, seriesTitle);
 
-    final List<EpisodeInfo> epList = episodesData?.episodes ?? [];
-    final EpisodeInfo? currentEp = epList.firstWhereOrNull((ep) => ep.number == currentEpNum);
+    // Consultar lista de episodios de la serie desde el provider de datos reales (solo para series)
+    final EpisodesResponse? episodesData = isMovie
+        ? null
+        : ref.watch(episodesProvider(EpisodesParams(
+            url: widget.sourceUrl,
+            source: widget.source,
+            category: widget.category,
+            title: seriesTitle,
+            season: widget.season,
+          ))).valueOrNull;
 
-    // Metadata Real del Episodio Activo
-    final String realEpTitle = (currentEp?.title != null && currentEp!.title!.isNotEmpty)
-        ? currentEp.title!
-        : (widget.episodeTitle ?? 'Episodio $currentEpNum');
+    final List<EpisodeInfo> epList = isMovie ? const [] : (episodesData?.episodes ?? []);
+    final EpisodeInfo? currentEp = isMovie ? null : epList.firstWhereOrNull((ep) => ep.number == currentEpNum);
 
-    final String realSynopsis = (currentEp?.description != null && currentEp!.description!.isNotEmpty)
-        ? currentEp.description!
-        : 'Sigue las aventuras de $seriesTitle en este episodio $realEpTitle con la mejor calidad en AurisTV.';
+    // Metadata Real del Episodio/Película Activo
+    final String realEpTitle = isMovie
+        ? (widget.episodeTitle ?? seriesTitle)
+        : ((currentEp?.title != null && currentEp!.title!.isNotEmpty)
+            ? currentEp.title!
+            : (widget.episodeTitle ?? 'Episodio $currentEpNum'));
+
+    final String realSynopsis = isMovie
+        ? (widget.synopsis ?? 'Disfruta de $seriesTitle con la mejor calidad en AurisTV.')
+        : ((currentEp?.description != null && currentEp!.description!.isNotEmpty)
+            ? currentEp.description!
+            : 'Sigue las aventuras de $seriesTitle en este episodio $realEpTitle con la mejor calidad en AurisTV.');
 
     final String rawDate = (currentEp?.airDate != null && currentEp!.airDate!.isNotEmpty)
         ? currentEp.airDate!
@@ -1049,13 +1174,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     final bool isBookmarked = ref.watch(favoritesProvider).any((f) => f.id == widget.contentId || f.title == seriesTitle);
 
-    // Calcular episodio siguiente y anterior con metadatos reales
+    // Calcular episodio siguiente con metadatos reales (solo para series)
     EpisodeInfo? nextEp;
-    EpisodeInfo? prevEp;
 
-    for (final ep in epList) {
-      if (ep.number == currentEpNum + 1) nextEp = ep;
-      if (ep.number == currentEpNum - 1) prevEp = ep;
+    if (!isMovie) {
+      for (final ep in epList) {
+        if (ep.number == currentEpNum + 1) nextEp = ep;
+      }
     }
 
     return PopScope(
@@ -1104,7 +1229,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                     metadataWidget: WatchEpisodeMetadata(
                       seriesTitle: seriesTitle,
                       episodeTitle: realEpTitle,
-                      episodeNumber: epNumStr,
+                      episodeNumber: isMovie ? 'Película' : epNumStr,
                       ratingBadge: realCertification,
                       audioSubsBadge: realBadges,
                       releaseDate: realReleaseDate,
@@ -1163,8 +1288,12 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                     synopsisWidget: WatchSynopsis(
                       synopsis: realSynopsis,
                     ),
-                    nextEpisodeWidget: nextEp != null
-                        ? WatchNavCard(
+                    nextEpisodeWidget: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Ocultar Siguiente Episodio si la lista in-line fue desplegada (_visibleEpisodesLimit > 0)
+                        if (nextEp != null && _visibleEpisodesLimit == 0)
+                          WatchNavCard(
                             sectionLabel: 'Siguiente Episodio',
                             episodeNumber: 'E${nextEp.number}',
                             episodeTitle: (nextEp.title != null && nextEp.title!.isNotEmpty) ? nextEp.title! : 'Episodio ${nextEp.number}',
@@ -1172,19 +1301,184 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                             duration: nextEp.duration ?? (nextEp.runtime != null ? '${nextEp.runtime}m' : '24m'),
                             audioSubsBadge: nextEp.quality ?? 'Sub | Dob',
                             onTap: () => _switchEpisode(nextEp!),
-                          )
-                        : const SizedBox.shrink(),
-                    previousEpisodeWidget: prevEp != null
-                        ? WatchNavCard(
-                            sectionLabel: 'Episodio Anterior',
-                            episodeNumber: 'E${prevEp.number}',
-                            episodeTitle: (prevEp.title != null && prevEp.title!.isNotEmpty) ? prevEp.title! : 'Episodio ${prevEp.number}',
-                            thumbnailUrl: prevEp.thumbnail ?? widget.bannerUrl,
-                            duration: prevEp.duration ?? (prevEp.runtime != null ? '${prevEp.runtime}m' : '24m'),
-                            audioSubsBadge: prevEp.quality ?? 'Sub | Dob',
-                            onTap: () => _switchEpisode(prevEp!),
-                          )
-                        : const SizedBox.shrink(),
+                          ),
+
+                        // Lista In-Line de Episodios Paginada de 28 en 28
+                        if (_visibleEpisodesLimit > 0 && epList.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8, top: 6),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'EPISODIOS',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(20),
+                                  onTap: () {
+                                    setState(() {
+                                      _visibleEpisodesLimit = 0;
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4.0),
+                                    child: AurisIcon(
+                                      AurisIcons.chevronUp,
+                                      color: Colors.white70,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ...epList.take(_visibleEpisodesLimit).map((ep) {
+                            final bool isCurrent = ep.number.toString() == widget.episode;
+                            final String epTitle = (ep.title != null && ep.title!.isNotEmpty) ? ep.title! : 'Episodio ${ep.number}';
+                            final String durationStr = ep.duration ?? (ep.runtime != null ? '${ep.runtime}m' : '24m');
+                            final String qualityStr = ep.quality ?? 'Sub | Dob';
+                            final String thumbUrl = ep.thumbnail ?? widget.bannerUrl ?? widget.posterUrl ?? '';
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () => _switchEpisode(ep),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Thumbnail 16:9 con Badge de Duración y REPRODUCIENDO
+                                    SizedBox(
+                                      width: 140,
+                                      child: AspectRatio(
+                                        aspectRatio: 16 / 9,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Colors.white12, width: 0.5),
+                                            image: thumbUrl.isNotEmpty
+                                                ? DecorationImage(image: NetworkImage(thumbUrl), fit: BoxFit.cover)
+                                                : null,
+                                            color: Colors.white10,
+                                          ),
+                                          child: Stack(
+                                            children: [
+                                              if (isCurrent)
+                                                Positioned(
+                                                  top: 6,
+                                                  left: 6,
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFEF7A1E),
+                                                      borderRadius: BorderRadius.circular(3),
+                                                    ),
+                                                    child: const Text(
+                                                      'REPRODUCIENDO',
+                                                      style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.w900),
+                                                    ),
+                                                  ),
+                                                ),
+                                              Positioned(
+                                                right: 6,
+                                                bottom: 6,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black87,
+                                                    borderRadius: BorderRadius.circular(3),
+                                                  ),
+                                                  child: Text(
+                                                    durationStr,
+                                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 12),
+
+                                    // Título y Calidad
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'E${ep.number} - $epTitle',
+                                            style: TextStyle(
+                                              color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              height: 1.25,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            qualityStr,
+                                            style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+
+                        // Botón VER MÁS EPISODIOS (Suma 28 episodios a la lista in-line cada vez)
+                        if (_visibleEpisodesLimit < epList.length) ...[
+                          const SizedBox(height: 12),
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFBBBBBB),
+                              side: const BorderSide(color: Color(0xFFBBBBBB), width: 2.0),
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _visibleEpisodesLimit += 28;
+                              });
+                            },
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AurisIcon(AurisIcons.episodes, color: const Color(0xFFBBBBBB), size: 24),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _visibleEpisodesLimit == 0 ? 'VER MÁS EPISODIOS' : 'VER MÁS EPISODIOS (${epList.length - _visibleEpisodesLimit})',
+                                  style: const TextStyle(
+                                    color: Color(0xFFBBBBBB),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    previousEpisodeWidget: const SizedBox.shrink(),
                     playlistSidebarWidget: epList.isNotEmpty
                         ? WatchPlaylistSidebar(
                             episodes: epList,
@@ -1195,8 +1489,12 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                   );
 
                   if (_ambientModeEnabled) {
+                    final Color posterColor = extractAmbientColorFromTitle(
+                      widget.title ?? widget.metadataTitle ?? widget.contentId,
+                    );
                     return CinematicAmbientLighting(
-                      player: ref.read(activePlayerProvider).player,
+                      player: ref.watch(activePlayerProvider).player,
+                      posterColor: posterColor,
                       heightMultiplier: 1.0,
                       percentageFromTop: 0.15,
                       intensity: 0.65,

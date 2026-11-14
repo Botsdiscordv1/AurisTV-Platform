@@ -102,6 +102,7 @@ String simplifySourceName(String name) {  final l = name.toLowerCase();
   if (l.contains('tudorama')) return 'TDM';
   if (l.contains('latinoyt')) return 'LYT';
   if (l.contains('veranime')) return 'VAE';
+  if (l.contains('cliver')) return 'CVR';
   return name.toUpperCase();
 }
 
@@ -121,6 +122,7 @@ const Map<String, int> _sourceDisplayOrder = {
   'TDM': 13,
   'LYT': 14,
   'VAE': 15,
+  'CVR': 17,
   'GHD': 16,
 };
 

@@ -37,6 +37,7 @@ class WatchScreen extends ConsumerWidget {
     this.onNextEpisode,
     this.onPreviousEpisode,
     this.onEpisodeSelected,
+    this.showPlaylistSidebar = true,
   });
 
   final String contentId;
@@ -64,6 +65,7 @@ class WatchScreen extends ConsumerWidget {
   final VoidCallback? onNextEpisode;
   final VoidCallback? onPreviousEpisode;
   final ValueChanged<EpisodeInfo>? onEpisodeSelected;
+  final bool showPlaylistSidebar;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -93,6 +95,7 @@ class WatchScreen extends ConsumerWidget {
       onNextEpisode: onNextEpisode,
       onPreviousEpisode: onPreviousEpisode,
       onEpisodeSelected: onEpisodeSelected,
+      showPlaylistSidebar: showPlaylistSidebar,
     );
   }
 }

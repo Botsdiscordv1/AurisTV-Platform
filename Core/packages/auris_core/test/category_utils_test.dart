@@ -213,4 +213,12 @@ void main() {
       expect(simplifySourceName('Veranime'), 'VAE');
     });
   });
+
+  group('simplifySourceName para Cliver', () {
+    test('Simplifica Cliver a CVR', () {
+      expect(simplifySourceName('cliver'), 'CVR');
+      expect(simplifySourceName('Cliver'), 'CVR');
+      expect(simplifySourceName('CLIVER'), 'CVR');
+    });
+  });
 }

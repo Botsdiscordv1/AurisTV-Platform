@@ -23,8 +23,10 @@ class CinematicAmbientLighting extends StatefulWidget {
   const CinematicAmbientLighting({
     super.key,
     this.player,
+    this.videoWidgetKey,
     this.primaryColor,
     this.secondaryColor,
+    this.posterColor,
     this.blurSigma = 45.0,
     this.intensity = 0.55,
     this.heightMultiplier = 1.6,
@@ -35,11 +37,20 @@ class CinematicAmbientLighting extends StatefulWidget {
   /// Instancia de [Player] para extraer la paleta cromática del video en tiempo de ejecución.
   final Player? player;
 
+  /// GlobalKey opcional del widget exclusivo del reproductor de video.
+  /// Si no se especifica, se envuelve [child] completo.
+  final GlobalKey? videoWidgetKey;
+
   /// Color primario del resplandor (Start Color) — usado si no hay player.
   final Color? primaryColor;
 
   /// Color secundario del resplandor (End Color) — usado si no hay player.
   final Color? secondaryColor;
+
+  /// Color del poster/banner (fallback para ambient mode en Android SurfaceView).
+  /// Cuando el video usa superficie nativa, screenshot bloquea 5-13s; se usa este
+  /// color como paleta inmediata hasta que screenshot funcione.
+  final Color? posterColor;
 
   /// Nivel de difusión gaussiana (por defecto 45.0, emula el radial blur de YouTube).
   final double blurSigma;
@@ -83,7 +94,8 @@ class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
       _initSampling();
     } else if (widget.player == null &&
         (oldWidget.primaryColor != widget.primaryColor ||
-            oldWidget.secondaryColor != widget.secondaryColor)) {
+            oldWidget.secondaryColor != widget.secondaryColor ||
+            oldWidget.posterColor != widget.posterColor)) {
       _applyExplicitColors();
     }
   }
@@ -94,7 +106,8 @@ class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
       _paletteController?.dispose();
       _paletteController = CinematicPaletteController(
         player: widget.player!,
-        videoKey: _videoKey,
+        videoKey: widget.videoWidgetKey ?? _videoKey,
+        posterColor: widget.posterColor,
       )..addListener(_onPaletteUpdated);
     } else {
       _applyExplicitColors();
@@ -110,10 +123,17 @@ class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
   }
 
   void _applyExplicitColors() {
+    // Prioridad: primaryColor > posterColor > colors del controller > transparent.
     if (widget.primaryColor != null) {
       setState(() {
         _topColor = widget.primaryColor!;
         _bottomColor = widget.secondaryColor ?? widget.primaryColor!.withValues(alpha: 0.6);
+      });
+    } else if (widget.posterColor != null) {
+      // Usar colores por defecto cinematográficos derivados del poster.
+      setState(() {
+        _topColor = const Color(0xFF1E2A38);
+        _bottomColor = const Color(0xFF0F151C);
       });
     } else {
       setState(() {
@@ -192,14 +212,14 @@ class _CinematicAmbientLightingState extends State<CinematicAmbientLighting> {
           ),
         ),
 
-        // 2. Capa Frontal: El reproductor de video u otro hijo,
-        //    envuelto en RepaintBoundary para que CinematicPaletteController
-        //    pueda capturar frames incluso con SurfaceView / hardware acceleration.
+        // 2. Capa Frontal: El reproductor de video u otro hijo.
         if (widget.child != null)
-          RepaintBoundary(
-            key: _videoKey,
-            child: widget.child!,
-          ),
+          widget.videoWidgetKey != null
+              ? widget.child!
+              : RepaintBoundary(
+                  key: _videoKey,
+                  child: widget.child!,
+                ),
       ],
     );
   }

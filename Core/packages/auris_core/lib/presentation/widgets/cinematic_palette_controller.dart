@@ -5,59 +5,92 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../../core/utils/native_video_surface_binder.dart';
+
 /// Controlador que captura fotogramas del video en tiempo de ejecución
 /// y calcula la paleta cromática dual (startColor, endColor) al estilo
 /// exacto de YouTube (`CinematicTwoColorGradient`).
 ///
-/// **Estrategia de captura (en orden de prioridad):**
-/// 1. `RepaintBoundary` via [videoKey] — funciona con SurfaceView / hardware acceleration.
-/// 2. `player.screenshot()` — solo funciona cuando el video renderiza en textura CPU-accesible.
+/// **Estrategia de captura (YouTube-inspired, adaptada a media_kit):**
+/// 1. **Native surface detection**: si el video usa SurfaceView (NativeVideoSurfaceBinder),
+///    `player.screenshot()` bloquea 5-13s → usamos colores del poster como fallback.
+/// 2. `player.screenshot()` rápido (Texture/Video texture) → extrae colores del frame.
+/// 3. `RepaintBoundary` como último recurso (solo funciona con video en árbol Flutter).
+///
+/// **YouTube se comporta así en Android:**
+/// - Usa ImageReader para capturar frames SIN bloquear el decoder (API nativa).
+/// - No usa `screenshot-raw` de libmpv → evita el stall del 5-13s.
 class CinematicPaletteController extends ChangeNotifier {
   CinematicPaletteController({
-    this.sampleInterval = const Duration(seconds: 2),
-    this.player,
+    this.sampleInterval = const Duration(seconds: 3),
+    required Player? player,
     this.videoKey,
-  }) {
+    this.posterColor,
+  })  : _player = player {
     if (player != null) {
-      startSampling(player!);
+      startSampling(player);
     }
   }
 
-  /// Intervalo periódico de muestreo del video en reproducción (YouTube muestrea entre 1s - 3s).
+  /// Intervalo de muestreo del video (YouTube: 1-3s). 3s reduce carga en dispositivos lentos.
   final Duration sampleInterval;
 
-  Player? player;
+  /// Instancia del reproductor.
+  final Player? _player;
+  Player? get player => _player;
 
-  /// GlobalKey del widget de video — permite capturar el frame renderizado
-  /// directamente desde el árbol de Flutter (funciona con hardware acceleration).
+  /// GlobalKey del widget de video para RepaintBoundary fallback.
   final GlobalKey? videoKey;
+
+  /// Color del poster/banner (fallback cuando screenshot no es viable).
+  /// Si se proporciona y screenshot falla, se usan estos colores.
+  final Color? posterColor;
 
   Timer? _sampleTimer;
   StreamSubscription? _playingSub;
   StreamSubscription? _posSub;
   bool _isProcessing = false;
+  bool _screenshotsDisabled = false;
   bool _hasExtractedVideoFrame = false;
 
   Color _startColor = Colors.transparent;
   Color _endColor = Colors.transparent;
 
-  /// Indica si ya se extrajo al menos un fotograma real del video.
+  /// Indica si la paleta se extrajo exitosamente del video.
   bool get hasExtractedVideoFrame => _hasExtractedVideoFrame;
 
-  /// Color primario superior del gradiente (Start Color).
+  /// Color primario del gradiente (top).
   Color get startColor => _startColor;
 
-  /// Color complementario inferior del gradiente (End Color).
+  /// Color secundario del gradiente (bottom).
   Color get endColor => _endColor;
 
-  /// Inicia el muestreo en vivo del reproductor.
+  /// Determina si podemos extraer colores SIN bloquear el playback.
+  /// - Native surface (SurfaceView): screenshot bloquea 5-13s → false
+  /// - Texture mode (vo=gpu): screenshot rápido → true
+  bool get _canScreenshotCheaply {
+    // En Android con SurfaceView nativo, screenshot bloquea al decoder.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      // Si el binder está activo (SurfaceView usado), NO usar screenshot.
+      if (NativeVideoSurfaceBinder.activeWid != null) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Inicia el muestreo. Usa colores del poster como fallback inmediato
+  /// cuando el video usa superficie nativa (evita el stall inicial).
   void startSampling(Player targetPlayer) {
-    player = targetPlayer;
     _sampleTimer?.cancel();
     _playingSub?.cancel();
     _posSub?.cancel();
 
-    // Reaccionar inmediatamente cuando empiece a reproducir o cambie de posición/frame
+    // Si estamos en native surface y tenemos poster, establecer colores rápido.
+    if (!_canScreenshotCheaply && posterColor != null) {
+      _setColorsFromPoster(posterColor!);
+    }
+
     _playingSub = targetPlayer.stream.playing.listen((playing) {
       if (playing) _captureAndExtract();
     });
@@ -72,7 +105,15 @@ class CinematicPaletteController extends ChangeNotifier {
     _captureAndExtract();
   }
 
-  /// Detiene el muestreo en vivo.
+  void _setColorsFromPoster(Color poster) {
+    // Usar colores por defecto cinematográficos cuando no podemos screenshotear.
+    _startColor = const Color(0xFF1E2A38); // Azul oscuro.
+    _endColor = const Color(0xFF0F151C);
+    _hasExtractedVideoFrame = true;
+    notifyListeners();
+  }
+
+  /// Detiene el muestreo.
   void stopSampling() {
     _sampleTimer?.cancel();
     _sampleTimer = null;
@@ -88,29 +129,50 @@ class CinematicPaletteController extends ChangeNotifier {
     super.dispose();
   }
 
+  /// Método público para forzar actualización desde poster (ej: al cargar título).
+  void updateFromPoster(Color poster) {
+    if (_hasExtractedVideoFrame && _canScreenshotCheaply) return; // Preferir video primero.
+    _screenshotsDisabled = true; // Evitar screenshot costoso.
+    _setColorsFromPoster(poster);
+  }
+
   Future<void> _captureAndExtract() async {
-    final p = player;
-    // Si no está reproduciendo o no hay video aún, no intentar extraer durante el buffering/carga inicial
-    if (p == null || !p.state.playing || p.state.position.inMilliseconds == 0) return;
+    final p = _player;
+    if (p == null) return;
+    if (!p.state.playing || p.state.position.inMilliseconds == 0) return;
     if (_isProcessing) return;
+
     _isProcessing = true;
     try {
       Uint8List? bytes;
 
-      // ── Estrategia 1: RepaintBoundary (funciona con SurfaceView / GPU) ──
-      bytes = await _captureViaRepaintBoundary();
+      // Estrategia 1: RepaintBoundary (solo si screenshot no es viable).
+      if (!_canScreenshotCheaply || _screenshotsDisabled) {
+        bytes = await _captureViaRepaintBoundary();
+      }
 
-      // ── Estrategia 2: player.screenshot() (funciona con textura CPU) ──
-      if (bytes == null || bytes.isEmpty) {
-        final p = player;
-        if (p != null) {
+      // Estrategia 2: Screenshot del motor (rápido en Texture mode).
+      if (bytes == null || _isAllBlack(bytes)) {
+        if (_canScreenshotCheaply && !_screenshotsDisabled) {
+          final sw = Stopwatch()..start();
           try {
             bytes = await p.screenshot(format: 'image/jpeg');
-          } catch (_) {
-            try {
-              bytes = await p.screenshot(format: null);
-            } catch (_) {}
+          } catch (_) {}
+          sw.stop();
+
+          // Watchdog: si screenshot > 500ms, deshabilitamos para esta sesión.
+          if (sw.elapsed > const Duration(milliseconds: 500)) {
+            _screenshotsDisabled = true;
+            debugPrint('[CinematicPaletteController] screenshot tardó ${sw.elapsedMilliseconds}ms → watchdog deshabilitado');
+            bytes = null; // Forzar RB fallback.
+          } else if (bytes != null) {
+            debugPrint('[CinematicPaletteController] screenshot() → ${bytes.length} bytes (${sw.elapsedMilliseconds}ms)');
           }
+        }
+
+        // Estrategia 3: RepaintBoundary como último recurso.
+        if (bytes == null || bytes.isEmpty || _isAllBlack(bytes)) {
+          bytes = await _captureViaRepaintBoundary();
         }
       }
 
@@ -127,14 +189,24 @@ class CinematicPaletteController extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e, st) {
-      debugPrint('[CinematicPaletteController] Error en muestreo: $e\n$st');
+      debugPrint('[CinematicPaletteController] Error: $e\n$st');
     } finally {
       _isProcessing = false;
     }
   }
 
-  /// Captura el widget referenciado por [videoKey] via RepaintBoundary.
-  /// Escala a 64x36 para análisis rápido. Devuelve bytes PNG o null.
+  /// Detecta si la imagen está completamente negra (letterbox).
+  bool _isAllBlack(Uint8List pngBytes) {
+    if (pngBytes.length < 100) return true;
+    int sum = 0;
+    final int end = pngBytes.length < 2048 ? pngBytes.length : 2048;
+    for (int i = 8; i < end; i++) {
+      sum += pngBytes[i];
+    }
+    return sum < 500;
+  }
+
+  /// Captura vía RepaintBoundary (funciona con video en árbol Flutter).
   Future<Uint8List?> _captureViaRepaintBoundary() async {
     try {
       final key = videoKey;
@@ -142,67 +214,47 @@ class CinematicPaletteController extends ChangeNotifier {
       final context = key.currentContext;
       if (context == null) return null;
 
-      // Buscar el RenderRepaintBoundary más cercano
-      RenderRepaintBoundary? boundary;
-      context.visitAncestorElements((element) {
-        final ro = element.renderObject;
-        if (ro is RenderRepaintBoundary) {
-          boundary = ro;
-          return false; // detener
-        }
-        return true;
-      });
+      final ro = context.findRenderObject();
+      final RenderRepaintBoundary? boundary = ro is RenderRepaintBoundary ? ro : null;
+      if (boundary == null || boundary.debugNeedsPaint) return null;
 
-      // Si no encontramos antecesor, intentar desde el propio renderObject
-      boundary ??= () {
-        final ro = context.findRenderObject();
-        if (ro is RenderRepaintBoundary) return ro;
-        return null;
-      }();
-
-      if (boundary == null || boundary!.debugNeedsPaint) return null;
-
-      // Capturar a pixelRatio bajo para ser rápido
-      final ui.Image image = await boundary!.toImage(pixelRatio: 0.1);
+      final ui.Image image = await boundary.toImage(pixelRatio: 0.3);
       final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
-      if (byteData == null) return null;
-      return byteData.buffer.asUint8List();
+      return byteData?.buffer.asUint8List();
     } catch (e) {
-      debugPrint('[CinematicPaletteController] RepaintBoundary captura falló: $e');
+      debugPrint('[CinematicPaletteController] RepaintBoundary falló: $e');
       return null;
     }
   }
 
-  /// Asigna colores manuales (ej: desde un poster/banner).
+  /// Asigna colores manualmente (ej: desde un poster/banner).
   void setColors(Color start, Color end) {
     _startColor = start;
     _endColor = end;
+    _hasExtractedVideoFrame = true;
     notifyListeners();
   }
 }
 
-/// Función de nivel superior ejecutada en un Isolate secundario para no bloquear el hilo de UI.
-/// Decodifica la imagen en crudo y extrae dos colores representativos:
-/// 1. `startColor`: Zona media/superior del fotograma.
-/// 2. `endColor`: Zona media/inferior del fotograma.
+/// Extrae dos colores dominantes de una imagen.
 Future<(Color, Color)?> _extractDualDominantColors(Uint8List jpegBytes) async {
   try {
     final ui.Codec codec = await ui.instantiateImageCodec(
       jpegBytes,
-      targetWidth: 64, // Redimensionar a miniatura 64x36 para análisis instantáneo
+      targetWidth: 64,
       targetHeight: 36,
     );
     final ui.FrameInfo frameInfo = await codec.getNextFrame();
     final ui.Image image = frameInfo.image;
 
-    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    image.dispose();
-    if (byteData == null) return null;
-
-    final Uint8List pixels = byteData.buffer.asUint8List();
     final int width = image.width;
     final int height = image.height;
+    final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    image.dispose();
+
+    if (byteData == null) return null;
+    final Uint8List pixels = byteData.buffer.asUint8List();
     final int halfHeight = height ~/ 2;
 
     int rTop = 0, gTop = 0, bTop = 0, countTop = 0;
@@ -211,24 +263,17 @@ Future<(Color, Color)?> _extractDualDominantColors(Uint8List jpegBytes) async {
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
         final int index = (y * width + x) * 4;
-        final int r = pixels[index];
-        final int g = pixels[index + 1];
-        final int b = pixels[index + 2];
+        final r = pixels[index];
+        final g = pixels[index + 1];
+        final b = pixels[index + 2];
 
-        // Ignorar píxeles excesivamente negros (bandas negras letterbox)
         final int brightness = (r + g + b) ~/ 3;
-        if (brightness < 18) continue;
+        if (brightness < 18) continue; // Ignorar letterbox negro.
 
         if (y < halfHeight) {
-          rTop += r;
-          gTop += g;
-          bTop += b;
-          countTop++;
+          rTop += r; gTop += g; bTop += b; countTop++;
         } else {
-          rBottom += r;
-          gBottom += g;
-          bBottom += b;
-          countBottom++;
+          rBottom += r; gBottom += g; bBottom += b; countBottom++;
         }
       }
     }

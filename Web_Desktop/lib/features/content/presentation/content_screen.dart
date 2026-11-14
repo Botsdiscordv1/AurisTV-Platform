@@ -3196,7 +3196,7 @@ void _openPlayer(PlayerScreen player) {
       final epBundle = episodesAsync.maybeWhen(data: (d) => d, orElse: () => null);
       final epData = epBundle?.response;
 
-      final dataReady = activeSources.isNotEmpty;
+      final dataReady = detailAsync.hasValue || activeSources.isNotEmpty;
       if (dataReady && !_showContent) {
         _loadTimer?.cancel();
         _loadTimer = null;

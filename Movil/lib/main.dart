@@ -219,10 +219,10 @@ class PipVideoContainer extends ConsumerWidget {
               ? ColoredBox(
                   color: Colors.black,
                   child: FittedMobileVideoSurface(
-                    player: player!,
+                    player: player,
                     onSurface: (viewId, wid, width, height) {
                       unawaited(NativeVideoSurfaceBinder.attach(
-                        player: player!,
+                        player: player,
                         viewId: viewId,
                         wid: wid,
                         width: width,

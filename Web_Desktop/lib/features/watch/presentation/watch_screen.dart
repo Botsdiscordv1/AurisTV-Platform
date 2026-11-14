@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../player/presentation/player_screen.dart';
@@ -69,7 +68,7 @@ class WatchScreen extends ConsumerStatefulWidget {
 
 class _WatchScreenState extends ConsumerState<WatchScreen> {
   bool _isTheaterMode = false;
-  final GlobalKey _playerKey = GlobalKey(debugLabel: 'embedded_player_global_key');
+  bool _isAmbientLightingEnabled = true;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +80,21 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     )));
 
     final String resolvedUrl = extractAsync.valueOrNull?.url ?? widget.sourceUrl;
+    
+    // ── Stop player when URL changes (fixes episode switch bug in Web) ──
+    // This ensures that when navigating back and selecting a new episode,
+    // the player is stopped and will load the new stream instead of
+    // continuing with the cached one from the previous episode.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        final active = ref.read(activePlayerProvider);
+        // Stop player if URL differs or is still playing from previous episode
+        if (active.url != resolvedUrl || active.player?.state.playing == true) {
+          ref.read(activePlayerProvider.notifier).stop();
+        }
+      } catch (_) {}
+    });
 
     // Senior Fix (SSE): ref.listen para capturar CADA evento SSE del StreamProvider
     // y actualizar activePlayerProvider con los tracks acumulados. Sin esto, cuando
@@ -155,25 +169,21 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       onEpisodeSelected: widget.onEpisodeSelected,
       isTheaterMode: _isTheaterMode,
       playerWidget: resolvedUrl.isNotEmpty 
-        ? KeyedSubtree(
-            key: _playerKey,
-            child: CinematicAmbientLighting(
-              player: ref.watch(activePlayerProvider).player,
-              child: CleanEmbeddedPlayer(
-                key: ValueKey(resolvedUrl),
-                sourceUrl: resolvedUrl,
-                source: widget.source,
-                category: widget.category,
-                onExpandPressed: () => _openFullscreenPlayer(context),
-                onNextEpisode: widget.onNextEpisode,
-                onPreviousEpisode: widget.onPreviousEpisode,
-                hasPrevious: hasPrevious,
-                hasNext: hasNext,
-                episodeLabel: realEpLabel,
-                isTheaterMode: _isTheaterMode,
-                onTheaterModeToggle: () => setState(() => _isTheaterMode = !_isTheaterMode),
-              ),
-            ),
+        ? CleanEmbeddedPlayer(
+            key: ValueKey(resolvedUrl),
+            sourceUrl: resolvedUrl,
+            source: widget.source,
+            category: widget.category,
+            onExpandPressed: () => _openFullscreenPlayer(context),
+            onNextEpisode: widget.onNextEpisode,
+            onPreviousEpisode: widget.onPreviousEpisode,
+            hasPrevious: hasPrevious,
+            hasNext: hasNext,
+            episodeLabel: realEpLabel,
+            isTheaterMode: _isTheaterMode,
+            onTheaterModeToggle: () => setState(() => _isTheaterMode = !_isTheaterMode),
+            isAmbientLightingEnabled: _isAmbientLightingEnabled,
+            onAmbientLightingToggle: (val) => setState(() => _isAmbientLightingEnabled = val),
           )
         : const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
     );

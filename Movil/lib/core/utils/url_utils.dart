@@ -41,6 +41,7 @@ class UrlUtils {
     'OnlyPelis': 'op|https://onlypelis.net/',
     'PelisPedia': 'pp|https://www.pelispedia.li/',
     'RePelisHD': 'rh|https://repelishd.pics/',
+    'Cliver': 'cv|https://cliver.mom/',
     'TMDB': 'tm|tmdb://',
     'AniList': 'ai|anilist://',
   };
