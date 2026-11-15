@@ -111,7 +111,9 @@ class _SourceChipsBarState extends ConsumerState<SourceChipsBar> {
             return _SourceItem(
               key: ValueKey('item_${widget.sources[i].source}_${widget.sources[i].url}'),
               source: widget.sources[i],
-              isSelected: widget.currentSource != null && widget.sources[i].url == widget.currentSource!.url,
+              isSelected: widget.currentSource != null &&
+                  widget.sources[i].url == widget.currentSource!.url &&
+                  simplifySourceName(widget.sources[i].source) == simplifySourceName(widget.currentSource!.source),
               animate: isNew,
               season: widget.season,
               fontSize: widget.fontSize,

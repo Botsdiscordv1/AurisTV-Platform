@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:collection/collection.dart';
@@ -100,6 +101,12 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   Timer? _sleepTimer;
   bool _isMinimizing = false;
   int _visibleEpisodesLimit = 0;
+
+  /// Título del episodio resuelto en el último build (puede venir de la lista
+  /// de episodios cargada async, superior a widget.episodeTitle que solo tiene
+  /// lo que llegó por URL). Se usa en _updateHistory para guardar el título
+  /// correcto en el historial (Continuar Viendo).
+  String? _resolvedEpTitle;
 
   @override
   void initState() {
@@ -391,7 +398,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         episode: widget.episode ?? '1',
         season: widget.season ?? 1,
         source: widget.source,
-        episodeTitle: widget.episodeTitle,
+        episodeTitle: _resolvedEpTitle ?? widget.episodeTitle,
         headers: effectiveHeaders,
       );
 
@@ -407,6 +414,10 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   void _updateHistory(int posMs, int durMs) {
     if (posMs <= 0 || durMs <= 0) return;
     final String seriesTitle = widget.title ?? widget.metadataTitle ?? widget.contentId;
+    // Leer todas las fuentes activas descubiertas por ContentScreen para este título.
+    // Así el historial preserva la lista completa y "Continuar Viendo" puede
+    // reconstruir todos los source pills sin perder ninguna URL canónica.
+    final List<SearchResult> allSources = ref.read(activeContentSourcesProvider);
     ref.read(playbackHistoryStateProvider.notifier).updatePosition(
       contentId: seriesTitle,
       season: widget.season,
@@ -419,7 +430,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       category: widget.category,
       source: widget.source,
       url: widget.sourceUrl,
-      episodeTitle: widget.episodeTitle,
+      episodeTitle: _resolvedEpTitle ?? widget.episodeTitle,
+      alternativeSources: allSources.isNotEmpty ? allSources : null,
     );
   }
 
@@ -510,104 +522,117 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF212121),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (bottomSheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Top Pill Handle (YouTube Style)
-                    Container(
-                      width: 32,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Ajustes de Reproducción',
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // 1. Velocidad de Reproducción
-                    ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      leading: const Icon(Icons.speed_outlined, color: Colors.white, size: 22),
-                      title: const Text('Velocidad de reproducción', style: TextStyle(color: Colors.white, fontSize: 15)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(currentSpeedLabel, style: const TextStyle(color: Colors.white54, fontSize: 13)),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
-                        ],
-                      ),
-                      onTap: () {
-                        Navigator.pop(bottomSheetContext);
-                        _showSpeedSheet();
-                      },
-                    ),
-
-                    // 2. Modo Ambiente (Switch sincronizado con settingsProvider)
-                    SwitchListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      secondary: const Icon(Icons.vignette_outlined, color: Colors.white, size: 22),
-                      title: const Text('Modo ambiente', style: TextStyle(color: Colors.white, fontSize: 15)),
-                      activeThumbColor: const Color(0xFFEF7A1E),
-                      activeTrackColor: const Color(0xFFEF7A1E).withValues(alpha: 0.5),
-                      value: ref.watch(settingsProvider.select((s) => s.ambientModeEnabled)),
-                      onChanged: (val) {
-                        setSheetState(() {});
-                        ref.read(settingsProvider.notifier).setAmbientModeEnabled(val);
-                      },
-                    ),
-
-                    // 3. Temporizador de Apagado
-                    ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      leading: const Icon(Icons.bedtime_outlined, color: Colors.white, size: 22),
-                      title: const Text('Temporizador de apagado', style: TextStyle(color: Colors.white, fontSize: 15)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _sleepTimerMinutes > 0 ? '${_sleepTimerMinutes}m' : 'Desactivado',
-                            style: const TextStyle(color: Colors.white54, fontSize: 13),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
-                        ],
-                      ),
-                      onTap: () {
-                        Navigator.pop(bottomSheetContext);
-                        _showSleepTimerSheet();
-                      },
-                    ),
-
-                    const Divider(color: Colors.white12, height: 1),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                      child: Text(
-                        'AurisTV Player Engine',
-                        style: TextStyle(color: Colors.white38, fontSize: 12),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xE61C1C1C), // rgba(28, 28, 28, 0.90) - YouTube Popup
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                border: Border(
+                  top: BorderSide(color: Colors.white.withValues(alpha: 0.12), width: 0.5),
                 ),
               ),
-            );
-          },
+              child: StatefulBuilder(
+                builder: (context, setSheetState) {
+                  return SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Top Pill Handle (YouTube Style)
+                          Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Ajustes de Reproducción',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // 1. Velocidad de Reproducción (YouTube Speed Icon)
+                          ListTile(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            leading: AurisIcon(AurisIcons.playbackSpeed, color: Colors.white, size: 22),
+                            title: const Text('Velocidad de reproducción', style: TextStyle(color: Colors.white, fontSize: 15)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(currentSpeedLabel, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.pop(bottomSheetContext);
+                              _showSpeedSheet();
+                            },
+                          ),
+
+                          // 2. Modo Ambiente (YouTube Ambient Mode Icon)
+                          SwitchListTile(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            secondary: AurisIcon(AurisIcons.ambientMode, color: Colors.white, size: 22),
+                            title: const Text('Modo ambiente', style: TextStyle(color: Colors.white, fontSize: 15)),
+                            activeThumbColor: const Color(0xFFFF0033),
+                            activeTrackColor: const Color(0xFFFF0033).withValues(alpha: 0.5),
+                            value: ref.watch(settingsProvider.select((s) => s.ambientModeEnabled)),
+                            onChanged: (val) {
+                              setSheetState(() {});
+                              ref.read(settingsProvider.notifier).setAmbientModeEnabled(val);
+                            },
+                          ),
+
+                          // 3. Temporizador de Apagado (YouTube Sleep Timer Icon)
+                          ListTile(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            leading: AurisIcon(AurisIcons.sleepTimer, color: Colors.white, size: 22),
+                            title: const Text('Temporizador de apagado', style: TextStyle(color: Colors.white, fontSize: 15)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _sleepTimerMinutes > 0 ? '${_sleepTimerMinutes}m' : 'Desactivado',
+                                  style: const TextStyle(color: Colors.white54, fontSize: 13),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right, color: Colors.white54, size: 18),
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.pop(bottomSheetContext);
+                              _showSleepTimerSheet();
+                            },
+                          ),
+
+                          const Divider(color: Colors.white12, height: 1),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                            child: Text(
+                              'AurisTV Player Engine',
+                              style: TextStyle(color: Colors.white38, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
         );
       },
     );
@@ -622,82 +647,95 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF212121),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSpeedState) {
-            final double currentRate = active.player?.state.rate ?? 1.0;
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.speed_outlined, color: Colors.white, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${currentRate.toStringAsFixed(currentRate % 1 == 0 ? 1 : 2)}x',
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ...presetRows.map((row) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: row.map((r) {
-                            final bool isSel = (currentRate - r).abs() < 0.01;
-                            return InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap: () {
-                                active.player?.setRate(r);
-                                setSpeedState(() {});
-                                setState(() {});
-                                Navigator.pop(context);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSel ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '${r}x',
-                                  style: TextStyle(
-                                    color: isSel ? Colors.black : Colors.white,
-                                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 8),
-                  ],
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xE61C1C1C),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                border: Border(
+                  top: BorderSide(color: Colors.white.withValues(alpha: 0.12), width: 0.5),
                 ),
               ),
-            );
-          },
+              child: StatefulBuilder(
+                builder: (context, setSpeedState) {
+                  final double currentRate = active.player?.state.rate ?? 1.0;
+                  return SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              AurisIcon(AurisIcons.playbackSpeed, color: Colors.white, size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'x',
+                                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          ...presetRows.map((row) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: row.map((r) {
+                                  final bool isSel = (currentRate - r).abs() < 0.01;
+                                  return InkWell(
+                                    borderRadius: BorderRadius.circular(8),
+                                    onTap: () {
+                                      active.player?.setRate(r);
+                                      setSpeedState(() {});
+                                      setState(() {});
+                                      Navigator.pop(context);
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: isSel ? const Color(0xFFFF0033) : Colors.white.withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        'x',
+                                        style: TextStyle(
+                                          color: isSel ? Colors.white : Colors.white,
+                                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            );
+                          }),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
         );
       },
     );
@@ -714,62 +752,74 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF212121),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 32,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xE61C1C1C),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                border: Border(
+                  top: BorderSide(color: Colors.white.withValues(alpha: 0.12), width: 0.5),
+                ),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text('Temporizador de Apagado', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      ...options.map((opt) {
+                        final int mins = opt['minutes'] as int;
+                        final String label = opt['label'] as String;
+                        final bool isSelected = _sleepTimerMinutes == mins;
+
+                        return ListTile(
+                          leading: SizedBox(
+                            width: 24,
+                            child: isSelected ? const Icon(Icons.check, color: Color(0xFFFF0033), size: 20) : null,
+                          ),
+                          title: Text(label, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                          onTap: () {
+                            _sleepTimer?.cancel();
+                            setState(() => _sleepTimerMinutes = mins);
+                            if (mins > 0) {
+                              _sleepTimer = Timer(Duration(minutes: mins), () {
+                                final active = ref.read(activePlayerProvider);
+                                active.player?.pause();
+                                if (mounted) setState(() => _sleepTimerMinutes = 0);
+                              });
+                            }
+                            Navigator.pop(context);
+                          },
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                const Text('Temporizador de Apagado', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                ...options.map((opt) {
-                  final int mins = opt['minutes'] as int;
-                  final String label = opt['label'] as String;
-                  final bool isSelected = _sleepTimerMinutes == mins;
-
-                  return ListTile(
-                    leading: SizedBox(
-                      width: 24,
-                      child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
-                    ),
-                    title: Text(label, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                    onTap: () {
-                      _sleepTimer?.cancel();
-                      setState(() => _sleepTimerMinutes = mins);
-                      if (mins > 0) {
-                        _sleepTimer = Timer(Duration(minutes: mins), () {
-                          final active = ref.read(activePlayerProvider);
-                          active.player?.pause();
-                          if (mounted) setState(() => _sleepTimerMinutes = 0);
-                        });
-                      }
-                      Navigator.pop(context);
-                    },
-                  );
-                }),
-                const SizedBox(height: 8),
-              ],
+              ),
             ),
           ),
         );
       },
     );
   }
-
   Widget _buildEmbeddedPlayer() {
     final active = ref.watch(activePlayerProvider);
     final String currentSourceLower = (widget.source.toLowerCase()) + (widget.serverName?.toLowerCase() ?? '');
@@ -852,57 +902,109 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
             duration: const Duration(milliseconds: 200),
             child: IgnorePointer(
               ignoring: !(_showControls && !isInitialLoading),
-              child: Container(
-                color: Colors.black38,
-                child: Stack(
-                  children: [
-                    // Botones Centrales: Retroceder 10s, Play/Pausa, Adelantar 10s
-                    Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            iconSize: 32,
-                            icon: const Icon(Icons.replay_10, color: Colors.white),
-                            onPressed: _rewind10,
-                          ),
-                          const SizedBox(width: 24),
-                          IconButton(
-                            iconSize: 38,
-                            icon: AurisIcon(
-                              _isCompleted
-                                  ? AurisIcons.restart
-                                  : (_isPlaying ? AurisIcons.pauseFilled : AurisIcons.playFilled),
-                              color: const Color(0xFFEF7A1E),
-                              size: 38,
-                            ),
-                            onPressed: () {
-                              final active = ref.read(activePlayerProvider);
-                              if (_isCompleted) {
-                                setState(() {
-                                  _isCompleted = false;
-                                  _position = Duration.zero;
-                                  _isPlaying = true;
-                                });
-                                active.player?.seek(Duration.zero);
-                                active.player?.play();
-                              } else if (_isPlaying) {
-                                active.player?.pause();
-                              } else {
-                                active.player?.play();
-                              }
-                              _startHideTimer();
-                            },
-                          ),
-                          const SizedBox(width: 24),
-                          IconButton(
-                            iconSize: 32,
-                            icon: const Icon(Icons.forward_10, color: Colors.white),
-                            onPressed: _fastForward10,
-                          ),
-                        ],
+              child: Stack(
+                children: [
+                  // Gradiente Sombrío Superior (YouTube ytp-gradient-top)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 72,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0x99000000), // rgba(0,0,0, 0.60)
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
                     ),
+                  ),
+
+                  // Gradiente Sombrío Inferior (YouTube ytp-gradient-bottom)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 98,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            Color(0xB3000000), // rgba(0,0,0, 0.70)
+                            Color(0x59000000), // rgba(0,0,0, 0.35)
+                            Colors.transparent,
+                          ],
+                          stops: [0.0, 0.6, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Botones Centrales: Retroceder 10s, Play/Pausa, Adelantar 10s
+                  Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          iconSize: 32,
+                          icon: AurisIcon(AurisIcons.backward10Seconds, color: Colors.white, size: 30),
+                          onPressed: _rewind10,
+                        ),
+                        const SizedBox(width: 24),
+                        // Bezel Central (YouTube Bezel Overlay)
+                        Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              iconSize: 34,
+                              icon: AurisIcon(
+                                _isCompleted
+                                    ? AurisIcons.restart
+                                    : (_isPlaying ? AurisIcons.pauseFilled : AurisIcons.playFilled),
+                                color: Colors.white,
+                                size: 34,
+                              ),
+                              onPressed: () {
+                                final active = ref.read(activePlayerProvider);
+                                if (_isCompleted) {
+                                  setState(() {
+                                    _isCompleted = false;
+                                    _position = Duration.zero;
+                                    _isPlaying = true;
+                                  });
+                                  active.player?.seek(Duration.zero);
+                                  active.player?.play();
+                                } else if (_isPlaying) {
+                                  active.player?.pause();
+                                } else {
+                                  active.player?.play();
+                                }
+                                _startHideTimer();
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                        IconButton(
+                          iconSize: 32,
+                          icon: AurisIcon(AurisIcons.forward10Seconds, color: Colors.white, size: 30),
+                          onPressed: _fastForward10,
+                        ),
+                      ],
+                    ),
+                  ),
 
                     // Botón Atrás en la esquina superior izquierda (Dentro del Reproductor)
                     Positioned(
@@ -944,11 +1046,15 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                           // Botón MiniPlayer / Picture-in-Picture voluntario
                           if (!_isFullscreen)
                             IconButton(
-                              icon: const Icon(Icons.picture_in_picture_alt_outlined, color: Colors.white, size: 22),
+                              padding: const EdgeInsets.all(6),
+                              constraints: const BoxConstraints(),
+                              icon: AurisIcon(AurisIcons.toPip, color: Colors.white, size: 22),
                               tooltip: 'Minimizar',
                               onPressed: _minimizeToMiniPlayer,
                             ),
                           IconButton(
+                            padding: const EdgeInsets.all(6),
+                            constraints: const BoxConstraints(),
                             icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
                             onPressed: () {
                               showModalBottomSheet(
@@ -960,73 +1066,105 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                             },
                           ),
                           IconButton(
-                            icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+                            padding: const EdgeInsets.all(6),
+                            constraints: const BoxConstraints(),
+                            icon: AurisIcon(AurisIcons.settings, color: Colors.white, size: 22),
                             onPressed: _showSettingsSheet,
                           ),
                         ],
                       ),
                     ),
 
-                    // Cápsula "Saltar OP/ED" (Fondo negro con opacidad 20% y bordes redondeados)
-                    Positioned(
-                      left: 12,
-                      bottom: 30,
-                      child: InkWell(
-                        onTap: _skipOpEd,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.20),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white24, width: 0.5),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AurisIcon(
-                                AurisIcons.fastForward,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Saltar OP/ED',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Botón Circular de Pantalla Completa (Navega a PlayerScreen)
+                    // Acciones Inferiores Derecha: Cápsula "Saltar OP/ED" + Botón Circular de Pantalla Completa
                     Positioned(
                       right: 12,
                       bottom: 30,
-                      child: InkWell(
-                        onTap: _navigateToFullscreen,
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: AurisIcon(
-                              AurisIcons.expand,
-                              color: Colors.white,
-                              size: 18,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Cápsula "Saltar OP/ED" (YouTube Delhi Pill con Frosted Glass)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                              child: InkWell(
+                                onTap: _skipOpEd,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.30),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.12),
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AurisIcon(
+                                        AurisIcons.fastForward,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text(
+                                        'Saltar OP/ED',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.2,
+                                          shadows: [
+                                            Shadow(
+                                              offset: Offset(0, 0),
+                                              blurRadius: 2,
+                                              color: Colors.black54,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+
+                          const SizedBox(width: 8),
+
+                          // Botón Circular de Pantalla Completa (YouTube Pill Frosted Glass)
+                          ClipOval(
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                              child: InkWell(
+                                onTap: _navigateToFullscreen,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.30),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.12),
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: AurisIcon(
+                                      AurisIcons.expand,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -1048,12 +1186,12 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                           ),
                           SliderTheme(
                             data: const SliderThemeData(
-                              trackHeight: 2,
-                              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 4.5),
-                              overlayShape: RoundSliderOverlayShape(overlayRadius: 10),
-                              activeTrackColor: Color(0xFFEF7A1E),
+                              trackHeight: 3.5,
+                              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6.5),
+                              overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
+                              activeTrackColor: Color(0xFFFF0033),
                               inactiveTrackColor: Colors.white24,
-                              thumbColor: Color(0xFFEF7A1E),
+                              thumbColor: Color(0xFFFF0033),
                             ),
                             child: Slider(
                               value: _position.inSeconds.toDouble().clamp(0, (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble()),
@@ -1084,7 +1222,6 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1207,6 +1344,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         : ((currentEp?.title != null && currentEp!.title!.isNotEmpty)
             ? currentEp.title!
             : (widget.episodeTitle ?? 'Episodio $currentEpNum'));
+
+    // Sincronizar el título resuelto en el State para que _updateHistory
+    // lo pueda usar aunque se llame desde el timer (fuera del build).
+    if (_resolvedEpTitle != realEpTitle) {
+      // Sin setState — solo actualiza el campo; el próximo build ya lo tiene.
+      _resolvedEpTitle = realEpTitle;
+    }
 
     final String realSynopsis = isMovie
         ? (widget.synopsis ?? 'Disfruta de $seriesTitle con la mejor calidad en AurisTV.')
@@ -1357,7 +1501,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                             episodeTitle: (nextEp.title != null && nextEp.title!.isNotEmpty) ? nextEp.title! : 'Episodio ${nextEp.number}',
                             thumbnailUrl: nextEp.thumbnail ?? widget.bannerUrl,
                             duration: nextEp.duration ?? (nextEp.runtime != null ? '${nextEp.runtime}m' : '24m'),
-                            audioSubsBadge: nextEp.quality ?? 'Sub | Dob',
+                            audioSubsBadge: (nextEp.airDate != null && nextEp.airDate!.isNotEmpty && formatDisplayDate(nextEp.airDate) != 'N/A')
+                                ? formatDisplayDate(nextEp.airDate)
+                                : (nextEp.quality ?? 'Sub | Dob'),
                             onTap: () => _switchEpisode(nextEp!),
                           ),
 
@@ -1401,7 +1547,10 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                             final bool isCurrent = ep.number.toString() == widget.episode;
                             final String epTitle = (ep.title != null && ep.title!.isNotEmpty) ? ep.title! : 'Episodio ${ep.number}';
                             final String durationStr = ep.duration ?? (ep.runtime != null ? '${ep.runtime}m' : '24m');
-                            final String qualityStr = ep.quality ?? 'Sub | Dob';
+                            final String epDate = (ep.airDate != null && ep.airDate!.isNotEmpty) ? formatDisplayDate(ep.airDate) : '';
+                            final String qualityStr = (epDate.isNotEmpty && epDate != 'N/A')
+                                ? epDate
+                                : (ep.quality ?? 'Sub | Dob');
                             final String thumbUrl = ep.thumbnail ?? widget.bannerUrl ?? widget.posterUrl ?? '';
 
                             return Padding(

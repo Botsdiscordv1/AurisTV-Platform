@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:ui' as ui;
@@ -2954,9 +2954,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     // pueda llegar al servidor.
     videoUrl = ApiEndpoints.fixUrl(videoUrl);
 
-    // Config remota de playback: dispara la descarga (no bloquea) y usa los
-    // valores actuales; si a�n no carg�, defaults = valores hardcodeados previos.
-    final pcfg = ref.read(playbackConfigProvider).valueOrNull ?? PlaybackConfig.defaults;
+    // Config remota de playback: selecciona el perfil correcto (movie/episode)
+    // del servidor VPS correspondiente a esta fuente/categor�a.
+    final _pcfgParam = resolvePlaybackParam(
+      source: _currentSource,
+      category: widget.category,
+    );
+    final pcfg = ref.read(playbackConfigFamily(_pcfgParam)).valueOrNull ?? PlaybackConfig.defaults;
     PlaybackTelemetry.instance.setPlatformOverride('tv');
     PlaybackTelemetry.instance.configure(pcfg);
     PlaybackTelemetry.instance.beginSession();
@@ -3035,7 +3039,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     }
 
     if (_player == null) {
-      _player = Player(configuration: const PlayerConfiguration(bufferSize: 32 * 1024 * 1024));
+      final _pcfgParam2 = resolvePlaybackParam(source: _currentSource, category: widget.category);
+      final pcfg = ref.read(playbackConfigFamily(_pcfgParam2)).valueOrNull ?? PlaybackConfig.defaults;
+      _player = Player(configuration: PlayerConfiguration(bufferSize: pcfg.bufferSizeBytes));
     }
     final player = _player!;
 
@@ -3404,8 +3410,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('cache', 'yes');
         platform.setProperty('cache-on-disk', 'no');
         
-        platform.setProperty('demuxer-max-bytes', '67108864');
-        platform.setProperty('demuxer-readahead-secs', '30');
+        platform.setProperty('demuxer-max-bytes', pcfg.demuxerMaxBytes);
+        platform.setProperty('demuxer-readahead-secs', pcfg.demuxerReadaheadSecs.toString());
+        platform.setProperty('demuxer-max-back-bytes', pcfg.demuxerMaxBackBytes);
+        platform.setProperty('network-timeout', pcfg.networkTimeoutSecs.toString());
         
         platform.setProperty('video-sync', 'audio');
         platform.setProperty('framedrop', 'decoder+vo');

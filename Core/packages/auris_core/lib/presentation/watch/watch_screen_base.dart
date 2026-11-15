@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:auris_core/auris_core.dart';
 import 'package:collection/collection.dart';
 import 'adaptive_watch_layout.dart';
+import 'widgets/watch_top_bar.dart';
 import 'widgets/watch_episode_metadata.dart';
 import 'widgets/watch_action_bar.dart';
 import 'widgets/watch_synopsis.dart';
@@ -27,6 +28,8 @@ class WatchScreenBase extends ConsumerStatefulWidget {
     this.episode,
     this.season,
     this.serverName,
+    this.availableServers,
+    this.onServerSelected,
     this.category,
     this.title,
     this.metadataTitle,
@@ -46,6 +49,7 @@ class WatchScreenBase extends ConsumerStatefulWidget {
     this.onNextEpisode,
     this.onPreviousEpisode,
     this.onEpisodeSelected,
+    this.onBack,
     this.isTheaterMode = false,
     this.showPlaylistSidebar = true,
   });
@@ -56,6 +60,8 @@ class WatchScreenBase extends ConsumerStatefulWidget {
   final String? episode;
   final int? season;
   final String? serverName;
+  final List<String>? availableServers;
+  final ValueChanged<String>? onServerSelected;
   final String? category;
   final String? title;
   final String? metadataTitle;
@@ -75,6 +81,7 @@ class WatchScreenBase extends ConsumerStatefulWidget {
   final VoidCallback? onNextEpisode;
   final VoidCallback? onPreviousEpisode;
   final ValueChanged<EpisodeInfo>? onEpisodeSelected;
+  final VoidCallback? onBack;
   final bool isTheaterMode;
   final bool showPlaylistSidebar;
 
@@ -176,7 +183,9 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
             episodeTitle: (nextEp.title != null && nextEp.title!.isNotEmpty) ? nextEp.title! : 'Episodio ${nextEp.number}',
             thumbnailUrl: nextEp.thumbnail ?? widget.bannerUrl,
             duration: nextEp.duration ?? (nextEp.runtime != null ? '${nextEp.runtime}m' : '24m'),
-            audioSubsBadge: nextEp.quality ?? 'Sub | Dob',
+            audioSubsBadge: (nextEp.airDate != null && nextEp.airDate!.isNotEmpty && formatDisplayDate(nextEp.airDate) != 'N/A')
+                ? formatDisplayDate(nextEp.airDate)
+                : (nextEp.quality ?? 'Sub | Dob'),
             onTap: (widget.onEpisodeSelected != null)
                 ? () => widget.onEpisodeSelected!(nextEp!)
                 : widget.onNextEpisode,
@@ -190,7 +199,9 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
             episodeTitle: (prevEp.title != null && prevEp.title!.isNotEmpty) ? prevEp.title! : 'Episodio ${prevEp.number}',
             thumbnailUrl: prevEp.thumbnail ?? widget.bannerUrl,
             duration: prevEp.duration ?? (prevEp.runtime != null ? '${prevEp.runtime}m' : '24m'),
-            audioSubsBadge: prevEp.quality ?? 'Sub | Dob',
+            audioSubsBadge: (prevEp.airDate != null && prevEp.airDate!.isNotEmpty && formatDisplayDate(prevEp.airDate) != 'N/A')
+                ? formatDisplayDate(prevEp.airDate)
+                : (prevEp.quality ?? 'Sub | Dob'),
             onTap: (widget.onEpisodeSelected != null)
                 ? () => widget.onEpisodeSelected!(prevEp!)
                 : widget.onPreviousEpisode,
@@ -199,10 +210,36 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
 
     final String epNumDisplay = isMovie ? 'Película' : ((activeEpisode?.number != null) ? 'E${activeEpisode!.number}' : (widget.episode != null ? 'E${widget.episode}' : 'E$currentEpNum'));
 
+    final VoidCallback toggleBookmark = () {
+      final favItem = FavoriteItem(
+        id: widget.contentId,
+        title: seriesTitle,
+        posterUrl: widget.posterUrl ?? widget.bannerUrl ?? '',
+        bannerUrl: widget.bannerUrl ?? '',
+        category: widget.category ?? 'anime',
+        source: widget.source,
+        url: widget.sourceUrl,
+        addedAt: DateTime.now(),
+        profileId: 'guest_profile',
+        year: widget.year,
+      );
+      ref.read(favoritesProvider.notifier).toggleFavorite(favItem);
+    };
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: AdaptiveWatchLayout(
         isTheaterMode: widget.isTheaterMode,
+        topBarWidget: WatchTopBar(
+          onBack: widget.onBack,
+          category: widget.category,
+          seriesTitle: seriesTitle,
+          episodeNumber: isMovie ? null : epNumDisplay,
+          serverName: widget.serverName,
+          isBookmarked: isBookmarked,
+          onBookmarkToggle: toggleBookmark,
+          onSharePressed: () {},
+        ),
         playerWidget: widget.playerWidget,
         metadataWidget: WatchEpisodeMetadata(
           seriesTitle: seriesTitle,
@@ -212,21 +249,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
           audioSubsBadge: realBadges,
           releaseDate: realReleaseDate,
           isBookmarked: isBookmarked,
-          onBookmarkToggle: () {
-            final favItem = FavoriteItem(
-              id: widget.contentId,
-              title: seriesTitle,
-              posterUrl: widget.posterUrl ?? widget.bannerUrl ?? '',
-              bannerUrl: widget.bannerUrl ?? '',
-              category: widget.category ?? 'anime',
-              source: widget.source,
-              url: widget.sourceUrl,
-              addedAt: DateTime.now(),
-              profileId: 'guest_profile',
-              year: widget.year,
-            );
-            ref.read(favoritesProvider.notifier).toggleFavorite(favItem);
-          },
+          onBookmarkToggle: toggleBookmark,
         ),
         actionBarWidget: WatchActionBar(
           likeCount: '20.4K',
@@ -346,7 +369,12 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                 : 'Episodio ${ep.number}';
             final String durationStr =
                 ep.duration ?? (ep.runtime != null ? '${ep.runtime}m' : '24m');
-            final String qualityStr = ep.quality ?? 'Sub | Dob';
+            final String epDate = (ep.airDate != null && ep.airDate!.isNotEmpty)
+                ? formatDisplayDate(ep.airDate)
+                : '';
+            final String qualityStr = (epDate.isNotEmpty && epDate != 'N/A')
+                ? epDate
+                : (ep.quality ?? 'Sub | Dob');
             final String thumbUrl =
                 ep.thumbnail ?? widget.bannerUrl ?? widget.posterUrl ?? '';
 

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -2179,7 +2179,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
     // Config remota de playback: dispara la descarga (no bloquea) y usa los
     // valores actuales; si a�n no carg�, defaults = valores hardcodeados previos.
-    final pcfg = ref.read(playbackConfigProvider).value ?? PlaybackConfig.defaults;
+    final _pcfgParam = resolvePlaybackParam(source: _currentSource, category: widget.category);
+    final pcfg = ref.read(playbackConfigFamily(_pcfgParam)).valueOrNull ?? PlaybackConfig.defaults;
     PlaybackTelemetry.instance.configure(pcfg);
     PlaybackTelemetry.instance.beginSession();
 
@@ -2621,8 +2622,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
         platform.setProperty('msg-level', 'all=error');
         platform.setProperty('cache', 'yes');
         platform.setProperty('cache-on-disk', 'no');
-        platform.setProperty('demuxer-max-bytes', '536870912'); 
-        platform.setProperty('demuxer-readahead-secs', '120');
+        platform.setProperty('demuxer-max-bytes', pcfg.demuxerMaxBytes); 
+        platform.setProperty('demuxer-readahead-secs', pcfg.demuxerReadaheadSecs.toString());
+        platform.setProperty('demuxer-max-back-bytes', pcfg.demuxerMaxBackBytes);
+        platform.setProperty('network-timeout', pcfg.networkTimeoutSecs.toString());
         platform.setProperty('video-sync', 'audio'); 
         platform.setProperty('mc', '0'); 
         platform.setProperty('autosync', '30'); 

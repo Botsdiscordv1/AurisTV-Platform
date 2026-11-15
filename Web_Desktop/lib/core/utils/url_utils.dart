@@ -12,10 +12,11 @@ class UrlUtils {
   /// abra por su propio _openPlayer (mini, control remoto, notificaciones).
   static final ValueNotifier<int> playerOpenedTick = ValueNotifier<int>(0);
 
-  /// Guarda la última URI de ficha de contenido visitada antes de entrar al reproductor.
+  /// Guarda la última URI y el último `extra` de ficha de contenido visitada antes de entrar al reproductor.
   /// Permite que al dar atrás desde el reproductor (incluso habiendo navegado por
-  /// múltiples episodios) se retorne de forma limpia y directa a la ficha.
+  /// múltiples episodios) se retorne de forma limpia y directa a la ficha conservando sus datos y fuentes.
   static String? lastContentUri;
+  static Object? lastContentExtra;
 
   /// Abre el reproductor a pantalla completa en la ruta `/watch/:token/:slug`.
   ///
@@ -26,10 +27,11 @@ class UrlUtils {
   static Future<T?> openPlayer<T>(BuildContext context, PlayerScreen player) async {
     playerOpenedTick.value++;
     
-    // Guardar la URI actual (la ficha de contenido) para poder retornar a ella al salir del player
+    // Guardar la URI actual (la ficha de contenido) y su extra para poder retornar a ella al salir del player
     final currentUri = GoRouterState.of(context).uri.toString();
     if (!currentUri.startsWith('/watch')) {
       lastContentUri = currentUri;
+      lastContentExtra = GoRouterState.of(context).extra;
     }
     final slug = (player.title ?? '')
         .toLowerCase()

@@ -236,6 +236,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       onNextEpisode: effectiveOnNext,
       onPreviousEpisode: effectiveOnPrevious,
       onEpisodeSelected: effectiveOnSelected,
+      onBack: _handleBackToContent,
       isTheaterMode: _isTheaterMode,
       // Siempre renderizamos CleanEmbeddedPlayer para que el Stack(fit:expand)
       // siempre tenga constraints correctos. El player muestra su propio spinner
@@ -273,7 +274,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
   void _handleBackToContent() {
     if (UrlUtils.lastContentUri != null && UrlUtils.lastContentUri!.isNotEmpty) {
-      context.go(UrlUtils.lastContentUri!);
+      context.go(UrlUtils.lastContentUri!, extra: UrlUtils.lastContentExtra);
     } else {
       // Si entró directamente por URL/bookmark y no hay lastContentUri,
       // reconstruye la URL de la ficha para volver a ella.

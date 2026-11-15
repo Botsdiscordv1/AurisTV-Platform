@@ -127,21 +127,31 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
 
     // Knob de server (GET /api/client-config); si aún no cargó, el default
     // es exactamente el bufferSize anterior hardcodeado (32 MiB).
+    // Resolver config según servidor y tipo de contenido ya conocido en el estado.
+    final pcfgParam = resolvePlaybackParam(
+      source: state.source,
+      category: state.currentItem?.type.name,
+    );
+    final pcfg = playbackConfigSync(ref, pcfgParam);
     final player = Player(
       configuration: PlayerConfiguration(
-        bufferSize: playbackConfigSync(ref).bufferSizeBytes,
+        bufferSize: pcfg.bufferSizeBytes,
       ),
     );
     
     // Senior Tuning: Optimizamos el motor para salida de video GPU por textura en Android
+    // y aplicamos configuración avanzada de demuxer/buffer para absorber jitter de red.
     try {
       if (!kIsWeb) {
         final platform = player.platform as dynamic;
         platform.setProperty('vo', 'gpu');
         platform.setProperty('hwdec', 'auto-safe');
         platform.setProperty('ao', 'opensles,audiotrack');
-        platform.setProperty('network-timeout', '8');
-        platform.setProperty('demuxer-readahead-secs', '15');
+        platform.setProperty('network-timeout', pcfg.networkTimeoutSecs.toString());
+        platform.setProperty('demuxer-readahead-secs', pcfg.demuxerReadaheadSecs.toString());
+        platform.setProperty('demuxer-max-bytes', pcfg.demuxerMaxBytes);
+        platform.setProperty('demuxer-max-back-bytes', pcfg.demuxerMaxBackBytes);
+        platform.setProperty('stream-buffer-size', pcfg.streamBufferSizeFor(false));
       }
     } catch (_) {}
 
@@ -298,6 +308,16 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     String? episodeTitle,
     Map<String, String>? headers,
   }) async {
+    // Prefetch de config para este servidor+perfil antes de crear el player.
+    // Es no-bloqueante: si ya está en caché Riverpod la devuelve de inmediato;
+    // si no, el family la descarga y quedará lista cuando initPlayerIfNeeded()
+    // la lea. Usamos read() para no crear dependencia reactiva aquí.
+    final _prefetchParam = resolvePlaybackParam(
+      source: source,
+      category: item.type.name,
+    );
+    ref.read(playbackConfigFamily(_prefetchParam).future).ignore();
+
     if (createPlayer) initPlayerIfNeeded();
 
     if (source == 'ppv' || url.contains('/embed/') || (item.source == 'ppv') || (item.detailUrl != null && item.detailUrl!.contains('/embed/'))) {
@@ -390,9 +410,16 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
     // dejamos una sesión "viva" sin nada que reproducir.
     if (!isSameUrl || !engineAlive) {
       _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
-      final String freshUrl = url.contains('#')
-          ? '$url&_at=$_currentSessionId'
-          : '$url#_at=$_currentSessionId';
+      
+      // Senior Acceleration: Pasar MP4s estáticos por el acelerador multi-hilo local
+      String targetStreamUrl = url;
+      try {
+        targetStreamUrl = await AurisChunkedStreamAccelerator.instance.prepareAcceleratedStream(url, headers);
+      } catch (_) {}
+
+      final String freshUrl = targetStreamUrl.contains('#')
+          ? '$targetStreamUrl&_at=$_currentSessionId'
+          : '$targetStreamUrl#_at=$_currentSessionId';
 
       await state.player?.open(Media(freshUrl, httpHeaders: headers ?? const {}));
 

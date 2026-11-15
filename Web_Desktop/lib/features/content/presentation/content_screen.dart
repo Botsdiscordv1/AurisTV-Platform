@@ -1733,6 +1733,23 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
   Timer? _timeoutFallbackTimer;
   bool _hasOpenedPlayer = false;
 
+  /// Memoria estática de fuentes conocidas por título/url para Web.
+  /// Previene que al navegar a `/watch` y dar Atrás (`context.go`) se pierdan
+  /// las fuentes suplementarias descubiertas (ej. AV1 + JKA).
+  static final Map<String, List<SearchResult>> _discoveredSourcesMemoryCache = {};
+
+  List<SearchResult>? _resolveInitialSources() {
+    final String key = (widget.title.isNotEmpty ? widget.title : widget.url).trim().toLowerCase();
+    final cached = _discoveredSourcesMemoryCache[key];
+    if (cached != null && cached.isNotEmpty) {
+      if (widget.result != null && !cached.any((s) => s.source == widget.result!.source && s.url == widget.result!.url)) {
+        return List.unmodifiable([...cached, widget.result!]);
+      }
+      return List.unmodifiable(cached);
+    }
+    return widget.result != null ? List.unmodifiable([widget.result!]) : null;
+  }
+
   Widget _buildEpisodesSkeleton(BuildContext context, bool isMobile) {
     try {
       final width = MediaQuery.of(context).size.width;
@@ -2457,7 +2474,7 @@ void _openPlayer(PlayerScreen player) {
       url: widget.url,
       type: widget.result?.type ?? widget.type,
       sectionId: widget.sectionId,
-      initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
+      initialSources: _resolveInitialSources(),
     );
     final detailState = ref.read(unifiedContentProvider(detailParams));
     final history = ref.read(playbackHistoryStateProvider).asData?.value?.where((h) => h.contentId == widget.title).firstOrNull;
@@ -2518,6 +2535,7 @@ void _openPlayer(PlayerScreen player) {
           totalEpisodes: epData?.total ?? 0,
           title: detailState.seasonTitle ?? widget.title,
           metadataTitle: widget.metadataTitle,
+          episodeTitle: ep?.title,
           logoUrl: detailState.detail.asData?.value?.main.logo,
           posterUrl: currentSource?.thumbnail ?? widget.result?.thumbnail,
           bannerUrl: episodeThumb,
@@ -2876,7 +2894,7 @@ void _openPlayer(PlayerScreen player) {
                   url: widget.url,
                   type: widget.result?.type ?? widget.type,
                   sectionId: widget.sectionId,
-                  initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
+                  initialSources: _resolveInitialSources(),
                 ),
                 episodesBuilder: (episodes) {
                   final epBundleVal = episodesAsync.value;
@@ -2930,6 +2948,7 @@ void _openPlayer(PlayerScreen player) {
                                 totalEpisodes: epDataVal.total,
                                 title: seasonTitle ?? widget.title,
                                 metadataTitle: widget.metadataTitle,
+                                episodeTitle: ep?.title,
                                 logoUrl: detailLogo,
                                 posterUrl: tapSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
                                 bannerUrl: epThumb,
@@ -2987,6 +3006,7 @@ void _openPlayer(PlayerScreen player) {
                                 totalEpisodes: epDataVal.total,
                                 title: seasonTitle ?? widget.title,
                                 metadataTitle: widget.metadataTitle,
+                                episodeTitle: ep?.title,
                                 logoUrl: detailLogo,
                                 posterUrl: tapSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
                                 bannerUrl: epThumb,
@@ -3047,6 +3067,7 @@ void _openPlayer(PlayerScreen player) {
                                   totalEpisodes: epDataVal.total,
                                   title: seasonTitle ?? widget.title,
                                   metadataTitle: widget.metadataTitle,
+                                  episodeTitle: sp.title,
                                   logoUrl: detailLogo,
                                   posterUrl: spSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
                                   bannerUrl: epThumb,
@@ -3099,6 +3120,7 @@ void _openPlayer(PlayerScreen player) {
                                   totalEpisodes: epDataVal.total,
                                   title: seasonTitle ?? widget.title,
                                   metadataTitle: widget.metadataTitle,
+                                  episodeTitle: sp.title,
                                   logoUrl: detailLogo,
                                   posterUrl: spSource?.thumbnail ?? (currentSource?.thumbnail ?? widget.result?.thumbnail),
                                   bannerUrl: epThumb,
@@ -3163,7 +3185,7 @@ void _openPlayer(PlayerScreen player) {
         url: widget.url,
         type: widget.result?.type ?? widget.type,
         sectionId: widget.sectionId,
-        initialSources: widget.result != null ? List.unmodifiable([widget.result!]) : null,
+        initialSources: _resolveInitialSources(),
       );
 
       final detailState = ref.watch(unifiedContentProvider(detailParams));
@@ -3174,6 +3196,9 @@ void _openPlayer(PlayerScreen player) {
 
       ref.listen<UnifiedContentState>(unifiedContentProvider(detailParams), (prev, next) {
         if (next.allSources.isNotEmpty) {
+          final String key = (widget.title.isNotEmpty ? widget.title : widget.url).trim().toLowerCase();
+          _discoveredSourcesMemoryCache[key] = next.allSources;
+
           final currentInPlayer = ref.read(activeContentSourcesProvider);
           if (!const ListEquality().equals(currentInPlayer, next.allSources)) {
             ref.read(activeContentSourcesProvider.notifier).state = next.allSources;

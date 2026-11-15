@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 import 'package:media_kit/media_kit.dart';
@@ -48,9 +50,11 @@ class CleanEmbeddedPlayer extends ConsumerStatefulWidget {
     this.currentSubtitleLabel,
     this.hasQualityOptions = true,
     this.onBack,
+    this.showBackButton,
   });
 
   final VoidCallback? onBack;
+  final bool? showBackButton;
 
   final String sourceUrl;
   final String source;
@@ -108,7 +112,9 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   bool _resumeApplied = false;
 
   double _volume = 100.0;
+  double _lastNonZeroVolume = 100.0;
   bool _isVolumeHovered = false;
+  bool _isVolumeDragging = false;
 
   // --- Floating Settings Panel State ---
   bool _showSettingsPanel = false;
@@ -118,6 +124,9 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   Timer? _sleepTimer;
   int _sleepTimerMinutes = 0;
   String _sleepTimerLabel = 'No';
+
+  // --- Focus Node para atajos de teclado Web Desktop ---
+  final FocusNode _focusNode = FocusNode();
 
   // --- Quality options state ---
   List<QualityOption> _discoveredQualities = [];
@@ -130,6 +139,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     _isAmbientLightingEnabled = widget.isAmbientLightingEnabled;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _focusNode.requestFocus();
       _initPlayerAndSource();
     });
   }
@@ -389,13 +399,84 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
 
   void _setVolume(double val) {
     setState(() {
-      _volume = val;
-      ref.read(activePlayerProvider).player?.setVolume(val);
+      _volume = val.clamp(0.0, 100.0);
+      if (_volume > 0) {
+        _lastNonZeroVolume = _volume;
+      }
+      ref.read(activePlayerProvider).player?.setVolume(_volume);
     });
+  }
+
+  void _toggleMute() {
+    if (_volume > 0) {
+      _setVolume(0);
+    } else {
+      _setVolume(_lastNonZeroVolume > 0 ? _lastNonZeroVolume : 100);
+    }
+    _startHideTimer();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    final key = event.logicalKey;
+    final player = ref.read(activePlayerProvider).player;
+
+    if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) {
+      if (_isPlaying) {
+        player?.pause();
+      } else {
+        player?.play();
+      }
+      _toggleControls();
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.keyF) {
+      widget.onExpandPressed?.call();
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.keyT) {
+      widget.onTheaterModeToggle?.call();
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.keyM) {
+      _toggleMute();
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyJ) {
+      final newSec = (_position.inSeconds - 10).clamp(0, _duration.inSeconds);
+      player?.seek(Duration(seconds: newSec));
+      _startHideTimer();
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) {
+      final newSec = (_position.inSeconds + 10).clamp(0, _duration.inSeconds);
+      player?.seek(Duration(seconds: newSec));
+      _startHideTimer();
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.arrowUp) {
+      _setVolume((_volume + 10).clamp(0, 100));
+      _startHideTimer();
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.arrowDown) {
+      _setVolume((_volume - 10).clamp(0, 100));
+      _startHideTimer();
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.keyN) {
+      if (widget.hasNext || widget.onNextEpisode != null) {
+        widget.onNextEpisode?.call();
+        _startHideTimer();
+      }
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.keyP) {
+      if (widget.hasPrevious || widget.onPreviousEpisode != null) {
+        widget.onPreviousEpisode?.call();
+        _startHideTimer();
+      }
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
   }
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _sleepTimer?.cancel();
     _hideControlsTimer?.cancel();
     _posSub?.cancel();
@@ -427,121 +508,186 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
             : null);
 
     final bool isInitialLoading = !_hasLoadedFirstFrame && !_isPlaying && _position.inMilliseconds == 0;
+    final bool isTabletOrDesktop = MediaQuery.sizeOf(context).width >= 768;
+    final bool shouldShowEmbedBack = widget.onBack != null &&
+        (widget.showBackButton ?? !isTabletOrDesktop);
 
-    return MouseRegion(
-      onHover: (_) {
-        if (!_showControls) _toggleControls();
-      },
-      child: GestureDetector(
-        onTap: () {
-          if (!isInitialLoading) {
-            if (_isPlaying) {
-              player?.pause();
-            } else {
-              player?.play();
-            }
-            _toggleControls();
-          }
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: (node, event) => _handleKeyEvent(node, event),
+      child: MouseRegion(
+        onHover: (_) {
+          if (!_showControls) _toggleControls();
         },
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // 1. Capa de Video real
-            if (controller != null)
-              Video(
-                controller: controller,
-                controls: NoVideoControls,
-                fit: BoxFit.contain,
-              )
-            else
-              Container(color: Colors.black),
-
-            // 2. Fase de Carga Inicial
-            if (isInitialLoading)
-              Container(
-                color: Colors.black,
-                child: const Center(
-                  child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
-                ),
-              ),
-
-            // 3. Overlay de Controles Rediseñado para Web Desktop
-            AnimatedOpacity(
-              opacity: (_showControls && !isInitialLoading) ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 200),
-              child: IgnorePointer(
-                ignoring: !(_showControls && !isInitialLoading),
-                child: Stack(
-                  children: [
-                    // Botón Back superior izquierdo si está provisto (espejo de móvil)
-                    if (widget.onBack != null)
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: widget.onBack,
-                            borderRadius: BorderRadius.circular(20),
-                            hoverColor: Colors.white.withValues(alpha: 0.15),
-                            child: Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.40),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.arrow_back_rounded,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    // Gradiente sutil únicamente en la parte inferior tras los controles
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: 120,
+        child: GestureDetector(
+          onTap: () {
+            if (!isInitialLoading) {
+              if (_isPlaying) {
+                player?.pause();
+              } else {
+                player?.play();
+              }
+              _toggleControls();
+            }
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 0. Resplandor de Luz Ambiental (Ambilight)
+              if (_isAmbientLightingEnabled)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 500),
+                      opacity: _isPlaying ? 0.85 : 0.40,
                       child: Container(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
+                          gradient: RadialGradient(
+                            center: Alignment.center,
+                            radius: 1.2,
                             colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.65),
+                              const Color(0xFFEF7A1E).withValues(alpha: 0.18),
+                              Colors.black.withValues(alpha: 0.0),
                             ],
                           ),
                         ),
                       ),
                     ),
+                  ),
+                ),
 
-                    // Barra Inferior de Controles Completa (Estilo Web Desktop)
+              // 1. Capa de Video real
+              if (controller != null)
+                Video(
+                  controller: controller,
+                  controls: NoVideoControls,
+                  fit: BoxFit.contain,
+                )
+              else
+                Container(color: Colors.black),
+
+              // 2. Fase de Carga Inicial
+              if (isInitialLoading)
+                Container(
+                  color: Colors.black,
+                  child: const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+                  ),
+                ),
+
+              // 3. Overlay de Controles Rediseñado para Web Desktop
+              AnimatedOpacity(
+                opacity: (_showControls && !isInitialLoading) ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: IgnorePointer(
+                  ignoring: !(_showControls && !isInitialLoading),
+                  child: Stack(
+                    children: [
+                      // Botón Back superior izquierdo (sólo si no hay WatchTopBar activo)
+                      if (shouldShowEmbedBack)
+                        Positioned(
+                          top: 12,
+                          left: 12,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: widget.onBack,
+                              borderRadius: BorderRadius.circular(20),
+                              hoverColor: Colors.white.withValues(alpha: 0.15),
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.40),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.arrow_back_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // Gradiente Superior sutil (sólo si el botón back embebido está activo)
+                      if (shouldShowEmbedBack)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 72,
+                          child: IgnorePointer(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.60),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                    // Gradiente Inferior estilo YouTube (ytp-gradient-bottom)
                     Positioned(
-                      left: widget.isTheaterMode ? 28 : 16,
-                      right: widget.isTheaterMode ? 28 : 16,
-                      bottom: widget.isTheaterMode ? 14 : 12,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 120,
+                      child: IgnorePointer(
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Color(0x33000000), // rgba(0, 0, 0, 0.20)
+                                Color(0x80000000), // rgba(0, 0, 0, 0.50)
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // =====================================================================
+                    // YouTube Web Desktop Official Chrome Controls (.ytp-chrome-controls)
+                    // Con Cápsulas Delhi Modern Frosted Glass (ytp-delhi-modern)
+                    // =====================================================================
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 8,
                       child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // 1. Slider de Tiempo
-                            SliderTheme(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // --- 1. ytp-progress-bar-container (Timeline Slider) ---
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: SliderTheme(
                               data: const SliderThemeData(
-                                trackHeight: 3,
-                                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
-                                activeTrackColor: Color(0xFFEF7A1E),
-                                inactiveTrackColor: Colors.white24,
-                                thumbColor: Color(0xFFEF7A1E),
+                                trackHeight: 3.0,
+                                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6.5),
+                                overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
+                                activeTrackColor: Color(0xFFFF0033), // ytp-play-progress
+                                inactiveTrackColor: Colors.white24, // ytp-progress-list bg
+                                thumbColor: Color(0xFFFF0033), // ytp-scrubber-button
                               ),
                               child: Slider(
-                                value: _position.inSeconds.toDouble().clamp(0, (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble()),
+                                value: _position.inSeconds.toDouble().clamp(
+                                      0,
+                                      (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
+                                    ),
                                 max: (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
                                 onChanged: (value) {
                                   player?.seek(Duration(seconds: value.toInt()));
@@ -549,294 +695,416 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                 },
                               ),
                             ),
-                            const SizedBox(height: 4),
+                          ),
+                          const SizedBox(height: 2),
 
-                            // 2. Fila de Controles (Play, Prev, Next, Volume, Time, Chapter | CC, Settings HD, List, Fullscreen)
-                            SizedBox(
-                              height: 48,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  // GRUPO IZQUIERDO
-                                  Row(
-                                    children: [
-                                      // 1. Cápsula Play / Pause
-                                      Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: () {
-                                            if (_isPlaying) {
-                                              player?.pause();
-                                            } else {
-                                              player?.play();
-                                            }
-                                            _startHideTimer();
-                                          },
-                                          borderRadius: BorderRadius.circular(18),
-                                          hoverColor: Colors.white.withValues(alpha: 0.15),
-                                          child: Container(
-                                            width: 36,
-                                            height: 36,
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withValues(alpha: 0.20),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Center(
-                                              child: AurisIcon(
-                                                _isPlaying ? AurisIcons.customPause : AurisIcons.customPlay,
-                                                color: Colors.white,
-                                                size: 20,
+                          // --- 2. ytp-chrome-controls (Height 56px, Proporciones Oficiales YouTube Delhi) ---
+                          SizedBox(
+                            height: 56,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // =========================================================
+                                // ytp-left-controls (Play Circle Pill, Nav Pill, Time Pill)
+                                // =========================================================
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    // 1. ytp-play-button (Circular 48px Frosted Glass Capsule - Destacado)
+                                    ClipOval(
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.compose(
+                                          outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                          inner: ColorFilter.matrix(const <double>[
+                                            1.630, -0.572, -0.058, 0, 0,
+                                            -0.170, 1.228, -0.058, 0, 0,
+                                            -0.170, -0.572, 1.742, 0, 0,
+                                            0, 0, 0, 1, 0,
+                                          ]),
+                                        ),
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () {
+                                              if (_isPlaying) {
+                                                player?.pause();
+                                              } else {
+                                                player?.play();
+                                              }
+                                              _startHideTimer();
+                                            },
+                                            hoverColor: const Color(0x1AFFFFFF), // rgba(255, 255, 255, 0.10)
+                                            child: Container(
+                                              width: 48,
+                                              height: 48,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Center(
+                                                child: AurisIcon(
+                                                  _isPlaying ? AurisIcons.pause : AurisIcons.play,
+                                                  color: Colors.white,
+                                                  size: 24,
+                                                ),
                                               ),
                                             ),
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                    ),
+                                    const SizedBox(width: 8),
 
-                                      // 2. Cápsula Prev / Next
-                                      Container(
-                                        height: 36,
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withValues(alpha: 0.20),
-                                          borderRadius: BorderRadius.circular(18),
+                                    // 2. ytp-prev-button & ytp-next-button (Navigation Frosted Glass Pill 40px)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.compose(
+                                          outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                          inner: ColorFilter.matrix(const <double>[
+                                            1.630, -0.572, -0.058, 0, 0,
+                                            -0.170, 1.228, -0.058, 0, 0,
+                                            -0.170, -0.572, 1.742, 0, 0,
+                                            0, 0, 0, 1, 0,
+                                          ]),
                                         ),
-                                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            // Previous Episode
-                                            IconButton(
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                              icon: AurisIcon(
-                                                AurisIcons.customPrev,
-                                                color: (widget.hasPrevious || widget.onPreviousEpisode != null) ? Colors.white : Colors.white30,
-                                                size: 20,
-                                              ),
-                                              onPressed: (widget.hasPrevious || widget.onPreviousEpisode != null)
-                                                  ? () {
-                                                      widget.onPreviousEpisode?.call();
-                                                      _startHideTimer();
-                                                    }
-                                                  : null,
-                                            ),
-                                            const SizedBox(width: 2),
-                                            // Next Episode
-                                            IconButton(
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                              icon: AurisIcon(
-                                                AurisIcons.customNext,
-                                                color: (widget.hasNext || widget.onNextEpisode != null) ? Colors.white : Colors.white30,
-                                                size: 20,
-                                              ),
-                                              onPressed: (widget.hasNext || widget.onNextEpisode != null)
-                                                  ? () {
-                                                      widget.onNextEpisode?.call();
-                                                      _startHideTimer();
-                                                    }
-                                                  : null,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-
-                                      // 3. Cápsula Volume (hover expandable)
-                                      MouseRegion(
-                                        onEnter: (_) => setState(() => _isVolumeHovered = true),
-                                        onExit: (_) => setState(() => _isVolumeHovered = false),
-                                        child: AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
-                                          height: 36,
-                                          width: _isVolumeHovered ? 130 : 36,
-                                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                                        child: Container(
+                                          height: 40,
+                                          padding: const EdgeInsets.symmetric(horizontal: 4),
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.20),
-                                            borderRadius: BorderRadius.circular(18),
+                                            color: const Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
+                                            borderRadius: BorderRadius.circular(20),
                                           ),
                                           child: Row(
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
+                                              // Previous Button
                                               IconButton(
                                                 padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                                 icon: AurisIcon(
-                                                  AurisIcons.customVolume,
-                                                  color: _volume == 0 ? Colors.white38 : Colors.white,
-                                                  size: 20,
+                                                  AurisIcons.backwardStep,
+                                                  color: (widget.hasPrevious || widget.onPreviousEpisode != null)
+                                                      ? Colors.white
+                                                      : Colors.white30,
+                                                  size: 19,
                                                 ),
-                                                onPressed: () {
-                                                  if (_volume > 0) {
-                                                    _setVolume(0);
-                                                  } else {
-                                                    _setVolume(100);
-                                                  }
-                                                },
+                                                onPressed: (widget.hasPrevious || widget.onPreviousEpisode != null)
+                                                    ? () {
+                                                        widget.onPreviousEpisode?.call();
+                                                        _startHideTimer();
+                                                      }
+                                                    : null,
+                                                tooltip: 'Anterior',
                                               ),
-                                              if (_isVolumeHovered)
-                                                Expanded(
-                                                  child: SliderTheme(
-                                                    data: const SliderThemeData(
-                                                      trackHeight: 2.5,
-                                                      thumbShape: RoundSliderThumbShape(enabledThumbRadius: 4),
-                                                      activeTrackColor: Color(0xFFEF7A1E),
-                                                      inactiveTrackColor: Colors.white24,
-                                                      thumbColor: Color(0xFFEF7A1E),
-                                                    ),
-                                                    child: Slider(
-                                                      value: _volume,
-                                                      min: 0,
-                                                      max: 100,
-                                                      onChanged: (val) => _setVolume(val),
-                                                    ),
-                                                  ),
+                                              const SizedBox(width: 2),
+
+                                              // Next Button
+                                              IconButton(
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                                icon: AurisIcon(
+                                                  AurisIcons.forwardStep,
+                                                  color: (widget.hasNext || widget.onNextEpisode != null)
+                                                      ? Colors.white
+                                                      : Colors.white30,
+                                                  size: 19,
                                                 ),
+                                                onPressed: (widget.hasNext || widget.onNextEpisode != null)
+                                                    ? () {
+                                                        widget.onNextEpisode?.call();
+                                                        _startHideTimer();
+                                                      }
+                                                    : null,
+                                                tooltip: 'Siguiente',
+                                              ),
                                             ],
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                    ),
+                                    const SizedBox(width: 8),
 
-                                      // 4. Cápsula Time Duration Badge
-                                      Container(
-                                        height: 36,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withValues(alpha: 0.20),
-                                          borderRadius: BorderRadius.circular(18),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.5,
+                                    // 3. ytp-volume-area (Official YouTube Standalone Volume Capsule 40px)
+                                    MouseRegion(
+                                      onEnter: (_) => setState(() => _isVolumeHovered = true),
+                                      onExit: (_) => setState(() => _isVolumeHovered = false),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: BackdropFilter(
+                                          filter: ImageFilter.compose(
+                                            outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                            inner: ColorFilter.matrix(const <double>[
+                                              1.630, -0.572, -0.058, 0, 0,
+                                              -0.170, 1.228, -0.058, 0, 0,
+                                              -0.170, -0.572, 1.742, 0, 0,
+                                              0, 0, 0, 1, 0,
+                                            ]),
+                                          ),
+                                          child: Container(
+                                            height: 40,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                // Botón de mute con icono oficial de YouTube
+                                                IconButton(
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                                                  icon: _YouTubeVolumeIcon(
+                                                    volume: _volume,
+                                                    size: 20,
+                                                  ),
+                                                  onPressed: () {
+                                                    _toggleMute();
+                                                    _startHideTimer();
+                                                  },
+                                                  tooltip: _volume == 0 ? 'Activar sonido (m)' : 'Silenciar (m)',
+                                                ),
+
+                                                // Slider de volumen horizontal idéntico a YouTube Web (ytp-volume-slider)
+                                                AnimatedSize(
+                                                  duration: const Duration(milliseconds: 200),
+                                                  curve: Curves.easeOutCubic,
+                                                  child: (_isVolumeHovered || _isVolumeDragging)
+                                                      ? _YouTubeVolumeSlider(
+                                                          volume: _volume,
+                                                          onVolumeChanged: (val) {
+                                                            _setVolume(val);
+                                                            _startHideTimer();
+                                                          },
+                                                          onDragStateChanged: (dragging) {
+                                                            setState(() => _isVolumeDragging = dragging);
+                                                            if (!dragging) _startHideTimer();
+                                                          },
+                                                        )
+                                                      : const SizedBox.shrink(),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    const SizedBox(width: 8),
 
-                                  // GRUPO DERECHO
-                                  Row(
-                                    children: [
-                                      // Subtitles / CC
-                                      IconButton(
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                        icon: const Icon(
-                                          Icons.subtitles_rounded,
-                                          color: Colors.white,
-                                          size: 20,
+                                    // 4. ytp-time-display (Official ytp-time-wrapper-delhi Frosted Glass Capsule 40px)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: BackdropFilter(
+                                        filter: ImageFilter.compose(
+                                          outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                          inner: ColorFilter.matrix(const <double>[
+                                            1.630, -0.572, -0.058, 0, 0,
+                                            -0.170, 1.228, -0.058, 0, 0,
+                                            -0.170, -0.572, 1.742, 0, 0,
+                                            0, 0, 0, 1, 0,
+                                          ]),
                                         ),
-                                        onPressed: widget.onSubtitlesPressed,
-                                        tooltip: 'Subtítulos',
-                                      ),
-                                      const SizedBox(width: 4),
-
-                                      // Settings Gear with HD Badge
-                                      InkWell(
-                                        onTap: () {
-                                          setState(() {
-                                            _showSettingsPanel = !_showSettingsPanel;
-                                            _settingsView = SettingsView.main;
-                                          });
-                                          _startHideTimer();
-                                        },
-                                        borderRadius: BorderRadius.circular(16),
-                                        hoverColor: Colors.white.withOpacity(0.12),
                                         child: Container(
-                                          width: 32,
-                                          height: 32,
+                                          height: 40,
+                                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
                                           alignment: Alignment.center,
-                                          child: Stack(
-                                            alignment: Alignment.center,
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              Icon(
-                                                Icons.settings_rounded,
-                                                color: _showSettingsPanel ? const Color(0xFFEF7A1E) : Colors.white,
-                                                size: 20,
-                                              ),
-                                              if (widget.hasQualityOptions)
-                                                Positioned(
-                                                  top: -2,
-                                                  right: -4,
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(0xFFE50914),
-                                                      borderRadius: BorderRadius.circular(4),
-                                                    ),
-                                                    child: const Text(
-                                                      'HD',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 7,
-                                                        fontWeight: FontWeight.w900,
-                                                        height: 1.0,
+                                          child: RichText(
+                                            text: TextSpan(
+                                              children: [
+                                                TextSpan(
+                                                  text: _formatDuration(_position),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    letterSpacing: 0.2,
+                                                    shadows: [
+                                                      Shadow(
+                                                        offset: Offset(0, 0),
+                                                        blurRadius: 2,
+                                                        color: Colors.black, // Exacto YouTube: text-shadow: 0 0 2px #000
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const TextSpan(
+                                                  text: ' / ',
+                                                  style: TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.normal,
+                                                  ),
+                                                ),
+                                                TextSpan(
+                                                  text: _formatDuration(_duration),
+                                                  style: const TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.normal,
+                                                    letterSpacing: 0.2,
+                                                    shadows: [
+                                                      Shadow(
+                                                        offset: Offset(0, 0),
+                                                        blurRadius: 2,
+                                                        color: Colors.black, // Exacto YouTube: text-shadow: 0 0 2px #000
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                // =========================================================
+                                // ytp-right-controls (Official Delhi Frosted Glass Capsule 40px)
+                                // =========================================================
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.compose(
+                                      outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                      inner: ColorFilter.matrix(const <double>[
+                                        1.630, -0.572, -0.058, 0, 0,
+                                        -0.170, 1.228, -0.058, 0, 0,
+                                        -0.170, -0.572, 1.742, 0, 0,
+                                        0, 0, 0, 1, 0,
+                                      ]),
+                                    ),
+                                    child: Container(
+                                      height: 40,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // 1. ytp-subtitles-button (CC)
+                                          IconButton(
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                                            icon: AurisIcon(
+                                              AurisIcons.subtitles,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                            onPressed: widget.onSubtitlesPressed,
+                                            tooltip: 'Subtítulos (c)',
+                                          ),
+                                          const SizedBox(width: 2),
+
+                                          // 2. ytp-settings-button (Settings Gear with HD Badge)
+                                          IconButton(
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                            icon: Stack(
+                                              clipBehavior: Clip.none,
+                                              alignment: Alignment.center,
+                                              children: [
+                                                AurisIcon(
+                                                  AurisIcons.settings,
+                                                  color: _showSettingsPanel ? const Color(0xFFFF0033) : Colors.white,
+                                                  size: 20,
+                                                ),
+                                                if (widget.hasQualityOptions)
+                                                  Positioned(
+                                                    top: -2,
+                                                    right: -4,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFFF0033),
+                                                        borderRadius: BorderRadius.circular(2),
+                                                      ),
+                                                      child: const Text(
+                                                        'HD',
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 7,
+                                                          fontWeight: FontWeight.w900,
+                                                          height: 1.0,
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                            ],
+                                              ],
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _showSettingsPanel = !_showSettingsPanel;
+                                                _settingsView = SettingsView.main;
+                                              });
+                                              _startHideTimer();
+                                            },
+                                            tooltip: 'Configuración',
                                           ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
+                                          const SizedBox(width: 2),
 
-                                      // Episodes Drawer button
-                                      IconButton(
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                        icon: const Icon(
-                                          Icons.format_list_bulleted_rounded,
-                                          color: Colors.white,
-                                          size: 20,
-                                        ),
-                                        onPressed: widget.onEpisodesPressed,
-                                        tooltip: 'Episodios',
-                                      ),
-                                      const SizedBox(width: 4),
-
-                                      // Modo Teatro / Expandir
-                                      if (widget.onTheaterModeToggle != null) ...[
-                                        IconButton(
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                          icon: AurisIcon(
-                                            AurisIcons.expandir,
-                                            color: widget.isTheaterMode ? const Color(0xFFEF7A1E) : Colors.white,
-                                            size: 20,
+                                          // 3. Episodes Drawer Button
+                                          IconButton(
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                            icon: AurisIcon(
+                                              AurisIcons.episodes,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                            onPressed: widget.onEpisodesPressed,
+                                            tooltip: 'Episodios',
                                           ),
-                                          onPressed: widget.onTheaterModeToggle,
-                                          tooltip: widget.isTheaterMode ? 'Restaurar tamaño' : 'Modo Teatro (Expandir)',
-                                        ),
-                                        const SizedBox(width: 4),
-                                      ],
+                                          const SizedBox(width: 2),
 
-                                      // Fullscreen Expand
-                                      IconButton(
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                        icon: AurisIcon(
-                                          AurisIcons.customFullscreen,
-                                          color: Colors.white,
-                                          size: 22,
-                                        ),
-                                        onPressed: widget.onExpandPressed,
-                                        tooltip: 'Pantalla Completa',
+                                          // 4. ytp-size-button (Modo cine / Teatro)
+                                          if (widget.onTheaterModeToggle != null) ...[
+                                            IconButton(
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              icon: AurisIcon(
+                                                AurisIcons.theaterMode,
+                                                color: widget.isTheaterMode ? const Color(0xFFFF0033) : Colors.white,
+                                                size: 20,
+                                              ),
+                                              onPressed: widget.onTheaterModeToggle,
+                                              tooltip: widget.isTheaterMode ? 'Restaurar tamaño (t)' : 'Modo cine (t)',
+                                            ),
+                                            const SizedBox(width: 2),
+                                          ],
+
+                                          // 5. ytp-fullscreen-button (Pantalla completa)
+                                          IconButton(
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                            icon: AurisIcon(
+                                              AurisIcons.expand,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                            onPressed: widget.onExpandPressed,
+                                            tooltip: 'Pantalla completa (f)',
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
+                    ),
 
                       // Panel Flotante de Configuración (Settings Popover)
                       _buildFloatingSettingsPanel(),
@@ -847,8 +1115,9 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildFloatingSettingsPanel() {
     if (!_showSettingsPanel) return const SizedBox.shrink();
@@ -859,45 +1128,48 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
       width: 310,
       child: Material(
         color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.85),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.12), width: 0.8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.6),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_settingsView == SettingsView.main) ...[
-                // 1. Iluminación cinematográfica
-                _buildSettingsTile(
-                  icon: Icons.wb_sunny_outlined,
-                  title: 'Iluminación cinematográfica',
-                  trailing: SizedBox(
-                    height: 24,
-                    child: Switch.adaptive(
-                      value: _isAmbientLightingEnabled,
-                      activeColor: const Color(0xFFEF7A1E),
-                      onChanged: (val) {
-                        setState(() => _isAmbientLightingEnabled = val);
-                        widget.onAmbientLightingToggle?.call(val);
-                      },
-                    ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xE61C1C1C), // Official YouTube Popover Background rgba(28,28,28,0.90)
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 0.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
                   ),
-                ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_settingsView == SettingsView.main) ...[
+                    // 1. Iluminación cinematográfica (Modo Ambiente YouTube)
+                    _buildSettingsTile(
+                      customSvgIcon: AurisIcons.ambientMode,
+                      title: 'Iluminación cinematográfica',
+                      trailing: SizedBox(
+                        height: 24,
+                        child: Switch.adaptive(
+                          value: _isAmbientLightingEnabled,
+                          activeColor: const Color(0xFFFF0033),
+                          onChanged: (val) {
+                            setState(() => _isAmbientLightingEnabled = val);
+                            widget.onAmbientLightingToggle?.call(val);
+                          },
+                        ),
+                      ),
+                    ),
 
                 // 2. Subtítulos
                 _buildSettingsTile(
-                  icon: Icons.subtitles_outlined,
+                  customSvgIcon: AurisIcons.subtitles,
                   title: 'Subtítulos',
                   trailingText: widget.currentSubtitleLabel ?? 'Español - es',
                   onTap: () {
@@ -906,9 +1178,9 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                   },
                 ),
 
-                // 3. Temporizador de apagado
+                // 3. Temporizador de apagado (YouTube Sleep Timer)
                 _buildSettingsTile(
-                  icon: Icons.nights_stay_outlined,
+                  customSvgIcon: AurisIcons.sleepTimer,
                   title: 'Temporizador de apagado',
                   trailingText: _sleepTimerLabel,
                   onTap: () {
@@ -916,9 +1188,9 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                   },
                 ),
 
-                // 4. Velocidad de reproducción
+                // 4. Velocidad de reproducción (YouTube Speed)
                 _buildSettingsTile(
-                  icon: Icons.speed_rounded,
+                  customSvgIcon: AurisIcons.playbackSpeed,
                   title: 'Velocidad de reproducción',
                   trailingText: _playbackSpeed == 1.0 ? 'Normal' : '${_playbackSpeed}x',
                   onTap: () {
@@ -1012,6 +1284,8 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
           ),
         ),
       ),
+    ),
+    ),
     );
   }
 
@@ -1040,7 +1314,8 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   }
 
   Widget _buildSettingsTile({
-    required IconData icon,
+    IconData? icon,
+    String? customSvgIcon,
     required String title,
     Widget? trailing,
     String? trailingText,
@@ -1054,7 +1329,12 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            Icon(icon, color: Colors.white, size: 20),
+            if (customSvgIcon != null)
+              AurisIcon(customSvgIcon, color: Colors.white, size: 20)
+            else if (icon != null)
+              Icon(icon, color: Colors.white, size: 20)
+            else
+              const SizedBox(width: 20),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
@@ -1131,7 +1411,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   }) {
     return InkWell(
       onTap: onTap,
-      hoverColor: Colors.white.withOpacity(0.08),
+      hoverColor: Colors.white.withValues(alpha: 0.08),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
@@ -1140,15 +1420,230 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFFEF7A1E) : Colors.white,
+                  color: isSelected ? const Color(0xFFFF0033) : Colors.white,
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_rounded, color: Color(0xFFEF7A1E), size: 18),
+              const Icon(Icons.check_rounded, color: Color(0xFFFF0033), size: 18),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// YOUTUBE VOLUME COMPONENTES OFICIALES (Icono Vectorial Multi-Capa + Slider)
+// =============================================================================
+
+/// Icono oficial de volumen de YouTube con transición fluida de ondas sonoras:
+/// - Speaker base constante
+/// - Onda pequeña (small-ripple) activa si volumen > 0 con fade/scale
+/// - Onda grande (big-ripple) activa si volumen >= 50 con fade/scale
+/// - Cruz de mute activa si volumen == 0
+class _YouTubeVolumeIcon extends StatelessWidget {
+  final double volume;
+  final double size;
+
+  const _YouTubeVolumeIcon({
+    required this.volume,
+    this.size = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isMuted = volume == 0;
+    final bool showSmallRipple = volume > 0;
+    final bool showBigRipple = volume >= 50;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 1. Speaker base
+          AurisIcon(
+            r'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="''' +
+                AurisIcons.ytVolumeSpeakerPath +
+                r'''" fill="white"/></svg>''',
+            size: size,
+            color: Colors.white,
+          ),
+
+          // 2. Small ripple (onda baja)
+          AnimatedOpacity(
+            opacity: showSmallRipple ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
+            child: AnimatedScale(
+              scale: showSmallRipple ? 1.0 : 0.6,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOutCubic,
+              alignment: const Alignment(0.5, 0.0), // punto de pivote (18, 12)
+              child: AurisIcon(
+                r'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="''' +
+                    AurisIcons.ytVolumeSmallRipplePath +
+                    r'''" fill="white"/></svg>''',
+                size: size,
+                color: Colors.white,
+              ),
+            ),
+          ),
+
+          // 3. Big ripple (onda alta)
+          AnimatedOpacity(
+            opacity: showBigRipple ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
+            child: AnimatedScale(
+              scale: showBigRipple ? 1.0 : 0.6,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOutCubic,
+              alignment: const Alignment(0.83, 0.0), // punto de pivote (22, 12)
+              child: AurisIcon(
+                r'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="''' +
+                    AurisIcons.ytVolumeBigRipplePath +
+                    r'''" fill="white"/></svg>''',
+                size: size,
+                color: Colors.white,
+              ),
+            ),
+          ),
+
+          // 4. Mute cross (cruz cuando está silenciado)
+          AnimatedOpacity(
+            opacity: isMuted ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
+            child: AnimatedScale(
+              scale: isMuted ? 1.0 : 0.5,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOutCubic,
+              child: AurisIcon(
+                r'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="''' +
+                    AurisIcons.ytVolumeMuteCrossPath +
+                    r'''" fill="white"/></svg>''',
+                size: size,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Slider horizontal idéntico al reproductor web de YouTube (`ytp-volume-slider`):
+/// - Track de 2px de altura (blanco activo, rgba(255, 255, 255, 0.20) inactivo)
+/// - Handle circular de 12px blanco limpio con sombra suave
+/// - Arrastre y clic fluido continuo (touch-action: none)
+class _YouTubeVolumeSlider extends StatefulWidget {
+  final double volume;
+  final ValueChanged<double> onVolumeChanged;
+  final ValueChanged<bool> onDragStateChanged;
+
+  const _YouTubeVolumeSlider({
+    required this.volume,
+    required this.onVolumeChanged,
+    required this.onDragStateChanged,
+  });
+
+  @override
+  State<_YouTubeVolumeSlider> createState() => _YouTubeVolumeSliderState();
+}
+
+class _YouTubeVolumeSliderState extends State<_YouTubeVolumeSlider> {
+  static const double _trackWidth = 56.0;
+  static const double _handleSize = 12.0;
+
+  void _updateVolumeFromOffset(double localDx) {
+    final double fraction = (localDx / _trackWidth).clamp(0.0, 1.0);
+    widget.onVolumeChanged(fraction * 100.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double fraction = (widget.volume / 100.0).clamp(0.0, 1.0);
+    final double handleLeft = (fraction * _trackWidth) - (_handleSize / 2.0);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (details) {
+          widget.onDragStateChanged(true);
+          _updateVolumeFromOffset(details.localPosition.dx);
+        },
+        onTapUp: (_) => widget.onDragStateChanged(false),
+        onTapCancel: () => widget.onDragStateChanged(false),
+        onHorizontalDragStart: (details) {
+          widget.onDragStateChanged(true);
+          _updateVolumeFromOffset(details.localPosition.dx);
+        },
+        onHorizontalDragUpdate: (details) {
+          _updateVolumeFromOffset(details.localPosition.dx);
+        },
+        onHorizontalDragEnd: (_) => widget.onDragStateChanged(false),
+        onHorizontalDragCancel: () => widget.onDragStateChanged(false),
+        child: Container(
+          width: _trackWidth + 12.0, // margen derecho para respirar en la cápsula
+          height: 40,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(right: 12.0),
+          child: SizedBox(
+            width: _trackWidth,
+            height: _handleSize,
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              clipBehavior: Clip.none,
+              children: [
+                // 1. Inactive track (YouTube: rgba(255, 255, 255, 0.20))
+                Container(
+                  width: _trackWidth,
+                  height: 2.0,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.20),
+                    borderRadius: BorderRadius.circular(1.0),
+                  ),
+                ),
+
+                // 2. Active track (YouTube: #fff)
+                Container(
+                  width: _trackWidth * fraction,
+                  height: 2.0,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(1.0),
+                  ),
+                ),
+
+                // 3. Handle dot (YouTube: 12px círculo blanco limpio con sombra ligera)
+                Positioned(
+                  left: handleLeft.clamp(-_handleSize / 2.0, _trackWidth - (_handleSize / 2.0)),
+                  child: Container(
+                    width: _handleSize,
+                    height: _handleSize,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.80),
+                          blurRadius: 1.0,
+                          offset: const Offset(0, 0),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

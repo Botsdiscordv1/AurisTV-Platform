@@ -6,10 +6,14 @@
 /// apps; si el server no responde, el comportamiento es idéntico al anterior.
 class PlaybackConfig {
   const PlaybackConfig({
-    this.version = 1,
-    this.bufferSizeBytes = 32 * 1024 * 1024,
-    this.streamBufferSize = '16MiB',
-    this.streamBufferSizeWeb = '10MiB',
+    this.version = 2,
+    this.bufferSizeBytes = 96 * 1024 * 1024,
+    this.streamBufferSize = '32MiB',
+    this.streamBufferSizeWeb = '16MiB',
+    this.demuxerReadaheadSecs = 60,
+    this.demuxerMaxBytes = '128MiB',
+    this.demuxerMaxBackBytes = '32MiB',
+    this.networkTimeoutSecs = 6,
     this.audioBufferSec = 5,
     this.audioBufferSecWeb = 3,
     this.bufferingDebounceMs = 2500,
@@ -22,6 +26,10 @@ class PlaybackConfig {
   final int bufferSizeBytes;
   final String streamBufferSize;
   final String streamBufferSizeWeb;
+  final int demuxerReadaheadSecs;
+  final String demuxerMaxBytes;
+  final String demuxerMaxBackBytes;
+  final int networkTimeoutSecs;
   final int audioBufferSec;
   final int audioBufferSecWeb;
   final int bufferingDebounceMs;
@@ -31,10 +39,23 @@ class PlaybackConfig {
 
   static const PlaybackConfig defaults = PlaybackConfig();
 
-  factory PlaybackConfig.fromJson(Map<String, dynamic> json) {
-    final player = json['player'] is Map
-        ? Map<String, dynamic>.from(json['player'] as Map)
+  factory PlaybackConfig.fromJson(Map<String, dynamic> json, {bool isMovie = false}) {
+    // Selección de perfil: profiles.movie o profiles.episode tienen prioridad
+    // sobre el bloque legacy player (que actúa como fallback).
+    final profiles = json['profiles'] is Map
+        ? Map<String, dynamic>.from(json['profiles'] as Map)
         : const <String, dynamic>{};
+    final profileKey = isMovie ? 'movie' : 'episode';
+    final profileBlock = profiles[profileKey] is Map
+        ? Map<String, dynamic>.from(profiles[profileKey] as Map)
+        : null;
+
+    // Bloque legacy player: fallback cuando no hay profiles en la respuesta.
+    final player = profileBlock ??
+        (json['player'] is Map
+            ? Map<String, dynamic>.from(json['player'] as Map)
+            : const <String, dynamic>{});
+
     final telemetry = json['telemetry'] is Map
         ? Map<String, dynamic>.from(json['telemetry'] as Map)
         : const <String, dynamic>{};
@@ -43,7 +64,7 @@ class PlaybackConfig {
         v is num ? v.toInt() : (v is String ? int.tryParse(v) ?? fallback : fallback);
 
     return PlaybackConfig(
-      version: asInt(json['version'], 1),
+      version: asInt(json['version'], 2),
       bufferSizeBytes: asInt(player['bufferSizeBytes'], defaults.bufferSizeBytes),
       streamBufferSize: player['streamBufferSize'] is String
           ? player['streamBufferSize'] as String
@@ -51,6 +72,14 @@ class PlaybackConfig {
       streamBufferSizeWeb: player['streamBufferSizeWeb'] is String
           ? player['streamBufferSizeWeb'] as String
           : defaults.streamBufferSizeWeb,
+      demuxerReadaheadSecs: asInt(player['demuxerReadaheadSecs'], defaults.demuxerReadaheadSecs),
+      demuxerMaxBytes: player['demuxerMaxBytes'] is String
+          ? player['demuxerMaxBytes'] as String
+          : defaults.demuxerMaxBytes,
+      demuxerMaxBackBytes: player['demuxerMaxBackBytes'] is String
+          ? player['demuxerMaxBackBytes'] as String
+          : defaults.demuxerMaxBackBytes,
+      networkTimeoutSecs: asInt(player['networkTimeoutSecs'], defaults.networkTimeoutSecs),
       audioBufferSec: asInt(player['audioBufferSec'], defaults.audioBufferSec),
       audioBufferSecWeb: asInt(player['audioBufferSecWeb'], defaults.audioBufferSecWeb),
       bufferingDebounceMs: asInt(player['bufferingDebounceMs'], defaults.bufferingDebounceMs),
