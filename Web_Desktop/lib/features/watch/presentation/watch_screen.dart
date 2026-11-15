@@ -161,11 +161,15 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         : (extractAsync.valueOrNull?.url ?? '');
 
     // ── Episodios para navegación ──
-    final cachedEpisodesData = ProgressiveContentNotifier.lookupCachedEpisodesResponse(
-      title: widget.title ?? widget.contentId,
-      metadataTitle: widget.metadataTitle,
-      season: widget.season ?? 1,
-    );
+    final bool isTheme = widget.source == 'Themes' || widget.source == 'YouTube' || widget.sourceUrl.contains('animethemes.moe');
+
+    final cachedEpisodesData = isTheme
+        ? null
+        : ProgressiveContentNotifier.lookupCachedEpisodesResponse(
+            title: widget.title ?? widget.contentId,
+            metadataTitle: widget.metadataTitle,
+            season: widget.season ?? 1,
+          );
 
     final episodesParams = EpisodesParams(
       url: widget.sourceUrl,
@@ -175,22 +179,28 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       season: widget.season,
     );
 
-    final episodesData = cachedEpisodesData ?? ref.watch(episodesProvider(episodesParams)).valueOrNull;
-    final episodesList =
-        widget.playlistEpisodes ?? (episodesData?.episodes ?? []);
+    final episodesData = isTheme
+        ? null
+        : (cachedEpisodesData ?? ref.watch(episodesProvider(episodesParams)).valueOrNull);
+    final episodesList = isTheme
+        ? const <EpisodeInfo>[]
+        : (widget.playlistEpisodes ?? (episodesData?.episodes ?? []));
 
-    final int currentEpNum = int.tryParse(widget.episode ?? '1') ?? 1;
-    final int currentEpIndex =
-        episodesList.indexWhere((ep) => ep.number == currentEpNum);
+    final int? parsedEpNum = int.tryParse(widget.episode ?? '');
+    final int currentEpNum = parsedEpNum ?? 1;
+    final int currentEpIndex = (isTheme || parsedEpNum == null)
+        ? -1
+        : episodesList.indexWhere((ep) => ep.number == currentEpNum);
     final int safeIndex = currentEpIndex >= 0 ? currentEpIndex : 0;
 
-    final bool hasPrevious = safeIndex > 0;
-    final bool hasNext = safeIndex < episodesList.length - 1;
+    final bool hasPrevious = !isTheme && safeIndex > 0;
+    final bool hasNext = !isTheme && episodesList.isNotEmpty && safeIndex < episodesList.length - 1;
 
-    final String realEpLabel = (widget.episode != null &&
-            widget.episode!.isNotEmpty)
-        ? 'Episodio ${widget.episode}'
-        : 'En este video';
+    final String realEpLabel = isTheme
+        ? (widget.episode ?? 'Tema Musical')
+        : ((widget.episode != null && widget.episode!.isNotEmpty)
+            ? 'Episodio ${widget.episode}'
+            : 'En este video');
 
     // Callbacks para cambiar de episodio de forma consistente si no vienen inyectados
     final effectiveOnNext = widget.onNextEpisode ??
@@ -227,12 +237,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       logoUrl: widget.logoUrl,
       year: widget.year,
       certification: widget.certification,
-      totalEpisodes: widget.totalEpisodes,
+      totalEpisodes: isTheme ? 1 : widget.totalEpisodes,
       skipResume: widget.skipResume,
       isLive: widget.isLive,
-      playlistEpisodes: widget.playlistEpisodes,
+      playlistEpisodes: isTheme ? const [] : widget.playlistEpisodes,
       playlistIndex: widget.playlistIndex,
       synopsis: widget.synopsis,
+      showPlaylistSidebar: !isTheme,
       onNextEpisode: effectiveOnNext,
       onPreviousEpisode: effectiveOnPrevious,
       onEpisodeSelected: effectiveOnSelected,

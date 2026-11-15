@@ -1012,6 +1012,16 @@ class AurisRepositoryImpl implements AurisRepository {
 
   @override
   Future<ExtractResult> extractVideo(String url, String source, {String? category, bool direct = false, CancelToken? cancelToken}) async {
+    final sourceLower = source.toLowerCase();
+    if (sourceLower == 'themes' || url.contains('animethemes.moe')) {
+      final Map<String, String> headers = url.contains('animethemes.moe')
+          ? {'Referer': 'https://animethemes.moe/'}
+          : const {};
+      return ExtractResult(url: url, headers: headers, qualities: [], tracks: [
+        VideoTrackOption(label: 'Direct', url: url, headers: headers),
+      ]);
+    }
+
     // ============================================
     // VALIDACIÓN DE SEGURIDAD - SSRF Prevention
     // ============================================
@@ -1043,6 +1053,17 @@ class AurisRepositoryImpl implements AurisRepository {
     bool direct = false,
     CancelToken? cancelToken,
   }) async* {
+    final sourceLower = source.toLowerCase();
+    if (sourceLower == 'themes' || url.contains('animethemes.moe')) {
+      final Map<String, String> headers = url.contains('animethemes.moe')
+          ? {'Referer': 'https://animethemes.moe/'}
+          : const {};
+      yield ExtractResult(url: url, headers: headers, qualities: [], tracks: [
+        VideoTrackOption(label: 'Direct', url: url, headers: headers),
+      ]);
+      return;
+    }
+
     // ============================================
     // VALIDACIÓN DE SEGURIDAD - SSRF Prevention
     // ============================================

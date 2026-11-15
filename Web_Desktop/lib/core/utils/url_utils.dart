@@ -56,6 +56,8 @@ class UrlUtils {
       if (player.season != null && player.season! > 1) 'season': player.season.toString(),
       if (player.skipResume) 'skipResume': '1',
       if (player.isLive) 'isLive': '1',
+      if (player.episodeTitle != null && player.episodeTitle!.isNotEmpty)
+        'episodeTitle': player.episodeTitle!,
     };
 
     try {

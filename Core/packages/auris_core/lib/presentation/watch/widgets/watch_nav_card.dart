@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/string_utils.dart';
 import '../../widgets/cured_network_image.dart';
 
 /// Tarjeta de navegación de episodio para la WatchScreen (Estilo Crunchyroll).
@@ -63,9 +64,16 @@ class WatchNavCard extends StatelessWidget {
                         width: 120,
                         height: 68,
                         child: thumbnailUrl != null && thumbnailUrl!.isNotEmpty
-                            ? CuredNetworkImage(
-                                imageUrl: thumbnailUrl!,
-                                fit: BoxFit.cover,
+                            ? Builder(
+                                builder: (ctx) {
+                                  final dpr = MediaQuery.maybeDevicePixelRatioOf(ctx) ?? 1.0;
+                                  return CuredNetworkImage(
+                                    imageUrl: thumbnailUrl!,
+                                    fit: BoxFit.cover,
+                                    memCacheWidth: (120 * dpr).round().clamp(1, 1024),
+                                    memCacheHeight: (68 * dpr).round().clamp(1, 1024),
+                                  );
+                                },
                               )
                             : Container(
                                 color: Colors.white10,
@@ -103,16 +111,22 @@ class WatchNavCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        episodeNumber.isNotEmpty ? '$episodeNumber - $episodeTitle' : episodeTitle,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          height: 1.3,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      Builder(
+                        builder: (_) {
+                          final int epNum = int.tryParse(episodeNumber.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                          final String displayTitle = AurisStringUtils.formatEpisodeTitle(epNum, episodeTitle);
+                          return Text(
+                            displayTitle,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        },
                       ),
                       const SizedBox(height: 4),
                       Text(

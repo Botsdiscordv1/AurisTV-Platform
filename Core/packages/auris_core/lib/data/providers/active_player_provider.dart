@@ -421,6 +421,16 @@ class ActivePlayerNotifier extends StateNotifier<ActivePlayerState> {
           ? '$targetStreamUrl&_at=$_currentSessionId'
           : '$targetStreamUrl#_at=$_currentSessionId';
 
+      if (!kIsWeb && url.toLowerCase().contains('.webm')) {
+        try {
+          final platform = state.player?.platform as dynamic;
+          platform?.setProperty('hwdec', 'no');
+          platform?.setProperty('vd-lavc-threads', '1');
+          platform?.setProperty('vo', 'gpu');
+          platform?.setProperty('gpu-context', 'sdl');
+        } catch (_) {}
+      }
+
       await state.player?.open(Media(freshUrl, httpHeaders: headers ?? const {}));
 
       // [Intelligence] Reportar el inicio real de reproducción

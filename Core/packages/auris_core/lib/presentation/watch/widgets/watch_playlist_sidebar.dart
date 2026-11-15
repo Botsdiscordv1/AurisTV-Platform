@@ -86,9 +86,7 @@ class WatchPlaylistSidebar extends StatelessWidget {
               itemBuilder: (context, index) {
                 final ep = episodes[index];
                 final bool isActive = ep.number.toString() == activeEpisode;
-                final String epTitle = (ep.title != null && ep.title!.isNotEmpty)
-                    ? ep.title!
-                    : 'Episodio ${ep.number}';
+                final String formattedEpTitle = formatEpisodeTitle(ep.number, ep.title);
 
                 // Duración
                 String durationStr = (ep.duration != null && ep.duration!.isNotEmpty)
@@ -147,9 +145,16 @@ class WatchPlaylistSidebar extends StatelessWidget {
                                 children: [
                                   Positioned.fill(
                                     child: ep.thumbnail != null && ep.thumbnail!.isNotEmpty
-                                        ? CuredNetworkImage(
-                                            imageUrl: ep.thumbnail!,
-                                            fit: BoxFit.cover,
+                                        ? Builder(
+                                            builder: (ctx) {
+                                              final dpr = MediaQuery.maybeDevicePixelRatioOf(ctx) ?? 1.0;
+                                              return CuredNetworkImage(
+                                                imageUrl: ep.thumbnail!,
+                                                fit: BoxFit.cover,
+                                                memCacheWidth: (124 * dpr).round().clamp(1, 1024),
+                                                memCacheHeight: (70 * dpr).round().clamp(1, 1024),
+                                              );
+                                            },
                                           )
                                         : Container(
                                             color: Colors.white10,
@@ -188,7 +193,7 @@ class WatchPlaylistSidebar extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'E${ep.number} - $epTitle',
+                                  formattedEpTitle,
                                   style: TextStyle(
                                     color: isActive
                                         ? const Color(0xFFEF7A1E)

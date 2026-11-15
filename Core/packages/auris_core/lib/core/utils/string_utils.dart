@@ -80,10 +80,52 @@ class AurisStringUtils {
 
     return clean;
   }
+
+  /// Formatea el título del episodio combinando el número y el título crudo de forma limpia,
+  /// evitando duplicar el número de episodio si ya viene en el título (ej: "2.ª noche...", "Episodio 2", "E2 - ...").
+  static String formatEpisodeTitle(int epNumber, String? rawTitle) {
+    final String titleStr = (rawTitle != null && rawTitle.trim().isNotEmpty)
+        ? rawTitle.trim()
+        : 'Episodio $epNumber';
+
+    if (epNumber <= 0) return titleStr;
+
+    final String lower = titleStr.toLowerCase();
+    final String numStr = epNumber.toString();
+    final String paddedNumStr = epNumber < 10 ? '0$epNumber' : numStr;
+
+    final bool startsWithNumber =
+        titleStr.startsWith(numStr) ||
+        titleStr.startsWith(paddedNumStr) ||
+        lower.startsWith('e$numStr') ||
+        lower.startsWith('e$paddedNumStr') ||
+        lower.startsWith('e.$numStr') ||
+        lower.startsWith('e.$paddedNumStr') ||
+        lower.startsWith('ep $numStr') ||
+        lower.startsWith('ep. $numStr') ||
+        lower.startsWith('ep.$numStr') ||
+        lower.startsWith('ep0') ||
+        lower.startsWith('ep $paddedNumStr') ||
+        lower.startsWith('episodio') ||
+        lower.startsWith('capitulo') ||
+        lower.startsWith('cap ') ||
+        lower.startsWith('cap. ') ||
+        RegExp('^(e|ep|cap|episodio)?\\.?\\s*0*$epNumber[^0-9]', caseSensitive: false).hasMatch(titleStr);
+
+    if (startsWithNumber) {
+      return titleStr;
+    }
+
+    return 'E$epNumber - $titleStr';
+  }
 }
 
 /// Helper global de formateo de fecha.
 String formatDisplayDate(String? raw) => AurisStringUtils.formatDisplayDate(raw);
+
+/// Helper global de formateo de título de episodio.
+String formatEpisodeTitle(int epNumber, String? rawTitle) =>
+    AurisStringUtils.formatEpisodeTitle(epNumber, rawTitle);
 
 /// Formateador para campos de texto que capitaliza solo la primera letra automáticamente.
 class CapitalizeFirstLetterFormatter extends TextInputFormatter {

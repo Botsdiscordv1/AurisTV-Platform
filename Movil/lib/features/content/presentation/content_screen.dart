@@ -694,24 +694,20 @@ class _ThemeCardState extends State<_ThemeCard> {
       onExit: (_) => setState(() => _isHovered = false), 
       child: GestureDetector(
         onTap: () {
-          String url = widget.theme.videoUrl; final typeLabel = widget.isOP ? 'OP' : 'ED';
+          String url = widget.theme.videoUrl;
+          final typeLabel = widget.isOP ? 'OP' : 'ED';
+          final posterParam = '&posterUrl=${Uri.encodeComponent(img ?? widget.fallbackImage ?? '')}&bannerUrl=${Uri.encodeComponent(widget.fallbackImage ?? '')}';
+          final extraTitleParam = '&title=${Uri.encodeComponent(widget.animeTitle)}&episodeTitle=${Uri.encodeComponent(widget.theme.title)}&logoUrl=${Uri.encodeComponent(widget.logoUrl ?? '')}';
           if (!url.startsWith('http')) { 
             url = 'https://www.youtube.com/watch?v=$url'; 
-            final extraTitleParam = '&title=${Uri.encodeComponent(widget.animeTitle)}&episodeTitle=${Uri.encodeComponent(widget.theme.title)}&logoUrl=${Uri.encodeComponent(widget.logoUrl ?? '')}';
-            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube$extraTitleParam');
+            context.push('/watch/${Uri.encodeComponent(widget.animeTitle)}?source=YouTube&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=YouTube&category=anime$extraTitleParam$posterParam');
           }
           else { 
             String url720 = widget.theme.video720 ?? '';
             String url1080 = widget.theme.video1080 ?? '';
-            if (kIsWeb && url.contains('animethemes.moe')) {
-              url = '${ApiEndpoints.baseUrl}/api/proxy/video?url=${Uri.encodeComponent(url)}';
-              if (url720.isNotEmpty) url720 = '${ApiEndpoints.baseUrl}/api/proxy/video?url=${Uri.encodeComponent(url720)}';
-              if (url1080.isNotEmpty) url1080 = '${ApiEndpoints.baseUrl}/api/proxy/video?url=${Uri.encodeComponent(url1080)}';
-            }
             final v720Param = url720.isNotEmpty ? '&video720=${Uri.encodeComponent(url720)}' : '';
             final v1080Param = url1080.isNotEmpty ? '&video1080=${Uri.encodeComponent(url1080)}' : '';
-            final extraTitleParam = '&title=${Uri.encodeComponent(widget.animeTitle)}&episodeTitle=${Uri.encodeComponent(widget.theme.title)}&logoUrl=${Uri.encodeComponent(widget.logoUrl ?? '')}';
-            context.push('/player/${Uri.encodeComponent(widget.theme.title)}?source=&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes$v720Param$v1080Param$extraTitleParam');
+            context.push('/watch/${Uri.encodeComponent(widget.animeTitle)}?source=Themes&url=${Uri.encodeComponent(url)}&episode=$typeLabel&serverName=Themes&category=anime$v720Param$v1080Param$extraTitleParam$posterParam');
           }
         }, 
         child: AnimatedContainer(

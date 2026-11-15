@@ -53,7 +53,9 @@ class WatchTopBar extends StatelessWidget {
     final String categoryLabel = _formatCategoryLabel(category);
     final String mainTitle = seriesTitle ?? 'Contenido';
     final String epNumStr = (episodeNumber != null && episodeNumber!.isNotEmpty)
-        ? (episodeNumber!.startsWith('E') ? episodeNumber! : 'Ep. $episodeNumber')
+        ? (RegExp(r'^(E\d|Ep|OP|ED|Película)', caseSensitive: false).hasMatch(episodeNumber!)
+            ? episodeNumber!
+            : (int.tryParse(episodeNumber!) != null ? 'E$episodeNumber' : episodeNumber!))
         : '';
 
     return Container(

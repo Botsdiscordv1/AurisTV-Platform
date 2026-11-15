@@ -12,6 +12,41 @@ import '../../../core/utils/pip_service.dart';
 import '../../cast/presentation/widgets/cast_picker_sheet.dart';
 import '../../player/presentation/mobile_video_surface.dart';
 
+String _formatEpTitle(int epNumber, String? rawTitle) {
+  final String titleStr = (rawTitle != null && rawTitle.trim().isNotEmpty)
+      ? rawTitle.trim()
+      : 'Episodio $epNumber';
+
+  if (epNumber <= 0) return titleStr;
+
+  final String lower = titleStr.toLowerCase();
+  final String numStr = epNumber.toString();
+  final String paddedNumStr = epNumber < 10 ? '0$epNumber' : numStr;
+
+  final bool startsWithNumber = titleStr.startsWith(numStr) ||
+      titleStr.startsWith(paddedNumStr) ||
+      lower.startsWith('e$numStr') ||
+      lower.startsWith('e$paddedNumStr') ||
+      lower.startsWith('e.$numStr') ||
+      lower.startsWith('e.$paddedNumStr') ||
+      lower.startsWith('ep $numStr') ||
+      lower.startsWith('ep. $numStr') ||
+      lower.startsWith('ep.$numStr') ||
+      lower.startsWith('ep0') ||
+      lower.startsWith('ep $paddedNumStr') ||
+      lower.startsWith('episodio') ||
+      lower.startsWith('capitulo') ||
+      lower.startsWith('cap ') ||
+      lower.startsWith('cap. ') ||
+      RegExp('^(e|ep|cap|episodio)?\\.?\\s*0*$epNumber[^0-9]', caseSensitive: false).hasMatch(titleStr);
+
+  if (startsWithNumber) {
+    return titleStr;
+  }
+
+  return 'E$epNumber - $titleStr';
+}
+
 /// Pantalla WatchScreen (Previa al Player Fullscreen - Crunchyroll Style).
 ///
 /// Muestra:
@@ -40,6 +75,8 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.certification,
     this.startPosition,
     this.synopsis,
+    this.video720,
+    this.video1080,
   });
 
   final String contentId;
@@ -59,6 +96,8 @@ class WatchScreen extends ConsumerStatefulWidget {
   final String? certification;
   final int? startPosition;
   final String? synopsis;
+  final String? video720;
+  final String? video1080;
 
   @override
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
@@ -101,6 +140,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   Timer? _sleepTimer;
   bool _isMinimizing = false;
   int _visibleEpisodesLimit = 0;
+
+  // Velocidad x2 al mantener pulsado
+  bool _isLongPressSpeedActive = false;
+  bool _wasPlayingBeforeLongPress = false;
+  double _normalPlaybackRate = 1.0;
 
   /// Título del episodio resuelto en el último build (puede venir de la lista
   /// de episodios cargada async, superior a widget.episodeTitle que solo tiene
@@ -293,6 +337,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       if (widget.bannerUrl != null) 'bannerUrl': widget.bannerUrl!,
       if (widget.logoUrl != null) 'logoUrl': widget.logoUrl!,
       if (widget.certification != null) 'certification': widget.certification!,
+      if (widget.video720 != null && widget.video720!.isNotEmpty) 'video720': widget.video720!,
+      if (widget.video1080 != null && widget.video1080!.isNotEmpty) 'video1080': widget.video1080!,
       'startPosition': currentPosMs.toString(),
     };
 
@@ -383,6 +429,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       } else if (urlStream.contains('voe.sx')) {
         effectiveHeaders['Referer'] = 'https://voe.sx/';
         effectiveHeaders['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+      } else if (urlStream.contains('animethemes.moe') && !effectiveHeaders.containsKey('Referer')) {
+        effectiveHeaders['Referer'] = 'https://animethemes.moe/';
       }
 
       await notifier.play(
@@ -822,6 +870,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   }
   Widget _buildEmbeddedPlayer() {
     final active = ref.watch(activePlayerProvider);
+    final bool isTheme = widget.source == 'Themes' ||
+        widget.source == 'YouTube' ||
+        widget.sourceUrl.contains('animethemes.moe');
     final String currentSourceLower = (widget.source.toLowerCase()) + (widget.serverName?.toLowerCase() ?? '');
     final bool isZillaHls = currentSourceLower.contains('zilla') &&
         (_lastOpenedUrl.contains('.m3u8') || _lastOpenedUrl.contains('/hls/'));
@@ -850,6 +901,47 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
         if (!isInitialLoading) {
           _toggleControls();
         }
+      },
+      onLongPressStart: (_) {
+        if (isInitialLoading) return;
+        final activePlayer = ref.read(activePlayerProvider).player;
+        if (activePlayer == null) return;
+
+        _wasPlayingBeforeLongPress = activePlayer.state.playing;
+        _normalPlaybackRate = activePlayer.state.rate;
+        activePlayer.setRate(2.0);
+        if (!_wasPlayingBeforeLongPress) {
+          activePlayer.play();
+        }
+        setState(() {
+          _isLongPressSpeedActive = true;
+          _showControls = false;
+        });
+        HapticFeedback.heavyImpact();
+      },
+      onLongPressEnd: (_) {
+        if (!_isLongPressSpeedActive) return;
+        final activePlayer = ref.read(activePlayerProvider).player;
+
+        activePlayer?.setRate(_normalPlaybackRate);
+        if (!_wasPlayingBeforeLongPress) {
+          activePlayer?.pause();
+        }
+        setState(() {
+          _isLongPressSpeedActive = false;
+        });
+      },
+      onLongPressCancel: () {
+        if (!_isLongPressSpeedActive) return;
+        final activePlayer = ref.read(activePlayerProvider).player;
+
+        activePlayer?.setRate(_normalPlaybackRate);
+        if (!_wasPlayingBeforeLongPress) {
+          activePlayer?.pause();
+        }
+        setState(() {
+          _isLongPressSpeedActive = false;
+        });
       },
       child: Stack(
         fit: StackFit.expand,
@@ -896,7 +988,20 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
             ),
 
-          // 2. Overlay de Controles (Disponible cuando el primer frame ya cargó)
+          // 2. Cápsula Indicadora de Velocidad 2X al mantener pulsado
+          if (_isLongPressSpeedActive)
+            Positioned(
+              top: 14,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: IgnorePointer(
+                  child: _buildSpeedIndicator(),
+                ),
+              ),
+            ),
+
+          // 3. Overlay de Controles (Disponible cuando el primer frame ya cargó)
           AnimatedOpacity(
             opacity: (_showControls && !isInitialLoading) ? 1.0 : 0.0,
             duration: const Duration(milliseconds: 200),
@@ -1044,17 +1149,25 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // Botón MiniPlayer / Picture-in-Picture voluntario
-                          if (!_isFullscreen)
+                          if (!_isFullscreen) ...[
                             IconButton(
-                              padding: const EdgeInsets.all(6),
-                              constraints: const BoxConstraints(),
+                              style: IconButton.styleFrom(
+                                padding: const EdgeInsets.all(6),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
                               icon: AurisIcon(AurisIcons.toPip, color: Colors.white, size: 22),
                               tooltip: 'Minimizar',
                               onPressed: _minimizeToMiniPlayer,
                             ),
+                            const SizedBox(width: 2),
+                          ],
                           IconButton(
-                            padding: const EdgeInsets.all(6),
-                            constraints: const BoxConstraints(),
+                            style: IconButton.styleFrom(
+                              padding: const EdgeInsets.all(6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             icon: AurisIcon(AurisIcons.cast, color: Colors.white, size: 22),
                             onPressed: () {
                               showModalBottomSheet(
@@ -1065,9 +1178,13 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                               );
                             },
                           ),
+                          const SizedBox(width: 2),
                           IconButton(
-                            padding: const EdgeInsets.all(6),
-                            constraints: const BoxConstraints(),
+                            style: IconButton.styleFrom(
+                              padding: const EdgeInsets.all(6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             icon: AurisIcon(AurisIcons.settings, color: Colors.white, size: 22),
                             onPressed: _showSettingsSheet,
                           ),
@@ -1083,57 +1200,58 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Cápsula "Saltar OP/ED" (YouTube Delhi Pill con Frosted Glass)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                              child: InkWell(
-                                onTap: _skipOpEd,
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.30),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.12),
-                                      width: 0.5,
+                          // Cápsula "Saltar OP/ED" (YouTube Delhi Pill con Frosted Glass) - solo en episodios regulares
+                          if (!isTheme) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                child: InkWell(
+                                  onTap: _skipOpEd,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.30),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.12),
+                                        width: 0.5,
+                                      ),
                                     ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      AurisIcon(
-                                        AurisIcons.fastForward,
-                                        color: Colors.white,
-                                        size: 14,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      const Text(
-                                        'Saltar OP/ED',
-                                        style: TextStyle(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        AurisIcon(
+                                          AurisIcons.fastForward,
                                           color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: 0.2,
-                                          shadows: [
-                                            Shadow(
-                                              offset: Offset(0, 0),
-                                              blurRadius: 2,
-                                              color: Colors.black54,
-                                            ),
-                                          ],
+                                          size: 14,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 6),
+                                        const Text(
+                                          'Saltar OP/ED',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.2,
+                                            shadows: [
+                                              Shadow(
+                                                offset: Offset(0, 0),
+                                                blurRadius: 2,
+                                                color: Colors.black54,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-
-                          const SizedBox(width: 8),
+                            const SizedBox(width: 8),
+                          ],
 
                           // Botón Circular de Pantalla Completa (YouTube Pill Frosted Glass)
                           ClipOval(
@@ -1227,6 +1345,52 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     );
   }
 
+  Widget _buildSpeedIndicator() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.60),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.15),
+              width: 0.5,
+            ),
+            boxShadow: const [
+              BoxShadow(color: Colors.black38, blurRadius: 10, spreadRadius: 1),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "2X VELOCIDAD",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                  shadows: [
+                    Shadow(
+                      offset: Offset(0, 0),
+                      blurRadius: 2,
+                      color: Colors.black54,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              AurisIcon(AurisIcons.fastForwardFilled, color: const Color(0xFFEF7A1E), size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final String seriesTitle = widget.title ?? widget.metadataTitle ?? 'AurisTV Content';
@@ -1314,8 +1478,9 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     });
 
     final bool isMovie = isMovieLike(widget.category, seriesTitle);
+    final bool isTheme = widget.source == 'Themes' || widget.source == 'YouTube';
 
-    final cachedEpisodesData = isMovie
+    final cachedEpisodesData = (isMovie || isTheme)
         ? null
         : ProgressiveContentNotifier.lookupCachedEpisodesResponse(
             title: widget.title ?? widget.contentId,
@@ -1324,7 +1489,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
           );
 
     // Consultar lista de episodios de la serie desde el provider de datos reales (solo para series)
-    final EpisodesResponse? episodesData = isMovie
+    final EpisodesResponse? episodesData = (isMovie || isTheme)
         ? null
         : (cachedEpisodesData ??
             ref.watch(episodesProvider(EpisodesParams(
@@ -1335,12 +1500,12 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               season: widget.season,
             ))).valueOrNull);
 
-    final List<EpisodeInfo> epList = isMovie ? const [] : (episodesData?.episodes ?? []);
-    final EpisodeInfo? currentEp = isMovie ? null : epList.firstWhereOrNull((ep) => ep.number == currentEpNum);
+    final List<EpisodeInfo> epList = (isMovie || isTheme) ? const [] : (episodesData?.episodes ?? []);
+    final EpisodeInfo? currentEp = (isMovie || isTheme) ? null : epList.firstWhereOrNull((ep) => ep.number == currentEpNum);
 
     // Metadata Real del Episodio/Película Activo
-    final String realEpTitle = isMovie
-        ? (widget.episodeTitle ?? seriesTitle)
+    final String realEpTitle = (isMovie || isTheme)
+        ? (widget.episodeTitle ?? (isTheme ? (widget.episode ?? 'Tema Musical') : seriesTitle))
         : ((currentEp?.title != null && currentEp!.title!.isNotEmpty)
             ? currentEp.title!
             : (widget.episodeTitle ?? 'Episodio $currentEpNum'));
@@ -1352,8 +1517,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       _resolvedEpTitle = realEpTitle;
     }
 
-    final String realSynopsis = isMovie
-        ? (widget.synopsis ?? 'Disfruta de $seriesTitle con la mejor calidad en AurisTV.')
+    final String realSynopsis = (isMovie || isTheme)
+        ? (widget.synopsis ?? (isTheme ? 'Tema musical de $seriesTitle: $realEpTitle' : 'Disfruta de $seriesTitle con la mejor calidad en AurisTV.'))
         : ((currentEp?.description != null && currentEp!.description!.isNotEmpty)
             ? currentEp.description!
             : 'Sigue las aventuras de $seriesTitle en este episodio $realEpTitle con la mejor calidad en AurisTV.');
@@ -1364,9 +1529,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     final String realReleaseDate = formatDisplayDate(rawDate);
 
-    final String realBadges = (currentEp?.quality != null && currentEp!.quality!.isNotEmpty)
-        ? currentEp.quality!
-        : 'Sub | Dob';
+    final String realBadges = isTheme
+        ? (widget.episode ?? 'OP/ED')
+        : ((currentEp?.quality != null && currentEp!.quality!.isNotEmpty)
+            ? currentEp.quality!
+            : 'Sub | Dob');
 
     final String realCertification = (widget.certification != null &&
             widget.certification!.isNotEmpty &&
@@ -1431,7 +1598,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                     metadataWidget: WatchEpisodeMetadata(
                       seriesTitle: seriesTitle,
                       episodeTitle: realEpTitle,
-                      episodeNumber: isMovie ? 'Película' : epNumStr,
+                      episodeNumber: isMovie ? 'Película' : (isTheme ? (widget.episode ?? 'Tema') : epNumStr),
                       ratingBadge: realCertification,
                       audioSubsBadge: realBadges,
                       releaseDate: realReleaseDate,
@@ -1566,17 +1733,25 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                                       width: 140,
                                       child: AspectRatio(
                                         aspectRatio: 16 / 9,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.white12, width: 0.5),
-                                            image: thumbUrl.isNotEmpty
-                                                ? DecorationImage(image: NetworkImage(thumbUrl), fit: BoxFit.cover)
-                                                : null,
-                                            color: Colors.white10,
-                                          ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
                                           child: Stack(
+                                            fit: StackFit.expand,
                                             children: [
+                                              if (thumbUrl.isNotEmpty)
+                                                Builder(
+                                                  builder: (ctx) {
+                                                    final dpr = MediaQuery.maybeDevicePixelRatioOf(ctx) ?? 1.0;
+                                                    return CuredNetworkImage(
+                                                      imageUrl: thumbUrl,
+                                                      fit: BoxFit.cover,
+                                                      memCacheWidth: (140 * dpr).round().clamp(1, 1024),
+                                                      memCacheHeight: (79 * dpr).round().clamp(1, 1024),
+                                                    );
+                                                  },
+                                                )
+                                              else
+                                                Container(color: Colors.white10),
                                               if (isCurrent)
                                                 Positioned(
                                                   top: 6,
@@ -1623,7 +1798,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                                         children: [
                                           const SizedBox(height: 4),
                                           Text(
-                                            'E${ep.number} - $epTitle',
+                                            _formatEpTitle(ep.number, epTitle),
                                             style: TextStyle(
                                               color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white,
                                               fontSize: 14,

@@ -1011,11 +1011,6 @@ class _ThemeCardState extends State<_ThemeCard> {
           else { 
             String url720 = widget.theme.video720 ?? '';
             String url1080 = widget.theme.video1080 ?? '';
-            if (kIsWeb && url.contains('animethemes.moe')) {
-              url = '${ApiEndpoints.baseUrl}/api/proxy/video?url=${Uri.encodeComponent(url)}';
-              if (url720.isNotEmpty) url720 = '${ApiEndpoints.baseUrl}/api/proxy/video?url=${Uri.encodeComponent(url720)}';
-              if (url1080.isNotEmpty) url1080 = '${ApiEndpoints.baseUrl}/api/proxy/video?url=${Uri.encodeComponent(url1080)}';
-            }
 
             // Senior Web Fix: Para evitar colisiones y doble inicialización de audio en Web con media_kit,
             // abrimos la pantalla directamente pasándole los metadatos correctos sin pasar por la precarga redundante.

@@ -272,8 +272,12 @@ final extractStreamProvider =
     StreamProvider.autoDispose.family<ExtractResult, ExtractParams>((ref, params) {
   if (params.source == 'ppv' || params.source == 'sport' || params.source == 'live' ||
       params.url.contains('/embed/') ||
-      params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
-    return Stream.value(ExtractResult(url: params.url, headers: const {}));
+      params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be') ||
+      params.source == 'Themes' || params.url.contains('animethemes.moe')) {
+    final Map<String, String> headers = params.url.contains('animethemes.moe')
+        ? {'Referer': 'https://animethemes.moe/'}
+        : const {};
+    return Stream.value(ExtractResult(url: params.url, headers: headers));
   }
 
   // Senior Fix (SSE): NO cancelar el cancelToken al dispose del provider.
@@ -302,8 +306,12 @@ final extractProvider =
     FutureProvider.autoDispose.family<ExtractResult, ExtractParams>((ref, params) async {
   if (params.source == 'ppv' || params.source == 'sport' || params.source == 'live' ||
       params.url.contains('/embed/') ||
-      params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be')) {
-    return ExtractResult(url: params.url, headers: const {});
+      params.source == 'YouTube' || params.url.contains('youtube.com') || params.url.contains('youtu.be') ||
+      params.source == 'Themes' || params.url.contains('animethemes.moe')) {
+    final Map<String, String> headers = params.url.contains('animethemes.moe')
+        ? {'Referer': 'https://animethemes.moe/'}
+        : const {};
+    return ExtractResult(url: params.url, headers: headers);
   }
   final CancelToken cancelToken = CancelToken();
   ref.onDispose(() => cancelToken.cancel('Provider disposed'));

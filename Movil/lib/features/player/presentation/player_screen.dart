@@ -38,6 +38,41 @@ import '../../cast/presentation/providers/cast_provider.dart';
 import '../../cast/presentation/widgets/cast_picker_sheet.dart';
 import '../../cast/presentation/widgets/cast_mode_view.dart';
 
+String _formatEpTitle(int epNumber, String? rawTitle) {
+  final String titleStr = (rawTitle != null && rawTitle.trim().isNotEmpty)
+      ? rawTitle.trim()
+      : 'Episodio $epNumber';
+
+  if (epNumber <= 0) return titleStr;
+
+  final String lower = titleStr.toLowerCase();
+  final String numStr = epNumber.toString();
+  final String paddedNumStr = epNumber < 10 ? '0$epNumber' : numStr;
+
+  final bool startsWithNumber = titleStr.startsWith(numStr) ||
+      titleStr.startsWith(paddedNumStr) ||
+      lower.startsWith('e$numStr') ||
+      lower.startsWith('e$paddedNumStr') ||
+      lower.startsWith('e.$numStr') ||
+      lower.startsWith('e.$paddedNumStr') ||
+      lower.startsWith('ep $numStr') ||
+      lower.startsWith('ep. $numStr') ||
+      lower.startsWith('ep.$numStr') ||
+      lower.startsWith('ep0') ||
+      lower.startsWith('ep $paddedNumStr') ||
+      lower.startsWith('episodio') ||
+      lower.startsWith('capitulo') ||
+      lower.startsWith('cap ') ||
+      lower.startsWith('cap. ') ||
+      RegExp('^(e|ep|cap|episodio)?\\.?\\s*0*$epNumber[^0-9]', caseSensitive: false).hasMatch(titleStr);
+
+  if (startsWithNumber) {
+    return titleStr;
+  }
+
+  return 'E$epNumber - $titleStr';
+}
+
 class PlayerScreen extends ConsumerStatefulWidget {
   final String contentId;
   final String sourceUrl;
@@ -2672,7 +2707,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
                                   // Título del Episodio
                                   Text(
-                                    'E${ep.number} - $epTitle',
+                                    _formatEpTitle(ep.number, epTitle),
                                     style: TextStyle(
                                       color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white,
                                       fontSize: 13,

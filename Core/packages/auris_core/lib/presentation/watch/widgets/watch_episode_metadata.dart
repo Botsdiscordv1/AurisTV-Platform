@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/auris_icons.dart';
+import '../../../core/utils/string_utils.dart';
 import '../../widgets/auris_icon.dart';
 
 /// Bloque de metadatos del episodio para la WatchScreen (Estilo Crunchyroll).
@@ -38,9 +39,13 @@ class WatchEpisodeMetadata extends StatelessWidget {
     final bool isDesktopTablet = MediaQuery.sizeOf(context).width >= 768;
     final bool shouldShowSeriesTitle = showSeriesTitle ?? !isDesktopTablet;
 
-    final String fullEpTitle = episodeNumber.isNotEmpty
-        ? '$episodeNumber - $episodeTitle'
-        : episodeTitle;
+    final int? epNum = int.tryParse(episodeNumber.replaceAll(RegExp(r'[^0-9]'), ''));
+
+    final String fullEpTitle = (epNum != null && epNum > 0)
+        ? AurisStringUtils.formatEpisodeTitle(epNum, episodeTitle)
+        : ((episodeNumber.isNotEmpty && episodeNumber != 'Película')
+            ? '$episodeNumber - $episodeTitle'
+            : episodeTitle);
 
     final Widget bookmarkButton = IconButton(
       onPressed: onBookmarkToggle,

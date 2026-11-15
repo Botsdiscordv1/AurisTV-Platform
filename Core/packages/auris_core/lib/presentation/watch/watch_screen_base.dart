@@ -110,8 +110,11 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
     final bool isBookmarked = favorites.any((f) => f.id == widget.contentId || f.title == (widget.metadataTitle ?? widget.title));
     final String seriesTitle = widget.metadataTitle ?? widget.title ?? widget.contentId;
     final bool isMovie = isMovieLike(widget.category, seriesTitle);
+    final bool isTheme = widget.source == 'Themes' ||
+        widget.source == 'YouTube' ||
+        widget.sourceUrl.contains('animethemes.moe');
 
-    final cachedEpisodesData = isMovie
+    final cachedEpisodesData = (isMovie || isTheme)
         ? null
         : ProgressiveContentNotifier.lookupCachedEpisodesResponse(
             title: widget.title ?? widget.contentId,
@@ -127,27 +130,33 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
       season: widget.season,
     );
 
-    final episodesData = isMovie
+    final episodesData = (isMovie || isTheme)
         ? null
         : (cachedEpisodesData ?? ref.watch(episodesProvider(episodesParams)).valueOrNull);
-    final List<EpisodeInfo> episodesList = isMovie
+    final List<EpisodeInfo> episodesList = (isMovie || isTheme)
         ? const []
         : (widget.playlistEpisodes ?? (episodesData?.episodes ?? []));
 
     // Resolver el número actual del episodio
-    final int currentEpNum = int.tryParse(widget.episode ?? '1') ?? 1;
+    final int? parsedEpNum = int.tryParse(widget.episode ?? '');
+    final int currentEpNum = parsedEpNum ?? 1;
 
-    // Encontrar el episodio activo por número exacto
-    final EpisodeInfo? activeEpisode = isMovie ? null : episodesList.firstWhereOrNull((ep) => ep.number == currentEpNum);
+    // Encontrar el episodio activo por número exacto (solo si no es película ni tema y es un número válido)
+    final EpisodeInfo? activeEpisode = (isMovie || isTheme || parsedEpNum == null)
+        ? null
+        : episodesList.firstWhereOrNull((ep) => ep.number == currentEpNum);
 
-    final String realEpTitle = isMovie
-        ? (widget.episodeTitle ?? seriesTitle)
-        : ((activeEpisode?.title != null && activeEpisode!.title!.isNotEmpty)
-            ? activeEpisode.title!
-            : (widget.episodeTitle ?? 'Episodio $currentEpNum'));
+    final String? epTitle = activeEpisode?.title;
+    final String rawEpTitle = (epTitle != null && epTitle.isNotEmpty)
+        ? epTitle
+        : (widget.episodeTitle ?? (isTheme ? (widget.episode ?? 'Tema Musical') : 'Episodio $currentEpNum'));
 
-    final String realSynopsis = isMovie
-        ? (widget.synopsis ?? 'Disfruta de $seriesTitle con la mejor calidad en AurisTV.')
+    final String realEpTitle = (isMovie || isTheme)
+        ? (widget.episodeTitle ?? (isTheme ? (widget.episode ?? 'Tema Musical') : seriesTitle))
+        : formatEpisodeTitle(currentEpNum, rawEpTitle);
+
+    final String realSynopsis = (isMovie || isTheme)
+        ? (widget.synopsis ?? (isTheme ? 'Tema musical de $seriesTitle: $realEpTitle' : 'Disfruta de $seriesTitle con la mejor calidad en AurisTV.'))
         : ((activeEpisode?.description != null && activeEpisode!.description!.isNotEmpty)
             ? activeEpisode.description!
             : (widget.synopsis ?? 'Sigue las aventuras de $seriesTitle en este episodio $realEpTitle con la mejor calidad en AurisTV.'));
@@ -158,9 +167,11 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
 
     final String realReleaseDate = formatDisplayDate(rawDate);
 
-    final String realBadges = (activeEpisode?.quality != null && activeEpisode!.quality!.isNotEmpty)
-        ? activeEpisode.quality!
-        : 'Sub | Dob';
+    final String realBadges = isTheme
+        ? (widget.episode ?? 'OP/ED')
+        : ((activeEpisode?.quality != null && activeEpisode!.quality!.isNotEmpty)
+            ? activeEpisode.quality!
+            : 'Sub | Dob');
 
     final String realCertification = (widget.certification != null && widget.certification!.isNotEmpty && widget.certification != 'NR')
         ? widget.certification!.toUpperCase()
@@ -169,14 +180,14 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
     // Calcular episodio siguiente y anterior por número de episodio real (solo para series)
     EpisodeInfo? nextEp;
     EpisodeInfo? prevEp;
-    if (!isMovie) {
+    if (!isMovie && !isTheme) {
       for (final ep in episodesList) {
         if (ep.number == currentEpNum + 1) nextEp = ep;
         if (ep.number == currentEpNum - 1) prevEp = ep;
       }
     }
 
-    final Widget nextEpisodeWidget = (!isMovie && nextEp != null)
+    final Widget nextEpisodeWidget = (!isMovie && !isTheme && nextEp != null)
         ? WatchNavCard(
             sectionLabel: 'SIGUIENTE EPISODIO',
             episodeNumber: 'E${nextEp.number}',
@@ -192,7 +203,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
           )
         : const SizedBox.shrink();
 
-    final Widget previousEpisodeWidget = (!isMovie && prevEp != null)
+    final Widget previousEpisodeWidget = (!isMovie && !isTheme && prevEp != null)
         ? WatchNavCard(
             sectionLabel: 'EPISODIO ANTERIOR',
             episodeNumber: 'E${prevEp.number}',
@@ -208,7 +219,13 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
           )
         : const SizedBox.shrink();
 
-    final String epNumDisplay = isMovie ? 'Película' : ((activeEpisode?.number != null) ? 'E${activeEpisode!.number}' : (widget.episode != null ? 'E${widget.episode}' : 'E$currentEpNum'));
+    final String epNumDisplay = isMovie
+        ? 'Película'
+        : (isTheme
+            ? (widget.episode ?? 'Tema')
+            : ((activeEpisode?.number != null)
+                ? 'E${activeEpisode!.number}'
+                : (widget.episode != null ? 'E${widget.episode}' : 'E$currentEpNum')));
 
     final VoidCallback toggleBookmark = () {
       final favItem = FavoriteItem(
@@ -234,7 +251,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
           onBack: widget.onBack,
           category: widget.category,
           seriesTitle: seriesTitle,
-          episodeNumber: isMovie ? null : epNumDisplay,
+          episodeNumber: (isMovie || isTheme) ? (widget.episode ?? '') : epNumDisplay,
           serverName: widget.serverName,
           isBookmarked: isBookmarked,
           onBookmarkToggle: toggleBookmark,
@@ -263,14 +280,14 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
         ),
         nextEpisodeWidget: nextEpisodeWidget,
         previousEpisodeWidget: previousEpisodeWidget,
-        playlistSidebarWidget: (widget.showPlaylistSidebar && !isMovie && episodesList.isNotEmpty)
+        playlistSidebarWidget: (widget.showPlaylistSidebar && !isMovie && !isTheme && episodesList.isNotEmpty)
             ? WatchPlaylistSidebar(
                 episodes: episodesList,
                 activeEpisode: (activeEpisode?.number ?? currentEpNum).toString(),
                 onEpisodeSelected: widget.onEpisodeSelected ?? (_) {},
               )
             : null,
-        rightColumnWidget: widget.showPlaylistSidebar && !isMovie
+        rightColumnWidget: widget.showPlaylistSidebar && !isMovie && !isTheme
             ? (episodesList.isNotEmpty
                 ? WatchPlaylistSidebar(
                     episodes: episodesList,
@@ -278,7 +295,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                     onEpisodeSelected: widget.onEpisodeSelected ?? (_) {},
                   )
                 : null)
-            : (episodesList.isNotEmpty
+            : (!isMovie && !isTheme && episodesList.isNotEmpty
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -293,7 +310,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                     ],
                   )
                 : null),
-        mobileEpisodesWidget: (!isMovie && episodesList.isNotEmpty)
+        mobileEpisodesWidget: (!isMovie && !isTheme && episodesList.isNotEmpty)
             ? _buildMobileEpisodesSection(
                 context,
                 episodesList,
@@ -394,8 +411,6 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
-                            border:
-                                Border.all(color: Colors.white12, width: 0.5),
                             image: thumbUrl.isNotEmpty
                                 ? DecorationImage(
                                     image: NetworkImage(thumbUrl),
@@ -460,7 +475,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                         children: [
                           const SizedBox(height: 4),
                           Text(
-                            'E${ep.number} - $epTitle',
+                            AurisStringUtils.formatEpisodeTitle(ep.number, epTitle),
                             style: TextStyle(
                               color: isCurrent
                                   ? const Color(0xFFEF7A1E)

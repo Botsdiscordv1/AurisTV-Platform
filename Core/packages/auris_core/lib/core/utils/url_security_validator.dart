@@ -29,6 +29,8 @@ class UrlSecurityValidator {
     'telegram',
     'veranime',
     'latinoyt',
+    'themes',
+    'animethemes',
     
     // Movie/Series sources
     'gnula',
@@ -130,8 +132,10 @@ class UrlSecurityValidator {
     if (source != null && source.isNotEmpty) {
       final sourceLower = source.toLowerCase();
       
-      // YouTube se maneja aparte (no hace extract)
+      // YouTube y Themes se manejan aparte (no hacen extract remoto)
       if (sourceLower.contains('youtube') || 
+          sourceLower.contains('themes') ||
+          url.contains('animethemes.moe') ||
           url.contains('youtube.com') || 
           url.contains('youtu.be')) {
         return true; // Se maneja sin extract
@@ -195,6 +199,10 @@ class ExtractParamsValidator {
     required String source,
     String? category,
   }) {
+    final sourceLower = source.toLowerCase();
+    if (sourceLower.contains('themes') || url.contains('animethemes.moe')) {
+      return true;
+    }
     // Validar URL base
     if (!UrlSecurityValidator.isUrlSafe(url, source: source)) {
       return false;

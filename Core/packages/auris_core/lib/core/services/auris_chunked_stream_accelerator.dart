@@ -46,7 +46,7 @@ class AurisChunkedStreamAccelerator {
   /// Si el host no soporta rangos o el acelerador no puede arrancar, retorna la URL original intacta.
   Future<String> prepareAcceleratedStream(String remoteUrl, [Map<String, String>? headers]) async {
     if (kIsWeb) return remoteUrl; // En Web el navegador maneja directamente los sockets
-    if (remoteUrl.contains('.m3u8')) return remoteUrl; // HLS ya viene segmentado por .ts nativamente
+    if (remoteUrl.contains('.m3u8') || remoteUrl.contains('.webm')) return remoteUrl; // HLS y WebM nativo sin proxy
 
     await ensureStarted();
     if (!isRunning) return remoteUrl;

@@ -54,17 +54,30 @@ class _CuredNetworkImageState extends State<CuredNetworkImage> {
   bool _curing = false;
   bool _cureScheduled = false;
 
+  static String _resolveOptimalUrl(String rawUrl, int? memWidth) {
+    if (rawUrl.isEmpty) return rawUrl;
+    // Si es una imagen de TMDB (w500) y el contenedor es pequeño (móvil o sidebar < 250px lógicos / 400px físicos),
+    // solicitamos w300 para ahorrar datos y acelerar la carga en red.
+    // En pantallas grandes (TV/Desktop con ancho > 400px), w500 se mantiene intacto para máxima nitidez.
+    if (memWidth != null && memWidth > 0 && memWidth <= 400) {
+      if (rawUrl.contains('image.tmdb.org/t/p/w500')) {
+        return rawUrl.replaceFirst('/w500/', '/w300/');
+      }
+    }
+    return rawUrl;
+  }
+
   @override
   void initState() {
     super.initState();
-    _url = widget.imageUrl;
+    _url = _resolveOptimalUrl(widget.imageUrl, widget.memCacheWidth);
   }
 
   @override
   void didUpdateWidget(covariant CuredNetworkImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
-      _url = widget.imageUrl;
+    if (oldWidget.imageUrl != widget.imageUrl || oldWidget.memCacheWidth != widget.memCacheWidth) {
+      _url = _resolveOptimalUrl(widget.imageUrl, widget.memCacheWidth);
       _curing = false;
       _cureScheduled = false;
     }

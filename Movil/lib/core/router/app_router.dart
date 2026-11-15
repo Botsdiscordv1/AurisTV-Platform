@@ -324,6 +324,8 @@ final GoRouter appRouter = GoRouter(
         final certification = state.uri.queryParameters['certification'];
         final startPosition = int.tryParse(state.uri.queryParameters['startPosition'] ?? '');
         final synopsis = state.uri.queryParameters['synopsis'];
+        final video720 = state.uri.queryParameters['video720'];
+        final video1080 = state.uri.queryParameters['video1080'];
 
         return WatchScreen(
           contentId: contentId,
@@ -343,6 +345,8 @@ final GoRouter appRouter = GoRouter(
           certification: certification,
           startPosition: startPosition,
           synopsis: synopsis,
+          video720: video720,
+          video1080: video1080,
         );
       },
     ),

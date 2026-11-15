@@ -125,6 +125,12 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   int _sleepTimerMinutes = 0;
   String _sleepTimerLabel = 'No';
 
+  // --- 2x Speed Hold State ---
+  bool _isHolding2x = false;
+  double _preHoldSpeed = 1.0;
+  bool _wasPlayingBeforeHold = false;
+  Timer? _holdTimer;
+
   // --- Focus Node para atajos de teclado Web Desktop ---
   final FocusNode _focusNode = FocusNode();
 
@@ -416,13 +422,64 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     _startHideTimer();
   }
 
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+  void _setHold2x(bool holding) {
+    if (_isHolding2x == holding) return;
+    final player = ref.read(activePlayerProvider).player;
+    if (mounted) {
+      setState(() {
+        _isHolding2x = holding;
+        if (holding) {
+          _wasPlayingBeforeHold = player?.state.playing ?? false;
+          _preHoldSpeed = _playbackSpeed;
+          if (!_wasPlayingBeforeHold) {
+            player?.play();
+          }
+          player?.setRate(2.0);
+        } else {
+          player?.setRate(_playbackSpeed);
+          if (!_wasPlayingBeforeHold) {
+            player?.pause();
+          }
+        }
+      });
+    }
+  }
 
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     final key = event.logicalKey;
     final player = ref.read(activePlayerProvider).player;
 
-    if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) {
+    if (key == LogicalKeyboardKey.space) {
+      if (event is KeyDownEvent) {
+        _holdTimer?.cancel();
+        _holdTimer = Timer(const Duration(milliseconds: 250), () {
+          _setHold2x(true);
+        });
+        return KeyEventResult.handled;
+      } else if (event is KeyRepeatEvent) {
+        if (!_isHolding2x) {
+          _setHold2x(true);
+        }
+        return KeyEventResult.handled;
+      } else if (event is KeyUpEvent) {
+        _holdTimer?.cancel();
+        if (_isHolding2x) {
+          _setHold2x(false);
+        } else {
+          if (_isPlaying) {
+            player?.pause();
+          } else {
+            player?.play();
+          }
+          _toggleControls();
+        }
+        return KeyEventResult.handled;
+      }
+    }
+
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    if (key == LogicalKeyboardKey.keyK) {
       if (_isPlaying) {
         player?.pause();
       } else {
@@ -476,6 +533,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
 
   @override
   void dispose() {
+    _holdTimer?.cancel();
     _focusNode.dispose();
     _sleepTimer?.cancel();
     _hideControlsTimer?.cancel();
@@ -520,42 +578,62 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
         onHover: (_) {
           if (!_showControls) _toggleControls();
         },
-        child: GestureDetector(
-          onTap: () {
-            if (!isInitialLoading) {
-              if (_isPlaying) {
-                player?.pause();
-              } else {
-                player?.play();
-              }
-              _toggleControls();
+        child: Listener(
+          onPointerDown: (_) {
+            _holdTimer?.cancel();
+            _holdTimer = Timer(const Duration(milliseconds: 250), () {
+              _setHold2x(true);
+            });
+          },
+          onPointerUp: (_) {
+            _holdTimer?.cancel();
+            if (_isHolding2x) {
+              _setHold2x(false);
             }
           },
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 0. Resplandor de Luz Ambiental (Ambilight)
-              if (_isAmbientLightingEnabled)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 500),
-                      opacity: _isPlaying ? 0.85 : 0.40,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: RadialGradient(
-                            center: Alignment.center,
-                            radius: 1.2,
-                            colors: [
-                              const Color(0xFFEF7A1E).withValues(alpha: 0.18),
-                              Colors.black.withValues(alpha: 0.0),
-                            ],
+          onPointerCancel: (_) {
+            _holdTimer?.cancel();
+            if (_isHolding2x) {
+              _setHold2x(false);
+            }
+          },
+          child: GestureDetector(
+            onTap: () {
+              if (_isHolding2x) return;
+              if (!isInitialLoading) {
+                if (_isPlaying) {
+                  player?.pause();
+                } else {
+                  player?.play();
+                }
+                _toggleControls();
+              }
+            },
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // 0. Resplandor de Luz Ambiental (Ambilight)
+                if (_isAmbientLightingEnabled)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 500),
+                        opacity: _isPlaying ? 0.85 : 0.40,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              center: Alignment.center,
+                              radius: 1.2,
+                              colors: [
+                                const Color(0xFFEF7A1E).withValues(alpha: 0.18),
+                                Colors.black.withValues(alpha: 0.0),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
 
               // 1. Capa de Video real
               if (controller != null)
@@ -1112,11 +1190,70 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                   ),
                 ),
               ),
+
+              // 4. Cápsula Flotante "2x" al mantener presionado (Standard Delhi Frosted Glass)
+              if (_isHolding2x)
+                Positioned(
+                  top: 28,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: IgnorePointer(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: BackdropFilter(
+                          filter: ImageFilter.compose(
+                            outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                            inner: ColorFilter.matrix(const <double>[
+                              1.630, -0.572, -0.058, 0, 0,
+                              -0.170, 1.228, -0.058, 0, 0,
+                              -0.170, -0.572, 1.742, 0, 0,
+                              0, 0, 0, 1, 0,
+                            ]),
+                          ),
+                          child: Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text(
+                                  '2x',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                AurisIcon(
+                                  AurisIcons.fastForwardFilled,
+                                  color: const Color(0xFFEF7A1E),
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
           ],
         ),
       ),
     ),
-  );
+  ),
+);
 }
 
   Widget _buildFloatingSettingsPanel() {
