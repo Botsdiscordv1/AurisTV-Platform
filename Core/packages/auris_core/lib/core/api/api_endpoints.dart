@@ -316,6 +316,27 @@ class ApiEndpoints {
 
     final String lowerUrl = workingUrl.toLowerCase();
 
+    // TMDB directo: Cloudflare Enterprise CDN con presencia edge global y CORS nativo.
+    // Evita la latencia transatlántica de weserv y elimina peticiones de rebote al VPS.
+    if (lowerUrl.contains('image.tmdb.org')) {
+      if (targetWidth != null && targetWidth > 0) {
+        String bucket;
+        if (targetWidth <= 300) {
+          bucket = 'w300';
+        } else if (targetWidth <= 500) {
+          bucket = 'w500';
+        } else if (targetWidth <= 780) {
+          bucket = 'w780';
+        } else if (targetWidth <= 1280) {
+          bucket = 'w1280';
+        } else {
+          bucket = 'original';
+        }
+        return fixUrl(workingUrl.replaceFirst(RegExp(r'/t/p/(w\d+|original)/'), '/t/p/$bucket/'));
+      }
+      return fixUrl(workingUrl);
+    }
+
     if (lowerUrl.contains('ppvservices.st') || lowerUrl.contains('ppvservices')) {
       return fixUrl(workingUrl);
     }

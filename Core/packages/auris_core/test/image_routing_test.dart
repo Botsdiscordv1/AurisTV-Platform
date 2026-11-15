@@ -2,8 +2,19 @@ import 'package:auris_core/core/api/api_endpoints.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('weserv urls carry proxy errorredirect by default', () {
+  test('tmdb urls bypass weserv and go direct', () {
     final out = ApiEndpoints.proxyImage('https://image.tmdb.org/t/p/w500/abc.jpg');
+    expect(out, 'https://image.tmdb.org/t/p/w500/abc.jpg');
+    expect(out.contains('weserv.nl'), false);
+  });
+
+  test('tmdb urls adapt bucket to targetWidth', () {
+    final out = ApiEndpoints.proxyImage('https://image.tmdb.org/t/p/w500/abc.jpg', width: 300);
+    expect(out, 'https://image.tmdb.org/t/p/w300/abc.jpg');
+  });
+
+  test('weserv urls carry proxy errorredirect by default', () {
+    final out = ApiEndpoints.proxyImage('https://cdn.jkanime.net/assets/images/animes/image/abc.jpg');
     expect(out.contains('images.weserv.nl'), true);
     expect(out.contains('errorredirect='), true);
     expect(out.contains(Uri.encodeComponent('api/proxy/image')), true);
