@@ -89,6 +89,14 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   }
 
   @override
+  void didUpdateWidget(WatchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.sourceUrl != oldWidget.sourceUrl || widget.episode != oldWidget.episode) {
+      _lastOpenedUrl = '';
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Resolver la fuente real del video via SSE/extract
     final extractAsync = ref.watch(extractStreamProvider(ExtractParams(

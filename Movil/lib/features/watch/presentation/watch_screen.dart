@@ -111,6 +111,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   StreamSubscription? _bufSubscription;
   StreamSubscription? _durSubscription;
   StreamSubscription? _completedSub;
+  StreamSubscription? _bufferDurationSub;
 
   bool _showControls = false;
   bool _isPlaying = false;
@@ -120,6 +121,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   bool _hasLoadedFirstFrame = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  Duration _bufferedDuration = Duration.zero;
 
   // --- Resume state ---
   int _pendingResumeMs = 0;
@@ -207,6 +209,18 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       if (_isSeeking) return;
       setState(() => _isBuffering = buffering);
     });
+
+    _bufferDurationSub?.cancel();
+    _bufferDurationSub = player.stream.buffer.listen((buf) {
+      if (mounted) {
+        setState(() {
+          _bufferedDuration = buf;
+        });
+      }
+    });
+    if (player.state.buffer > Duration.zero) {
+      _bufferedDuration = player.state.buffer;
+    }
 
     _posSubscription?.cancel();
     _posSubscription = player.stream.position.listen((pos) {
@@ -357,6 +371,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     _posSubscription?.cancel();
     _playSubscription?.cancel();
     _bufSubscription?.cancel();
+    _bufferDurationSub?.cancel();
     _durSubscription?.cancel();
     _completedSub?.cancel();
     _sleepTimer?.cancel();
@@ -1303,13 +1318,17 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                             ),
                           ),
                           SliderTheme(
-                            data: const SliderThemeData(
-                              trackHeight: 3.5,
-                              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6.5),
-                              overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
-                              activeTrackColor: Color(0xFFFF0033),
-                              inactiveTrackColor: Colors.white24,
-                              thumbColor: Color(0xFFFF0033),
+                            data: SliderThemeData(
+                              trackHeight: 4.5,
+                              trackShape: _YouTubeSliderTrackShape(
+                                bufferValue: _duration.inMilliseconds > 0
+                                    ? (_bufferedDuration.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
+                                    : 0.0,
+                              ),
+                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.5),
+                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                              thumbColor: const Color(0xFFFF0033),
+                              overlayColor: const Color(0xFFFF0033).withValues(alpha: 0.2),
                             ),
                             child: Slider(
                               value: _position.inSeconds.toDouble().clamp(0, (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble()),
@@ -1889,5 +1908,81 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
               ),
             ),
     );
+  }
+}
+
+class _YouTubeSliderTrackShape extends SliderTrackShape with BaseSliderTrackShape {
+  const _YouTubeSliderTrackShape({required this.bufferValue});
+
+  final double bufferValue;
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required Offset thumbCenter,
+    Offset? secondaryOffset,
+    bool isEnabled = true,
+    bool isDiscrete = false,
+    required TextDirection textDirection,
+  }) {
+    final Rect trackRect = getPreferredRect(
+      parentBox: parentBox,
+      offset: offset,
+      sliderTheme: sliderTheme,
+      isEnabled: isEnabled,
+      isDiscrete: isDiscrete,
+    );
+
+    final Paint basePaint = Paint()
+      ..color = const Color(0xFF282828).withValues(alpha: 0.60)
+      ..style = PaintingStyle.fill;
+
+    final Paint bufferPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.40)
+      ..style = PaintingStyle.fill;
+
+    final Paint activePaint = Paint()
+      ..color = const Color(0xFFFF0033)
+      ..style = PaintingStyle.fill;
+
+    const double trackHeight = 4.5;
+    final double verticalCenter = trackRect.center.dy;
+    final Rect rect = Rect.fromLTRB(
+      trackRect.left,
+      verticalCenter - trackHeight / 2,
+      trackRect.right,
+      verticalCenter + trackHeight / 2,
+    );
+
+    const Radius radius = Radius.circular(2.25);
+
+    // 1. Fondo Inactivo
+    context.canvas.drawRRect(RRect.fromRectAndRadius(rect, radius), basePaint);
+
+    // 2. Barra de Buffer
+    if (bufferValue > 0) {
+      final double bufferRight = trackRect.left + (trackRect.width * bufferValue.clamp(0.0, 1.0));
+      final Rect bufferRect = Rect.fromLTRB(
+        trackRect.left,
+        verticalCenter - trackHeight / 2,
+        bufferRight,
+        verticalCenter + trackHeight / 2,
+      );
+      context.canvas.drawRRect(RRect.fromRectAndRadius(bufferRect, radius), bufferPaint);
+    }
+
+    // 3. Barra Activa (Reproducción)
+    final double activeRight = thumbCenter.dx.clamp(trackRect.left, trackRect.right);
+    final Rect activeRect = Rect.fromLTRB(
+      trackRect.left,
+      verticalCenter - trackHeight / 2,
+      activeRight,
+      verticalCenter + trackHeight / 2,
+    );
+    context.canvas.drawRRect(RRect.fromRectAndRadius(activeRect, radius), activePaint);
   }
 }

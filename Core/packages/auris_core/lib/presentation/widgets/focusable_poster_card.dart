@@ -8,8 +8,7 @@ import 'marquee_text.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 Color _colorFromString(String s) {
-  final hash = s.codeUnits.fold<int>(0, (h, c) => h * 31 + c);
-  // Paleta AurisTV: Naranjas, Grises Pro y Azules Cine
+  if (s.isEmpty) return const Color(0xFFEF7A1E);
   const colors = [
     Color(0xFFEF7A1E), // Brand Orange
     Color(0xFF2A2A2A), // Deep Grey
@@ -17,7 +16,9 @@ Color _colorFromString(String s) {
     Color(0xFF3D1D0A), // Dark Orange
     Color(0xFF1976D2), // Cinema Blue
   ];
-  return colors[hash.abs() % colors.length];
+  final hash = s.hashCode;
+  final index = hash.abs() % colors.length;
+  return colors[index < 0 ? 0 : index];
 }
 
 Widget _letterPlaceholder(String title) {

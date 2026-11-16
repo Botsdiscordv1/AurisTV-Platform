@@ -53,11 +53,21 @@ class UrlUtils {
 
     final queryParams = <String, String>{
       'episode': player.episode ?? '1',
+      if (player.source.isNotEmpty) 'source': player.source,
+      if (player.sourceUrl.isNotEmpty) 'url': player.sourceUrl,
+      if (player.serverName != null && player.serverName!.isNotEmpty) 'serverName': player.serverName!,
+      if (player.category != null && player.category!.isNotEmpty) 'category': player.category!,
       if (player.season != null && player.season! > 1) 'season': player.season.toString(),
       if (player.skipResume) 'skipResume': '1',
       if (player.isLive) 'isLive': '1',
       if (player.episodeTitle != null && player.episodeTitle!.isNotEmpty)
         'episodeTitle': player.episodeTitle!,
+      if (player.posterUrl != null && player.posterUrl!.isNotEmpty)
+        'posterUrl': player.posterUrl!,
+      if (player.bannerUrl != null && player.bannerUrl!.isNotEmpty)
+        'bannerUrl': player.bannerUrl!,
+      if (player.logoUrl != null && player.logoUrl!.isNotEmpty)
+        'logoUrl': player.logoUrl!,
     };
 
     try {
@@ -579,9 +589,27 @@ class UrlUtils {
       season: season,
     );
 
-    final queryParams = {
+    final queryParams = <String, String>{
       'episode': episode,
+      if (source.isNotEmpty) 'source': source,
+      if (url.isNotEmpty) 'url': url,
+      if (serverName != null && serverName.isNotEmpty) 'serverName': serverName,
+      if (category != null && category.isNotEmpty) 'category': category,
       if (season != null && season > 1) 'season': season.toString(),
+      if (episodeTitle != null && episodeTitle.isNotEmpty)
+        'episodeTitle': episodeTitle,
+      if (posterUrl != null && posterUrl.isNotEmpty)
+        'posterUrl': posterUrl,
+      if (bannerUrl != null && bannerUrl.isNotEmpty)
+        'bannerUrl': bannerUrl,
+      if (logoUrl != null && logoUrl.isNotEmpty)
+        'logoUrl': logoUrl,
+      if (certification != null && certification.isNotEmpty)
+        'certification': certification,
+      if (year != null && year > 0)
+        'year': year.toString(),
+      if (totalEpisodes != null && totalEpisodes > 0)
+        'totalEpisodes': totalEpisodes.toString(),
     };
 
     final path = slug.isNotEmpty ? '/watch/$token/$slug' : '/watch/$token';

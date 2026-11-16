@@ -243,10 +243,13 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
       ref.read(favoritesProvider.notifier).toggleFavorite(favItem);
     };
 
+    final bool isDesktopWeb = MediaQuery.sizeOf(context).width >= 1024;
+    final bool effectiveTheaterMode = widget.isTheaterMode || (isTheme && isDesktopWeb);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: AdaptiveWatchLayout(
-        isTheaterMode: widget.isTheaterMode,
+        isTheaterMode: effectiveTheaterMode,
         topBarWidget: WatchTopBar(
           onBack: widget.onBack,
           category: widget.category,

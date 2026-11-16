@@ -100,12 +100,7 @@ class AdaptiveWatchLayout extends StatelessWidget {
                                             width: double.infinity,
                                             height: stageHeight,
                                             color: Colors.black,
-                                            child: Center(
-                                              child: AspectRatio(
-                                                aspectRatio: 16 / 9,
-                                                child: playerWidget,
-                                              ),
-                                            ),
+                                            child: playerWidget,
                                           )
                                         : ClipRRect(
                                             borderRadius: BorderRadius.circular(12),
@@ -187,41 +182,36 @@ class AdaptiveWatchLayout extends StatelessWidget {
                       ),
                     );
                   } else if (isTabletWidth) {
-                    // Layout Tablet / Móvil Landscape (768px - 1024px)
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 6,
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(16),
+                    // Layout Tablet (768px - 1024px): Reproductor ancho completo arriba, metadatos y navegación limpia estilo móvil
+                    return SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AspectRatio(
+                            aspectRatio: 16 / 9,
+                            child: playerWidget,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(24),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                AspectRatio(
-                                  aspectRatio: 16 / 9,
-                                  child: playerWidget,
-                                ),
-                                const SizedBox(height: 16),
                                 metadataWidget,
                                 actionBarWidget,
+                                const Divider(color: Colors.white10, height: 24),
                                 synopsisWidget,
-                                const SizedBox(height: 16),
-                                nextEpisodeWidget,
-                                previousEpisodeWidget,
+                                const SizedBox(height: 24),
+                                if (mobileEpisodesWidget == null) ...[
+                                  nextEpisodeWidget,
+                                  previousEpisodeWidget,
+                                ],
+                                if (mobileEpisodesWidget != null)
+                                  mobileEpisodesWidget!,
                               ],
                             ),
                           ),
-                        ),
-                        if (playlistSidebarWidget != null)
-                          Expanded(
-                            flex: 4,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: playlistSidebarWidget!,
-                            ),
-                          ),
-                      ],
+                        ],
+                      ),
                     );
                   } else {
                     // Layout Móvil Retrato (< 768px)

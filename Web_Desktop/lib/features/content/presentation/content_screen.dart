@@ -995,6 +995,7 @@ class _ThemeCardState extends State<_ThemeCard> {
       child: GestureDetector(
         onTap: () {
           String url = widget.theme.videoUrl; final typeLabel = widget.isOP ? 'OP' : 'ED';
+          final posterUrl = img ?? widget.fallbackImage;
           if (!url.startsWith('http')) { 
             url = 'https://www.youtube.com/watch?v=$url'; 
             final player = PlayerScreen(
@@ -1005,6 +1006,10 @@ class _ThemeCardState extends State<_ThemeCard> {
               serverName: 'YouTube',
               totalEpisodes: 1,
               logoUrl: widget.logoUrl,
+              posterUrl: posterUrl,
+              bannerUrl: widget.fallbackImage,
+              title: widget.animeTitle,
+              episodeTitle: widget.theme.title,
             );
             UrlUtils.openPlayer(context, player);
           }
@@ -1023,6 +1028,8 @@ class _ThemeCardState extends State<_ThemeCard> {
               serverName: 'Themes',
               totalEpisodes: 1,
               logoUrl: widget.logoUrl,
+              posterUrl: posterUrl,
+              bannerUrl: widget.fallbackImage,
               video720: url720.isNotEmpty ? url720 : null,
               video1080: url1080.isNotEmpty ? url1080 : null,
               title: widget.animeTitle, // Pasamos el título del anime a través del nuevo parámetro
@@ -2132,11 +2139,7 @@ void _openPlayer(PlayerScreen player) {
       _ytController!.close();
       _ytController = null;
     }
-    if (mounted) {
-      setState(() {
-        _useHtmlIframeFallback = false;
-      });
-    }
+    _useHtmlIframeFallback = false;
   }
 
   Widget _buildMetaRow(dynamic detail, {bool isMobile = false, bool isCompact = false, String? kind}) {

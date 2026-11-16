@@ -139,8 +139,8 @@ class WatchPlaylistSidebar extends StatelessWidget {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(6),
                             child: SizedBox(
-                              width: 124,
-                              height: 70,
+                              width: 150,
+                              height: 84,
                               child: Stack(
                                 children: [
                                   Positioned.fill(
@@ -151,15 +151,15 @@ class WatchPlaylistSidebar extends StatelessWidget {
                                               return CuredNetworkImage(
                                                 imageUrl: ep.thumbnail!,
                                                 fit: BoxFit.cover,
-                                                memCacheWidth: (124 * dpr).round().clamp(1, 1024),
-                                                memCacheHeight: (70 * dpr).round().clamp(1, 1024),
+                                                memCacheWidth: (150 * dpr).round().clamp(1, 1024),
+                                                memCacheHeight: (84 * dpr).round().clamp(1, 1024),
                                               );
                                             },
                                           )
                                         : Container(
                                             color: Colors.white10,
                                             child: const Icon(Icons.movie_outlined,
-                                                color: Colors.white38, size: 22),
+                                                color: Colors.white38, size: 24),
                                           ),
                                   ),
                                   if (isActive)
@@ -198,7 +198,7 @@ class WatchPlaylistSidebar extends StatelessWidget {
                                     color: isActive
                                         ? const Color(0xFFEF7A1E)
                                         : Colors.white,
-                                    fontSize: 12.5,
+                                    fontSize: 14.5,
                                     fontWeight:
                                         isActive ? FontWeight.bold : FontWeight.w600,
                                     height: 1.25,
@@ -207,12 +207,12 @@ class WatchPlaylistSidebar extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 if (metaLine.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 5),
                                   Text(
                                     metaLine,
                                     style: const TextStyle(
-                                      color: Colors.white38,
-                                      fontSize: 11,
+                                      color: Colors.white54,
+                                      fontSize: 12.0,
                                     ),
                                   ),
                                 ],

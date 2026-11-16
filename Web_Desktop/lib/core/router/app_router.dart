@@ -125,7 +125,9 @@ Widget _buildWatchScreenFromToken(BuildContext context, GoRouterState state) {
     }
   }
 
-  final PlayerScreen player = (extra is PlayerScreen)
+  // Si el extra trae PlayerScreen y coincide con el episodio solicitado, respetamos sus campos prioritariamente;
+  // si viene de navegación entre episodios o URL, los queryParams tienen precedencia sobre el payload base de la serie.
+  final PlayerScreen player = (extra is PlayerScreen && (params['episode'] == null || extra.episode == params['episode']))
       ? extra
       : PlayerScreen(
           contentId: params['contentId'] ?? token,
@@ -133,7 +135,7 @@ Widget _buildWatchScreenFromToken(BuildContext context, GoRouterState state) {
           source: params['source'] ?? payload?['source'] ?? '',
           episode: params['episode'] ?? (payload?['episode']?.toString() ?? '1'),
           season: int.tryParse(params['season'] ?? payload?['season']?.toString() ?? ''),
-          serverName: params['serverName'],
+          serverName: params['serverName'] ?? payload?['serverName'],
           category: params['category'] ?? payload?['category'],
           totalEpisodes: int.tryParse(params['totalEpisodes'] ?? ''),
           title: params['title'] ?? (slug.isNotEmpty ? slug.replaceAll('-', ' ') : payload?['title']),

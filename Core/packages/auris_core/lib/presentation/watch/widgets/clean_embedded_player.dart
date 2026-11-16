@@ -96,6 +96,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   StreamSubscription? _posSub;
   StreamSubscription? _playSub;
   StreamSubscription? _bufSub;
+  StreamSubscription? _bufferProgressSub;
   StreamSubscription? _durSub;
   StreamSubscription? _compSub;
 
@@ -106,6 +107,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   bool _hasLoadedFirstFrame = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  Duration _bufferProgress = Duration.zero;
 
   // --- Resume state ---
   int _pendingResumeMs = 0;
@@ -115,6 +117,8 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   double _lastNonZeroVolume = 100.0;
   bool _isVolumeHovered = false;
   bool _isVolumeDragging = false;
+  bool _isTimeHovered = false;
+  bool _showRemainingTime = false;
 
   // --- Floating Settings Panel State ---
   bool _showSettingsPanel = false;
@@ -125,11 +129,12 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   int _sleepTimerMinutes = 0;
   String _sleepTimerLabel = 'No';
 
-  // --- 2x Speed Hold State ---
+  // --- 2x Speed Hold & Skip OP/ED State ---
   bool _isHolding2x = false;
   double _preHoldSpeed = 1.0;
   bool _wasPlayingBeforeHold = false;
   Timer? _holdTimer;
+  bool _isSkipOpEdHovered = false;
 
   // --- Focus Node para atajos de teclado Web Desktop ---
   final FocusNode _focusNode = FocusNode();
@@ -172,6 +177,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
       if (isSameContent && isSameEp && (isSameStream || isActivelyPlaying)) {
         setState(() {
           _position = player.state.position;
+          _bufferProgress = player.state.buffer;
           if (player.state.duration > Duration.zero) {
             _duration = player.state.duration;
           }
@@ -202,6 +208,11 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     _bufSub?.cancel();
     _bufSub = player.stream.buffering.listen((buffering) {
       if (mounted) setState(() => _isBuffering = buffering);
+    });
+
+    _bufferProgressSub?.cancel();
+    _bufferProgressSub = player.stream.buffer.listen((buf) {
+      if (mounted) setState(() => _bufferProgress = buf);
     });
 
     _posSub?.cancel();
@@ -422,6 +433,20 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     _startHideTimer();
   }
 
+  void _skipOpEd() {
+    final player = ref.read(activePlayerProvider).player;
+    if (player == null) return;
+    final current = player.state.position;
+    final duration = player.state.duration;
+    final target = current + const Duration(seconds: 85);
+    if (duration > Duration.zero && target > duration) {
+      player.seek(duration);
+    } else {
+      player.seek(target);
+    }
+    _startHideTimer();
+  }
+
   void _setHold2x(bool holding) {
     if (_isHolding2x == holding) return;
     final player = ref.read(activePlayerProvider).player;
@@ -430,18 +455,29 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
         _isHolding2x = holding;
         if (holding) {
           _wasPlayingBeforeHold = player?.state.playing ?? false;
-          _preHoldSpeed = _playbackSpeed;
+          // Guardar la velocidad real del player (no solo la del selector) para restaurarla al soltar.
+          _preHoldSpeed = player?.state.rate ?? _playbackSpeed;
           if (!_wasPlayingBeforeHold) {
             player?.play();
           }
           player?.setRate(2.0);
         } else {
-          player?.setRate(_playbackSpeed);
+          player?.setRate(_preHoldSpeed);
           if (!_wasPlayingBeforeHold) {
             player?.pause();
           }
         }
       });
+    }
+  }
+
+  void _seekToPercent(double percent) {
+    final player = ref.read(activePlayerProvider).player;
+    if (_duration.inMilliseconds > 0) {
+      final targetMs = (_duration.inMilliseconds * percent).toInt();
+      player?.seek(Duration(milliseconds: targetMs));
+      _startHideTimer();
+      _toggleControls();
     }
   }
 
@@ -526,6 +562,38 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
         _startHideTimer();
       }
       return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit0 || key == LogicalKeyboardKey.numpad0) {
+      player?.seek(Duration.zero);
+      _startHideTimer();
+      _toggleControls();
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1) {
+      _seekToPercent(0.1);
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit2 || key == LogicalKeyboardKey.numpad2) {
+      _seekToPercent(0.2);
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit3 || key == LogicalKeyboardKey.numpad3) {
+      _seekToPercent(0.3);
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit4 || key == LogicalKeyboardKey.numpad4) {
+      _seekToPercent(0.4);
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit5 || key == LogicalKeyboardKey.numpad5) {
+      _seekToPercent(0.5);
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit6 || key == LogicalKeyboardKey.numpad6) {
+      _seekToPercent(0.6);
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit7 || key == LogicalKeyboardKey.numpad7) {
+      _seekToPercent(0.7);
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit8 || key == LogicalKeyboardKey.numpad8) {
+      _seekToPercent(0.8);
+      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.digit9 || key == LogicalKeyboardKey.numpad9) {
+      _seekToPercent(0.9);
+      return KeyEventResult.handled;
     }
 
     return KeyEventResult.ignored;
@@ -540,6 +608,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     _posSub?.cancel();
     _playSub?.cancel();
     _bufSub?.cancel();
+    _bufferProgressSub?.cancel();
     _durSub?.cancel();
     _compSub?.cancel();
     super.dispose();
@@ -569,6 +638,10 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     final bool isTabletOrDesktop = MediaQuery.sizeOf(context).width >= 768;
     final bool shouldShowEmbedBack = widget.onBack != null &&
         (widget.showBackButton ?? !isTabletOrDesktop);
+    final bool isTheme = widget.source == 'Themes' ||
+        widget.source == 'YouTube' ||
+        widget.sourceUrl.contains('animethemes.moe');
+    final bool isTabletOrMobile = MediaQuery.sizeOf(context).width < 1024;
 
     return Focus(
       focusNode: _focusNode,
@@ -578,90 +651,59 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
         onHover: (_) {
           if (!_showControls) _toggleControls();
         },
-        child: Listener(
-          onPointerDown: (_) {
-            _holdTimer?.cancel();
-            _holdTimer = Timer(const Duration(milliseconds: 250), () {
-              _setHold2x(true);
-            });
-          },
-          onPointerUp: (_) {
-            _holdTimer?.cancel();
-            if (_isHolding2x) {
-              _setHold2x(false);
-            }
-          },
-          onPointerCancel: (_) {
-            _holdTimer?.cancel();
-            if (_isHolding2x) {
-              _setHold2x(false);
-            }
-          },
-          child: GestureDetector(
-            onTap: () {
-              if (_isHolding2x) return;
-              if (!isInitialLoading) {
-                if (_isPlaying) {
-                  player?.pause();
-                } else {
-                  player?.play();
-                }
-                _toggleControls();
+        child: GestureDetector(
+          onTap: () {
+            if (_isHolding2x) return;
+            if (!isInitialLoading) {
+              if (_isPlaying) {
+                player?.pause();
+              } else {
+                player?.play();
               }
-            },
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // 0. Resplandor de Luz Ambiental (Ambilight)
-                if (_isAmbientLightingEnabled)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 500),
-                        opacity: _isPlaying ? 0.85 : 0.40,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              center: Alignment.center,
-                              radius: 1.2,
-                              colors: [
-                                const Color(0xFFEF7A1E).withValues(alpha: 0.18),
-                                Colors.black.withValues(alpha: 0.0),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+              _toggleControls();
+            }
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 0. Resplandor de Luz Ambiental (Ambilight)
+              _buildAmbientLightingOverlay(),
 
               // 1. Capa de Video real
-              if (controller != null)
-                Video(
-                  controller: controller,
-                  controls: NoVideoControls,
-                  fit: BoxFit.contain,
-                )
-              else
-                Container(color: Colors.black),
+              controller != null
+                  ? Positioned.fill(
+                      child: Video(
+                        controller: controller,
+                        controls: NoVideoControls,
+                        fit: BoxFit.contain,
+                      ),
+                    )
+                  : const Positioned.fill(
+                      child: ColoredBox(color: Colors.black),
+                    ),
 
               // 2. Fase de Carga Inicial
-              if (isInitialLoading)
-                Container(
-                  color: Colors.black,
-                  child: const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
-                  ),
-                ),
+              isInitialLoading
+                  ? Positioned.fill(
+                      child: Container(
+                        color: Colors.black,
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
 
               // 3. Overlay de Controles Rediseñado para Web Desktop
-              AnimatedOpacity(
-                opacity: (_showControls && !isInitialLoading) ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: IgnorePointer(
-                  ignoring: !(_showControls && !isInitialLoading),
-                  child: Stack(
-                    children: [
+              Positioned.fill(
+                child: AnimatedOpacity(
+                  opacity: (_showControls && !isInitialLoading) ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: IgnorePointer(
+                    ignoring: !(_showControls && !isInitialLoading),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children  : [
                       // Botón Back superior izquierdo (sólo si no hay WatchTopBar activo)
                       if (shouldShowEmbedBack)
                         Positioned(
@@ -672,7 +714,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                             child: InkWell(
                               onTap: widget.onBack,
                               borderRadius: BorderRadius.circular(20),
-                              hoverColor: Colors.white.withValues(alpha: 0.15),
+                              hoverColor: Colors.white.withValues(alpha: 0.08),
                               child: Container(
                                 width: 38,
                                 height: 38,
@@ -691,7 +733,6 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                             ),
                           ),
                         ),
-
                       // Gradiente Superior sutil (sólo si el botón back embebido está activo)
                       if (shouldShowEmbedBack)
                         Positioned(
@@ -715,28 +756,65 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                           ),
                         ),
 
-                    // Gradiente Inferior estilo YouTube (ytp-gradient-bottom)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: 120,
-                      child: IgnorePointer(
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Color(0x33000000), // rgba(0, 0, 0, 0.20)
-                                Color(0x80000000), // rgba(0, 0, 0, 0.50)
-                              ],
-                            ),
+                      // --- Center Play/Pause & Seek -10s / +10s Controls (Mobile / Tablet) ---
+                      if (isTabletOrMobile)
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // -10s Button
+                              IconButton(
+                                onPressed: () {
+                                  final newSec = (_position.inSeconds - 10).clamp(0, _duration.inSeconds);
+                                  player?.seek(Duration(seconds: newSec));
+                                  _startHideTimer();
+                                },
+                                icon: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 36),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.black.withValues(alpha: 0.50),
+                                  padding: const EdgeInsets.all(12),
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+
+                              // Play / Pause Button
+                              IconButton(
+                                onPressed: () {
+                                  if (_isPlaying) {
+                                    player?.pause();
+                                  } else {
+                                    player?.play();
+                                  }
+                                  _startHideTimer();
+                                },
+                                icon: Icon(
+                                  _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                  size: 44,
+                                ),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.black.withValues(alpha: 0.50),
+                                  padding: const EdgeInsets.all(16),
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+
+                              // +10s Button
+                              IconButton(
+                                onPressed: () {
+                                  final newSec = (_position.inSeconds + 10).clamp(0, _duration.inSeconds);
+                                  player?.seek(Duration(seconds: newSec));
+                                  _startHideTimer();
+                                },
+                                icon: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 36),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.black.withValues(alpha: 0.50),
+                                  padding: const EdgeInsets.all(12),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ),
 
                     // =====================================================================
                     // YouTube Web Desktop Official Chrome Controls (.ytp-chrome-controls)
@@ -749,21 +827,26 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // --- 1. ytp-progress-bar-container (Timeline Slider) ---
+                          // --- 1. ytp-progress-bar-container (Timeline Slider con _YouTubeSliderTrackShape) ---
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: SliderTheme(
-                              data: const SliderThemeData(
-                                trackHeight: 3.0,
-                                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6.5),
-                                overlayShape: RoundSliderOverlayShape(overlayRadius: 14),
-                                activeTrackColor: Color(0xFFFF0033), // ytp-play-progress
-                                inactiveTrackColor: Colors.white24, // ytp-progress-list bg
-                                thumbColor: Color(0xFFFF0033), // ytp-scrubber-button
+                              data: SliderThemeData(
+                                trackHeight: 4.5,
+                                trackShape: _YouTubeSliderTrackShape(
+                                  buffer: _bufferProgress,
+                                  duration: _duration,
+                                ),
+                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0),
+                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 0.0),
+                                activeTrackColor: const Color(0xFFFF0033),
+                                inactiveTrackColor: Colors.transparent,
+                                thumbColor: const Color(0xFFFF0033),
+                                overlayColor: Colors.transparent,
                               ),
                               child: Slider(
                                 value: _position.inSeconds.toDouble().clamp(
-                                      0,
+                                      0.0,
                                       (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
                                     ),
                                 max: (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
@@ -774,9 +857,9 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          
 
-                          // --- 2. ytp-chrome-controls (Height 56px, Proporciones Oficiales YouTube Delhi) ---
+                          // --- 2. ytp-chrome-controls (Height 64px, Web Desktop Proporciones Ampliadas) ---
                           SizedBox(
                             height: 56,
                             child: Row(
@@ -790,69 +873,62 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    // 1. ytp-play-button (Circular 48px Frosted Glass Capsule - Destacado)
-                                    ClipOval(
-                                      child: BackdropFilter(
-                                        filter: ImageFilter.compose(
-                                          outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                                          inner: ColorFilter.matrix(const <double>[
-                                            1.630, -0.572, -0.058, 0, 0,
-                                            -0.170, 1.228, -0.058, 0, 0,
-                                            -0.170, -0.572, 1.742, 0, 0,
-                                            0, 0, 0, 1, 0,
-                                          ]),
-                                        ),
-                                        child: Material(
-                                          color: Colors.transparent,
-                                          child: InkWell(
-                                            onTap: () {
-                                              if (_isPlaying) {
-                                                player?.pause();
-                                              } else {
-                                                player?.play();
-                                              }
-                                              _startHideTimer();
-                                            },
-                                            hoverColor: const Color(0x1AFFFFFF), // rgba(255, 255, 255, 0.10)
-                                            child: Container(
-                                              width: 48,
-                                              height: 48,
-                                              decoration: const BoxDecoration(
-                                                color: Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Center(
-                                                child: AurisIcon(
-                                                  _isPlaying ? AurisIcons.pause : AurisIcons.play,
-                                                  color: Colors.white,
-                                                  size: 24,
+                                    // 1. ytp-play-button (Circular 40px Frosted Glass Capsule)
+                                    if (!isTabletOrMobile)
+                                      ClipOval(
+                                        child: BackdropFilter(
+                                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                          child: Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0x4D000000),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Material(
+                                              color: Colors.transparent,
+                                              shape: const CircleBorder(),
+                                              clipBehavior: Clip.antiAlias,
+                                              child: InkWell(
+                                                onTap: () {
+                                                  if (_isPlaying) {
+                                                    player?.pause();
+                                                  } else {
+                                                    player?.play();
+                                                  }
+                                                  _startHideTimer();
+                                                },
+                                                hoverColor: Colors.white.withValues(alpha: 0.08),
+                                                child: SizedBox(
+                                                  width: 32,
+                                                  height: 32,
+                                                  child: Center(
+                                                    child: AurisIcon(
+                                                      _isPlaying ? AurisIcons.pause : AurisIcons.play,
+                                                      color: Colors.white,
+                                                      size: 22,
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                             ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
+                                    if (!isTabletOrMobile)
+                                      const SizedBox(width: 8),
 
-                                    // 2. ytp-prev-button & ytp-next-button (Navigation Frosted Glass Pill 40px)
+                                    // 2. ytp-prev-button & ytp-next-button (Navigation Frosted Glass Pill 46px)
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(20),
                                       child: BackdropFilter(
-                                        filter: ImageFilter.compose(
-                                          outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                                          inner: ColorFilter.matrix(const <double>[
-                                            1.630, -0.572, -0.058, 0, 0,
-                                            -0.170, 1.228, -0.058, 0, 0,
-                                            -0.170, -0.572, 1.742, 0, 0,
-                                            0, 0, 0, 1, 0,
-                                          ]),
-                                        ),
+                                        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                                         child: Container(
                                           height: 40,
                                           padding: const EdgeInsets.symmetric(horizontal: 4),
                                           decoration: BoxDecoration(
-                                            color: const Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
+                                            color: const Color(0x4D000000),
                                             borderRadius: BorderRadius.circular(20),
                                           ),
                                           child: Row(
@@ -861,13 +937,17 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                               // Previous Button
                                               IconButton(
                                                 padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                                constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
+                                                style: IconButton.styleFrom(
+                                                  hoverColor: Colors.white.withValues(alpha: 0.08),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                ),
                                                 icon: AurisIcon(
                                                   AurisIcons.backwardStep,
                                                   color: (widget.hasPrevious || widget.onPreviousEpisode != null)
                                                       ? Colors.white
                                                       : Colors.white30,
-                                                  size: 19,
+                                                  size: 22,
                                                 ),
                                                 onPressed: (widget.hasPrevious || widget.onPreviousEpisode != null)
                                                     ? () {
@@ -882,13 +962,17 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                               // Next Button
                                               IconButton(
                                                 padding: EdgeInsets.zero,
-                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                                constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
+                                                style: IconButton.styleFrom(
+                                                  hoverColor: Colors.white.withValues(alpha: 0.08),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                ),
                                                 icon: AurisIcon(
                                                   AurisIcons.forwardStep,
                                                   color: (widget.hasNext || widget.onNextEpisode != null)
                                                       ? Colors.white
                                                       : Colors.white30,
-                                                  size: 19,
+                                                  size: 22,
                                                 ),
                                                 onPressed: (widget.hasNext || widget.onNextEpisode != null)
                                                     ? () {
@@ -906,136 +990,203 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                     const SizedBox(width: 8),
 
                                     // 3. ytp-volume-area (Official YouTube Standalone Volume Capsule 40px)
-                                    MouseRegion(
-                                      onEnter: (_) => setState(() => _isVolumeHovered = true),
-                                      onExit: (_) => setState(() => _isVolumeHovered = false),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(20),
-                                        child: BackdropFilter(
-                                          filter: ImageFilter.compose(
-                                            outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                                            inner: ColorFilter.matrix(const <double>[
-                                              1.630, -0.572, -0.058, 0, 0,
-                                              -0.170, 1.228, -0.058, 0, 0,
-                                              -0.170, -0.572, 1.742, 0, 0,
-                                              0, 0, 0, 1, 0,
-                                            ]),
-                                          ),
-                                          child: Container(
-                                            height: 40,
-                                            decoration: BoxDecoration(
-                                              color: const Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
-                                              borderRadius: BorderRadius.circular(20),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                // Botón de mute con icono oficial de YouTube
-                                                IconButton(
-                                                  padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                                                  icon: _YouTubeVolumeIcon(
-                                                    volume: _volume,
-                                                    size: 20,
+                                    if (!isTabletOrMobile) ...[
+                                      MouseRegion(
+                                        onEnter: (_) => setState(() => _isVolumeHovered = true),
+                                        onExit: (_) => setState(() => _isVolumeHovered = false),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(20),
+                                          child: BackdropFilter(
+                                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                            child: TweenAnimationBuilder<double>(
+                                              tween: Tween<double>(
+                                                begin: 40.0,
+                                                end: (_isVolumeHovered || _isVolumeDragging) ? 122.0 : 40.0,
+                                              ),
+                                              duration: const Duration(milliseconds: 250),
+                                              curve: Curves.easeInOutCubic,
+                                              builder: (context, width, _) {
+                                              return ClipRect(
+                                                child: Container(
+                                                  width: width,
+                                                  height: 40.0,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0x4D000000),
+                                                    borderRadius: BorderRadius.circular(20),
                                                   ),
-                                                  onPressed: () {
-                                                    _toggleMute();
-                                                    _startHideTimer();
-                                                  },
-                                                  tooltip: _volume == 0 ? 'Activar sonido (m)' : 'Silenciar (m)',
-                                                ),
+                                                  child: OverflowBox(
+                                                    minWidth: 0,
+                                                    maxWidth: 114.0,
+                                                    alignment: Alignment.centerLeft,
+                                                    child: Stack(
+                                                      alignment: Alignment.centerLeft,
+                                                      children: [
+                                                        if (_isVolumeHovered || _isVolumeDragging)
+                                                          Positioned.fill(
+                                                            child: Center(
+                                                              child: Container(
+                                                                height: 32,
+                                                                decoration: BoxDecoration(
+                                                                  color: Colors.white.withValues(alpha: 0.08),
+                                                                  borderRadius: BorderRadius.circular(16),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            // Botón de mute con icono oficial de YouTube
+                                                            IconButton(
+                                                              padding: EdgeInsets.zero,
+                                                              constraints: const BoxConstraints(minWidth: 38, minHeight: 32),
+                                                              hoverColor: Colors.transparent,
+                                                              splashColor: Colors.transparent,
+                                                              highlightColor: Colors.transparent,
+                                                              icon: _YouTubeVolumeIcon(
+                                                                volume: _volume,
+                                                                size: 23,
+                                                              ),
+                                                              onPressed: () {
+                                                                _toggleMute();
+                                                                _startHideTimer();
+                                                              },
+                                                              tooltip: _volume == 0 ? 'Activar sonido (m)' : 'Silenciar (m)',
+                                                            ),
 
-                                                // Slider de volumen horizontal idéntico a YouTube Web (ytp-volume-slider)
-                                                AnimatedSize(
-                                                  duration: const Duration(milliseconds: 200),
-                                                  curve: Curves.easeOutCubic,
-                                                  child: (_isVolumeHovered || _isVolumeDragging)
-                                                      ? _YouTubeVolumeSlider(
-                                                          volume: _volume,
-                                                          onVolumeChanged: (val) {
-                                                            _setVolume(val);
-                                                            _startHideTimer();
-                                                          },
-                                                          onDragStateChanged: (dragging) {
-                                                            setState(() => _isVolumeDragging = dragging);
-                                                            if (!dragging) _startHideTimer();
-                                                          },
-                                                        )
-                                                      : const SizedBox.shrink(),
+                                                            // Slider de volumen horizontal con ancho animado y Fade In/Out
+                                                            AnimatedContainer(
+                                                              duration: const Duration(milliseconds: 250),
+                                                              curve: Curves.easeInOutCubic,
+                                                              width: (_isVolumeHovered || _isVolumeDragging) ? 76.0 : 0.0,
+                                                              child: AnimatedOpacity(
+                                                                opacity: (_isVolumeHovered || _isVolumeDragging) ? 1.0 : 0.0,
+                                                                duration: const Duration(milliseconds: 200),
+                                                                child: SizedBox(
+                                                                  width: 76.0,
+                                                                  child: (_isVolumeHovered || _isVolumeDragging)
+                                                                      ? _YouTubeVolumeSlider(
+                                                                          volume: _volume,
+                                                                          onVolumeChanged: (val) {
+                                                                            _setVolume(val);
+                                                                            _startHideTimer();
+                                                                          },
+                                                                          onDragStateChanged: (dragging) {
+                                                                            setState(() => _isVolumeDragging = dragging);
+                                                                            if (!dragging) _startHideTimer();
+                                                                          },
+                                                                        )
+                                                                      : const SizedBox.shrink(),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
                                                 ),
-                                              ],
-                                            ),
+                                              );
+                                            },
                                           ),
                                         ),
                                       ),
                                     ),
+                                    ],
                                     const SizedBox(width: 8),
 
-                                    // 4. ytp-time-display (Official ytp-time-wrapper-delhi Frosted Glass Capsule 40px)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(20),
-                                      child: BackdropFilter(
-                                        filter: ImageFilter.compose(
-                                          outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                                          inner: ColorFilter.matrix(const <double>[
-                                            1.630, -0.572, -0.058, 0, 0,
-                                            -0.170, 1.228, -0.058, 0, 0,
-                                            -0.170, -0.572, 1.742, 0, 0,
-                                            0, 0, 0, 1, 0,
-                                          ]),
-                                        ),
-                                        child: Container(
-                                          height: 40,
-                                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: RichText(
-                                            text: TextSpan(
-                                              children: [
-                                                TextSpan(
-                                                  text: _formatDuration(_position),
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    letterSpacing: 0.2,
-                                                    shadows: [
-                                                      Shadow(
-                                                        offset: Offset(0, 0),
-                                                        blurRadius: 2,
-                                                        color: Colors.black, // Exacto YouTube: text-shadow: 0 0 2px #000
+                                    // 4. ytp-time-display (Official ytp-time-wrapper-delhi Frosted Glass Capsule 46px)
+                                    MouseRegion(
+                                      onEnter: (_) => setState(() => _isTimeHovered = true),
+                                      onExit: (_) => setState(() => _isTimeHovered = false),
+                                      cursor: SystemMouseCursors.click,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: BackdropFilter(
+                                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              setState(() => _showRemainingTime = !_showRemainingTime);
+                                              _startHideTimer();
+                                            },
+                                            child: Container(
+                                              height: 40,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0x4D000000),
+                                                borderRadius: BorderRadius.circular(20),
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Stack(
+                                                alignment: Alignment.center,
+                                                children: [
+                                                  if (_isTimeHovered)
+                                                    Positioned.fill(
+                                                      child: Padding(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                                        child: Container(
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white.withValues(alpha: 0.08),
+                                                            borderRadius: BorderRadius.circular(19),
+                                                          ),
+                                                        ),
                                                       ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                const TextSpan(
-                                                  text: ' / ',
-                                                  style: TextStyle(
-                                                    color: Colors.white70,
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.normal,
-                                                  ),
-                                                ),
-                                                TextSpan(
-                                                  text: _formatDuration(_duration),
-                                                  style: const TextStyle(
-                                                    color: Colors.white70,
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.normal,
-                                                    letterSpacing: 0.2,
-                                                    shadows: [
-                                                      Shadow(
-                                                        offset: Offset(0, 0),
-                                                        blurRadius: 2,
-                                                        color: Colors.black, // Exacto YouTube: text-shadow: 0 0 2px #000
+                                                    ),
+                                                  Padding(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                                                    child: Center(
+                                                      child: RichText(
+                                                        text: TextSpan(
+                                                          children: [
+                                                            TextSpan(
+                                                              text: _showRemainingTime
+                                                                  ? '-${_formatDuration(_duration > _position ? _duration - _position : Duration.zero)}'
+                                                                  : _formatDuration(_position),
+                                                              style: const TextStyle(
+                                                                color: Colors.white,
+                                                                fontSize: 13.0,
+                                                                fontWeight: FontWeight.w600,
+                                                                letterSpacing: 0.2,
+                                                                shadows: [
+                                                                  Shadow(
+                                                                    offset: Offset(0, 0),
+                                                                    blurRadius: 2,
+                                                                    color: Colors.black,
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                            const TextSpan(
+                                                              text: ' / ',
+                                                              style: TextStyle(
+                                                                color: Colors.white70,
+                                                                fontSize: 13.0,
+                                                                fontWeight: FontWeight.normal,
+                                                              ),
+                                                            ),
+                                                            TextSpan(
+                                                              text: _formatDuration(_duration),
+                                                              style: const TextStyle(
+                                                                color: Colors.white70,
+                                                                fontSize: 13.0,
+                                                                fontWeight: FontWeight.normal,
+                                                                letterSpacing: 0.2,
+                                                                shadows: [
+                                                                  Shadow(
+                                                                    offset: Offset(0, 0),
+                                                                    blurRadius: 2,
+                                                                    color: Colors.black,
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
                                                       ),
-                                                    ],
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -1045,10 +1196,91 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                 ),
 
                                 // =========================================================
-                                // ytp-right-controls (Official Delhi Frosted Glass Capsule 40px)
+                                // ytp-right-controls Group (Saltar OP/ED Capsule + Controls Capsule)
                                 // =========================================================
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(20),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // 1. "Saltar OP/ED" Standalone Frosted Glass Capsule (46px)
+                                    if (!isTheme && widget.category != 'movie') ...[
+                                      MouseRegion(
+                                        onEnter: (_) => setState(() => _isSkipOpEdHovered = true),
+                                        onExit: (_) => setState(() => _isSkipOpEdHovered = false),
+                                        cursor: SystemMouseCursors.click,
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(20),
+                                          child: BackdropFilter(
+                                            filter: ImageFilter.compose(
+                                              outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                                              inner: ColorFilter.matrix(const <double>[
+                                                1.630, -0.572, -0.058, 0, 0,
+                                                -0.170, 1.228, -0.058, 0, 0,
+                                                -0.170, -0.572, 1.742, 0, 0,
+                                                0, 0, 0, 1, 0,
+                                              ]),
+                                            ),
+                                            child: GestureDetector(
+                                              onTap: _skipOpEd,
+                                              child: Container(
+                                                height: 40,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0x4D000000),
+                                                  borderRadius: const BorderRadius.all(Radius.circular(20)),
+                                                ),
+                                                alignment: Alignment.center,
+                                                child: Stack(
+                                                  alignment: Alignment.center,
+                                                  children: [
+                                                    if (_isSkipOpEdHovered)
+                                                      Positioned.fill(
+                                                        child: Padding(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                                          child: Container(
+                                                            decoration: BoxDecoration(
+                                                              color: Colors.white.withValues(alpha: 0.08),
+                                                              borderRadius: BorderRadius.circular(16),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    Padding(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                                                      child: Center(
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            AurisIcon(
+                                                              AurisIcons.fastForward,
+                                                              color: Colors.white,
+                                                              size: 18,
+                                                            ),
+                                                            const SizedBox(width: 6),
+                                                            const Text(
+                                                              'Saltar OP/ED',
+                                                              style: TextStyle(
+                                                                color: Colors.white,
+                                                                fontSize: 13.0,
+                                                                fontWeight: FontWeight.bold,
+                                                                letterSpacing: 0.3,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+
+                                    // 2. Right Controls Capsule (CC, Settings, Episodes, Theater, Fullscreen)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
                                   child: BackdropFilter(
                                     filter: ImageFilter.compose(
                                       outer: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
@@ -1061,40 +1293,30 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                     ),
                                     child: Container(
                                       height: 40,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
                                       decoration: BoxDecoration(
-                                        color: const Color(0x4D000000), // Exacto YouTube: rgba(0, 0, 0, 0.3)
+                                        color: const Color(0x4D000000),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          // 1. ytp-subtitles-button (CC)
+                                          // 1. ytp-settings-button (Settings Gear with HD Badge)
                                           IconButton(
                                             padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                                            icon: AurisIcon(
-                                              AurisIcons.subtitles,
-                                              color: Colors.white,
-                                              size: 20,
+                                            constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
+                                            style: IconButton.styleFrom(
+                                              hoverColor: Colors.white.withValues(alpha: 0.08),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                             ),
-                                            onPressed: widget.onSubtitlesPressed,
-                                            tooltip: 'Subtítulos (c)',
-                                          ),
-                                          const SizedBox(width: 2),
-
-                                          // 2. ytp-settings-button (Settings Gear with HD Badge)
-                                          IconButton(
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                             icon: Stack(
                                               clipBehavior: Clip.none,
                                               alignment: Alignment.center,
                                               children: [
                                                 AurisIcon(
                                                   AurisIcons.settings,
-                                                  color: _showSettingsPanel ? const Color(0xFFFF0033) : Colors.white,
-                                                  size: 20,
+                                                  color: Colors.white,
+                                                  size: 23,
                                                 ),
                                                 if (widget.hasQualityOptions)
                                                   Positioned(
@@ -1110,7 +1332,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                                         'HD',
                                                         style: TextStyle(
                                                           color: Colors.white,
-                                                          fontSize: 7,
+                                                          fontSize: 7.5,
                                                           fontWeight: FontWeight.w900,
                                                           height: 1.0,
                                                         ),
@@ -1130,29 +1352,19 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                           ),
                                           const SizedBox(width: 2),
 
-                                          // 3. Episodes Drawer Button
-                                          IconButton(
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                            icon: AurisIcon(
-                                              AurisIcons.episodes,
-                                              color: Colors.white,
-                                              size: 20,
-                                            ),
-                                            onPressed: widget.onEpisodesPressed,
-                                            tooltip: 'Episodios',
-                                          ),
-                                          const SizedBox(width: 2),
-
                                           // 4. ytp-size-button (Modo cine / Teatro)
-                                          if (widget.onTheaterModeToggle != null) ...[
+                                          if (!isTheme && !isTabletOrMobile && widget.onTheaterModeToggle != null) ...[
                                             IconButton(
                                               padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                              constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
+                                              style: IconButton.styleFrom(
+                                                hoverColor: Colors.white.withValues(alpha: 0.08),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                              ),
                                               icon: AurisIcon(
                                                 AurisIcons.theaterMode,
-                                                color: widget.isTheaterMode ? const Color(0xFFFF0033) : Colors.white,
-                                                size: 20,
+                                                color: Colors.white,
+                                                size: 23,
                                               ),
                                               onPressed: widget.onTheaterModeToggle,
                                               tooltip: widget.isTheaterMode ? 'Restaurar tamaño (t)' : 'Modo cine (t)',
@@ -1163,11 +1375,15 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                           // 5. ytp-fullscreen-button (Pantalla completa)
                                           IconButton(
                                             padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                            constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
+                                            style: IconButton.styleFrom(
+                                              hoverColor: Colors.white.withValues(alpha: 0.08),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                            ),
                                             icon: AurisIcon(
                                               AurisIcons.expand,
                                               color: Colors.white,
-                                              size: 20,
+                                              size: 23,
                                             ),
                                             onPressed: widget.onExpandPressed,
                                             tooltip: 'Pantalla completa (f)',
@@ -1179,17 +1395,20 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-
-                      // Panel Flotante de Configuración (Settings Popover)
-                      _buildFloatingSettingsPanel(),
+                    ],
+                  ),
+                ),
                     ],
                   ),
                 ),
               ),
+            ),
+
+              // Panel Flotante de Configuración (Settings Popover)
+              _buildFloatingSettingsPanel(),
 
               // 4. Cápsula Flotante "2x" al mantener presionado (Standard Delhi Frosted Glass)
               if (_isHolding2x)
@@ -1248,13 +1467,37 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                     ),
                   ),
                 ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  ),
-);
-}
+    );
+  }
+
+  Widget _buildAmbientLightingOverlay() {
+    if (!_isAmbientLightingEnabled) return const SizedBox.shrink();
+
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 500),
+          opacity: _isPlaying ? 0.85 : 0.40,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment.center,
+                radius: 1.2,
+                colors: [
+                  const Color(0xFFEF7A1E).withValues(alpha: 0.18),
+                  Colors.black.withValues(alpha: 0.0),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildFloatingSettingsPanel() {
     if (!_showSettingsPanel) return const SizedBox.shrink();
@@ -1460,7 +1703,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   }) {
     return InkWell(
       onTap: onTap,
-      hoverColor: Colors.white.withOpacity(0.08),
+      hoverColor: Colors.white.withValues(alpha: 0.08),
       splashColor: Colors.white.withOpacity(0.05),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1784,5 +2027,100 @@ class _YouTubeVolumeSliderState extends State<_YouTubeVolumeSlider> {
         ),
       ),
     );
+  }
+}
+
+class _YouTubeSliderTrackShape extends RoundedRectSliderTrackShape {
+  final Duration buffer;
+  final Duration duration;
+
+  _YouTubeSliderTrackShape({required this.buffer, required this.duration});
+
+  @override
+  Rect getPreferredRect({
+    required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    final double trackHeight = sliderTheme.trackHeight ?? 4.5;
+    final double trackLeft = offset.dx;
+    final double trackTop = offset.dy + (parentBox.size.height - trackHeight) / 2;
+    final double trackWidth = parentBox.size.width;
+    return Rect.fromLTWH(trackLeft, trackTop, trackWidth, trackHeight);
+  }
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required TextDirection textDirection,
+    required Offset thumbCenter,
+    Offset? secondaryOffset,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+    double additionalActiveTrackHeight = 2.0,
+  }) {
+    final Rect trackRect = getPreferredRect(
+      parentBox: parentBox,
+      offset: offset,
+      sliderTheme: sliderTheme,
+      isEnabled: isEnabled,
+      isDiscrete: isDiscrete,
+    );
+
+    final Paint basePaint = Paint()
+      ..color = const Color(0xFF282828).withValues(alpha: 0.60)
+      ..style = PaintingStyle.fill;
+
+    final Paint bufferPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.40)
+      ..style = PaintingStyle.fill;
+
+    final Paint activePaint = Paint()
+      ..color = sliderTheme.activeTrackColor ?? const Color(0xFFFF0033)
+      ..style = PaintingStyle.fill;
+
+    final double trackHeight = sliderTheme.trackHeight ?? 4.5;
+    final Radius radius = Radius.circular(trackHeight / 2);
+
+    // 1. Base track
+    final Rect baseRect = Rect.fromLTWH(
+      trackRect.left,
+      trackRect.top + (trackRect.height - trackHeight) / 2,
+      trackRect.width,
+      trackHeight,
+    );
+    context.canvas.drawRRect(RRect.fromRectAndRadius(baseRect, radius), basePaint);
+
+    // 2. Buffer track
+    final double durationSec = duration.inSeconds > 0 ? duration.inSeconds.toDouble() : 1.0;
+    final double bufferSec = buffer.inSeconds.toDouble().clamp(0.0, durationSec);
+    final double bufferWidth = trackRect.width * (bufferSec / durationSec);
+    if (bufferWidth > 0) {
+      final Rect bufferRect = Rect.fromLTWH(
+        trackRect.left,
+        trackRect.top + (trackRect.height - trackHeight) / 2,
+        bufferWidth,
+        trackHeight,
+      );
+      context.canvas.drawRRect(RRect.fromRectAndRadius(bufferRect, radius), bufferPaint);
+    }
+
+    // 3. Active (played) track
+    final double activeWidth = thumbCenter.dx - trackRect.left;
+    if (activeWidth > 0) {
+      final Rect activeRect = Rect.fromLTWH(
+        trackRect.left,
+        trackRect.top + (trackRect.height - trackHeight) / 2,
+        activeWidth.clamp(0.0, trackRect.width),
+        trackHeight,
+      );
+      context.canvas.drawRRect(RRect.fromRectAndRadius(activeRect, radius), activePaint);
+    }
   }
 }
