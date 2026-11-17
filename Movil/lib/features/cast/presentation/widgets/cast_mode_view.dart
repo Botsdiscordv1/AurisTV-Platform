@@ -46,7 +46,7 @@ class ChromecastModeView extends ConsumerWidget {
     final notifier = ref.read(chromecastProvider.notifier);
     final media = castState.media;
     final device = castState.device;
-    const accent = Color(0xFFEF7A1E);
+    const accent = AurisPalette.brand;
 
     final size = MediaQuery.of(context).size;
     final isLandscape = size.width > size.height;

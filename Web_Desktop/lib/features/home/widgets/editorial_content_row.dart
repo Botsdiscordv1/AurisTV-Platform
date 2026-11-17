@@ -431,7 +431,7 @@ class _SeeMoreButtonState extends State<_SeeMoreButton> {
                 style: TextStyle(
                   fontSize: ResponsiveUtils.rowTitleFontSize(context),
                   fontWeight: FontWeight.bold,
-                  color: _isHovered ? const Color(0xFFFF7A1E) : Colors.white,
+                  color: _isHovered ? AurisPalette.brand : Colors.white,
                 ),
               ),
               const SizedBox(width: 6),
@@ -441,7 +441,7 @@ class _SeeMoreButtonState extends State<_SeeMoreButton> {
               child: Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: widget.isMobile ? 16 : 13,
-                color: _isHovered ? const Color(0xFFFF7A1E) : (widget.isMobile ? Colors.white70 : Colors.white),
+                color: _isHovered ? AurisPalette.brand : (widget.isMobile ? Colors.white70 : Colors.white),
               ),
             ),
           ],

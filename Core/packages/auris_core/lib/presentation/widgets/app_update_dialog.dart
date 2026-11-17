@@ -5,6 +5,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../../data/services/app_update_service.dart';
 import 'tv_dialog_action.dart';
+import '../../core/config/brand_colors.dart';
 
 /// Diálogo de actualización: muestra las novedades y gestiona la descarga del
 /// APK con progreso en vivo, opción de ocultar (sigue en segundo plano),
@@ -26,7 +27,7 @@ class AppUpdateDialog extends StatefulWidget {
 }
 
 class _AppUpdateDialogState extends State<AppUpdateDialog> {
-  static const Color brandOrange = Color(0xFFEF7A1E);
+  static const Color brandOrange = AurisPalette.brand;
 
   AppUpdateAsset? _asset;
   bool _resolving = true;

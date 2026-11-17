@@ -153,7 +153,7 @@ class _ExitConfirmationDialog extends StatelessWidget {
         ),
         TvDialogAction(
           label: 'SALIR',
-          color: const Color(0xFFEF7A1E),
+          color: AurisPalette.brand,
           bold: true,
           onPressed: () => Navigator.of(context).pop(true),
         ),

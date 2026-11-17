@@ -258,10 +258,10 @@ class _CategoryFilters extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.08),
+                    color: isSelected ? AurisPalette.brand : Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFFEF7A1E) : Colors.white12,
+                      color: isSelected ? AurisPalette.brand : Colors.white12,
                     ),
                   ),
                   child: Text(
@@ -420,7 +420,7 @@ class _HistoryCardState extends State<_HistoryCard> {
                           child: FractionallySizedBox(
                             alignment: Alignment.centerLeft,
                             widthFactor: widget.item.progress.clamp(0.0, 1.0),
-                            child: Container(color: const Color(0xFFEF7A1E)),
+                            child: Container(color: AurisPalette.brand),
                           ),
                         ),
                       ),

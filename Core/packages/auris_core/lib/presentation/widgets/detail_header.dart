@@ -139,7 +139,7 @@ class AurisDetailHeader extends StatelessWidget {
                           const SizedBox(width: 8),
                           Padding(
                             padding: const EdgeInsets.only(bottom: 6),
-                            child: AurisIcon(AurisIcons.verify, color: const Color(0xFFEF7A1E), size: 20),
+                            child: AurisIcon(AurisIcons.verify, color: AurisPalette.brand, size: 20),
                           ),
                         ],
                       ),

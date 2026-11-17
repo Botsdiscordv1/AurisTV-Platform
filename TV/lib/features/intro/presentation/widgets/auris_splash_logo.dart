@@ -16,6 +16,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:auris_core/core/config/brand_colors.dart';
 
 class AurisSplashLogo extends StatefulWidget {
   final VoidCallback? onFinished;
@@ -202,9 +203,9 @@ class _StreaksPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final colors = [
-      const Color(0xFFEF7A1E),
+      AurisPalette.brand,
       const Color(0xFFFFB066),
-      const Color(0xFFEF7A1E),
+      AurisPalette.brand,
       const Color(0xFFFFB066),
     ];
 

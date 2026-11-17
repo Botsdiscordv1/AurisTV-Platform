@@ -210,7 +210,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
           width: 8,
           height: 8,
           decoration: const BoxDecoration(
-            color: Color(0xFFEF7A1E),
+            color: AurisPalette.brand,
             shape: BoxShape.circle,
           ),
         ),
@@ -218,7 +218,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
         Text(
           titleText,
           style: TextStyle(
-            color: const Color(0xFFEF7A1E),
+            color: AurisPalette.brand,
             fontSize: 13,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.5,
@@ -229,7 +229,7 @@ class _UpcomingReleaseCountdownState extends State<UpcomingReleaseCountdown> {
           width: 8,
           height: 8,
           decoration: const BoxDecoration(
-            color: Color(0xFFEF7A1E),
+            color: AurisPalette.brand,
             shape: BoxShape.circle,
           ),
         ),

@@ -11,7 +11,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider);
     final favorites = ref.watch(favoritesProvider);
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),

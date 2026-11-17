@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/models/server/search_result.dart';
 import 'category_utils.dart';
+import '../config/brand_colors.dart';
 
 /// Encapsula los metadatos visuales de un contenido para mostrar en tarjetas o listas.
 class ContentMetadata {
@@ -70,7 +71,7 @@ extension SearchResultMetadataExtension on SearchResult {
     final s = (status ?? '').toLowerCase();
     if (s.contains('emisi')) {
       statusLabel = 'EN EMISIÓN';
-      statusColor = const Color(0xFFEF7A1E); // AurisTV Brand Orange
+      statusColor = AurisPalette.brand; // AurisTV Brand Orange
     } else if (s.contains('finaliz') || s.contains('complet')) {
       statusLabel = 'FINALIZADO';
       statusColor = Colors.black.withOpacity(0.9);

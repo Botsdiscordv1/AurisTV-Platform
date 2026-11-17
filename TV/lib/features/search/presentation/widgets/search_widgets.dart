@@ -59,13 +59,13 @@ class SearchGenresGrid extends StatelessWidget {
   const SearchGenresGrid({super.key, required this.onGenreTap});
 
   static final List<Map<String, dynamic>> genres = [
-    {'name': 'Acción', 'color': const Color(0xFFEF7A1E), 'icon': Icons.flash_on_rounded},
+    {'name': 'Acción', 'color': AurisPalette.brand, 'icon': Icons.flash_on_rounded},
     {'name': 'Comedia', 'color': const Color(0xFF1A1A1A), 'icon': Icons.sentiment_satisfied_alt_rounded},
     {'name': 'Drama', 'color': const Color(0xFF262626), 'icon': Icons.theater_comedy_rounded},
-    {'name': 'Fantasía', 'color': const Color(0xFFEF7A1E), 'icon': Icons.auto_fix_high_rounded},
+    {'name': 'Fantasía', 'color': AurisPalette.brand, 'icon': Icons.auto_fix_high_rounded},
     {'name': 'Romance', 'color': const Color(0xFF1A1A1A), 'icon': Icons.favorite_rounded},
     {'name': 'Sci-Fi', 'color': const Color(0xFF262626), 'icon': Icons.rocket_launch_rounded},
-    {'name': 'Terror', 'color': const Color(0xFFEF7A1E), 'icon': Icons.psychology_alt_rounded},
+    {'name': 'Terror', 'color': AurisPalette.brand, 'icon': Icons.psychology_alt_rounded},
     {'name': 'Aventura', 'color': const Color(0xFF1A1A1A), 'icon': Icons.explore_rounded},
   ];
 
@@ -161,7 +161,7 @@ class SearchDiscoveryFeed extends ConsumerWidget {
       },
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+        child: Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
       ),
       error: (_, __) => const SizedBox.shrink(),
     );
@@ -362,7 +362,7 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
                 ],
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+            loading: () => const Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
             error: (_, __) => const SizedBox.shrink(),
           ),
         ),

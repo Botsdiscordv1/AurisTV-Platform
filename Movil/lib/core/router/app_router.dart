@@ -476,7 +476,7 @@ class _PlayerRouteShellState extends State<_PlayerRouteShell> {
           height: 48,
           child: CircularProgressIndicator(
             strokeWidth: 4,
-            color: Color(0xFFEF7A1E),
+            color: AurisPalette.brand,
           ),
         ),
       ),

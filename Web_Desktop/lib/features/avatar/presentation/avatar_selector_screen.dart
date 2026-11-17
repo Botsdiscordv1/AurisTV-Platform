@@ -43,7 +43,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
   Widget build(BuildContext context) {
     const backgroundColor = Color(0xFF0B0B0D);
     const surfaceColor = Color(0xFF1A1D24);
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
 
     final user = ref.watch(authProvider);
     final catalogAsync = ref.watch(avatarCatalogProvider);

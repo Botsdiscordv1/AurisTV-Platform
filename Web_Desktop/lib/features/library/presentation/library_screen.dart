@@ -286,10 +286,10 @@ class _CategoryFilters extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.08),
+                    color: isSelected ? AurisPalette.brand : Colors.white.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFFEF7A1E) : Colors.white12,
+                      color: isSelected ? AurisPalette.brand : Colors.white12,
                     ),
                   ),
                   child: Text(

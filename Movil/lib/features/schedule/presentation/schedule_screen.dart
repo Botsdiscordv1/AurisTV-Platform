@@ -166,7 +166,7 @@ class _ScheduleBody extends StatelessWidget {
                     width: 60,
                     height: 3,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEF7A1E),
+                      color: AurisPalette.brand,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -498,7 +498,7 @@ class _LocalTimeWidgetState extends State<_LocalTimeWidget> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.access_time, color: Color(0xFFEF7A1E), size: 14),
+          const Icon(Icons.access_time, color: AurisPalette.brand, size: 14),
           const SizedBox(width: 8),
           const Text(
             'HORA LOCAL: ',

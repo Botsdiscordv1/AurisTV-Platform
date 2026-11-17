@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/builtin_playlists.dart';
 import '../../data/models/user_playlist.dart';
 import '../../data/providers/playlists_provider.dart';
+import '../../core/config/brand_colors.dart';
 
 /// Contenido de Ajustes > "Listas añadidas" (Móvil y Web).
 ///
@@ -63,7 +64,7 @@ class PlaylistListsContent extends ConsumerWidget {
       child: Text(
         title.toUpperCase(),
         style: const TextStyle(
-          color: Color(0xFFEF7A1E),
+          color: AurisPalette.brand,
           fontSize: 12,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
@@ -94,7 +95,7 @@ class PlaylistListsContent extends ConsumerWidget {
         color: const Color(0xFF1A1D24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: const Color(0xFFEF7A1E).withValues(alpha: 0.35)),
+          side: BorderSide(color: AurisPalette.brand.withValues(alpha: 0.35)),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -106,10 +107,10 @@ class PlaylistListsContent extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEF7A1E).withValues(alpha: 0.15),
+                    color: AurisPalette.brand.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.playlist_add_rounded, color: Color(0xFFEF7A1E), size: 24),
+                  child: const Icon(Icons.playlist_add_rounded, color: AurisPalette.brand, size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -128,7 +129,7 @@ class PlaylistListsContent extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.add_circle_rounded, color: Color(0xFFEF7A1E), size: 26),
+                const Icon(Icons.add_circle_rounded, color: AurisPalette.brand, size: 26),
               ],
             ),
           ),
@@ -149,7 +150,7 @@ class PlaylistListsContent extends ConsumerWidget {
         ),
         child: Icon(
           playlist.isBuiltIn ? Icons.tv_rounded : Icons.playlist_play_rounded,
-          color: const Color(0xFFEF7A1E),
+          color: AurisPalette.brand,
           size: 22,
         ),
       ),
@@ -225,7 +226,7 @@ class PlaylistListsContent extends ConsumerWidget {
                         labelText: 'Nombre',
                         labelStyle: const TextStyle(color: Colors.white54),
                         focusedBorder: const UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFFEF7A1E)),
+                          borderSide: BorderSide(color: AurisPalette.brand),
                         ),
                         enabledBorder: UnderlineInputBorder(
                           borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
@@ -243,7 +244,7 @@ class PlaylistListsContent extends ConsumerWidget {
                         hintText: 'https://ejemplo.com/lista.m3u',
                         hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25)),
                         focusedBorder: const UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFFEF7A1E)),
+                          borderSide: BorderSide(color: AurisPalette.brand),
                         ),
                         enabledBorder: UnderlineInputBorder(
                           borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
@@ -274,7 +275,7 @@ class PlaylistListsContent extends ConsumerWidget {
                 ElevatedButton(
                   onPressed: submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF7A1E),
+                    backgroundColor: AurisPalette.brand,
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   ),

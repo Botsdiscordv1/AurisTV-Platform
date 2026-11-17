@@ -28,7 +28,7 @@ class _ProfileAddScreenState extends ConsumerState<ProfileAddScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     const backgroundColor = Color(0xFF000000);
     const cardColor = Color(0xFF1A1D24);
 
@@ -154,7 +154,7 @@ class _FocusableButtonState extends State<_FocusableButton> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     return Focus(
       onFocusChange: (hasFocus) => setState(() => _hasFocus = hasFocus),
       onKeyEvent: (node, event) {

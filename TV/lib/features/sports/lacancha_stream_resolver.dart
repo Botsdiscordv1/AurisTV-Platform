@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:auris_core/core/config/brand_colors.dart';
 
 /// Stream HLS ya resuelto, listo para abrir en media_kit con sus headers.
 class LacanchaResolvedStream {
@@ -155,7 +156,7 @@ class _ResolverDialogState extends State<_ResolverDialog> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+                  CircularProgressIndicator(color: AurisPalette.brand),
                   SizedBox(height: 16),
                   Text(
                     'Conectando con el servidor...',

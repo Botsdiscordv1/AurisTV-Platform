@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/config/brand_colors.dart';
 
 /// A shared content tab bar widget for all platforms (Mobile, TV, Web/Desktop).
 ///
@@ -91,7 +92,7 @@ class _ContentTabBarState extends State<ContentTabBar> with TickerProviderStateM
         isScrollable: true,
         tabAlignment: TabAlignment.start,
         dividerColor: Colors.transparent,
-        indicatorColor: const Color(0xFFEF7A1E),
+        indicatorColor: AurisPalette.brand,
         indicatorWeight: indicatorHeight,
         indicatorSize: TabBarIndicatorSize.tab, // <--- Abarca todo el ancho del tab (incluyendo padding)
         labelPadding: EdgeInsets.symmetric(horizontal: itemHPadding),

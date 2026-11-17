@@ -4,6 +4,7 @@ import '../../../core/utils/string_utils.dart';
 import '../../../data/models/server/episodes_response.dart';
 import '../../widgets/auris_icon.dart';
 import '../../widgets/cured_network_image.dart';
+import '../../../core/config/brand_colors.dart';
 
 /// Barra lateral / Cola de reproducción para Web, Desktop y Tablet.
 ///
@@ -46,7 +47,7 @@ class WatchPlaylistSidebar extends StatelessWidget {
               children: [
                 AurisIcon(
                   AurisIcons.episodes,
-                  color: const Color(0xFFEF7A1E),
+                  color: AurisPalette.brand,
                   size: 22,
                 ),
                 const SizedBox(width: 8),
@@ -125,12 +126,12 @@ class WatchPlaylistSidebar extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: isActive
-                            ? const Color(0xFFEF7A1E).withValues(alpha: 0.16)
+                            ? AurisPalette.brand.withValues(alpha: 0.16)
                             : Colors.transparent,
                         borderRadius: BorderRadius.zero,
                         border: isActive
                             ? const Border(
-                                left: BorderSide(color: Color(0xFFEF7A1E), width: 3.5),
+                                left: BorderSide(color: AurisPalette.brand, width: 3.5),
                               )
                             : null,
                       ),
@@ -170,7 +171,7 @@ class WatchPlaylistSidebar extends StatelessWidget {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 5, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFEF7A1E),
+                                          color: AurisPalette.brand,
                                           borderRadius: BorderRadius.circular(3),
                                         ),
                                         child: const Text(
@@ -196,7 +197,7 @@ class WatchPlaylistSidebar extends StatelessWidget {
                                   formattedEpTitle,
                                   style: TextStyle(
                                     color: isActive
-                                        ? const Color(0xFFEF7A1E)
+                                        ? AurisPalette.brand
                                         : Colors.white,
                                     fontSize: 14.5,
                                     fontWeight:

@@ -648,8 +648,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             secondary: AurisIcon(AurisIcons.ambientMode, color: Colors.white, size: 22),
                             title: const Text('Modo ambiente', style: TextStyle(color: Colors.white, fontSize: 15)),
-                            activeThumbColor: const Color(0xFFFF0033),
-                            activeTrackColor: const Color(0xFFFF0033).withValues(alpha: 0.5),
+                            activeThumbColor: AurisPalette.brand,
+                            activeTrackColor: AurisPalette.brand.withValues(alpha: 0.5),
                             value: ref.watch(settingsProvider.select((s) => s.ambientModeEnabled)),
                             onChanged: (val) {
                               setSheetState(() {});
@@ -773,7 +773,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                       decoration: BoxDecoration(
-                                        color: isSel ? const Color(0xFFFF0033) : Colors.white.withValues(alpha: 0.08),
+                                        color: isSel ? AurisPalette.brand : Colors.white.withValues(alpha: 0.08),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -855,7 +855,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                         return ListTile(
                           leading: SizedBox(
                             width: 24,
-                            child: isSelected ? const Icon(Icons.check, color: Color(0xFFFF0033), size: 20) : null,
+                            child: isSelected ? const Icon(Icons.check, color: AurisPalette.brand, size: 20) : null,
                           ),
                           title: Text(label, style: TextStyle(color: Colors.white, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
                           onTap: () {
@@ -1000,7 +1000,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
           // 1. Fase de Carga Inicial Única (Spinner sobre el video)
           if (isInitialLoading)
             const Center(
-              child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+              child: CircularProgressIndicator(color: AurisPalette.brand),
             ),
 
           // 2. Cápsula Indicadora de Velocidad 2X al mantener pulsado
@@ -1327,8 +1327,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                               ),
                               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.5),
                               overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                              thumbColor: const Color(0xFFFF0033),
-                              overlayColor: const Color(0xFFFF0033).withValues(alpha: 0.2),
+                              thumbColor: AurisPalette.brand,
+                              overlayColor: AurisPalette.brand.withValues(alpha: 0.2),
                             ),
                             child: Slider(
                               value: _position.inSeconds.toDouble().clamp(0, (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble()),
@@ -1402,7 +1402,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-              AurisIcon(AurisIcons.fastForwardFilled, color: const Color(0xFFEF7A1E), size: 16),
+              AurisIcon(AurisIcons.fastForwardFilled, color: AurisPalette.brand, size: 16),
             ],
           ),
         ),
@@ -1778,7 +1778,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                                                   child: Container(
                                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                     decoration: BoxDecoration(
-                                                      color: const Color(0xFFEF7A1E),
+                                                      color: AurisPalette.brand,
                                                       borderRadius: BorderRadius.circular(3),
                                                     ),
                                                     child: const Text(
@@ -1819,7 +1819,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
                                           Text(
                                             _formatEpTitle(ep.number, epTitle),
                                             style: TextStyle(
-                                              color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white,
+                                              color: isCurrent ? AurisPalette.brand : Colors.white,
                                               fontSize: 14,
                                               fontWeight: FontWeight.bold,
                                               height: 1.25,
@@ -1946,7 +1946,7 @@ class _YouTubeSliderTrackShape extends SliderTrackShape with BaseSliderTrackShap
       ..style = PaintingStyle.fill;
 
     final Paint activePaint = Paint()
-      ..color = const Color(0xFFFF0033)
+      ..color = AurisPalette.brand
       ..style = PaintingStyle.fill;
 
     const double trackHeight = 4.5;

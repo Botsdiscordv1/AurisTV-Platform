@@ -42,34 +42,39 @@ class UrlUtils {
 
     final String effectiveSlug = slug.isNotEmpty ? slug : 'media';
 
-    // Generar token auto-contenido (similar a buildShareableUri)
+    // Generar token auto-contenido: lleva TODO (fuente, URL, metadatos y
+    // datos de reproducción) para que la query quede mínima y legible.
+    final episodeLabel = player.episode ?? '1';
+    final bool isTheme = episodeLabel == 'OP' || episodeLabel == 'ED';
+
     final token = encodeShareableToken(
       title: player.title ?? '',
       source: player.source,
       url: player.sourceUrl,
       category: player.category,
       season: player.season,
+      year: player.year,
+      episode: episodeLabel,
+      serverName: player.serverName,
+      episodeTitle: player.episodeTitle,
+      posterUrl: player.posterUrl,
+      bannerUrl: player.bannerUrl,
+      logoUrl: player.logoUrl,
+      video720: player.video720,
+      video1080: player.video1080,
+      totalEpisodes: player.totalEpisodes,
+      certification: player.certification,
+      contentId: player.contentId,
+      skipResume: player.skipResume,
+      isLive: player.isLive,
     );
 
+    // Query mínima: `episode` (o `themes` para OP/ED). El resto viaja en el token.
     final queryParams = <String, String>{
-      'episode': player.episode ?? '1',
-      if (player.source.isNotEmpty) 'source': player.source,
-      if (player.sourceUrl.isNotEmpty) 'url': player.sourceUrl,
-      if (player.serverName != null && player.serverName!.isNotEmpty) 'serverName': player.serverName!,
-      if (player.category != null && player.category!.isNotEmpty) 'category': player.category!,
-      if (player.season != null && player.season! > 1) 'season': player.season.toString(),
-      if (player.skipResume) 'skipResume': '1',
-      if (player.isLive) 'isLive': '1',
-      if (player.episodeTitle != null && player.episodeTitle!.isNotEmpty)
-        'episodeTitle': player.episodeTitle!,
-      if (player.posterUrl != null && player.posterUrl!.isNotEmpty)
-        'posterUrl': player.posterUrl!,
-      if (player.bannerUrl != null && player.bannerUrl!.isNotEmpty)
-        'bannerUrl': player.bannerUrl!,
-      if (player.logoUrl != null && player.logoUrl!.isNotEmpty)
-        'logoUrl': player.logoUrl!,
-      if (player.video720 != null && player.video720!.isNotEmpty) 'video720': player.video720!,
-      if (player.video1080 != null && player.video1080!.isNotEmpty) 'video1080': player.video1080!,
+      if (isTheme)
+        'themes': episodeLabel
+      else
+        'episode': episodeLabel,
     };
 
     try {
@@ -102,6 +107,13 @@ class UrlUtils {
   /// Cache en memoria de acceso ultrarrápido (0 ms) para IDs cortos y slugs
   static final Map<String, Map<String, dynamic>> _memoryCache = {};
 
+  /// Límite de Hive para claves `String` (255 chars). Un token completo con
+  /// datos de reproducción mide ~440 chars, así que no puede usarse como clave
+  /// de Hive: esas entradas solo viven en [_memoryCache]. No es un problema,
+  /// porque el token es auto-contenido y se descifra en cada arranque; la caché
+  /// persistida es una optimización para Short IDs (9 chars) y slugs.
+  static const int _maxHiveKeyLength = 255;
+
   /// Guarda en memoria y en Hive ('media_slug_cache') para persistir tras F5
   static void _saveToCache(
       String shortId, String slug, Map<String, dynamic> data) {
@@ -110,8 +122,12 @@ class UrlUtils {
     try {
       if (Hive.isBoxOpen('media_slug_cache')) {
         final box = Hive.box('media_slug_cache');
-        box.put(shortId, data);
-        if (slug.isNotEmpty) box.put(slug, data);
+        // Cada clave se valida por separado: aunque el token sea demasiado
+        // largo, el slug (corto) sí debe persistirse.
+        if (shortId.length <= _maxHiveKeyLength) box.put(shortId, data);
+        if (slug.isNotEmpty && slug.length <= _maxHiveKeyLength) {
+          box.put(slug, data);
+        }
       }
     } catch (e) {
       debugPrint('[UrlUtils] Error guardando en media_slug_cache: $e');
@@ -123,6 +139,8 @@ class UrlUtils {
     if (_memoryCache.containsKey(key)) {
       return _memoryCache[key];
     }
+    // Hive rechaza claves >255 chars (lanzaría HiveError en la lectura).
+    if (key.length > _maxHiveKeyLength) return null;
     try {
       if (Hive.isBoxOpen('media_slug_cache')) {
         final box = Hive.box('media_slug_cache');
@@ -275,6 +293,14 @@ class UrlUtils {
   static const String _delimiter = '\x1F';
 
   /// Encripta y comprime los metadatos y la fuente en un token opaco y URL-safe auto-contenido (estilo Prime Video).
+  ///
+  /// Formato del paquete (campos separados por [_delimiter]):
+  /// - `[0..6]`  source, url, kind, year, season, title, category
+  ///             → posición fija: los tokens antiguos (7 campos) siguen leyéndose.
+  /// - `[7..19]` episode, serverName, episodeTitle, posterUrl, bannerUrl, logoUrl,
+  ///             video720, video1080, totalEpisodes, certification, contentId,
+  ///             skipResume, isLive
+  ///             → opcionales; si están vacíos se recortan del final.
   static String encodeShareableToken({
     required String title,
     required String source,
@@ -288,6 +314,19 @@ class UrlUtils {
     int? season,
     String? sectionId,
     String? from,
+    String? episode,
+    String? serverName,
+    String? episodeTitle,
+    String? posterUrl,
+    String? bannerUrl,
+    String? logoUrl,
+    String? video720,
+    String? video1080,
+    int? totalEpisodes,
+    String? certification,
+    String? contentId,
+    bool skipResume = false,
+    bool isLive = false,
   }) {
     // 1. Comprimir fuente y URL usando el diccionario si existe
     String compressedSource = source;
@@ -306,25 +345,47 @@ class UrlUtils {
       }
     }
 
-    // 2. Empaquetar campos esenciales de forma ultra-compacta:
-    // [source, url, kind, year, season, title, category]
+    // Limpieza: ningún valor puede contener el delimitador interno.
+    String clean(String? v) => (v ?? '').replaceAll(_delimiter, ' ').trim();
+
+    // 2. Empaquetar campos de forma ultra-compacta (ver doc del método).
     final effectiveKind = kind ?? category ?? type ?? '';
     final effectiveYear = (year != null && year > 0) ? year.toString() : '';
     final effectiveSeason =
         (season != null && season > 0) ? season.toString() : '';
     final effectiveCat = category ?? '';
 
-    final packed = [
-      compressedSource,
-      compressedUrl,
-      effectiveKind,
-      effectiveYear,
-      effectiveSeason,
-      title,
-      effectiveCat,
-    ].join(_delimiter);
+    final packed = <String>[
+      clean(compressedSource),
+      clean(compressedUrl),
+      clean(effectiveKind),
+      clean(effectiveYear),
+      clean(effectiveSeason),
+      clean(title),
+      clean(effectiveCat),
+      // --- Extensión de reproducción (se recorta si todo está vacío) ---
+      clean(episode),
+      clean(serverName),
+      clean(episodeTitle),
+      clean(posterUrl),
+      clean(bannerUrl),
+      clean(logoUrl),
+      clean(video720),
+      clean(video1080),
+      clean(totalEpisodes?.toString()),
+      clean(certification),
+      clean(contentId),
+      skipResume ? '1' : '',
+      isLive ? '1' : '',
+    ];
 
-    final rawBytes = utf8.encode(packed);
+    // Recortar campos vacíos finales: un link de ficha (sin datos de player)
+    // genera exactamente el mismo token de siempre.
+    while (packed.isNotEmpty && packed.last.isEmpty) {
+      packed.removeLast();
+    }
+
+    final rawBytes = utf8.encode(packed.join(_delimiter));
 
     // 3. Encriptación XOR determinística y reversible contra la clave interna
     final encrypted = List<int>.filled(rawBytes.length, 0);
@@ -342,19 +403,16 @@ class UrlUtils {
     try {
       if (token.isEmpty && (slug == null || slug.isEmpty)) return null;
 
-      // 1. Intento rápido: buscar en cache por Token / ID
+      // 1. Intento rápido: buscar en cache por Token / ID (clave exacta: seguro)
       if (token.isNotEmpty) {
         final cachedById = _getFromCache(token);
         if (cachedById != null) return cachedById;
       }
 
-      // 2. Intento rápido por slug
-      if (slug != null && slug.isNotEmpty) {
-        final cachedBySlug = _getFromCache(slug);
-        if (cachedBySlug != null) return cachedBySlug;
-      }
-
-      // 3. Desencriptar token auto-contenido si vino en la URL
+      // 2. Desencriptar token auto-contenido si vino en la URL.
+      //    El token manda sobre la caché por slug: el slug es compartido entre
+      //    la ficha (detalles) y el reproductor, así que una entrada vieja del
+      //    slug devolvería la URL del episodio en vez del OP/ED.
       if (token.isNotEmpty) {
         try {
           var normalized = token;
@@ -380,17 +438,20 @@ class UrlUtils {
             if (decodedStr.contains(_delimiter)) {
               final parts = decodedStr.split(_delimiter);
               if (parts.length >= 2) {
+                // Lectura posicional tolerante: los tokens antiguos solo tienen
+                // 7 campos; los nuevos añaden los de reproducción a partir del 7.
+                String at(int i) =>
+                    (parts.length > i && parts[i].isNotEmpty) ? parts[i] : '';
+
                 var rawSource = parts[0];
                 var rawUrl = parts[1];
-                final kind = parts.length > 2 ? parts[2] : '';
-                final year = parts.length > 3 ? int.tryParse(parts[3]) : null;
-                final season = parts.length > 4 ? int.tryParse(parts[4]) : null;
-                final title = parts.length > 5 && parts[5].isNotEmpty
-                    ? parts[5]
-                    : _titleFromSlug(slug);
-                final category = parts.length > 6 && parts[6].isNotEmpty
-                    ? parts[6]
-                    : (kind.isNotEmpty ? kind : 'all');
+                final kind = at(2);
+                final year = int.tryParse(at(3));
+                final season = int.tryParse(at(4));
+                final title =
+                    at(5).isNotEmpty ? at(5) : _titleFromSlug(slug);
+                final category =
+                    at(6).isNotEmpty ? at(6) : (kind.isNotEmpty ? kind : 'all');
 
                 final mapped = _codeToSource[rawSource];
                 if (mapped != null) {
@@ -413,6 +474,20 @@ class UrlUtils {
                   'kind': kind.isNotEmpty ? kind : null,
                   'type': kind.isNotEmpty ? kind : null,
                   'metadataTitle': title,
+                  // --- Extensión de reproducción (opcional) ---
+                  if (at(7).isNotEmpty) 'episode': at(7),
+                  if (at(8).isNotEmpty) 'serverName': at(8),
+                  if (at(9).isNotEmpty) 'episodeTitle': at(9),
+                  if (at(10).isNotEmpty) 'posterUrl': at(10),
+                  if (at(11).isNotEmpty) 'bannerUrl': at(11),
+                  if (at(12).isNotEmpty) 'logoUrl': at(12),
+                  if (at(13).isNotEmpty) 'video720': at(13),
+                  if (at(14).isNotEmpty) 'video1080': at(14),
+                  if (at(15).isNotEmpty) 'totalEpisodes': at(15),
+                  if (at(16).isNotEmpty) 'certification': at(16),
+                  if (at(17).isNotEmpty) 'contentId': at(17),
+                  if (at(18) == '1') 'skipResume': true,
+                  if (at(19) == '1') 'isLive': true,
                 };
 
                 _saveToCache(token, slug ?? '', result);
@@ -465,6 +540,13 @@ class UrlUtils {
         } catch (e) {
           debugPrint('[UrlUtils] Falló desencriptado directo: $e');
         }
+      }
+
+      // 3. Caché por slug: solo si el token venía vacío o no era descifrable
+      //    (p. ej. Short IDs de 9 caracteres).
+      if (slug != null && slug.isNotEmpty) {
+        final cachedBySlug = _getFromCache(slug);
+        if (cachedBySlug != null) return cachedBySlug;
       }
 
       // 4. Salvavidas final: Reconstruir a partir del slug para que la app NUNCA quede en blanco
@@ -573,6 +655,10 @@ class UrlUtils {
     String? episodeTitle,
     String? certification,
     int? year,
+    String? video720,
+    String? video1080,
+    bool skipResume = false,
+    bool isLive = false,
   }) {
     // Slug amigable para URL: título normalizado (lowercase, sin símbolos especiales)
     final slug = title
@@ -582,36 +668,38 @@ class UrlUtils {
         .replaceAll(RegExp(r'-+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
 
-    // Generar token auto-contenido (similar a buildShareableUri)
+    // Token auto-contenido: lleva TODO (fuente, URL, metadatos y datos de
+    // reproducción) para que la query quede mínima y legible.
+    final bool isTheme = episode == 'OP' || episode == 'ED';
+
     final token = encodeShareableToken(
       title: title,
       source: source,
       url: url,
       category: category,
       season: season,
+      year: year,
+      episode: episode,
+      serverName: serverName,
+      episodeTitle: episodeTitle,
+      posterUrl: posterUrl,
+      bannerUrl: bannerUrl,
+      logoUrl: logoUrl,
+      totalEpisodes: totalEpisodes,
+      certification: certification,
+      contentId: contentId,
+      video720: video720,
+      video1080: video1080,
+      skipResume: skipResume,
+      isLive: isLive,
     );
 
+    // Query mínima: `episode` (o `themes` para OP/ED).
     final queryParams = <String, String>{
-      'episode': episode,
-      if (source.isNotEmpty) 'source': source,
-      if (url.isNotEmpty) 'url': url,
-      if (serverName != null && serverName.isNotEmpty) 'serverName': serverName,
-      if (category != null && category.isNotEmpty) 'category': category,
-      if (season != null && season > 1) 'season': season.toString(),
-      if (episodeTitle != null && episodeTitle.isNotEmpty)
-        'episodeTitle': episodeTitle,
-      if (posterUrl != null && posterUrl.isNotEmpty)
-        'posterUrl': posterUrl,
-      if (bannerUrl != null && bannerUrl.isNotEmpty)
-        'bannerUrl': bannerUrl,
-      if (logoUrl != null && logoUrl.isNotEmpty)
-        'logoUrl': logoUrl,
-      if (certification != null && certification.isNotEmpty)
-        'certification': certification,
-      if (year != null && year > 0)
-        'year': year.toString(),
-      if (totalEpisodes != null && totalEpisodes > 0)
-        'totalEpisodes': totalEpisodes.toString(),
+      if (isTheme)
+        'themes': episode
+      else
+        'episode': episode,
     };
 
     final path = slug.isNotEmpty ? '/watch/$token/$slug' : '/watch/$token';

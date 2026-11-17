@@ -37,7 +37,7 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('¡Televisor vinculado con éxito!'),
-            backgroundColor: Color(0xFFEF7A1E),
+            backgroundColor: AurisPalette.brand,
           ),
         );
         // El home del router de Movil es `/` (no `/inicio`: ruta solo de Web_Desktop).
@@ -85,7 +85,7 @@ class _ActivateScreenState extends ConsumerState<ActivateScreen> {
                         height: 130,
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
-                            colors: [Color(0xFFEF7A1E), Color(0xFFC85F0D)],
+                            colors: [AurisPalette.brand, Color(0xFFC85F0D)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),

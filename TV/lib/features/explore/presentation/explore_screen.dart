@@ -213,7 +213,7 @@ class ExploreScreen extends ConsumerWidget {
                               color: const Color(0xFF1A1D23),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: AurisIcon(AurisIcons.grid, size: 24, color: const Color(0xFFEF7A1E)),
+                            child: AurisIcon(AurisIcons.grid, size: 24, color: AurisPalette.brand),
                           ),
                         ),
                       ),
@@ -307,7 +307,7 @@ class ExploreScreen extends ConsumerWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: isSelected ? const Color(0xFFEF7A1E) : Colors.white,
+          color: isSelected ? AurisPalette.brand : Colors.white,
           fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
           fontSize: 14,
         ),
@@ -359,7 +359,7 @@ class _FilterButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFEF7A1E) : const Color(0xFF1A1D23),
+          color: isSelected ? AurisPalette.brand : const Color(0xFF1A1D23),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(

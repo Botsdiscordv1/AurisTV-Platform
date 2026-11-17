@@ -483,7 +483,7 @@ class _QuickProfileTileState extends State<_QuickProfileTile> {
                           color: _hasFocus
                               ? Colors.white
                               : (widget.isActive
-                                  ? const Color(0xFFEF7A1E)
+                                  ? AurisPalette.brand
                                   : Colors.transparent),
                           width: _hasFocus ? 3.5 : (widget.isActive ? 2.5 : 0),
                         ),
@@ -508,7 +508,7 @@ class _QuickProfileTileState extends State<_QuickProfileTile> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEF7A1E),
+                            color: AurisPalette.brand,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Text(
@@ -909,10 +909,10 @@ class _NetflixTVRowState extends State<_NetflixTVRow> {
     final Color normalBorder = Colors.white.withValues(alpha: 0.06);
     final Color normalText = isDestructive
         ? const Color(0xFFFF5252)
-        : (widget.isPrimaryAction ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.88));
+        : (widget.isPrimaryAction ? AurisPalette.brand : Colors.white.withValues(alpha: 0.88));
     final Color normalIcon = isDestructive
         ? const Color(0xFFFF5252)
-        : (widget.isPrimaryAction ? const Color(0xFFEF7A1E) : const Color(0xFF808080));
+        : (widget.isPrimaryAction ? AurisPalette.brand : const Color(0xFF808080));
     const Color normalSub = Color(0xFF666666);
 
     return Padding(

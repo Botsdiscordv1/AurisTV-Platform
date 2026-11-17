@@ -16,7 +16,7 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider);
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     const backgroundColor = Color(0xFF000000);
 
     final state = GoRouterState.of(context);
@@ -166,7 +166,7 @@ class _ProfileSelectionScreenState extends ConsumerState<ProfileSelectionScreen>
           decoration: const InputDecoration(
             hintText: 'Nombre',
             hintStyle: TextStyle(color: Colors.white24),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFEF7A1E))),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AurisPalette.brand)),
           ),
         ),
         actions: [
@@ -214,7 +214,7 @@ class _ProfileItemState extends State<_ProfileItem> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -297,7 +297,7 @@ class _ProfileItemState extends State<_ProfileItem> {
                 ),
                 if (widget.isMain) ...[
                   const SizedBox(width: 6),
-                  AurisIcon(AurisIcons.verify, color: Color(0xFFEF7A1E), size: 16),
+                  AurisIcon(AurisIcons.verify, color: AurisPalette.brand, size: 16),
                 ],
               ],
             ),

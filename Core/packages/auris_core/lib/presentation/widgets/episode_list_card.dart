@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../data/models/server/episodes_response.dart';
+import '../../core/config/brand_colors.dart';
 
 /// Fila de episodio para listas two-panel (player, overlays).
 /// Compartida por TV / Móvil / Web.
@@ -43,7 +44,7 @@ class AurisEpisodeListCard extends StatelessWidget {
     this.overlineSize = 11,
     this.showDescription = true,
     this.borderRadius = 16,
-    this.accentColor = const Color(0xFFEF7A1E),
+    this.accentColor = AurisPalette.brand,
   });
 
   @override

@@ -123,7 +123,7 @@ class _DeviceTile extends ConsumerWidget {
     if (context.mounted) Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: const Color(0xFFEF7A1E),
+        backgroundColor: AurisPalette.brand,
         content: Text('Sincronizando con ${device.name}...', style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
@@ -172,7 +172,7 @@ class _CurrentDeviceStatus extends ConsumerWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.info_outline_rounded, color: Color(0xFFEF7A1E), size: 16),
+            const Icon(Icons.info_outline_rounded, color: AurisPalette.brand, size: 16),
             const SizedBox(width: 8),
             Expanded(
               child: Text(

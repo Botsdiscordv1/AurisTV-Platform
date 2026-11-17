@@ -237,7 +237,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               'assets/icons/auris-logo-web-flat.svg',
               height: 38,
               colorFilter: const ColorFilter.mode(
-                Color(0xFFEF7A1E),
+                AurisPalette.brand,
                 BlendMode.srcIn,
               ),
             ),
@@ -299,7 +299,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             style: OutlinedButton.styleFrom(
               backgroundColor: Colors.black,
               foregroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFEF7A1E), width: 1.5),
+              side: const BorderSide(color: AurisPalette.brand, width: 1.5),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
             child: Row(
@@ -309,7 +309,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 const SizedBox(width: 10),
                 const Text(
                   'INICIAR SESI\u00D3N CON GOOGLE',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFFEF7A1E)),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: AurisPalette.brand),
                 ),
               ],
             ),
@@ -324,7 +324,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               style: TextStyle(fontSize: 13, letterSpacing: 0.4),
               children: [
                 TextSpan(text: 'o ', style: TextStyle(color: Colors.white60)),
-                TextSpan(text: 'Crear cuenta', style: TextStyle(color: Color(0xFFEF7A1E), fontWeight: FontWeight.w900)),
+                TextSpan(text: 'Crear cuenta', style: TextStyle(color: AurisPalette.brand, fontWeight: FontWeight.w900)),
               ],
             ),
           ),
@@ -356,7 +356,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           'assets/icons/auris-logo-web-flat.svg',
           height: 42,
           colorFilter: const ColorFilter.mode(
-            Color(0xFFEF7A1E),
+            AurisPalette.brand,
             BlendMode.srcIn,
           ),
         ),
@@ -394,12 +394,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 TextSpan(text: 'Al iniciar sesi\u00F3n aceptas nuestros '),
                 TextSpan(
                   text: 'T\u00E9rminos',
-                  style: TextStyle(color: Color(0xFFEF7A1E), fontWeight: FontWeight.bold),
+                  style: TextStyle(color: AurisPalette.brand, fontWeight: FontWeight.bold),
                 ),
                 TextSpan(text: ' & '),
                 TextSpan(
                   text: 'Pol\u00EDtica de Privacidad',
-                  style: TextStyle(color: Color(0xFFEF7A1E), fontWeight: FontWeight.bold),
+                  style: TextStyle(color: AurisPalette.brand, fontWeight: FontWeight.bold),
                 ),
                 TextSpan(text: '.'),
               ],
@@ -457,7 +457,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             style: OutlinedButton.styleFrom(
               backgroundColor: Colors.transparent,
               foregroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFEF7A1E), width: 1.5),
+              side: const BorderSide(color: AurisPalette.brand, width: 1.5),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
             child: Row(
@@ -467,7 +467,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 const SizedBox(width: 10),
                 const Text(
                   'GOOGLE',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1, color: Color(0xFFEF7A1E)),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1, color: AurisPalette.brand),
                 ),
               ],
             ),
@@ -487,7 +487,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return TextField(
       controller: controller,
       obscureText: isPassword && !_showPassword,
-      cursorColor: const Color(0xFFEF7A1E),
+      cursorColor: AurisPalette.brand,
       style: const TextStyle(color: Colors.white, fontSize: 15),
       decoration: InputDecoration(
         filled: true,
@@ -511,7 +511,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.zero,
-          borderSide: const BorderSide(color: Color(0xFFEF7A1E), width: 1.5),
+          borderSide: const BorderSide(color: AurisPalette.brand, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
@@ -531,7 +531,7 @@ class _FooterLink extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(
-          color: Color(0xFFEF7A1E),
+          color: AurisPalette.brand,
           fontSize: 11,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.5,

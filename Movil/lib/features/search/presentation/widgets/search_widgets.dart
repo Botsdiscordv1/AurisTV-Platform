@@ -164,7 +164,7 @@ class SearchHistorySection extends ConsumerWidget {
             return ListTile(
               dense: true,
               visualDensity: VisualDensity.compact,
-              leading: const Icon(Icons.history_rounded, color: Color(0xFFEF7A1E), size: 20),
+              leading: const Icon(Icons.history_rounded, color: AurisPalette.brand, size: 20),
               title: Text(
                 item.query, 
                 maxLines: 1,
@@ -325,7 +325,7 @@ class SearchDiscoveryFeed extends ConsumerWidget {
       },
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+        child: Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
       ),
       error: (_, __) => const SizedBox.shrink(),
     );
@@ -526,7 +526,7 @@ class _SearchTrendingSectionState extends ConsumerState<SearchTrendingSection> {
                 ],
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+            loading: () => const Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
             error: (_, __) => const SizedBox.shrink(),
           ),
         ),

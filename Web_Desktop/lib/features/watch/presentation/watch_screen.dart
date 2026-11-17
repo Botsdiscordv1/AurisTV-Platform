@@ -387,6 +387,10 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       episodeTitle: ep.title,
       certification: widget.certification,
       year: widget.year,
+      video720: widget.video720,
+      video1080: widget.video1080,
+      skipResume: widget.skipResume,
+      isLive: widget.isLive,
     );
     context.pushReplacement(uri);
   }

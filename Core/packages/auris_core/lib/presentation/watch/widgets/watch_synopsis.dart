@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/config/brand_colors.dart';
 
 /// Sinopsis expandible para la WatchScreen.
 ///
@@ -72,7 +73,7 @@ class _WatchSynopsisState extends State<WatchSynopsis> {
                   child: Text(
                     _isExpanded ? 'VER MENOS' : 'VER MÁS',
                     style: TextStyle(
-                      color: const Color(0xFFEF7A1E), // Naranja AurisTV
+                      color: AurisPalette.brand, // Naranja AurisTV
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.8,

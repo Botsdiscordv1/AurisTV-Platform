@@ -253,7 +253,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
               'assets/icons/auris-logo-web-flat.svg',
               height: 38,
               colorFilter: const ColorFilter.mode(
-                Color(0xFFEF7A1E),
+                AurisPalette.brand,
                 BlendMode.srcIn,
               ),
             ),
@@ -323,7 +323,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
             style: OutlinedButton.styleFrom(
               backgroundColor: Colors.black,
               foregroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFEF7A1E), width: 1.5),
+              side: const BorderSide(color: AurisPalette.brand, width: 1.5),
               shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
             child: Row(
@@ -333,7 +333,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
                 const SizedBox(width: 10),
                 const Text(
                   'INICIAR SESIÓN CON GOOGLE',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: Color(0xFFEF7A1E)),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8, color: AurisPalette.brand),
                 ),
               ],
             ),
@@ -348,7 +348,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
               style: TextStyle(fontSize: 13, letterSpacing: 0.4),
               children: [
                 TextSpan(text: 'o ', style: TextStyle(color: Colors.white60)),
-                TextSpan(text: 'Crear cuenta', style: TextStyle(color: Color(0xFFEF7A1E), fontWeight: FontWeight.w900)),
+                TextSpan(text: 'Crear cuenta', style: TextStyle(color: AurisPalette.brand, fontWeight: FontWeight.w900)),
               ],
             ),
           ),
@@ -371,7 +371,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
           'assets/icons/auris-logo-web-flat.svg',
           height: 42,
           colorFilter: const ColorFilter.mode(
-            Color(0xFFEF7A1E),
+            AurisPalette.brand,
             BlendMode.srcIn,
           ),
         ),
@@ -444,7 +444,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
             style: OutlinedButton.styleFrom(
               backgroundColor: Colors.transparent,
               foregroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFEF7A1E), width: 1.5),
+              side: const BorderSide(color: AurisPalette.brand, width: 1.5),
               shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
             child: Row(
@@ -454,7 +454,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
                 const SizedBox(width: 10),
                 const Text(
                   'GOOGLE',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1, color: Color(0xFFEF7A1E)),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1, color: AurisPalette.brand),
                 ),
               ],
             ),
@@ -473,7 +473,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
     return TextField(
       controller: controller,
       obscureText: isPassword && !_showPassword,
-      cursorColor: const Color(0xFFEF7A1E),
+      cursorColor: AurisPalette.brand,
       style: const TextStyle(color: Colors.white, fontSize: 15),
       decoration: InputDecoration(
         filled: true,
@@ -497,7 +497,7 @@ class _MobileLoginScreenState extends ConsumerState<_MobileLoginScreen>
         ),
         focusedBorder: const OutlineInputBorder(
           borderRadius: BorderRadius.zero,
-          borderSide: BorderSide(color: Color(0xFFEF7A1E), width: 1.5),
+          borderSide: BorderSide(color: AurisPalette.brand, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
@@ -517,7 +517,7 @@ class _FooterLink extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(
-          color: Color(0xFFEF7A1E),
+          color: AurisPalette.brand,
           fontSize: 11,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.5,
@@ -543,12 +543,12 @@ class _LegalNotice extends StatelessWidget {
         Text('Al usar AurisTV aceptas nuestros ', style: TextStyle(color: textColor, fontSize: fontSize, height: 1.4)),
         GestureDetector(
           onTap: () => context.go('/terms'),
-          child: Text('Términos de Uso', style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: fontSize, fontWeight: FontWeight.bold, height: 1.4)),
+          child: Text('Términos de Uso', style: TextStyle(color: AurisPalette.brand, fontSize: fontSize, fontWeight: FontWeight.bold, height: 1.4)),
         ),
         Text(' y la ', style: TextStyle(color: textColor, fontSize: fontSize, height: 1.4)),
         GestureDetector(
           onTap: () => context.go('/privacy'),
-          child: Text('Política de Privacidad', style: TextStyle(color: const Color(0xFFEF7A1E), fontSize: fontSize, fontWeight: FontWeight.bold, height: 1.4)),
+          child: Text('Política de Privacidad', style: TextStyle(color: AurisPalette.brand, fontSize: fontSize, fontWeight: FontWeight.bold, height: 1.4)),
         ),
         Text('.', style: TextStyle(color: textColor, fontSize: fontSize, height: 1.4)),
       ],
@@ -664,7 +664,7 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
                         onTap: () => context.go('/inicio'),
-                        child: SvgPicture.asset('assets/icons/auris-logo-web-flat.svg', height: 38, colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn)),
+                        child: SvgPicture.asset('assets/icons/auris-logo-web-flat.svg', height: 38, colorFilter: const ColorFilter.mode(AurisPalette.brand, BlendMode.srcIn)),
                       ),
                     ),
                     Row(children: [
@@ -683,7 +683,7 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
                       ElevatedButton(
                         onPressed: () => ref.read(authProvider.notifier).signInWithGoogle(),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF7A1E), foregroundColor: Colors.black,
+                          backgroundColor: AurisPalette.brand, foregroundColor: Colors.black,
                           shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                           textStyle: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.8, fontSize: 13),
@@ -763,7 +763,7 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                              SvgPicture.asset('assets/icons/auris-logo-web-flat.svg', height: 34, colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn)),
+                              SvgPicture.asset('assets/icons/auris-logo-web-flat.svg', height: 34, colorFilter: const ColorFilter.mode(AurisPalette.brand, BlendMode.srcIn)),
                               IconButton(icon: const Icon(Icons.close, color: Colors.white54, size: 22), onPressed: _closePanel),
                             ]),
                             const SizedBox(height: 40),
@@ -779,7 +779,7 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
                               width: double.infinity, height: 52,
                               child: ElevatedButton(
                                 onPressed: () {},
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF7A1E), foregroundColor: Colors.black, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero), textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                                style: ElevatedButton.styleFrom(backgroundColor: AurisPalette.brand, foregroundColor: Colors.black, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero), textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                                 child: const Text('ACCEDER'),
                               ),
                             ),
@@ -798,11 +798,11 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
                               width: double.infinity, height: 52,
                               child: OutlinedButton(
                                 onPressed: () => ref.read(authProvider.notifier).signInWithGoogle(),
-                                style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFFEF7A1E), width: 1.5), shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero), foregroundColor: Colors.white),
+                                style: OutlinedButton.styleFrom(side: const BorderSide(color: AurisPalette.brand, width: 1.5), shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero), foregroundColor: Colors.white),
                                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                                   SvgPicture.asset('assets/icons/google_logo.svg', height: 22),
                                   const SizedBox(width: 12),
-                                  const Text('CONTINUAR CON GOOGLE', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1, color: Color(0xFFEF7A1E))),
+                                  const Text('CONTINUAR CON GOOGLE', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1, color: AurisPalette.brand)),
                                 ]),
                               ),
                             ),
@@ -826,14 +826,14 @@ class _DesktopLoginScreenState extends ConsumerState<_DesktopLoginScreen>
         Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
         const SizedBox(height: 6),
         TextField(
-          controller: controller, obscureText: isPassword && !_showPassword, cursorColor: const Color(0xFFEF7A1E),
+          controller: controller, obscureText: isPassword && !_showPassword, cursorColor: AurisPalette.brand,
           style: const TextStyle(color: Colors.white, fontSize: 15),
           decoration: InputDecoration(
             filled: true, fillColor: const Color(0xFF141418),
             prefixIcon: Icon(icon, color: Colors.white38, size: 20),
             suffixIcon: isPassword ? IconButton(icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility, color: Colors.white38, size: 20), onPressed: () => setState(() => _showPassword = !_showPassword)) : null,
             enabledBorder: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: Colors.white12)),
-            focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: Color(0xFFEF7A1E), width: 1.5)),
+            focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: AurisPalette.brand, width: 1.5)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
           ),
         ),
@@ -868,7 +868,7 @@ class _InlineEmailRow extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: emailController,
-                  cursorColor: const Color(0xFFEF7A1E),
+                  cursorColor: AurisPalette.brand,
                   style: const TextStyle(color: Colors.white, fontSize: 15),
                   decoration: InputDecoration(
                     filled: true,
@@ -881,7 +881,7 @@ class _InlineEmailRow extends StatelessWidget {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(4),
-                      borderSide: const BorderSide(color: Color(0xFFEF7A1E), width: 1.5),
+                      borderSide: const BorderSide(color: AurisPalette.brand, width: 1.5),
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
                   ),
@@ -889,7 +889,7 @@ class _InlineEmailRow extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Material(
-                color: const Color(0xFFEF7A1E),
+                color: AurisPalette.brand,
                 borderRadius: BorderRadius.circular(4),
                 child: InkWell(
                   onTap: onAcceder,

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:auris_core/core/config/brand_colors.dart';
 
 class AppTheme {
   AppTheme._();
 
   // Brand Colors
-  static const Color brand = Color(0xFFEF7A1E);
+  static const Color brand = AurisPalette.brand;
   static const Color brandLight = Color(0xFFFF963D);
   static const Color brandDark = Color(0xFFC85F0D);
 
@@ -33,7 +34,9 @@ class AppTheme {
   static const auristvDarkScheme = ColorScheme(
     brightness: Brightness.dark,
     primary: brand,
-    onPrimary: Color(0xFFFFFFFF),
+    // Negro, no blanco: blanco sobre #EF7A1E da 2.81:1 (FALLO WCAG).
+    // El negro sobre naranja da 7.47:1 AAA — igual que el logo.
+    onPrimary: Colors.black,
     primaryContainer: Color(0xFF5A2A08),
     onPrimaryContainer: Color(0xFFFFDBC7),
     secondary: brandLight,

@@ -1316,7 +1316,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 SizedBox(
                   width: 36, height: 36,
                   child: Center(
-                    child: AurisIcon(volIcon, color: isBoost ? const Color(0xFFEF7A1E) : Colors.white, size: 24),
+                    child: AurisIcon(volIcon, color: isBoost ? AurisPalette.brand : Colors.white, size: 24),
                   ),
                 ),
                 if (_isVolumePillHovered) ...[
@@ -1327,10 +1327,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         trackHeight: 2,
                         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                         overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                        activeTrackColor: isBoost ? const Color(0xFFEF7A1E) : Colors.white,
+                        activeTrackColor: isBoost ? AurisPalette.brand : Colors.white,
                         inactiveTrackColor: Colors.white24,
-                        thumbColor: isBoost ? const Color(0xFFEF7A1E) : Colors.white,
-                        overlayColor: (isBoost ? const Color(0xFFEF7A1E) : Colors.white).withOpacity(0.2),
+                        thumbColor: isBoost ? AurisPalette.brand : Colors.white,
+                        overlayColor: (isBoost ? AurisPalette.brand : Colors.white).withOpacity(0.2),
                       ),
                       child: Slider(
                         value: _volume,
@@ -1351,7 +1351,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     child: Text(
                       '$displayPercent%',
                       style: TextStyle(
-                        color: isBoost ? const Color(0xFFEF7A1E) : Colors.white,
+                        color: isBoost ? AurisPalette.brand : Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1437,7 +1437,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                 SizedBox(
                   width: 28,
                   height: 28,
-                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFFEF7A1E)),
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: AurisPalette.brand),
                 ),
                 SizedBox(height: 12),
                 Text('Buscando fuentes...', style: TextStyle(color: Colors.white54, fontSize: 13)),
@@ -2025,7 +2025,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
       },
       loading: () => const Center(child: Padding(
         padding: EdgeInsets.all(32.0),
-        child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+        child: CircularProgressIndicator(color: AurisPalette.brand),
       )),
       error: (err, _) => Center(child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -4169,7 +4169,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         ),
                         const SizedBox(width: 16),
                         ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF7A1E)), 
+                          style: ElevatedButton.styleFrom(backgroundColor: AurisPalette.brand), 
                           onPressed: () {
                              Navigator.of(context).pop();
                           }, 
@@ -4253,7 +4253,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
 
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              backgroundColor: Color(0xFFEF7A1E),
+                              backgroundColor: AurisPalette.brand,
                               content: Text('Recuperando reproducci�n local...', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           );
@@ -4286,19 +4286,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFEF7A1E).withOpacity(0.1),
+              color: AurisPalette.brand.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFEF7A1E).withOpacity(0.3)),
+              border: Border.all(color: AurisPalette.brand.withOpacity(0.3)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 18),
+                const Icon(Icons.cast_connected_rounded, color: AurisPalette.brand, size: 18),
                 const SizedBox(width: 10),
                 Text(
                   target.name.toUpperCase(),
                   style: const TextStyle(
-                    color: Color(0xFFEF7A1E), 
+                    color: AurisPalette.brand, 
                     fontWeight: FontWeight.w900,
                     fontSize: 13,
                     letterSpacing: 1.1
@@ -4358,7 +4358,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               decoration: BoxDecoration(
                 color: Colors.white, 
                 shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: const Color(0xFFEF7A1E).withOpacity(0.3), blurRadius: 15)]
+                boxShadow: [BoxShadow(color: AurisPalette.brand.withOpacity(0.3), blurRadius: 15)]
               ),
               child: IconButton(
                 iconSize: 44,
@@ -4392,7 +4392,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
               Expanded(
                 child: Slider(
                   value: target.volume.clamp(0.0, 1.0),
-                  activeColor: const Color(0xFFEF7A1E),
+                  activeColor: AurisPalette.brand,
                   inactiveColor: Colors.white10,
                   onChanged: (v) => _sendRemoteAction(target, RemoteAction.setVolume, {'volume': v}),
                 ),
@@ -4478,7 +4478,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                       ),
                     ),
                     title: Text(label, style: TextStyle(color: isCurrent ? Colors.white : Colors.white70, fontWeight: isCurrent ? FontWeight.w900 : FontWeight.normal)),
-                    trailing: isCurrent ? const Icon(Icons.check_circle_rounded, color: Color(0xFFEF7A1E)) : null,
+                    trailing: isCurrent ? const Icon(Icons.check_circle_rounded, color: AurisPalette.brand) : null,
                   );
                 },
               ),
@@ -4539,21 +4539,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             leading: Container(
                               width: 40, height: 40,
                               decoration: BoxDecoration(
-                                color: isCurrent ? const Color(0xFFEF7A1E).withOpacity(0.1) : Colors.white10,
+                                color: isCurrent ? AurisPalette.brand.withOpacity(0.1) : Colors.white10,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Center(
-                                child: Text('${ep.number}', style: TextStyle(color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white70, fontWeight: FontWeight.bold)),
+                                child: Text('${ep.number}', style: TextStyle(color: isCurrent ? AurisPalette.brand : Colors.white70, fontWeight: FontWeight.bold)),
                               ),
                             ),
                             title: Text(ep.title ?? 'Episodio ${ep.number}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isCurrent ? Colors.white : Colors.white70, fontWeight: isCurrent ? FontWeight.w900 : FontWeight.normal)),
                             subtitle: (ep.description != null && ep.description!.isNotEmpty) ? Text(ep.description!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)) : null,
-                            trailing: isCurrent ? const Icon(Icons.play_circle_fill_rounded, color: Color(0xFFEF7A1E)) : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white10, size: 14),
+                            trailing: isCurrent ? const Icon(Icons.play_circle_fill_rounded, color: AurisPalette.brand) : const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white10, size: 14),
                           );
                         },
                       );
                     },
-                    loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+                    loading: () => const Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
                     error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.redAccent))),
                   ),
                 ),
@@ -4590,7 +4590,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: const Color(0xFFEF7A1E),
+        backgroundColor: AurisPalette.brand,
         content: Text('Lanzando Episodio $epNum...', style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
@@ -4605,7 +4605,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
           data: SliderTheme.of(context).copyWith(
             trackHeight: 4,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-            activeTrackColor: const Color(0xFFEF7A1E),
+            activeTrackColor: AurisPalette.brand,
             inactiveTrackColor: Colors.white10,
           ),
           child: Slider(
@@ -4761,7 +4761,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFEF7A1E),
+                color: AurisPalette.brand,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -5004,7 +5004,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.cast_connected_rounded, color: Color(0xFFEF7A1E), size: 64),
+                            const Icon(Icons.cast_connected_rounded, color: AurisPalette.brand, size: 64),
                             const SizedBox(height: 24),
                             const Text(
                               'SINCROIZACI�N REMOTA',
@@ -5018,7 +5018,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             const SizedBox(height: 32),
                             ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFEF7A1E),
+                                backgroundColor: AurisPalette.brand,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -5122,7 +5122,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                                ElevatedButton(
                                  style: ElevatedButton.styleFrom(
                                      backgroundColor:
-                                         const Color(0xFFEF7A1E)),
+                                         AurisPalette.brand),
                                  onPressed: _retryPlayback,
                                  child: const Text('Reintentar'),
                                ),
@@ -6008,7 +6008,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                             scrubbing ? _seekTargetDuration : position);
                         final style = TextStyle(
                           color: scrubbing
-                              ? const Color(0xFFEF7A1E)
+                              ? AurisPalette.brand
                               : Colors.white,
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -6056,10 +6056,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                                     bufferFraction: bufferFraction),
                                 thumbShape: RoundSliderThumbShape(
                                     enabledThumbRadius: scrubbing ? 11 : 7),
-                                activeTrackColor: const Color(0xFFEF7A1E),
+                                activeTrackColor: AurisPalette.brand,
                                 inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
-                                thumbColor: const Color(0xFFEF7A1E),
-                                overlayColor: const Color(0xFFEF7A1E).withOpacity(0.3),
+                                thumbColor: AurisPalette.brand,
+                                overlayColor: AurisPalette.brand.withOpacity(0.3),
                               ),
                               child: Slider(
                                 value: displayMs,
@@ -6130,7 +6130,7 @@ class _PlayerTextButtonState extends State<_PlayerTextButton> {
                     child: Container(
                         padding: EdgeInsets.symmetric(horizontal: isMobile ? (widget.label.isEmpty ? 6 : 10) : 24, vertical: isMobile ? 6 : 12),
                         decoration: BoxDecoration(
-                            color: _isFocused ? const Color(0xFFEF7A1E) : (widget.useBackground ? (isActive ? Colors.white24 : Colors.white10) : (isActive ? Colors.white10 : Colors.transparent)),
+                            color: _isFocused ? AurisPalette.brand : (widget.useBackground ? (isActive ? Colors.white24 : Colors.white10) : (isActive ? Colors.white10 : Colors.transparent)),
                             border: _isFocused ? Border.all(color: Colors.white, width: 2) : null,
                             borderRadius: BorderRadius.circular(8)),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -6294,7 +6294,7 @@ class _ZeroPaddingSliderTrackShape extends RoundedRectSliderTrackShape {
     );
 
     final Paint activePaint = Paint()
-      ..color = sliderTheme.activeTrackColor ?? const Color(0xFFEF7A1E);
+      ..color = sliderTheme.activeTrackColor ?? AurisPalette.brand;
     final Paint inactivePaint = Paint()
       ..color = sliderTheme.inactiveTrackColor ?? Colors.white.withOpacity(0.25);
     final Paint bufferPaint = Paint()

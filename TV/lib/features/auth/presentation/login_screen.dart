@@ -123,7 +123,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('¡Dispositivo activado con éxito! Iniciando sesión...'),
-            backgroundColor: Color(0xFFEF7A1E),
+            backgroundColor: AurisPalette.brand,
           ),
         );
         context.go('/');
@@ -198,7 +198,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             width: 52,
             height: 52,
             child: CircularProgressIndicator(
-              color: Color(0xFFEF7A1E),
+              color: AurisPalette.brand,
               strokeWidth: 3.8,
             ),
           ),
@@ -712,7 +712,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('¡Sesión iniciada con éxito!'),
-            backgroundColor: Color(0xFFEF7A1E),
+            backgroundColor: AurisPalette.brand,
           ),
         );
         context.go('/');

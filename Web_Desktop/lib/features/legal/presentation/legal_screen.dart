@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:auris_core/core/config/brand_colors.dart';
 
 class LegalScreen extends StatelessWidget {
   final bool isTerms;
@@ -48,7 +49,7 @@ class LegalScreen extends StatelessWidget {
                       width: 4,
                       height: 24,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEF7A1E),
+                        color: AurisPalette.brand,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -146,7 +147,7 @@ class LegalScreen extends StatelessWidget {
       child: Text(
         text,
         style: const TextStyle(
-          color: Color(0xFFEF7A1E),
+          color: AurisPalette.brand,
           fontSize: 18,
           fontWeight: FontWeight.bold,
         ),

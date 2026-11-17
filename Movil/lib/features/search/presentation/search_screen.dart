@@ -168,7 +168,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withOpacity(0.05),
+                  color: _isFocused ? AurisPalette.brand : Colors.white.withOpacity(0.05),
                   width: 1.5,
                 ),
               ),
@@ -307,7 +307,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     height: 28,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: Color(0xFFEF7A1E),
+                      color: AurisPalette.brand,
                     ),
                   ),
                 ),

@@ -51,7 +51,7 @@ class PlaylistChannelsScreen extends ConsumerWidget {
         title: Text(
           (playlist?.name ?? 'Lista').toUpperCase(),
           style: const TextStyle(
-            color: Color(0xFFEF7A1E),
+            color: AurisPalette.brand,
             fontSize: 18,
             fontWeight: FontWeight.w900,
             letterSpacing: 1.5,
@@ -136,7 +136,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
         Expanded(
           child: channelsAsync.when(
             loading: () => const Center(
-              child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+              child: CircularProgressIndicator(color: AurisPalette.brand),
             ),
             error: (error, _) => Center(
               child: _TvTextButton(
@@ -184,7 +184,7 @@ class _TvChannelTileState extends State<_TvChannelTile> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     final channel = widget.channel;
 
     return Padding(
@@ -301,7 +301,7 @@ class _TvTextButtonState extends State<_TvTextButton> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
 
     return Focus(
       onFocusChange: (f) => setState(() => _focused = f),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/playlist_channel.dart';
 import '../../data/models/user_playlist.dart';
 import '../../data/providers/playlists_provider.dart';
+import '../../core/config/brand_colors.dart';
 
 /// Contenido del detalle de una lista: buscador + canales (Móvil y Web).
 ///
@@ -86,7 +87,7 @@ class _PlaylistChannelsContentState extends ConsumerState<PlaylistChannelsConten
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFFEF7A1E)),
+                borderSide: const BorderSide(color: AurisPalette.brand),
               ),
             ),
           ),
@@ -96,7 +97,7 @@ class _PlaylistChannelsContentState extends ConsumerState<PlaylistChannelsConten
         Expanded(
           child: channelsAsync.when(
             loading: () => const Center(
-              child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+              child: CircularProgressIndicator(color: AurisPalette.brand),
             ),
             error: (error, _) {
               final message = error is PlaylistChannelsFailure
@@ -121,7 +122,7 @@ class _PlaylistChannelsContentState extends ConsumerState<PlaylistChannelsConten
                         icon: const Icon(Icons.refresh_rounded, size: 18),
                         label: const Text('Reintentar'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEF7A1E),
+                          backgroundColor: AurisPalette.brand,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         ),
@@ -217,7 +218,7 @@ class _PlaylistChannelsContentState extends ConsumerState<PlaylistChannelsConten
               style: const TextStyle(color: Colors.white54, fontSize: 12),
             )
           : null,
-      trailing: const Icon(Icons.play_circle_outline_rounded, color: Color(0xFFEF7A1E), size: 26),
+      trailing: const Icon(Icons.play_circle_outline_rounded, color: AurisPalette.brand, size: 26),
       onTap: () => widget.onChannelTap(channel),
     );
   }

@@ -587,7 +587,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                                           IconButton(
                                             icon: AurisIcon(
                                                 AurisIcons.restart,
-                                                color: Color(0xFFEF7A1E),
+                                                color: AurisPalette.brand,
                                                 size: 44),
                                             onPressed: _replayMini,
                                           ),
@@ -819,7 +819,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                 FractionallySizedBox(
                   alignment: Alignment.centerLeft,
                   widthFactor: progress,
-                  child: Container(color: const Color(0xFFEF7A1E)),
+                  child: Container(color: AurisPalette.brand),
                 ),
                 // Thumb visible on hover or drag
                 if (_isHovered || _isDragging)
@@ -829,7 +829,7 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
                     child: Container(
                       width: 12, height: 12,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEF7A1E),
+                        color: AurisPalette.brand,
                         shape: BoxShape.circle,
                         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 4)],
                       ),
@@ -1179,13 +1179,13 @@ class _MiniPlayerBarState extends ConsumerState<MiniPlayerBar> with SingleTicker
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_getEpisodeDisplayTitle(ep), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isCurrent ? const Color(0xFFEF7A1E) : Colors.white, fontSize: 12, fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal, decoration: TextDecoration.none)),
+                  Text(_getEpisodeDisplayTitle(ep), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: isCurrent ? AurisPalette.brand : Colors.white, fontSize: 12, fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal, decoration: TextDecoration.none)),
                   if (ep.duration != null && ep.duration!.isNotEmpty)
                     Text(ep.duration!, style: TextStyle(color: Colors.white54, fontSize: 10, decoration: TextDecoration.none)),
                 ],
               ),
             ),
-            if (isCurrent) AurisIcon(AurisIcons.play, color: Color(0xFFEF7A1E), size: 16),
+            if (isCurrent) AurisIcon(AurisIcons.play, color: AurisPalette.brand, size: 16),
           ],
         ),
       ),

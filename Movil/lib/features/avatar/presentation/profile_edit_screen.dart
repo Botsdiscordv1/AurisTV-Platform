@@ -48,7 +48,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   void _showAudioLanguageDialog(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     final options = [
       'Español (Latinoamérica)',
       'Japonés',
@@ -79,7 +79,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   void _showQualityDialog(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     final options = ['auto', '1080p', '720p', '480p'];
 
     showDialog(
@@ -106,7 +106,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     const backgroundColor = Color(0xFF000000);
     const cardColor = Color(0xFF1A1D24);
 

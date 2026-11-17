@@ -35,7 +35,7 @@ class PlaylistsScreen extends ConsumerWidget {
         title: const Text(
           'LISTAS AÑADIDAS',
           style: TextStyle(
-            color: Color(0xFFEF7A1E),
+            color: AurisPalette.brand,
             fontSize: 20,
             fontWeight: FontWeight.w900,
             letterSpacing: 2,
@@ -81,7 +81,7 @@ class PlaylistsScreen extends ConsumerWidget {
       child: Text(
         title.toUpperCase(),
         style: const TextStyle(
-          color: Color(0xFFEF7A1E),
+          color: AurisPalette.brand,
           fontSize: 15,
           fontWeight: FontWeight.w900,
           letterSpacing: 1.5,
@@ -134,7 +134,7 @@ class _TvPlaylistTileState extends ConsumerState<_TvPlaylistTile> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     final playlist = widget.playlist;
 
     return Padding(
@@ -285,7 +285,7 @@ class _TvFocusTileState extends State<_TvFocusTile> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     final bool active = _focused;
 
     return Focus(
@@ -443,7 +443,7 @@ class _AddPlaylistTvDialogState extends ConsumerState<_AddPlaylistTvDialog> {
         ElevatedButton(
           onPressed: _submit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFEF7A1E),
+            backgroundColor: AurisPalette.brand,
             foregroundColor: Colors.black,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           ),
@@ -468,7 +468,7 @@ class _AddPlaylistTvDialogState extends ConsumerState<_AddPlaylistTvDialog> {
           decoration: BoxDecoration(
             color: active ? Colors.white.withValues(alpha: 0.06) : Colors.transparent,
             border: Border.all(
-              color: active ? const Color(0xFFEF7A1E) : Colors.white24,
+              color: active ? AurisPalette.brand : Colors.white24,
               width: active ? 2 : 1,
             ),
           ),
@@ -478,7 +478,7 @@ class _AddPlaylistTvDialogState extends ConsumerState<_AddPlaylistTvDialog> {
               Text(
                 label,
                 style: TextStyle(
-                  color: active ? const Color(0xFFEF7A1E) : Colors.white38,
+                  color: active ? AurisPalette.brand : Colors.white38,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1,

@@ -26,7 +26,7 @@ class _AvatarSelectorScreenState extends ConsumerState<AvatarSelectorScreen> {
     // Colores del tema AurisTV (basados en settings_screen.dart)
     const backgroundColor = Color(0xFF0B0B0D);
     const surfaceColor = Color(0xFF1A1D24);
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
 
     return Scaffold(
       backgroundColor: backgroundColor,

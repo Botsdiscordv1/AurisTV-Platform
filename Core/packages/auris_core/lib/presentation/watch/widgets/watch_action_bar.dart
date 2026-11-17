@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/config/brand_colors.dart';
 
 /// Barra de acciones del episodio para la WatchScreen (Crunchyroll Style).
 ///
@@ -42,14 +43,14 @@ class WatchActionBar extends StatelessWidget {
                 children: [
                   Icon(
                     isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
-                    color: isLiked ? const Color(0xFFEF7A1E) : Colors.white70,
+                    color: isLiked ? AurisPalette.brand : Colors.white70,
                     size: 20,
                   ),
                   const SizedBox(width: 6),
                   Text(
                     likeCount,
                     style: TextStyle(
-                      color: isLiked ? const Color(0xFFEF7A1E) : Colors.white70,
+                      color: isLiked ? AurisPalette.brand : Colors.white70,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),

@@ -551,10 +551,10 @@ class LocalCastOverlay extends ConsumerWidget {
           decoration: BoxDecoration(
             color: const Color(0xF5141519),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFEF7A1E).withOpacity(0.8), width: 1.5),
+            border: Border.all(color: AurisPalette.brand.withOpacity(0.8), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFEF7A1E).withOpacity(0.15),
+                color: AurisPalette.brand.withOpacity(0.15),
                 blurRadius: 24,
                 spreadRadius: 2,
               ),
@@ -575,14 +575,14 @@ class LocalCastOverlay extends ConsumerWidget {
                       children: [
                         AurisIcon(
                           AurisIcons.castMobile,
-                          color: const Color(0xFFEF7A1E),
+                          color: AurisPalette.brand,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
                         const Text(
                           'VINCULACIÓN DE MÓVIL',
                           style: TextStyle(
-                            color: Color(0xFFEF7A1E),
+                            color: AurisPalette.brand,
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
                             letterSpacing: 1.2,

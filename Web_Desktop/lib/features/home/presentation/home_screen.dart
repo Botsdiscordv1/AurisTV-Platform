@@ -433,7 +433,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     SvgPicture.asset(
                       'assets/icons/auris-tv-icon.svg',
                       height: 30,
-                      colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                      colorFilter: const ColorFilter.mode(AurisPalette.brand, BlendMode.srcIn),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -542,7 +542,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 SvgPicture.asset(
                   'assets/icons/auris-logo-web-flat.svg',
                   height: logoHeight,
-                  colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                  colorFilter: const ColorFilter.mode(AurisPalette.brand, BlendMode.srcIn),
                 ),
                 SizedBox(width: isUltraCompact ? 8 : (isCompactDesktop ? 20 : 40)),
                 _PillNavBar(
@@ -656,12 +656,12 @@ class _AuthButtonState extends State<_AuthButton> {
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(4),
-              boxShadow: _isHovered ? [BoxShadow(color: const Color(0xFFEF7A1E).withOpacity(0.5), blurRadius: 15, spreadRadius: 2)] : [],
+              boxShadow: _isHovered ? [BoxShadow(color: AurisPalette.brand.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)] : [],
             ),
             child: ElevatedButton(
               onPressed: () => context.go('/login'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF7A1E),
+                backgroundColor: AurisPalette.brand,
                 foregroundColor: Colors.white,
                 minimumSize: Size(0, widget.isCompactDesktop ? 36 : 42),
                 padding: const EdgeInsets.symmetric(horizontal: 16),

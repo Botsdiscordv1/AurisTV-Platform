@@ -590,7 +590,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       'assets/icons/auris-logo-web-flat.svg',
                       height: logoHeight,
                       fit: BoxFit.contain,
-                      colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                      colorFilter: const ColorFilter.mode(AurisPalette.brand, BlendMode.srcIn),
                     ),
                     SizedBox(width: isCompactDesktop ? 20 : 40),
                   ] else ...[
@@ -801,7 +801,7 @@ class _AuthButtonState extends State<_AuthButton> {
               borderRadius: BorderRadius.circular(4),
               boxShadow: _isHovered ? [
                 BoxShadow(
-                  color: const Color(0xFFEF7A1E).withValues(alpha: 0.5),
+                  color: AurisPalette.brand.withValues(alpha: 0.5),
                   blurRadius: 15,
                   spreadRadius: 2,
                 )
@@ -812,7 +812,7 @@ class _AuthButtonState extends State<_AuthButton> {
                 context.push('/login');
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF7A1E),
+                backgroundColor: AurisPalette.brand,
                 foregroundColor: Colors.white,
                 minimumSize: Size(0, widget.isCompactDesktop ? 36 : 42),
                 padding: const EdgeInsets.symmetric(horizontal: 16),

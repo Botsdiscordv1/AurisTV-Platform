@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/auris_icons.dart';
 import '../../../core/utils/string_utils.dart';
 import '../../widgets/auris_icon.dart';
+import '../../../core/config/brand_colors.dart';
 
 /// Bloque de metadatos del episodio para la WatchScreen (Estilo Crunchyroll).
 ///
@@ -51,7 +52,7 @@ class WatchEpisodeMetadata extends StatelessWidget {
       onPressed: onBookmarkToggle,
       icon: AurisIcon(
         isBookmarked ? AurisIcons.bookmarkFilled : AurisIcons.bookmark,
-        color: isBookmarked ? const Color(0xFFEF7A1E) : Colors.white70,
+        color: isBookmarked ? AurisPalette.brand : Colors.white70,
         size: 24,
       ),
       tooltip: isBookmarked ? 'Quitar de Mi Lista' : 'Guardar en Mi Lista',
@@ -69,7 +70,7 @@ class WatchEpisodeMetadata extends StatelessWidget {
                 child: Text(
                   seriesTitle,
                   style: const TextStyle(
-                    color: Color(0xFFEF7A1E), // Naranja AurisTV
+                    color: AurisPalette.brand, // Naranja AurisTV
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.3,
@@ -153,7 +154,7 @@ class WatchEpisodeMetadata extends StatelessWidget {
                 // Badge de Fecha de Lanzamiento (o Audio / Subtítulos si no hay fecha)
                 Row(
                   children: [
-                    const Icon(Icons.fiber_manual_record, size: 6, color: Color(0xFFEF7A1E)),
+                    const Icon(Icons.fiber_manual_record, size: 6, color: AurisPalette.brand),
                     const SizedBox(width: 6),
                     Text(
                       displayBadgeText,

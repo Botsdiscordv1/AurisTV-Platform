@@ -923,7 +923,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with RouteAware {
                   SvgPicture.asset(
                     'assets/icons/auris-tv-icon.svg',
                     height: logoHeight,
-                    colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                    colorFilter: const ColorFilter.mode(AurisPalette.brand, BlendMode.srcIn),
                   ),
                 ],
               ),
@@ -2207,7 +2207,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
           childBuilder: (Color c) => Center(
             child: Icon(
               _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-              color: _isListening ? const Color(0xFFEF7A1E) : c,
+              color: _isListening ? AurisPalette.brand : c,
               size: micSize * 0.55,
             ),
           ),
@@ -2511,7 +2511,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
                     width: 28,
                     height: 28,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2.5, color: Color(0xFFEF7A1E)),
+                        strokeWidth: 2.5, color: AurisPalette.brand),
                   ),
                 ),
               );
@@ -2565,7 +2565,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
         );
       },
       loading: () =>
-          const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+          const Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
       error: (err, _) => Center(
           child: Text('Error: $err',
               style: const TextStyle(color: Colors.white54))),
@@ -2649,7 +2649,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay>
         );
       },
       loading: () =>
-          const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+          const Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
       error: (err, _) => const SizedBox.shrink(),
     );
   }

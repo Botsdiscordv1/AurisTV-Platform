@@ -243,13 +243,13 @@ class CastPickerContent extends ConsumerWidget {
                       child: Center(
                         child: TextButton.icon(
                           style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFFEF7A1E),
+                            foregroundColor: AurisPalette.brand,
                             padding:
                                 const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(24),
                               side: BorderSide(
-                                  color: const Color(0xFFEF7A1E).withValues(alpha: 0.35)),
+                                  color: AurisPalette.brand.withValues(alpha: 0.35)),
                             ),
                           ),
                           onPressed: () {
@@ -285,7 +285,7 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       label.toUpperCase(),
       style: const TextStyle(
-        color: Color(0xFFEF7A1E),
+        color: AurisPalette.brand,
         fontWeight: FontWeight.w800,
         fontSize: 11,
         letterSpacing: 1.2,
@@ -313,7 +313,7 @@ class _CastDeviceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = const Color(0xFFEF7A1E);
+    final accent = AurisPalette.brand;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -629,7 +629,7 @@ class _LocalPairDialogState extends ConsumerState<_LocalPairDialog> {
                     ElevatedButton(
                       onPressed: _verifying ? null : _verifyPin,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF7A1E),
+                        backgroundColor: AurisPalette.brand,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -692,7 +692,7 @@ class _LocalPairDialogState extends ConsumerState<_LocalPairDialog> {
                     ElevatedButton(
                       onPressed: _verifying ? null : _verifyPin,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF7A1E),
+                        backgroundColor: AurisPalette.brand,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),

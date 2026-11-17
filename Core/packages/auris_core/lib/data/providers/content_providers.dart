@@ -620,6 +620,20 @@ final AutoDisposeFutureProviderFamily<PlayerEpisodesState, ({String url, String 
   );
 });
 
+/// Compara dos slugs por prefijo común (>= 8 chars) para detectar la misma
+/// obra con distinto formato de slug (p.ej. "temporada-3" vs "3rd-season").
+bool _slugPrefixEqual(String a, String b) {
+  // Si uno es prefijo del otro, es un mini/spin-off (rogue) → no considerar
+  // la misma obra. Solo tratar como misma obra cuando los slugs difieren en
+  // el medio/final (p.ej. "temporada-3" vs "3rd-season") pero comparten un
+  // prefijo largo.
+  if (a.startsWith(b) || b.startsWith(a)) return false;
+  final minLen = a.length < b.length ? a.length : b.length;
+  if (minLen < 8) return false;
+  final prefixLen = minLen < 12 ? minLen : 12;
+  return a.substring(0, prefixLen) == b.substring(0, prefixLen);
+}
+
 /// Guardia anti-variantes: si las fuentes curadas (calendario/búsqueda) ya
 /// cubren una familia (JKAnime, AnimeAV1...), un descubierto de la MISMA
 /// familia con distinto slug Y distinta url es otra obra (mini, spin-off,
@@ -647,7 +661,16 @@ bool isRogueVariant(SourceItem s, List<SearchResult>? initialSources) {
       familySeen = true;
       final sameSlug =
           (s.slug?.isNotEmpty ?? false) && s.slug == c.slug;
-      if (sameSlug || s.url == c.url) return false;
+      // Senior Fix: slugs que comparten un prefijo largo (>= 8 chars) son la
+      // misma obra con distinto formato de slug (p.ej. "temporada-3" vs
+      // "3rd-season"). No filtrar: es el mismo anime, no un mini/spin-off.
+      // También: si alguno de los slugs es null/vacío, no filtrar (no hay
+      // info suficiente para determinar si es rogue).
+      final slugPrefixMatch = (s.slug?.isNotEmpty ?? false) &&
+          (c.slug?.isNotEmpty ?? false) &&
+          _slugPrefixEqual(s.slug!, c.slug!);
+      final eitherSlugEmpty = (s.slug?.isEmpty ?? true) || (c.slug?.isEmpty ?? true);
+      if (sameSlug || slugPrefixMatch || eitherSlugEmpty || s.url == c.url) return false;
     }
   }
   return familySeen;

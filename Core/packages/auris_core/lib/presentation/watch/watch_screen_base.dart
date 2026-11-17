@@ -441,7 +441,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFEF7A1E),
+                                      color: AurisPalette.brand,
                                       borderRadius: BorderRadius.circular(3),
                                     ),
                                     child: const Text(
@@ -490,7 +490,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                             AurisStringUtils.formatEpisodeTitle(ep.number, epTitle),
                             style: TextStyle(
                               color: isCurrent
-                                  ? const Color(0xFFEF7A1E)
+                                  ? AurisPalette.brand
                                   : Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -587,7 +587,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.playlist_play, color: Color(0xFFEF7A1E), size: 24),
+                        const Icon(Icons.playlist_play, color: AurisPalette.brand, size: 24),
                         const SizedBox(width: 10),
                         const Text(
                           'Episodios',
@@ -640,7 +640,7 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
                   '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M21 10a1 1 0 011 1v9a1 1 0 01-1 1H3a1 1 0 01-1-1v-9a1 1 0 011-1h18zm-1 2H4v7h16v-7zm0-5a1 1 0 010 2H4a1 1 0 110-2h16zm-2-3a1 1 0 010 2H6a1 1 0 110-2h12z" fill="currentColor"/></svg>''',
                   width: 24,
                   height: 24,
-                  colorFilter: const ColorFilter.mode(Color(0xFFEF7A1E), BlendMode.srcIn),
+                  colorFilter: const ColorFilter.mode(AurisPalette.brand, BlendMode.srcIn),
                 ),
                 const SizedBox(width: 8),
                 const Text(

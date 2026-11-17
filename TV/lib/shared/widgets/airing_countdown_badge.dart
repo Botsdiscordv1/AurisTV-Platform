@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:auris_core/core/config/brand_colors.dart';
 
 /// Formatea un timestamp unix (segundos) a hora local "HH:mm".
 String formatAiringTime(int airingAt) {
@@ -91,7 +92,7 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
 
     if (aired) {
       label = 'Emitido · ${formatAiringTime(widget.airingAt)}';
-      bg = const Color(0xFFEF7A1E).withOpacity(0.85);
+      bg = AurisPalette.brand.withOpacity(0.85);
       fg = Colors.white;
     } else {
       final diff = _airing.difference(now);
@@ -111,7 +112,7 @@ class _AiringCountdownBadgeState extends State<AiringCountdownBadge> {
         final time = formatAiringTime(widget.airingAt);
         if (dayDiff == 0) {
           label = 'HOY $time';
-          bg = const Color(0xFFEF7A1E).withOpacity(0.9);
+          bg = AurisPalette.brand.withOpacity(0.9);
           fg = Colors.white;
         } else if (dayDiff == 1) {
           label = 'MAÑANA $time';

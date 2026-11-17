@@ -29,7 +29,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     final settings = ref.watch(settingsProvider);
 
     return Scaffold(
@@ -302,7 +302,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12)),
                 child: Row(
                   children: [
-                    const Icon(Icons.link, color: Color(0xFFEF7A1E)),
+                    const Icon(Icons.link, color: AurisPalette.brand),
                     const SizedBox(width: 15),
                     Expanded(
                       child: Column(
@@ -434,7 +434,7 @@ class _CategoryTileState extends State<_CategoryTile> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -508,7 +508,7 @@ class _CategoryHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title.toUpperCase(),
-      style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+      style: const TextStyle(color: AurisPalette.brand, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5),
     );
   }
 }
@@ -530,7 +530,7 @@ class _SettingsTVButtonState extends State<_SettingsTVButton> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     final bool active = _focused;
 
     return Padding(
@@ -611,7 +611,7 @@ class _SettingsTVSelectorState extends State<_SettingsTVSelector> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
@@ -692,7 +692,7 @@ class _SettingsTVSwitchState extends State<_SettingsTVSwitch> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),

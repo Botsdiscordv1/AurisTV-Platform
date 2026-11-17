@@ -17,7 +17,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sourcesAsync = ref.watch(sourcesProvider);
     final settings = ref.watch(settingsProvider);
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     final isMobile = ResponsiveUtils.isMobile(context);
 
     return Scaffold(
@@ -458,7 +458,7 @@ class SettingsScreen extends ConsumerWidget {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF7A1E),
+              backgroundColor: AurisPalette.brand,
               foregroundColor: Colors.black,
             ),
             child: const Text('Limpiar Todo', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -528,7 +528,7 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
     
     return ListTile(
       leading: Icon(icon, color: primaryColor, size: 22),
@@ -557,12 +557,12 @@ class _OptionTile extends StatelessWidget {
       title: Text(
         label,
         style: TextStyle(
-          color: isSelected ? const Color(0xFFEF7A1E) : Colors.white,
+          color: isSelected ? AurisPalette.brand : Colors.white,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
       ),
       trailing: isSelected
-          ? const Icon(Icons.check_circle, color: Color(0xFFEF7A1E), size: 20)
+          ? const Icon(Icons.check_circle, color: AurisPalette.brand, size: 20)
           : null,
       onTap: onTap,
     );

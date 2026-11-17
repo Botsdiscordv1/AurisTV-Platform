@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:auris_core/core/config/brand_colors.dart';
 
 /// Modo de teclado: `text` (búsqueda, comportamiento histórico) o `url`
 /// (ingreso de URLs de listas M3U: añade las filas de símbolos :/ etc.).
@@ -198,7 +199,7 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
           decoration: BoxDecoration(
             color: highlighted
                 ? (widget.isActive && !_isFocused
-                    ? const Color(0xFFEF7A1E)
+                    ? AurisPalette.brand
                     : const Color(0xFFD9D9D9))
                 : const Color(0xFF1E1E1E),
             border: widget.border,

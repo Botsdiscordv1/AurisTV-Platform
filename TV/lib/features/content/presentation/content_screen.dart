@@ -1071,7 +1071,7 @@ class _ContentHeaderState extends ConsumerState<_ContentHeader> {
                                               alignment: Alignment.centerLeft,
                                               widthFactor: widget.latestHistory!.progress.clamp(0.0, 1.0),
                                               child: Container(
-                                                color: const Color(0xFFEF7A1E),
+                                                color: AurisPalette.brand,
                                               ),
                                             ),
                                           ),

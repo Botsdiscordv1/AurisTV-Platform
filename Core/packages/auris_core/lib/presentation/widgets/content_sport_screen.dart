@@ -224,7 +224,7 @@ class _ContentSportScreenState extends ConsumerState<ContentSportScreen> {
                     const SizedBox(height: 8),
                     Text(
                       event.teams.join(' vs '),
-                      style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 18, fontWeight: FontWeight.w600),
+                      style: const TextStyle(color: AurisPalette.brand, fontSize: 18, fontWeight: FontWeight.w600),
                     ),
                   ],
                   if (event.synopsis != null && event.synopsis!.isNotEmpty) ...[
@@ -249,7 +249,7 @@ class _ContentSportScreenState extends ConsumerState<ContentSportScreen> {
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 24.0),
                       child: Center(
-                        child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+                        child: CircularProgressIndicator(color: AurisPalette.brand),
                       ),
                     )
                   else if (event.channels.isEmpty)
@@ -288,7 +288,7 @@ class _ContentSportScreenState extends ConsumerState<ContentSportScreen> {
                             enabled: playable,
                             leading: CircleAvatar(
                               backgroundColor: playable
-                                  ? const Color(0xFFEF7A1E)
+                                  ? AurisPalette.brand
                                   : Colors.white24,
                               child: Icon(Icons.play_arrow,
                                   color: playable ? Colors.white : Colors.white38),

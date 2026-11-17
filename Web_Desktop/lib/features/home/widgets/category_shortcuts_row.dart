@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/utils/responsive_utils.dart';
+import 'package:auris_core/core/config/brand_colors.dart';
 
 class CategoryShortcutsRow extends StatelessWidget {
   final ValueChanged<String> onCategoryTap;
@@ -17,7 +18,7 @@ class CategoryShortcutsRow extends StatelessWidget {
     final horizontalPadding = ResponsiveUtils.horizontalPadding(context);
 
     final shortcuts = [
-      {'id': 'animes', 'label': 'Animes', 'icon': Icons.auto_awesome, 'color': const Color(0xFFEF7A1E)},
+      {'id': 'animes', 'label': 'Animes', 'icon': Icons.auto_awesome, 'color': AurisPalette.brand},
       {'id': 'películas', 'label': 'Cine', 'icon': Icons.movie_filter_rounded, 'color': const Color(0xFF2196F3)},
       {'id': 'series', 'label': 'Series', 'icon': Icons.tv_rounded, 'color': const Color(0xFF4CAF50)},
       {'id': 'kdrama', 'label': 'KDramas', 'icon': Icons.favorite_rounded, 'color': const Color(0xFFE91E63)},

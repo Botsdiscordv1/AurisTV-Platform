@@ -243,7 +243,7 @@ class _ContinueWatchingCardState extends ConsumerState<ContinueWatchingCard> {
 
   @override
   Widget build(BuildContext context) {
-    const brandOrange = Color(0xFFEF7A1E);
+    const brandOrange = AurisPalette.brand;
     const textPrimary = Color(0xFFF5F5F5);
     const progressTrack = Color(0xFF39393D);
     final isDesktopOrWeb = kIsWeb || MediaQuery.of(context).size.width >= 800;

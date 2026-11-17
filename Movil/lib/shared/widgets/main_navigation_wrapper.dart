@@ -126,7 +126,7 @@ class _RemoteMiniPlayer extends ConsumerWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEF7A1E).withOpacity(0.3)),
+          border: Border.all(color: AurisPalette.brand.withOpacity(0.3)),
           boxShadow: [
             BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 15, offset: const Offset(0, 4))
           ],
@@ -161,11 +161,11 @@ class _RemoteMiniPlayer extends ConsumerWidget {
                   ),
                   Row(
                     children: [
-                      AurisIcon(AurisIcons.cast, color: Color(0xFFEF7A1E), size: 10),
+                      AurisIcon(AurisIcons.cast, color: AurisPalette.brand, size: 10),
                       const SizedBox(width: 4),
                       Text(
                         'EN ${target.name.toUpperCase()}',
-                        style: const TextStyle(color: Color(0xFFEF7A1E), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                        style: const TextStyle(color: AurisPalette.brand, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                       ),
                     ],
                   ),

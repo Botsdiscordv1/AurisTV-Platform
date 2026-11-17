@@ -266,12 +266,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
                       color: const Color(0xFF1A1A1A),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white.withValues(alpha: 0.08),
+                        color: _isFocused ? AurisPalette.brand : Colors.white.withValues(alpha: 0.08),
                         width: _isFocused ? 1.8 : 1.5,
                       ),
                       boxShadow: _isFocused ? [
                         BoxShadow(
-                          color: const Color(0xFFEF7A1E).withValues(alpha: 0.12),
+                          color: AurisPalette.brand.withValues(alpha: 0.12),
                           blurRadius: 15,
                           spreadRadius: 2,
                         )
@@ -294,7 +294,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> with RouteAware {
                           child: Center(
                             child: AurisIcon(
                               AurisIcons.search, 
-                              color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white24, 
+                              color: _isFocused ? AurisPalette.brand : Colors.white24, 
                               size: 16,
                             ),
                           ),
@@ -552,7 +552,7 @@ class _SearchResultsGrid extends ConsumerWidget {
                       height: 28,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        color: Color(0xFFEF7A1E),
+                        color: AurisPalette.brand,
                       ),
                     ),
                   ),

@@ -41,7 +41,7 @@ class AurisBottomBar extends ConsumerWidget {
     {bool isProfile = false}
   ) {
     final bool isActive = currentIndex == index;
-    const primaryColor = Color(0xFFEF7A1E);
+    const primaryColor = AurisPalette.brand;
 
     return Expanded(
       child: InkWell(

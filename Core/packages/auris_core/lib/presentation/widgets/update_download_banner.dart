@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/providers.dart';
 import '../../data/services/app_update_service.dart';
 import 'app_update_dialog.dart';
+import '../../core/config/brand_colors.dart';
 
 /// Barra flotante que aparece cuando hay una actualización descargándose o ya
 /// lista, mientras el diálogo está oculto. Permite reabrir el diálogo,
@@ -92,7 +93,7 @@ class UpdateDownloadBanner extends ConsumerWidget {
             Row(
               children: [
                 const Icon(Icons.system_update,
-                    color: Color(0xFFEF7A1E), size: 20),
+                    color: AurisPalette.brand, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -121,7 +122,7 @@ class UpdateDownloadBanner extends ConsumerWidget {
                 minHeight: 5,
                 backgroundColor: Colors.white.withValues(alpha: 0.1),
                 valueColor:
-                    const AlwaysStoppedAnimation<Color>(Color(0xFFEF7A1E)),
+                    const AlwaysStoppedAnimation<Color>(AurisPalette.brand),
               ),
             ),
           ],
@@ -145,7 +146,7 @@ class UpdateDownloadBanner extends ConsumerWidget {
               icon: const Icon(Icons.install_mobile, size: 18),
               label: const Text('Instalar'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF7A1E),
+                backgroundColor: AurisPalette.brand,
                 foregroundColor: Colors.white,
               ),
             ),
@@ -171,7 +172,7 @@ class UpdateDownloadBanner extends ConsumerWidget {
                 if (asset != null) downloader.start(info, asset);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF7A1E),
+                backgroundColor: AurisPalette.brand,
                 foregroundColor: Colors.white,
               ),
               child: const Text('Reintentar'),

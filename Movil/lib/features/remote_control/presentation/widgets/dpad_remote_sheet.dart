@@ -83,7 +83,7 @@ class DpadRemoteSheet extends ConsumerWidget {
       orElse: () => target,
     );
 
-    const accent = Color(0xFFEF7A1E);
+    const accent = AurisPalette.brand;
     final String deviceName = activeDevice.name.isNotEmpty ? activeDevice.name : 'TV';
 
     return Container(
@@ -322,7 +322,7 @@ class _DpadDirectionButton extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        splashColor: const Color(0xFFEF7A1E).withOpacity(0.3),
+        splashColor: AurisPalette.brand.withOpacity(0.3),
         child: SizedBox(
           width: 56,
           height: 56,
@@ -405,7 +405,7 @@ class _MandoSquareButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const accent = Color(0xFFEF7A1E);
+    const accent = AurisPalette.brand;
 
     return Column(
       mainAxisSize: MainAxisSize.min,

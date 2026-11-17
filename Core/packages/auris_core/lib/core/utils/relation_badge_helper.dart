@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/brand_colors.dart';
 
 class RelationBadgeHelper {
   /// Extrae el badge contextual ideal para una relación.
@@ -62,7 +63,7 @@ class RelationBadgeHelper {
       return const Color(0xFF2563EB); // Azul real
     }
     if (b.contains('PEL')) {
-      return const Color(0xFFEF7A1E); // Naranja AurisTV
+      return AurisPalette.brand; // Naranja AurisTV
     }
     if (b == 'OVA' || b == 'ONA') {
       return const Color(0xFF8B5CF6); // Púrpura elegante

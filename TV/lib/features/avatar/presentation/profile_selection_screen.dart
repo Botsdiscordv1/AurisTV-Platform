@@ -74,7 +74,7 @@ class _ProfileSelectionScreenState
         backgroundColor: backgroundColor,
         body: Center(
           child: CircularProgressIndicator(
-            color: Color(0xFFEF7A1E),
+            color: AurisPalette.brand,
             strokeWidth: 2,
           ),
         ),

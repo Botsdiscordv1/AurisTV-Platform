@@ -5,6 +5,7 @@ export 'core/api/api_client.dart';
 export 'core/api/providers.dart';
 export 'core/api/image_policy.dart';
 export 'core/constants/auris_icons.dart';
+export 'core/config/brand_colors.dart';
 export 'core/config/playback_config.dart';
 export 'core/config/video_surface_config.dart';
 export 'core/config/image_config.dart';

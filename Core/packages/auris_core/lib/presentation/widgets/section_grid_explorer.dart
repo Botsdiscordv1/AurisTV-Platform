@@ -251,7 +251,7 @@ class _SectionGridExplorerState extends ConsumerState<SectionGridExplorer> {
         surfaceTintColor: Colors.transparent,
       ),
       body: state.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+        loading: () => const Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
         error: (err, __) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),

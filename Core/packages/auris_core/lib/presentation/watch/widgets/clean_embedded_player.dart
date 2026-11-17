@@ -11,6 +11,7 @@ import 'package:auris_core/auris_core.dart';
 import 'ambient_glow.dart';
 import '../ambient_video_provider.dart';
 import '../../../core/utils/video_ambient.dart';
+import 'package:auris_core/core/config/brand_colors.dart';
 
 enum SettingsView { main, speed, sleepTimer, quality }
 
@@ -123,6 +124,8 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
   bool _isPlaying = false;
   bool _isCompleted = false;
   bool _isBuffering = false;
+  bool _isDraggingSlider = false;
+  double _dragPositionSeconds = 0.0;
   bool _hasLoadedFirstFrame = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -267,18 +270,20 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     _posSub?.cancel();
     _posSub = player.stream.position.listen((pos) {
       if (!mounted) return;
-      setState(() {
-        _position = pos;
-        if (pos.inMilliseconds > 0) _hasLoadedFirstFrame = true;
+      if (!_isDraggingSlider) {
+        setState(() {
+          _position = pos;
+          if (pos.inMilliseconds > 0) _hasLoadedFirstFrame = true;
 
-        if (_duration > Duration.zero) {
-          if (pos >= _duration - const Duration(milliseconds: 500)) {
-            _isCompleted = true;
-          } else if (pos < _duration - const Duration(seconds: 1) && _isCompleted) {
-            _isCompleted = false;
+          if (_duration > Duration.zero) {
+            if (pos >= _duration - const Duration(milliseconds: 500)) {
+              _isCompleted = true;
+            } else if (pos < _duration - const Duration(seconds: 1) && _isCompleted) {
+              _isCompleted = false;
+            }
           }
-        }
-      });
+        });
+      }
 
       if (!_resumeApplied && _pendingResumeMs > 3000) {
         final dur = player.state.duration;
@@ -808,7 +813,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                       child: Container(
                         color: Colors.black,
                         child: const Center(
-                          child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+                          child: CircularProgressIndicator(color: AurisPalette.brand),
                         ),
                       ),
                     )
@@ -947,31 +952,44 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                             // 8 px entre el timeline y las cápsulas (referencia de
                             // YouTube en el watch: unified_seek_player_edge_padding).
                             padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                            child: SliderTheme(
-                              data: SliderThemeData(
+                            child: _HoverableTimeline(
+                              sliderTheme: const SliderThemeData(
                                 trackHeight: 4.5,
-                                trackShape: _YouTubeSliderTrackShape(
-                                  buffer: _bufferProgress,
-                                  duration: _duration,
-                                ),
-                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8.0),
-                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 0.0),
-                                activeTrackColor: const Color(0xFFFF0033),
+                                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8.0),
+                                overlayShape: RoundSliderOverlayShape(overlayRadius: 0.0),
+                                activeTrackColor: AurisPalette.brand,
                                 inactiveTrackColor: Colors.transparent,
-                                thumbColor: const Color(0xFFFF0033),
+                                thumbColor: AurisPalette.brand,
                                 overlayColor: Colors.transparent,
                               ),
-                              child: Slider(
-                                value: _position.inSeconds.toDouble().clamp(
-                                      0.0,
-                                      (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
-                                    ),
-                                max: (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
-                                onChanged: (value) {
-                                  player?.seek(Duration(seconds: value.toInt()));
-                                  _startHideTimer();
-                                },
-                              ),
+                              value: _isDraggingSlider
+                                  ? _dragPositionSeconds.clamp(0.0, (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble())
+                                  : _position.inSeconds.toDouble().clamp(
+                                        0.0,
+                                        (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
+                                      ),
+                              max: (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
+                              buffer: _bufferProgress,
+                              duration: _duration,
+                              onChangeStart: (value) {
+                                setState(() {
+                                  _isDraggingSlider = true;
+                                  _dragPositionSeconds = value;
+                                });
+                              },
+                              onChanged: (value) {
+                                setState(() {
+                                  _dragPositionSeconds = value;
+                                });
+                                _startHideTimer();
+                              },
+                              onChangeEnd: (value) {
+                                player?.seek(Duration(seconds: value.toInt()));
+                                setState(() {
+                                  _isDraggingSlider = false;
+                                });
+                                _startHideTimer();
+                              },
                             ),
                           ),
                           
@@ -1406,7 +1424,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                                   child: Container(
                                                     padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
                                                     decoration: BoxDecoration(
-                                                      color: const Color(0xFFFF0033),
+                                                      color: AurisPalette.brand,
                                                       borderRadius: BorderRadius.circular(2),
                                                     ),
                                                     child: const Text(
@@ -1526,7 +1544,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                               const SizedBox(width: 6),
                               AurisIcon(
                                 AurisIcons.fastForwardFilled,
-                                color: const Color(0xFFEF7A1E),
+                                color: AurisPalette.brand,
                                 size: 16,
                               ),
                             ],
@@ -1682,13 +1700,16 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                     title: 'Iluminación cinematográfica',
                     trailing: SizedBox(
                       height: 24,
-                      child: Switch.adaptive(
-                        value: _isAmbientLightingEnabled,
-                        activeColor: const Color(0xFFFF0033),
-                        onChanged: (val) {
-                          setState(() => _isAmbientLightingEnabled = val);
-                          widget.onAmbientLightingToggle?.call(val);
-                        },
+                      child: Transform.scale(
+                        scale: 0.75,
+                        child: Switch.adaptive(
+                          value: _isAmbientLightingEnabled,
+                          activeColor: AurisPalette.brand,
+                          onChanged: (val) {
+                            setState(() => _isAmbientLightingEnabled = val);
+                            widget.onAmbientLightingToggle?.call(val);
+                          },
+                        ),
                       ),
                     ),
                   ),
@@ -1945,14 +1966,14 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
               child: Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFFFF0033) : Colors.white,
+                  color: isSelected ? AurisPalette.brand : Colors.white,
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_rounded, color: Color(0xFFFF0033), size: 18),
+              const Icon(Icons.check_rounded, color: AurisPalette.brand, size: 18),
           ],
         ),
       ),
@@ -2178,8 +2199,13 @@ class _YouTubeVolumeSliderState extends State<_YouTubeVolumeSlider> {
 class _YouTubeSliderTrackShape extends RoundedRectSliderTrackShape {
   final Duration buffer;
   final Duration duration;
+  final double? hoverFraction;
 
-  _YouTubeSliderTrackShape({required this.buffer, required this.duration});
+  _YouTubeSliderTrackShape({
+    required this.buffer,
+    required this.duration,
+    this.hoverFraction,
+  });
 
   @override
   Rect getPreferredRect({
@@ -2227,7 +2253,7 @@ class _YouTubeSliderTrackShape extends RoundedRectSliderTrackShape {
       ..style = PaintingStyle.fill;
 
     final Paint activePaint = Paint()
-      ..color = sliderTheme.activeTrackColor ?? const Color(0xFFFF0033)
+      ..color = sliderTheme.activeTrackColor ?? AurisPalette.brand
       ..style = PaintingStyle.fill;
 
     final double trackHeight = sliderTheme.trackHeight ?? 4.5;
@@ -2267,5 +2293,91 @@ class _YouTubeSliderTrackShape extends RoundedRectSliderTrackShape {
       );
       context.canvas.drawRRect(RRect.fromRectAndRadius(activeRect, radius), activePaint);
     }
+
+    // 4. Hover Preview track (painted after active track up to mouse cursor)
+    if (hoverFraction != null) {
+      final double hoverWidth = trackRect.width * hoverFraction!;
+      if (hoverWidth > activeWidth) {
+        final Paint previewPaint = Paint()
+          ..color = Colors.white.withValues(alpha: 0.60)
+          ..style = PaintingStyle.fill;
+        final Rect previewRect = Rect.fromLTWH(
+          trackRect.left + activeWidth,
+          trackRect.top + (trackRect.height - trackHeight) / 2,
+          (hoverWidth - activeWidth).clamp(0.0, trackRect.width - activeWidth),
+          trackHeight,
+        );
+        context.canvas.drawRRect(RRect.fromRectAndRadius(previewRect, radius), previewPaint);
+      }
+    }
+  }
+}
+
+class _HoverableTimeline extends StatefulWidget {
+  final SliderThemeData sliderTheme;
+  final double value;
+  final double max;
+  final Duration buffer;
+  final Duration duration;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onChangeStart;
+  final ValueChanged<double> onChangeEnd;
+
+  const _HoverableTimeline({
+    required this.sliderTheme,
+    required this.value,
+    required this.max,
+    required this.buffer,
+    required this.duration,
+    required this.onChanged,
+    required this.onChangeStart,
+    required this.onChangeEnd,
+  });
+
+  @override
+  State<_HoverableTimeline> createState() => _HoverableTimelineState();
+}
+
+class _HoverableTimelineState extends State<_HoverableTimeline> {
+  double? _hoverFraction;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return MouseRegion(
+          onHover: (event) {
+            final double localX = event.localPosition.dx;
+            final double width = constraints.maxWidth;
+            if (width > 0) {
+              setState(() {
+                _hoverFraction = (localX / width).clamp(0.0, 1.0);
+              });
+            }
+          },
+          onExit: (_) {
+            setState(() {
+              _hoverFraction = null;
+            });
+          },
+          child: SliderTheme(
+            data: widget.sliderTheme.copyWith(
+              trackShape: _YouTubeSliderTrackShape(
+                buffer: widget.buffer,
+                duration: widget.duration,
+                hoverFraction: _hoverFraction,
+              ),
+            ),
+            child: Slider(
+              value: widget.value,
+              max: widget.max,
+              onChangeStart: widget.onChangeStart,
+              onChanged: widget.onChanged,
+              onChangeEnd: widget.onChangeEnd,
+            ),
+          ),
+        );
+      },
+    );
   }
 }

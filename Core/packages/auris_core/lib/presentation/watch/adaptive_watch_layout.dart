@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'widgets/ambient_glow.dart';
+import '../../core/config/brand_colors.dart';
 
 /// Layout Adaptativo Responsivo para la WatchScreen (Estilo Web Desktop y Móvil).
 ///
@@ -121,7 +122,7 @@ class AdaptiveWatchLayout extends StatelessWidget {
                                               ? []
                                               : [
                                                   BoxShadow(
-                                                    color: const Color(0xFFEF7A1E).withValues(alpha: 0.10),
+                                                    color: AurisPalette.brand.withValues(alpha: 0.10),
                                                     blurRadius: 24,
                                                     spreadRadius: 2,
                                                   ),

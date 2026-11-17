@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/config/brand_colors.dart';
 
 /// Barra Superior de Navegación (TopBar) para la WatchScreen (Estilo Web Desktop).
 ///
@@ -146,7 +147,7 @@ class WatchTopBar extends StatelessWidget {
                   child: Text(
                     mainTitle,
                     style: const TextStyle(
-                      color: Color(0xFFEF7A1E),
+                      color: AurisPalette.brand,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/config/brand_colors.dart';
 
 /// Un badge para mostrar el número de temporada (S2, S3, etc.)
 /// en la esquina de las tarjetas de búsqueda.
@@ -18,7 +19,7 @@ class SeasonBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (season <= 1) return const SizedBox.shrink();
 
-    final brandOrange = const Color(0xFFEF7A1E);
+    final brandOrange = AurisPalette.brand;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

@@ -12,7 +12,7 @@ Color _colorFromString(String s) {
   final hash = s.codeUnits.fold<int>(0, (h, c) => h * 31 + c);
   // Paleta AurisTV: Naranjas, Grises Pro y Azules Cine
   const colors = [
-    Color(0xFFEF7A1E), // Brand Orange
+    AurisPalette.brand, // Brand Orange
     Color(0xFF2A2A2A), // Deep Grey
     Color(0xFF1E1E26), // Blue Tint Grey
     Color(0xFF3D1D0A), // Dark Orange

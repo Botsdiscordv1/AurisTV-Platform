@@ -171,7 +171,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       color: const Color(0xFF1A1A1A),
                       borderRadius: BorderRadius.zero,
                       border: Border.all(
-                        color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white38,
+                        color: _isFocused ? AurisPalette.brand : Colors.white38,
                         width: _isFocused ? 2.5 : 1.5,
                       ),
                     ),
@@ -179,7 +179,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       children: [
                         const SizedBox(width: 20),
                         Icon(Icons.search_rounded, 
-                            color: _isFocused ? const Color(0xFFEF7A1E) : Colors.white70, 
+                            color: _isFocused ? AurisPalette.brand : Colors.white70, 
                             size: 24),
                         const SizedBox(width: 16),
                         Expanded(
@@ -268,11 +268,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: _isListening ? const Color(0xFFEF7A1E).withOpacity(0.25) : Colors.transparent,
+            color: _isListening ? AurisPalette.brand.withOpacity(0.25) : Colors.transparent,
           ),
           child: Icon(
             _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-            color: _isListening ? const Color(0xFFEF7A1E) : Colors.white70,
+            color: _isListening ? AurisPalette.brand : Colors.white70,
             size: 24,
           ),
         ),
@@ -323,7 +323,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     height: 28,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: Color(0xFFEF7A1E),
+                      color: AurisPalette.brand,
                     ),
                   ),
                 ),
@@ -366,7 +366,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         );
       },
       loading: () => const Center(
-        child: CircularProgressIndicator(color: Color(0xFFEF7A1E)),
+        child: CircularProgressIndicator(color: AurisPalette.brand),
       ),
       error: (err, _) => Center(
         key: const ValueKey('search_error'),
@@ -427,7 +427,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+      loading: () => const Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
       error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white24))),
     );
   }

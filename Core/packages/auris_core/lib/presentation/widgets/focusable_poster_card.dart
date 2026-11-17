@@ -8,9 +8,9 @@ import 'marquee_text.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 Color _colorFromString(String s) {
-  if (s.isEmpty) return const Color(0xFFEF7A1E);
+  if (s.isEmpty) return AurisPalette.brand;
   const colors = [
-    Color(0xFFEF7A1E), // Brand Orange
+    AurisPalette.brand, // Brand Orange
     Color(0xFF2A2A2A), // Deep Grey
     Color(0xFF1E1E26), // Blue Tint Grey
     Color(0xFF3D1D0A), // Dark Orange
@@ -559,8 +559,8 @@ class _FocusablePosterCardState extends ConsumerState<FocusablePosterCard> {
                                               widthFactor: widget.progress!.clamp(0.0, 1.0),
                                               child: Container(
                                                 decoration: const BoxDecoration(
-                                                  color: Color(0xFFEF7A1E),
-                                                  boxShadow: [BoxShadow(color: Color(0xFFEF7A1E), blurRadius: 4)],
+                                                  color: AurisPalette.brand,
+                                                  boxShadow: [BoxShadow(color: AurisPalette.brand, blurRadius: 4)],
                                                 ),
                                               ),
                                             ),

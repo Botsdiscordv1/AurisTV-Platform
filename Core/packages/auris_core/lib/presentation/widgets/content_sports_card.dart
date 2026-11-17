@@ -38,9 +38,9 @@ class _ContentSportsCardState extends State<ContentSportsCard> {
           active: focused,
           // Acento propio de esta tarjeta: anillo y glow naranjas como antes,
           // pero con la geometría/movimiento Disney+ (1.03, radio 8, 300ms).
-          ringColor: const Color(0xFFEF7A1E),
-          activeShadow: const [
-            BoxShadow(color: Color(0x66EF7A1E), blurRadius: 12, spreadRadius: 2),
+          ringColor: AurisPalette.brand,
+          activeShadow: [
+            BoxShadow(color: AurisPalette.brand.withValues(alpha: 0.4), blurRadius: 12, spreadRadius: 2),
           ],
           child: ClipRRect(
             borderRadius: BorderRadius.circular(DisneyFocusTokens.radius),

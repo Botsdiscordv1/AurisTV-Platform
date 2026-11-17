@@ -504,7 +504,7 @@ class _FocusableWideCardState extends ConsumerState<FocusableWideCard> {
                                       child: FractionallySizedBox(
                                         alignment: Alignment.centerLeft,
                                         widthFactor: widget.progress!.clamp(0.0, 1.0),
-                                        child: Container(decoration: const BoxDecoration(color: Color(0xFFEF7A1E), boxShadow: [BoxShadow(color: Color(0xFFEF7A1E), blurRadius: 4)])),
+                                        child: Container(decoration: const BoxDecoration(color: AurisPalette.brand, boxShadow: [BoxShadow(color: AurisPalette.brand, blurRadius: 4)])),
                                       ),
                                     ),
                                   ),
