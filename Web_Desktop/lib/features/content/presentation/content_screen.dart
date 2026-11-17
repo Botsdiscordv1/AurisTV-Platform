@@ -259,14 +259,14 @@ class _CastCardState extends ConsumerState<_CastCard> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: _isHovered
-                          ? const Color(0xFFEF7A1E).withOpacity(0.8)
+                          ? AurisPalette.brand.withOpacity(0.8)
                           : Colors.white.withOpacity(0.1),
                       width: 2.5,
                     ),
                     boxShadow: [
                       BoxShadow(
                         color: _isHovered
-                            ? const Color(0xFFEF7A1E).withOpacity(0.3)
+                            ? AurisPalette.brand.withOpacity(0.3)
                             : Colors.black.withOpacity(0.4),
                         blurRadius: _isHovered ? 16 : 12,
                         spreadRadius: _isHovered ? 2 : 1,
@@ -305,7 +305,7 @@ class _CastCardState extends ConsumerState<_CastCard> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: _isHovered ? const Color(0xFFEF7A1E) : Colors.white,
+                color: _isHovered ? AurisPalette.brand : Colors.white,
                 fontWeight: FontWeight.w700,
                 fontSize: 14,
                 letterSpacing: -0.2,
@@ -567,7 +567,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                                         child: FractionallySizedBox(
                                           alignment: Alignment.centerLeft,
                                           widthFactor: widget.progress,
-                                          child: Container(color: const Color(0xFFEF7A1E)),
+                                          child: Container(color: AurisPalette.brand),
                                         ),
                                       ),
                                     ),
@@ -608,7 +608,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                                           },
                                           child: RawScrollbar(
                                             controller: _synopsisScrollController,
-                                            thumbColor: const Color(0xFFEF7A1E).withOpacity(0.4),
+                                            thumbColor: AurisPalette.brand.withOpacity(0.4),
                                             radius: const Radius.circular(20),
                                             thickness: 3,
                                             thumbVisibility: true,
@@ -770,7 +770,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                                 child: FractionallySizedBox(
                                   alignment: Alignment.centerLeft,
                                   widthFactor: widget.progress,
-                                  child: Container(color: const Color(0xFFEF7A1E)),
+                                  child: Container(color: AurisPalette.brand),
                                 ),
                               ),
                             ),
@@ -900,7 +900,7 @@ class _EpisodeCardState extends ConsumerState<_EpisodeCard> {
                           child: FractionallySizedBox(
                             alignment: Alignment.centerLeft,
                             widthFactor: widget.progress,
-                            child: Container(color: const Color(0xFFEF7A1E)),
+                            child: Container(color: AurisPalette.brand),
                           ),
                         ),
                       ),
@@ -1303,7 +1303,7 @@ class _CastCreditsModal extends ConsumerWidget {
                         Text(
                           'Filmografía',
                           style: TextStyle(
-                            color: const Color(0xFFEF7A1E),
+                            color: AurisPalette.brand,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.5,
@@ -1449,7 +1449,7 @@ class _CastCreditsModal extends ConsumerWidget {
                     ],
                   );
                 },
-                loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFEF7A1E))),
+                loading: () => const Center(child: CircularProgressIndicator(color: AurisPalette.brand)),
                 error: (err, _) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white54))),
               ),
             ),
@@ -1466,7 +1466,7 @@ class _CastCreditsModal extends ConsumerWidget {
         Text(
           label.toUpperCase(),
           style: TextStyle(
-            color: const Color(0xFFEF7A1E),
+            color: AurisPalette.brand,
             fontSize: 11,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.2,
@@ -1744,12 +1744,38 @@ class _ContentScreenState extends ConsumerState<ContentScreen> with WidgetsBindi
     final String key = (widget.title.isNotEmpty ? widget.title : widget.url).trim().toLowerCase();
     final cached = _discoveredSourcesMemoryCache[key];
     if (cached != null && cached.isNotEmpty) {
-      if (widget.result != null && !cached.any((s) => s.source == widget.result!.source && s.url == widget.result!.url)) {
-        return List.unmodifiable([...cached, widget.result!]);
+      if (widget.result != null) {
+        final idx = cached.indexWhere((s) => s.source == widget.result!.source && s.url == widget.result!.url);
+        if (idx >= 0) {
+          // Senior Fix: merge nested sources from widget.result (schedule) into
+          // the cached entry, so sources that were lost in a previous (stale)
+          // cache are recovered instead of being silently dropped.
+          final cachedEntry = cached[idx];
+          final mergedSources = List<SourceItem>.from(cachedEntry.sources);
+          for (final s in widget.result!.sources) {
+            if (!mergedSources.any((x) => x.source == s.source && x.url == s.url)) {
+              mergedSources.add(s);
+            }
+          }
+          if (mergedSources.length > cachedEntry.sources.length) {
+            final merged = List<SearchResult>.from(cached);
+            merged[idx] = cachedEntry.copyWith(sources: mergedSources);
+            _discoveredSourcesMemoryCache[key] = merged;
+            return List.unmodifiable(merged);
+          }
+          return List.unmodifiable(cached);
+        }
+        final merged = List<SearchResult>.from(cached)..add(widget.result!);
+        _discoveredSourcesMemoryCache[key] = merged;
+        return List.unmodifiable(merged);
       }
       return List.unmodifiable(cached);
     }
-    return widget.result != null ? List.unmodifiable([widget.result!]) : null;
+    if (widget.result != null) {
+      _discoveredSourcesMemoryCache[key] = [widget.result!];
+      return List.unmodifiable([widget.result!]);
+    }
+    return null;
   }
 
   Widget _buildEpisodesSkeleton(BuildContext context, bool isMobile) {
@@ -2387,7 +2413,7 @@ void _openPlayer(PlayerScreen player) {
             height: fixedH,
             child: RawScrollbar(
               controller: _synopsisScrollController,
-              thumbColor: const Color(0xFFEF7A1E).withOpacity(0.4),
+              thumbColor: AurisPalette.brand.withOpacity(0.4),
               radius: const Radius.circular(20),
               thickness: 3,
               thumbVisibility: true,
@@ -2432,7 +2458,7 @@ void _openPlayer(PlayerScreen player) {
                   child: Text(
                     'Ver más...',
                     style: TextStyle(
-                      color: const Color(0xFFEF7A1E),
+                      color: AurisPalette.brand,
                       fontWeight: FontWeight.bold,
                       fontSize: isCompact ? 14 : 16,
                     ),
@@ -2447,7 +2473,7 @@ void _openPlayer(PlayerScreen player) {
                   child: Text(
                     'Ver menos',
                     style: TextStyle(
-                      color: const Color(0xFFEF7A1E).withOpacity(0.7),
+                      color: AurisPalette.brand.withOpacity(0.7),
                       fontWeight: FontWeight.bold,
                       fontSize: isCompact ? 14 : 16,
                     ),
@@ -2627,7 +2653,7 @@ void _openPlayer(PlayerScreen player) {
             widthFactor: progress,
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFEF7A1E),
+                color: AurisPalette.brand,
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -3436,7 +3462,7 @@ void _openPlayer(PlayerScreen player) {
                 onSourceSelected: (index) => ref.setSource(detailParams, activeSources[index]),
                 compact: true,
                 unavailableSources: null,
-                season: widget.year,
+                season: currentSeason,
                 width: 140,
               ),
           ],
@@ -3843,7 +3869,7 @@ void _openPlayer(PlayerScreen player) {
                                             width: selectorWidth,
                                             height: selectorH,
                                             fontSize: selectorFontSize,
-                                            season: widget.year,
+                                            season: currentSeason,
                                           ),
                                         ),
                                     ],
@@ -4405,7 +4431,7 @@ void _openPlayer(PlayerScreen player) {
               title: character.name,
               subtitle: voiceActor?.name,
               label: roleLabel,
-              labelColor: (role == 'main') ? const Color(0xFFEF7A1E) : Colors.white24,
+              labelColor: (role == 'main') ? AurisPalette.brand : Colors.white24,
               width: width,
             );
           },
@@ -5082,10 +5108,10 @@ class _GalleryFilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEF7A1E) : Colors.white10,
+          color: selected ? AurisPalette.brand : Colors.white10,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? const Color(0xFFEF7A1E) : Colors.white24,
+            color: selected ? AurisPalette.brand : Colors.white24,
             width: 1,
           ),
         ),
@@ -5152,11 +5178,11 @@ class _GalleryItemState extends State<_GalleryItem> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: (!isMobile && _isHovered) ? const Color(0xFFEF7A1E) : Colors.white10,
+                  color: (!isMobile && _isHovered) ? AurisPalette.brand : Colors.white10,
                   width: 2,
                 ),
                 boxShadow: (!isMobile && _isHovered) 
-                    ? [BoxShadow(color: const Color(0xFFEF7A1E).withOpacity(0.3), blurRadius: 10, spreadRadius: 2)] 
+                    ? [BoxShadow(color: AurisPalette.brand.withOpacity(0.3), blurRadius: 10, spreadRadius: 2)] 
                     : [],
               ),
               child: ClipRRect(
