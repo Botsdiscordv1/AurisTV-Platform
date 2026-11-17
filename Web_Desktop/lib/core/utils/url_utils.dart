@@ -68,6 +68,8 @@ class UrlUtils {
         'bannerUrl': player.bannerUrl!,
       if (player.logoUrl != null && player.logoUrl!.isNotEmpty)
         'logoUrl': player.logoUrl!,
+      if (player.video720 != null && player.video720!.isNotEmpty) 'video720': player.video720!,
+      if (player.video1080 != null && player.video1080!.isNotEmpty) 'video1080': player.video1080!,
     };
 
     try {

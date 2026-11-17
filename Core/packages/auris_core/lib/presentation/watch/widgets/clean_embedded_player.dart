@@ -56,10 +56,14 @@ class CleanEmbeddedPlayer extends ConsumerStatefulWidget {
     this.cinematicAmbient = false,
     this.onBack,
     this.showBackButton,
+    this.video720,
+    this.video1080,
   });
 
   final VoidCallback? onBack;
   final bool? showBackButton;
+  final String? video720;
+  final String? video1080;
 
   final String sourceUrl;
   final String source;
@@ -117,8 +121,8 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
 
   bool _showControls = false;
   bool _isPlaying = false;
-  // ignore: unused_field
-  bool _isBuffering = true;
+  bool _isCompleted = false;
+  bool _isBuffering = false;
   bool _hasLoadedFirstFrame = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -223,13 +227,29 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     _loadSource();
   }
 
+  void _handlePlayReplay(Player? player) {
+    if (_isCompleted) {
+      player?.seek(Duration.zero);
+      player?.play();
+      setState(() => _isCompleted = false);
+    } else if (_isPlaying) {
+      player?.pause();
+    } else {
+      player?.play();
+    }
+    _startHideTimer();
+  }
+
   void _setupListeners(Player player) {
     _playSub?.cancel();
     _playSub = player.stream.playing.listen((playing) {
       if (mounted) {
         setState(() {
           _isPlaying = playing;
-          if (playing) _hasLoadedFirstFrame = true;
+          if (playing) {
+            _hasLoadedFirstFrame = true;
+            _isCompleted = false;
+          }
         });
       }
     });
@@ -250,6 +270,14 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
       setState(() {
         _position = pos;
         if (pos.inMilliseconds > 0) _hasLoadedFirstFrame = true;
+
+        if (_duration > Duration.zero) {
+          if (pos >= _duration - const Duration(milliseconds: 500)) {
+            _isCompleted = true;
+          } else if (pos < _duration - const Duration(seconds: 1) && _isCompleted) {
+            _isCompleted = false;
+          }
+        }
       });
 
       if (!_resumeApplied && _pendingResumeMs > 3000) {
@@ -280,6 +308,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
 
     _compSub?.cancel();
     _compSub = player.stream.completed.listen((completed) {
+      if (mounted) setState(() => _isCompleted = completed);
       if (completed && widget.onEpisodeEnd != null) {
         widget.onEpisodeEnd!();
       }
@@ -328,7 +357,23 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     });
 
     _masterStreamUrl = widget.sourceUrl;
-    _parseHlsVariantsIfNeeded(widget.sourceUrl, widget.headers);
+    final bool isOpEd = widget.source == 'Themes' || widget.sourceUrl.contains('animethemes.moe') || widget.video720 != null || widget.video1080 != null;
+    if (isOpEd) {
+      final List<QualityOption> opEdQualities = [];
+      if (widget.video1080 != null && widget.video1080!.isNotEmpty) {
+        opEdQualities.add(QualityOption(key: '1080', label: '1080p FHD', url: widget.video1080!));
+      }
+      if (widget.video720 != null && widget.video720!.isNotEmpty) {
+        opEdQualities.add(QualityOption(key: '720', label: '720p HD', url: widget.video720!));
+      }
+      if (mounted) {
+        setState(() {
+          _discoveredQualities = opEdQualities;
+        });
+      }
+    } else {
+      _parseHlsVariantsIfNeeded(widget.sourceUrl, widget.headers);
+    }
 
     await notifier.play(
       item: MediaItem(
@@ -410,8 +455,12 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     String? targetUrl;
     Map<String, String> targetHeaders = widget.headers;
 
+    final bool isOpEd = widget.source == 'Themes' || widget.sourceUrl.contains('animethemes.moe') || widget.video720 != null || widget.video1080 != null;
+
     if (qualityKey == 'auto') {
       targetUrl = _masterStreamUrl ?? widget.sourceUrl;
+    } else if (isOpEd) {
+      targetUrl = qualityKey == '720' ? widget.video720 : qualityKey == '1080' ? widget.video1080 : null;
     } else {
       final match = _discoveredQualities.firstWhereOrNull((q) => q.key == qualityKey);
       if (match != null) {
@@ -717,11 +766,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
           onTap: () {
             if (_isHolding2x) return;
             if (!isInitialLoading) {
-              if (_isPlaying) {
-                player?.pause();
-              } else {
-                player?.play();
-              }
+              _handlePlayReplay(player);
               _toggleControls();
             }
           },
@@ -855,17 +900,12 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                               // Play / Pause Button
                               IconButton(
                                 onPressed: () {
-                                  if (_isPlaying) {
-                                    player?.pause();
-                                  } else {
-                                    player?.play();
-                                  }
-                                  _startHideTimer();
+                                  _handlePlayReplay(player);
                                 },
-                                icon: Icon(
-                                  _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                icon: AurisIcon(
+                                  _isCompleted ? AurisIcons.ytReplay : (_isPlaying ? AurisIcons.pause : AurisIcons.play),
                                   color: Colors.white,
-                                  size: 44,
+                                  size: _isCompleted ? 52 : 38,
                                 ),
                                 style: IconButton.styleFrom(
                                   backgroundColor: Colors.black.withValues(alpha: 0.50),
@@ -967,12 +1007,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                             clipBehavior: Clip.antiAlias,
                                             child: InkWell(
                                               onTap: () {
-                                                if (_isPlaying) {
-                                                  player?.pause();
-                                                } else {
-                                                  player?.play();
-                                                }
-                                                _startHideTimer();
+                                                _handlePlayReplay(player);
                                               },
                                               hoverColor: Colors.white.withValues(alpha: 0.08),
                                               child: SizedBox(
@@ -980,9 +1015,9 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                                 height: 32,
                                                 child: Center(
                                                   child: AurisIcon(
-                                                    _isPlaying ? AurisIcons.pause : AurisIcons.play,
+                                                    _isCompleted ? AurisIcons.ytReplay : (_isPlaying ? AurisIcons.pause : AurisIcons.play),
                                                     color: Colors.white,
-                                                    size: 22,
+                                                    size: _isCompleted ? 30 : 22,
                                                   ),
                                                 ),
                                               ),

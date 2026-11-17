@@ -148,6 +148,8 @@ Widget _buildWatchScreenFromToken(BuildContext context, GoRouterState state) {
           certification: params['certification'] ?? payload?['certification'],
           skipResume: params['skipResume'] == '1' || payload?['skipResume'] == true,
           isLive: params['isLive'] == '1' || payload?['isLive'] == true,
+          video720: params['video720'] ?? payload?['video720'],
+          video1080: params['video1080'] ?? payload?['video1080'],
         );
 
   // Si el token es válido pero faltan datos críticos, rechazar
@@ -191,6 +193,8 @@ Widget _buildWatchScreenFromToken(BuildContext context, GoRouterState state) {
     totalEpisodes: player.totalEpisodes,
     skipResume: player.skipResume,
     isLive: player.isLive,
+    video720: player.video720,
+    video1080: player.video1080,
     onEpisodeSelected: (ep) {
       final targetUrl = ep.url.isNotEmpty
           ? ep.url

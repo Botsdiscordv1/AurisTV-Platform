@@ -39,6 +39,8 @@ class WatchScreen extends ConsumerStatefulWidget {
     this.onNextEpisode,
     this.onPreviousEpisode,
     this.onEpisodeSelected,
+    this.video720,
+    this.video1080,
   });
 
   final String contentId;
@@ -65,6 +67,8 @@ class WatchScreen extends ConsumerStatefulWidget {
   final VoidCallback? onNextEpisode;
   final VoidCallback? onPreviousEpisode;
   final ValueChanged<EpisodeInfo>? onEpisodeSelected;
+  final String? video720;
+  final String? video1080;
 
   @override
   ConsumerState<WatchScreen> createState() => _WatchScreenState();
@@ -287,6 +291,8 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
           setState(() => _isAmbientLightingEnabled = val),
       onBack: _isFullscreen ? _toggleFullscreen : _handleBackToContent,
       showBackButton: _isFullscreen ? true : null,
+      video720: widget.video720,
+      video1080: widget.video1080,
     );
 
     return Stack(

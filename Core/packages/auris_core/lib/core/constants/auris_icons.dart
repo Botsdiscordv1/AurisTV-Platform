@@ -44,6 +44,7 @@ class AurisIcons {
   static String get restart => _ytReplay;
   static String get repeat => _ytReplay;
   static String get rotateLeft => _ytReplay;
+  static String get ytReplay => _ytReplay;
 
   static String get forwardStep => _ytNext;
   static String get backwardStep => _ytPrev;
