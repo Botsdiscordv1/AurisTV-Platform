@@ -272,6 +272,12 @@ class ApiEndpoints {
   }) {
     if (url == null || url.isEmpty) return '';
 
+    // Si la imagen ya viene proxieda por nuestro servidor backend (/api/proxy/image),
+    // se respeta directamente sin desenvolver ni reproxiar por weserv.nl para evitar retrasos masivos.
+    if (url.contains('/api/proxy/image')) {
+      return fixUrl(url);
+    }
+
     String workingUrl = url;
     
     // Si hay una política, ella manda sobre los parámetros manuales

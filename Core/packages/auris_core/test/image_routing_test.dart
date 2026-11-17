@@ -27,14 +27,10 @@ void main() {
     expect(out.contains('api/proxy/image'), false);
   });
 
-  test('nested proxy url unwraps without double-proxy', () {
-    final out = ApiEndpoints.proxyImage(
-        'https://anime.auristv.dpdns.org/api/proxy/image?url=https%3A%2F%2Fcdn.animeav1.com%2Fs%2F1.jpg');
-    expect(out.contains('images.weserv.nl'), true);
-    // Sin URL anidada literal (el 'url=https' del query de weserv no cuenta).
-    expect(out.contains('/api/proxy/image?url=http'), false);
-    final err = Uri.parse(out).queryParameters['errorredirect'] ?? '';
-    expect(err.contains('/api/proxy/image?url='), true);
-    expect(err.contains('weserv'), false);
+  test('nested proxy url from backend is preserved directly without weserv', () {
+    const input = 'https://anime.auristv.dpdns.org/api/proxy/image?url=https%3A%2F%2Fcdn.animeav1.com%2Fs%2F1.jpg';
+    final out = ApiEndpoints.proxyImage(input);
+    expect(out, input);
+    expect(out.contains('weserv.nl'), false);
   });
 }
