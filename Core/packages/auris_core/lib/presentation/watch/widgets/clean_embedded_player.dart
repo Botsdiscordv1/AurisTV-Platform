@@ -759,6 +759,49 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
         widget.sourceUrl.contains('animethemes.moe');
     final bool isTabletOrMobile = MediaQuery.sizeOf(context).width < 1024;
 
+    final Widget timelineWidget = Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+      child: _HoverableTimeline(
+        sliderTheme: const SliderThemeData(
+          trackHeight: 4.5,
+          thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8.0),
+          overlayShape: RoundSliderOverlayShape(overlayRadius: 0.0),
+          activeTrackColor: AurisPalette.brand,
+          inactiveTrackColor: Colors.transparent,
+          thumbColor: AurisPalette.brand,
+          overlayColor: Colors.transparent,
+        ),
+        value: _isDraggingSlider
+            ? _dragPositionSeconds.clamp(0.0, (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble())
+            : _position.inSeconds.toDouble().clamp(
+                  0.0,
+                  (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
+                ),
+        max: (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
+        buffer: _bufferProgress,
+        duration: _duration,
+        onChangeStart: (value) {
+          setState(() {
+            _isDraggingSlider = true;
+            _dragPositionSeconds = value;
+          });
+        },
+        onChanged: (value) {
+          setState(() {
+            _dragPositionSeconds = value;
+          });
+          _startHideTimer();
+        },
+        onChangeEnd: (value) {
+          player?.seek(Duration(seconds: value.toInt()));
+          setState(() {
+            _isDraggingSlider = false;
+          });
+          _startHideTimer();
+        },
+      ),
+    );
+
     return Focus(
       focusNode: _focusNode,
       autofocus: true,
@@ -828,7 +871,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                     ignoring: !(_showControls && !isInitialLoading),
                     child: Stack(
                       fit: StackFit.expand,
-                      children  : [
+                      children: [
                       // Botón Back superior izquierdo (sólo si no hay WatchTopBar activo)
                       if (shouldShowEmbedBack)
                         Positioned(
@@ -947,54 +990,12 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // --- 1. ytp-progress-bar-container (Timeline Slider con _YouTubeSliderTrackShape) ---
-                          Padding(
-                            // 8 px entre el timeline y las cápsulas (referencia de
-                            // YouTube en el watch: unified_seek_player_edge_padding).
-                            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                            child: _HoverableTimeline(
-                              sliderTheme: const SliderThemeData(
-                                trackHeight: 4.5,
-                                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8.0),
-                                overlayShape: RoundSliderOverlayShape(overlayRadius: 0.0),
-                                activeTrackColor: AurisPalette.brand,
-                                inactiveTrackColor: Colors.transparent,
-                                thumbColor: AurisPalette.brand,
-                                overlayColor: Colors.transparent,
-                              ),
-                              value: _isDraggingSlider
-                                  ? _dragPositionSeconds.clamp(0.0, (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble())
-                                  : _position.inSeconds.toDouble().clamp(
-                                        0.0,
-                                        (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
-                                      ),
-                              max: (_duration.inSeconds > 0 ? _duration.inSeconds : 1).toDouble(),
-                              buffer: _bufferProgress,
-                              duration: _duration,
-                              onChangeStart: (value) {
-                                setState(() {
-                                  _isDraggingSlider = true;
-                                  _dragPositionSeconds = value;
-                                });
-                              },
-                              onChanged: (value) {
-                                setState(() {
-                                  _dragPositionSeconds = value;
-                                });
-                                _startHideTimer();
-                              },
-                              onChangeEnd: (value) {
-                                player?.seek(Duration(seconds: value.toInt()));
-                                setState(() {
-                                  _isDraggingSlider = false;
-                                });
-                                _startHideTimer();
-                              },
-                            ),
-                          ),
-                          
+                                                    if (!isTabletOrMobile) ...[
+                            timelineWidget,
+                            const SizedBox(height: 6),
+                          ],
 
-                          // --- 2. ytp-chrome-controls (Height 64px, Web Desktop Proporciones Ampliadas) ---
+                          // --- 2. ytp-chrome-controls (Height 56px, Web Desktop Proporciones Ampliadas) ---// --- 2. ytp-chrome-controls (Height 56px, Web Desktop Proporciones Ampliadas) ---
                           SizedBox(
                             height: 56,
                             child: Row(
@@ -1496,6 +1497,10 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                               ],
                             ),
                           ),
+                          if (isTabletOrMobile) ...[
+                            const SizedBox(height: 6),
+                            timelineWidget,
+                          ],
                         ],
                       ),
                     ),
