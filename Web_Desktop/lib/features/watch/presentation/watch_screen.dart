@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../player/presentation/player_screen.dart';
+import '../../../core/utils/app_fullscreen.dart';
 import '../../../core/utils/url_utils.dart';
 
 /// Pantalla WatchScreen para Web.
@@ -72,6 +74,11 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   bool _isTheaterMode = false;
   bool _isAmbientLightingEnabled = true;
 
+  /// Modo pantalla completa real (solo Web): el navegador entra en fullscreen
+  /// y la WatchScreen se colapsa al reproductor.
+  bool _isFullscreen = false;
+  StreamSubscription<void>? _fullscreenSub;
+
   /// URL del último stream que se abrió en el player.
   /// Evita re-abrir el mismo stream en cada rebuild del árbol.
   String _lastOpenedUrl = '';
@@ -86,6 +93,27 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       ref.read(activePlayerProvider.notifier).setUiState(PlayerUIState.full);
       debugPrint('[WebWatch] initState: player inicializado.');
     });
+
+    // Sincroniza el estado cuando el navegador sale de fullscreen por su cuenta
+    // (Esc, botón del navegador o gesto del sistema).
+    if (kIsWeb) {
+      _fullscreenSub = onFullscreenChanged()?.listen((_) {
+        if (!mounted) return;
+        final bool isActive = isAppFullscreen();
+        if (isActive != _isFullscreen) {
+          setState(() => _isFullscreen = isActive);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _fullscreenSub?.cancel();
+    if (kIsWeb && _isFullscreen) {
+      setAppFullscreen(false);
+    }
+    super.dispose();
   }
 
   @override
@@ -229,7 +257,44 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
 
     final effectiveOnSelected = widget.onEpisodeSelected ?? _handleEpisodeSelected;
 
-    return WatchScreenBase(
+    // Player compartido entre el layout normal y el modo pantalla completa.
+    final Widget cleanPlayerWidget = CleanEmbeddedPlayer(
+      // ValueKey garantiza que el widget se reconstruye cuando cambia
+      // el episodio o la URL, forzando la carga limpia del nuevo episodio
+      key: ValueKey('${widget.episode}_${resolvedUrl.isNotEmpty ? resolvedUrl : "__loading__"}'),
+      sourceUrl: resolvedUrl,
+      source: widget.source,
+      category: widget.category,
+      contentId: widget.contentId,
+      title: widget.title ?? widget.metadataTitle,
+      episode: widget.episode,
+      season: widget.season,
+      posterUrl: widget.posterUrl,
+      bannerUrl: widget.bannerUrl,
+      episodeTitle: widget.episodeTitle,
+      onExpandPressed: _toggleFullscreen,
+      onNextEpisode: effectiveOnNext,
+      onPreviousEpisode: effectiveOnPrevious,
+      hasPrevious: hasPrevious,
+      hasNext: hasNext,
+      episodeLabel: realEpLabel,
+      isTheaterMode: _isTheaterMode,
+      onTheaterModeToggle: () =>
+          setState(() => _isTheaterMode = !_isTheaterMode),
+      isAmbientLightingEnabled: _isAmbientLightingEnabled,
+      cinematicAmbient: _isFullscreen,
+      onAmbientLightingToggle: (val) =>
+          setState(() => _isAmbientLightingEnabled = val),
+      onBack: _isFullscreen ? _toggleFullscreen : _handleBackToContent,
+      showBackButton: _isFullscreen ? true : null,
+    );
+
+    return Stack(
+      children: [
+        // WatchScreenBase se mantiene montado para que su dispose no detenga
+        // el motor de reproducción al entrar/salir de pantalla completa.
+        WatchScreenBase(
+      isAmbientGlowEnabled: _isAmbientLightingEnabled,
       contentId: widget.contentId,
       sourceUrl: widget.sourceUrl,
       source: widget.source,
@@ -257,37 +322,22 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       onEpisodeSelected: effectiveOnSelected,
       onBack: _handleBackToContent,
       isTheaterMode: _isTheaterMode,
-      // Siempre renderizamos CleanEmbeddedPlayer para que el Stack(fit:expand)
-      // siempre tenga constraints correctos. El player muestra su propio spinner
-      // interno mientras la URL no esté lista (_hasLoadedFirstFrame = false).
-      playerWidget: CleanEmbeddedPlayer(
-        // ValueKey garantiza que el widget se reconstruye cuando cambia
-        // el episodio o la URL, forzando la carga limpia del nuevo episodio
-        key: ValueKey('${widget.episode}_${resolvedUrl.isNotEmpty ? resolvedUrl : "__loading__"}'),
-        sourceUrl: resolvedUrl,
-        source: widget.source,
-        category: widget.category,
-        contentId: widget.contentId,
-        title: widget.title ?? widget.metadataTitle,
-        episode: widget.episode,
-        season: widget.season,
-        posterUrl: widget.posterUrl,
-        bannerUrl: widget.bannerUrl,
-        episodeTitle: widget.episodeTitle,
-        onExpandPressed: () => _openFullscreenPlayer(context),
-        onNextEpisode: effectiveOnNext,
-        onPreviousEpisode: effectiveOnPrevious,
-        hasPrevious: hasPrevious,
-        hasNext: hasNext,
-        episodeLabel: realEpLabel,
-        isTheaterMode: _isTheaterMode,
-        onTheaterModeToggle: () =>
-            setState(() => _isTheaterMode = !_isTheaterMode),
-        isAmbientLightingEnabled: _isAmbientLightingEnabled,
-        onAmbientLightingToggle: (val) =>
-            setState(() => _isAmbientLightingEnabled = val),
-        onBack: _handleBackToContent,
-      ),
+      // En pantalla completa el player se dibuja en un layer propio encima del
+      // layout, para no desmontar WatchScreenBase.
+      playerWidget: _isFullscreen ? const SizedBox.shrink() : cleanPlayerWidget,
+        ),
+
+        // Modo pantalla completa: sólo el reproductor. Se envuelve en Scaffold
+        // para que el player tenga ancestro Material (textos, iconos, Slider y
+        // ripple se renderizan igual que en el embedded normal).
+        if (_isFullscreen)
+          Positioned.fill(
+            child: Scaffold(
+              backgroundColor: Colors.black,
+              body: cleanPlayerWidget,
+            ),
+          ),
+      ],
     );
   }
 
@@ -335,7 +385,19 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
     context.pushReplacement(uri);
   }
 
-  void _openFullscreenPlayer(BuildContext context) {
+  /// Alterna el modo pantalla completa del reproductor.
+  ///
+  /// En Web entra/sale del fullscreen del navegador y colapsa la pantalla al
+  /// reproductor. En nativo (Windows/Linux/macOS) conserva el comportamiento
+  /// anterior: abrir el reproductor dedicado.
+  void _toggleFullscreen() {
+    if (kIsWeb) {
+      final bool next = !_isFullscreen;
+      setState(() => _isFullscreen = next);
+      setAppFullscreen(next);
+      return;
+    }
+
     final player = PlayerScreen(
       contentId: widget.contentId,
       sourceUrl: widget.sourceUrl,

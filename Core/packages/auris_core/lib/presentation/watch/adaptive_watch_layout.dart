@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'widgets/ambient_glow.dart';
 
 /// Layout Adaptativo Responsivo para la WatchScreen (Estilo Web Desktop y Móvil).
 ///
@@ -20,6 +21,7 @@ class AdaptiveWatchLayout extends StatelessWidget {
     this.playlistSidebarWidget,
     this.rightColumnWidget,
     this.mobileEpisodesWidget,
+    this.ambientArtUrl,
     this.isTheaterMode = false,
   });
 
@@ -34,6 +36,8 @@ class AdaptiveWatchLayout extends StatelessWidget {
   final Widget? rightColumnWidget;
   final Widget? mobileEpisodesWidget;
   final bool isTheaterMode;
+  /// Arte del contenido que alimenta el halo ambiental del watch.
+  final String? ambientArtUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -75,40 +79,70 @@ class AdaptiveWatchLayout extends StatelessWidget {
                               children: [
                                 Expanded(
                                   flex: isTheaterMode ? 10 : 7,
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.easeInOutCubic,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(isTheaterMode ? 0 : 12),
-                                      boxShadow: isTheaterMode
-                                          ? []
-                                          : [
-                                              BoxShadow(
-                                                color: const Color(0xFFEF7A1E).withValues(alpha: 0.10),
-                                                blurRadius: 24,
-                                                spreadRadius: 2,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      if (!isTheaterMode) ...[
+                                        // La sombra se pinta en su propia capa, DEBAJO del
+                                        // halo: si la dibujara la tarjeta quedaría encima de
+                                        // la luz y formaría un anillo negro alrededor del
+                                        // video.
+                                        Positioned.fill(
+                                          child: IgnorePointer(
+                                            child: DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                borderRadius: BorderRadius.circular(12),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black.withValues(alpha: 0.80),
+                                                    blurRadius: 16,
+                                                    offset: const Offset(0, 8),
+                                                  ),
+                                                ],
                                               ),
-                                              BoxShadow(
-                                                color: Colors.black.withValues(alpha: 0.80),
-                                                blurRadius: 16,
-                                                offset: const Offset(0, 8),
-                                              ),
-                                            ],
-                                    ),
-                                    child: isTheaterMode
-                                        ? Container(
-                                            width: double.infinity,
-                                            height: stageHeight,
-                                            color: Colors.black,
-                                            child: playerWidget,
-                                          )
-                                        : ClipRRect(
-                                            borderRadius: BorderRadius.circular(12),
-                                            child: AspectRatio(
-                                              aspectRatio: 16 / 9,
-                                              child: playerWidget,
                                             ),
                                           ),
+                                        ),
+                                        if (ambientArtUrl != null)
+                                          Positioned(
+                                            left: -AmbientGlow.bleed,
+                                            right: -AmbientGlow.bleed,
+                                            top: -AmbientGlow.bleed,
+                                            bottom: -AmbientGlow.bleed,
+                                            child: AmbientGlow(imageUrl: ambientArtUrl!),
+                                          ),
+                                      ],
+                                      AnimatedContainer(
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOutCubic,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(isTheaterMode ? 0 : 12),
+                                          boxShadow: isTheaterMode
+                                              ? []
+                                              : [
+                                                  BoxShadow(
+                                                    color: const Color(0xFFEF7A1E).withValues(alpha: 0.10),
+                                                    blurRadius: 24,
+                                                    spreadRadius: 2,
+                                                  ),
+                                                ],
+                                        ),
+                                        child: isTheaterMode
+                                            ? Container(
+                                                width: double.infinity,
+                                                height: stageHeight,
+                                                color: Colors.black,
+                                                child: playerWidget,
+                                              )
+                                            : ClipRRect(
+                                                borderRadius: BorderRadius.circular(12),
+                                                child: AspectRatio(
+                                                  aspectRatio: 16 / 9,
+                                                  child: playerWidget,
+                                                ),
+                                              ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 if (!isTheaterMode && activeRightWidget != null) ...[

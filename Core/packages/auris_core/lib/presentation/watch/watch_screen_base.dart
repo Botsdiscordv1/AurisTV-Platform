@@ -52,6 +52,7 @@ class WatchScreenBase extends ConsumerStatefulWidget {
     this.onBack,
     this.isTheaterMode = false,
     this.showPlaylistSidebar = true,
+    this.isAmbientGlowEnabled = true,
   });
 
   final String contentId;
@@ -84,6 +85,9 @@ class WatchScreenBase extends ConsumerStatefulWidget {
   final VoidCallback? onBack;
   final bool isTheaterMode;
   final bool showPlaylistSidebar;
+
+  /// Controla el halo ambiental que rodea al reproductor en el watch.
+  final bool isAmbientGlowEnabled;
 
   @override
   ConsumerState<WatchScreenBase> createState() => _WatchScreenBaseState();
@@ -250,6 +254,11 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
       backgroundColor: Colors.black,
       body: AdaptiveWatchLayout(
         isTheaterMode: effectiveTheaterMode,
+        ambientArtUrl: !widget.isAmbientGlowEnabled
+            ? null
+            : (widget.bannerUrl?.trim().isNotEmpty ?? false)
+                ? widget.bannerUrl
+                : widget.posterUrl,
         topBarWidget: WatchTopBar(
           onBack: widget.onBack,
           category: widget.category,
