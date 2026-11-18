@@ -5214,9 +5214,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                     ),
                     Row(
                       children: [
-                        IconButton(
-                          iconSize: iconSize,
-                          icon: AurisIcon(AurisIcons.speedometer, color: Colors.white),
+                        _PlayerTextButton(
                           onPressed: () {
                             setState(() {
                               const speeds = [0.5, 0.7, 1.0, 1.2, 1.5, 1.7, 2.0];
@@ -5227,8 +5225,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> with WidgetsBinding
                               _player?.setRate(_playbackSpeed);
                             });
                           },
+                          icon: AurisIcons.speedometer,
+                          label: '${_playbackSpeed.toStringAsFixed(1)}x',
+                          useBackground: true,
                         ),
-                        Text('${_playbackSpeed.toStringAsFixed(1)}x', style: TextStyle(color: Colors.white, fontSize: useMobileLayout ? (isLandscape ? 11 : 13) : 14, fontWeight: FontWeight.w900)),
                         SizedBox(width: spacing),
                         if (!_isOpEd) ...[
                           IconButton(iconSize: iconSize, icon: AurisIcon(AurisIcons.server, color: Colors.white), onPressed: _showServerSelector),

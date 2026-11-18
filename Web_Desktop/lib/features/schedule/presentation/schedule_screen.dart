@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/url_utils.dart';
 import '../../../core/utils/responsive_utils.dart';
-import 'package:auris_web_desktop/core/router/app_router.dart';
 import 'package:auris_core/auris_core.dart';
 import '../../../shared/widgets/airing_countdown_badge.dart';
 
@@ -49,11 +48,27 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   Widget build(BuildContext context) {
     final scheduleAsync = ref.watch(_scheduleProvider);
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/calendario');
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/calendario');
+            }
+          },
         ),
         title: const Text('Calendario'),
         backgroundColor: const Color(0xFF0B0B0D),
@@ -67,6 +82,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
               style: const TextStyle(color: Colors.white54)),
         ),
       ),
+    ),
     );
   }
 }
@@ -386,7 +402,7 @@ class _ScheduleRowState extends State<ScheduleRow> {
                                         quality: item.quality,
                                         kind: 'anime',
                                         type: item.type,
-                                        from: '/horario',
+                                        from: '/calendario',
                                       );
 
                                       context.push(uri, extra: SearchResult(

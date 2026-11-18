@@ -284,7 +284,7 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       episodeLabel: realEpLabel,
       isTheaterMode: _isTheaterMode,
       onTheaterModeToggle: () =>
-          setState(() => _isTheaterMode = !_isTheaterMode),
+          _setViewMode(() => setState(() => _isTheaterMode = !_isTheaterMode)),
       isAmbientLightingEnabled: _isAmbientLightingEnabled,
       cinematicAmbient: _isFullscreen,
       onAmbientLightingToggle: (val) =>
@@ -328,23 +328,47 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
       onEpisodeSelected: effectiveOnSelected,
       onBack: _handleBackToContent,
       isTheaterMode: _isTheaterMode,
-      // En pantalla completa el player se dibuja en un layer propio encima del
-      // layout, para no desmontar WatchScreenBase.
-      playerWidget: _isFullscreen ? const SizedBox.shrink() : cleanPlayerWidget,
+      // El player no se reubica nunca: en pantalla completa el layout se
+      // colapsa a su alrededor. Moverlo de árbol recrearía su `State` y el
+      // navegador pausaría el `<video>` al reinsertarlo en el DOM.
+      isFullscreen: _isFullscreen,
+      playerWidget: cleanPlayerWidget,
         ),
-
-        // Modo pantalla completa: sólo el reproductor. Se envuelve en Scaffold
-        // para que el player tenga ancestro Material (textos, iconos, Slider y
-        // ripple se renderizan igual que en el embedded normal).
-        if (_isFullscreen)
-          Positioned.fill(
-            child: Scaffold(
-              backgroundColor: Colors.black,
-              body: cleanPlayerWidget,
-            ),
-          ),
       ],
     );
+  }
+
+  /// Aplica un cambio de disposición (normal / teatro / pantalla completa)
+  /// conservando la reproducción.
+  ///
+  /// Cambiar de modo reconstruye el árbol y, en web, el `<video>` de media_kit
+  /// se vuelve a insertar en el DOM. El navegador pausa un elemento multimedia
+  /// cuando sale del documento, así que el cambio deja el vídeo en pausa y hay
+  /// que reanudarlo a mano. Si venía reproduciendo se reanuda tras el frame,
+  /// una vez reenganchado el platform view.
+  void _setViewMode(VoidCallback apply) {
+    final wasPlaying = ref.read(activePlayerProvider).player?.state.playing ?? false;
+    apply();
+    if (!wasPlaying) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // El `pause` del navegador llega después del reenganche del platform
+      // view, en un momento no determinista: se reintenta unas cuantas veces.
+      const attempts = <Duration>[
+        Duration(milliseconds: 120),
+        Duration(milliseconds: 250),
+        Duration(milliseconds: 400),
+      ];
+      for (final delay in attempts) {
+        await Future<void>.delayed(delay);
+        if (!mounted) return;
+        final player = ref.read(activePlayerProvider).player;
+        if (player == null || player.state.playing) return;
+        try {
+          await player.play();
+        } catch (_) {}
+      }
+    });
   }
 
   void _handleBackToContent() {
@@ -403,8 +427,10 @@ class _WatchScreenState extends ConsumerState<WatchScreen> {
   void _toggleFullscreen() {
     if (kIsWeb) {
       final bool next = !_isFullscreen;
-      setState(() => _isFullscreen = next);
-      setAppFullscreen(next);
+      _setViewMode(() {
+        setState(() => _isFullscreen = next);
+        setAppFullscreen(next);
+      });
       return;
     }
 

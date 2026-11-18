@@ -51,6 +51,7 @@ class WatchScreenBase extends ConsumerStatefulWidget {
     this.onEpisodeSelected,
     this.onBack,
     this.isTheaterMode = false,
+    this.isFullscreen = false,
     this.showPlaylistSidebar = true,
     this.isAmbientGlowEnabled = true,
   });
@@ -84,6 +85,10 @@ class WatchScreenBase extends ConsumerStatefulWidget {
   final ValueChanged<EpisodeInfo>? onEpisodeSelected;
   final VoidCallback? onBack;
   final bool isTheaterMode;
+
+  /// Pantalla completa del reproductor: el layout se colapsa al player sin
+  /// reubicarlo, para no recrear el player ni pausar el vídeo.
+  final bool isFullscreen;
   final bool showPlaylistSidebar;
 
   /// Controla el halo ambiental que rodea al reproductor en el watch.
@@ -248,12 +253,13 @@ class _WatchScreenBaseState extends ConsumerState<WatchScreenBase> {
     };
 
     final bool isDesktopWeb = MediaQuery.sizeOf(context).width >= 1024;
-    final bool effectiveTheaterMode = widget.isTheaterMode || (isTheme && isDesktopWeb);
+    final bool effectiveTheaterMode = widget.isTheaterMode || ((isTheme || isMovie) && isDesktopWeb);
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: AdaptiveWatchLayout(
         isTheaterMode: effectiveTheaterMode,
+        isFullscreen: widget.isFullscreen,
         ambientArtUrl: !widget.isAmbientGlowEnabled
             ? null
             : (widget.bannerUrl?.trim().isNotEmpty ?? false)

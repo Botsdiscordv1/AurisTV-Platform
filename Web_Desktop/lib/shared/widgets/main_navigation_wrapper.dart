@@ -44,11 +44,13 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     final router = GoRouter.of(context);
     final String location = GoRouterState.of(context).uri.path;
     
-    // Rutas que consideramos "Raíz" de cada pestaña
-    final bool isRootPath = location == '/inicio' || 
-                            location == '/catalogo' || 
-                            location == '/explore' || 
-                            location == '/settings';
+    // Rutas que consideramos "Raíz" de cada pestaña (incluye las secciones del
+    // home, que ahora tienen URL propia)
+    const Set<String> rootPaths = {
+      '/inicio', '/animes', '/peliculas', '/series', '/kdramas', '/live',
+      '/catalogo', '/explore', '/settings',
+    };
+    final bool isRootPath = rootPaths.contains(location);
 
     // 1. Si estamos en una sub-ruta (Anime, Biblioteca, etc), cerramos esa pantalla
     if (!isRootPath && router.canPop()) {
@@ -76,7 +78,8 @@ class _MainNavigationWrapperState extends ConsumerState<MainNavigationWrapper> {
     // Senior Web Fix: Usamos GoRouterState para una detección reactiva y segura de la ruta.
     final state = GoRouterState.of(context);
     final String location = state.uri.path;
-    final bool isFullScreen = location.startsWith('/series') ||
+    // `/series` exacto es una sección del home; el player es `/series/<token>`.
+    final bool isFullScreen = location.startsWith('/series/') ||
         location.startsWith('/movie') ||
         location.startsWith('/detalles') ||
         location.startsWith('/watch') ||

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+
 import 'package:auris_core/auris_core.dart';
 import '../../../core/utils/responsive_utils.dart';
 import '../../../core/utils/web_utils.dart';
@@ -49,7 +50,8 @@ void openHomeDetails(BuildContext context, MediaItem item, String uiCategory) {
     kind: item.card?.kind,
     type: item.card?.type ?? item.card?.kind,
     sectionId: item.sectionId,
-    from: '/inicio',
+    // Sección real desde la que se abre la ficha (/animes, /peliculas, ...).
+    from: GoRouterState.of(context).uri.path,
   );
       
   if (context.mounted) {
@@ -75,7 +77,7 @@ void openHomeScheduleItem(BuildContext context, MediaItem item) {
     year: itemYear,
     kind: item.card?.kind ?? 'anime',
     type: item.card?.kind ?? (item.type == MediaType.anime ? 'anime' : null),
-    from: '/horario',
+    from: '/calendario',
   );
   
   if (context.mounted) {
@@ -566,7 +568,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _FocusIconButton(
                     icon: AurisIcons.grid,
                     size: isCompactDesktop ? 13 : 14,
-                    onPressed: () => context.push('/horario'),
+                    onPressed: () => context.push('/calendario'),
                   ),
                   const SizedBox(width: 8),
                 ],
@@ -580,10 +582,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  /// Ruta canónica de cada sección del home. La URL manda: la píldora navega a
+  /// ella y el `HomeScreen` de esa ruta sincroniza `homeCategoryProvider`.
+  static const Map<String, String> _categoryRoutes = {
+    'inicio': '/inicio',
+    'animes': '/animes',
+    'películas': '/peliculas',
+    'series': '/series',
+    'kdrama': '/kdramas',
+    'live': '/live',
+  };
+
   void _handleCategoryChange(String cat) {
-    // Senior Strategy: Actualizamos el estado interno en lugar de navegar a una nueva ruta
-    // para evitar errores de deep linking en la web y mantener la URL limpia.
+    // Se actualiza de inmediato para que la píldora responda al toque y, cuando
+    // la sección tiene URL propia, se navega a ella para que la barra del
+    // navegador, el botón atrás y el deep link funcionen.
     ref.read(homeCategoryProvider.notifier).state = cat;
+    final String? route = _categoryRoutes[cat];
+    if (route == null) return;
+    if (GoRouterState.of(context).uri.path == route) return;
+    context.go(route);
   }
 
   Widget _buildUserAvatar(BuildContext context, bool isCompact) {
@@ -1041,7 +1059,7 @@ class _ContinueWatchingSection extends ConsumerWidget {
       metadataTitle: detailParams.metadataTitle,
       season: detailParams.season,
       sectionId: detailParams.sectionId,
-      from: '/inicio',
+      from: GoRouterState.of(context).uri.path,
     );
     // Seed centralizado en Core (null si no hay URL http real).
     final seed = historyToSeed(item);

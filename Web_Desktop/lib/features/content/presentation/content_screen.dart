@@ -22,7 +22,7 @@ import 'package:auris_web_desktop/shared/widgets/auris_bottom_bar.dart';
 import 'package:auris_web_desktop/shared/widgets/full_screen_viewer.dart';
 import 'package:auris_web_desktop/features/player/presentation/player_screen.dart';
 import 'package:auris_web_desktop/core/router/app_router.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 
 // --- Galería Local Helpers ---
 

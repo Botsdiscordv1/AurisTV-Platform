@@ -183,6 +183,16 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
       // Primera muestra apenas haya frame, sin esperar el primer tick.
       Timer(const Duration(milliseconds: 1200), _sampleAmbient);
     }
+    // Post-frame callback para asegurar que el video empiece a reproducirse
+    // después de que el primer frame se carga. En Web a veces el autoplay se
+    // bloquea o el player queda parado después del layout recálculo.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final player = ref.read(activePlayerProvider).player;
+      if (player != null && !player.state.playing && player.state.position.inMilliseconds > 0) {
+        player.play();
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusNode.requestFocus();
@@ -756,6 +766,10 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     final bool isTheme = widget.source == 'Themes' ||
         widget.source == 'YouTube' ||
         widget.sourceUrl.contains('animethemes.moe');
+    final bool isMovie = widget.category == 'movie' ||
+        widget.category == 'movie_anime' ||
+        (widget.category?.toLowerCase().contains('movie') ?? false) ||
+        (widget.contentId?.toLowerCase().contains('movie') ?? false);
     final bool isTabletOrMobile = MediaQuery.sizeOf(context).width < 1024;
 
     final Widget timelineWidget = Padding(
@@ -831,18 +845,15 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                       // espacio sobrante de la tarjeta lo rellena la capa
                       // ambiente.
                       child: Center(
-                        child: AspectRatio(
-                          aspectRatio: _videoAspect,
-                          child: Video(
-                            controller: controller,
-                            controls: NoVideoControls,
-                            fit: BoxFit.contain,
-                            // `fill` pinta TODO el viewport (negro por defecto en
-                            // media_kit) y tapaba la capa ambiente en las barras.
-                            // Transparente deja ver el arte difuminado detrás.
-                            fill: Colors.transparent,
-                          ),
-                        ),
+                                                  child: Container(
+                                                    color: Colors.black,
+                                                    child: Video(
+                                                      controller: controller,
+                                                      aspectRatio: _videoAspect,
+                                                      fill: Colors.black,
+                                                      controls: NoVideoControls,
+                                                    ),
+                                                  ),
                       ),
                     )
                   : const Positioned.fill(
@@ -1322,7 +1333,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     // 1. "Saltar OP/ED" Standalone Frosted Glass Capsule (46px)
-                                    if (!isTheme && widget.category != 'movie') ...[
+                                    if (!isTheme && !isMovie) ...[
                                       MouseRegion(
                                         onEnter: (_) => setState(() => _isSkipOpEdHovered = true),
                                         onExit: (_) => setState(() => _isSkipOpEdHovered = false),
@@ -1452,7 +1463,7 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                         const SizedBox(width: 2),
 
                                         // 4. ytp-size-button (Modo cine / Teatro)
-                                        if (!isTheme && !isTabletOrMobile && widget.onTheaterModeToggle != null) ...[
+                                        if (!isTheme && !isMovie && !isTabletOrMobile && widget.onTheaterModeToggle != null) ...[
                                           IconButton(
                                             padding: EdgeInsets.zero,
                                             constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
