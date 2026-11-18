@@ -266,6 +266,16 @@ class ExploreScreen extends ConsumerWidget {
                       Breakpoint.xxl => 8,
                     };
 
+                    // Senior Fix (flutter-performance): progreso del historial
+                    // en O(1). Antes: ref.watch + firstWhereOrNull por CADA
+                    // card del grid → O(cards × historial) en cada rebuild.
+                    final progressByContentId = <String, double?>{};
+                    ref.watch(playbackHistoryStateProvider).whenData((hist) {
+                      for (final h in hist) {
+                        progressByContentId.putIfAbsent(h.contentId, () => h.progress);
+                      }
+                    });
+
                     return SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
@@ -277,13 +287,10 @@ class ExploreScreen extends ConsumerWidget {
                         (context, index) {
                           final item = items[index];
 
-                          // Senior Fix: Obtener el progreso del historial si existe
-                          final historyAsync = ref.watch(playbackHistoryStateProvider);
-                          double? progress;
-                          historyAsync.whenData((items) {
-                            final match = items.firstWhereOrNull((h) => h.contentId == item.id);
-                            if (match != null) progress = match.progress;
-                          });
+                          // Senior Fix (flutter-performance): lookup O(1) del
+                          // progreso precomputado fuera del builder (antes:
+                          // ref.watch + firstWhereOrNull por CADA card).
+                          final double? progress = progressByContentId[item.id];
 
                           return FocusablePosterCard(
                             title: item.title,

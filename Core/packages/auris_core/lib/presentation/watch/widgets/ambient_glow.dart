@@ -97,7 +97,14 @@ class AmbientGlow extends ConsumerWidget {
       child: Opacity(
         opacity: opacity,
         child: frame != null
-            ? AmbientVideoLayer(frame: frame)
+            ? LayoutBuilder(
+                builder: (context, constraints) => AmbientVideoLayer(
+                  frame: frame,
+                  // Radio radial geométrico del APK (`rkd.b`): mitad del lado
+                  // menor del vídeo, en dp.
+                  radius: constraints.biggest.shortestSide / 2,
+                ),
+              )
             : AmbientArtImage(
                 imageUrl: imageUrl,
                 sigma: blurSigma,

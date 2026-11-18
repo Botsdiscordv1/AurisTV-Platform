@@ -1307,6 +1307,15 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
   bool _showContent = false;
   Timer? _loadTimer;
   GroupedEpisodesResult? _lastEpisodes;
+  // Senior Fix (flutter-performance): paginación de la lista de episodios.
+  // shrinkWrap derrota la perezosidad del builder, así que sin paginar se
+  // construían TODAS las tarjetas de golpe (series largas: 1100+ widgets).
+  int _episodePageSize = 50;
+  int _desktopSelectedRangeStart = 1;
+  int _desktopSelectedRangeEnd = 50;
+  final TextEditingController _desktopEpisodeSearchController = TextEditingController();
+  String _desktopEpisodeSearchQuery = '';
+  bool _desktopSortAscending = true;
 
   // Trailer & Revealed State
   String? _lastTrailerKey;
@@ -1395,6 +1404,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     _delayTimer?.cancel();
     _fadeTimer?.cancel();
     _titleHideTimer?.cancel();
+    _desktopEpisodeSearchController.dispose();
     _disposeController();
     _scrollController.dispose();
     super.dispose();
@@ -1998,6 +2008,7 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
     final activeSources = detailState.allSources;
     final currentSource = detailState.selectedSource;
     final episodesAsync = detailState.episodes;
+    final epData = episodesAsync.valueOrNull?.response;
     final unifiedRelationsAsync = detailState.relations;
     final seasonTitle = detailState.seasonTitle;
 
@@ -2075,6 +2086,17 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
 
     final historyAsync = ref.watch(playbackHistoryStateProvider);
     final history = historyAsync.valueOrNull ?? [];
+    // Senior Fix (flutter-performance): índice O(1) del historial por episodio.
+    // Antes: firstWhereOrNull O(n) dentro del itemBuilder → O(episodios ×
+    // historial) en cada rebuild (1100 eps × 100 entradas = 110K comparaciones).
+    final historyByEpisode = <String, PlaybackHistory>{};
+    for (final h in history) {
+      if (h.contentId == widget.title &&
+          h.season == currentSeason &&
+          (h.episode?.isNotEmpty ?? false)) {
+        historyByEpisode.putIfAbsent(h.episode!, () => h);
+      }
+    }
     final detailLoading = detailAsync.isLoading && detailAsync.valueOrNull == null;
 
     // Pre-fetch Strategy de Carga Inicial Única (Guarded por _hasPrefetched)
@@ -2296,14 +2318,33 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                 ),
             ],
           ) : null,
-          tabs: ContentTabBar(
-            labels: tabLabels,
-            selectedIndex: selectedTabIndex,
-            onTabSelected: (i) => setState(() => _selectedTabIndex = i),
-            hPadding: 0,
-            isMobile: isMobile,
-            isCompact: isCompact,
-          ),
+          tabs: (width >= 768 && !isMobile)
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: ContentTabBar(
+                        labels: tabLabels,
+                        selectedIndex: selectedTabIndex,
+                        onTabSelected: (i) => setState(() => _selectedTabIndex = i),
+                        hPadding: 0,
+                        isMobile: isMobile,
+                        isCompact: isCompact,
+                      ),
+                    ),
+                    if (selectedTabIndex == episodesTabIndex && hasEpisodesTab && epData != null && epData.total > 0) ...[
+                      const SizedBox(width: 16),
+                      _buildDesktopEpisodeControls(epData.total, isCompact: isCompact),
+                    ],
+                  ],
+                )
+              : ContentTabBar(
+                  labels: tabLabels,
+                  selectedIndex: selectedTabIndex,
+                  onTabSelected: (i) => setState(() => _selectedTabIndex = i),
+                  hPadding: 0,
+                  isMobile: isMobile,
+                  isCompact: isCompact,
+                ),
           content: SliverMainAxisGroup(slivers: [
             if (episodesTabIndex >= 0 && selectedTabIndex == episodesTabIndex)
               SliverToBoxAdapter(
@@ -2317,16 +2358,53 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                         _lastEpisodes = epBundle;
                         final epData = epBundle.response;
                         final total = epData.total;
+                        // Senior Fix (flutter-performance): paginar para no
+                        // construir todas las tarjetas de golpe.
+                        final shown = _episodePageSize < total ? _episodePageSize : total;
+                        final hasMore = total > shown;
+                        Widget moreButton() => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              child: Center(
+                                child: OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFBBBBBB),
+                                    side: const BorderSide(color: Color(0xFFBBBBBB), width: 2.0),
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.zero,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  ),
+                                  onPressed: () => setState(() => _episodePageSize += 50),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AurisIcon(AurisIcons.episodes, color: const Color(0xFFBBBBBB), size: 24),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'VER MÁS EPISODIOS (${total - shown} restantes)',
+                                        style: const TextStyle(
+                                          color: Color(0xFFBBBBBB),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.6,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
 
                         if (isMobile) {
                           return ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: total,
+                            itemCount: hasMore ? shown + 1 : shown,
                             itemBuilder: (context, index) {
+                              if (hasMore && index == shown) return moreButton();
                               final ep = index < epData.episodes.length ? epData.episodes[index] : null;
                               final epNum = (ep?.number ?? index + 1).toString();
-                              final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
+                              final epHistory = historyByEpisode[epNum];
                               final epSource = epBundle.sourceForIndex(index) ?? currentSource;
                               return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: ep?.quality ?? epSource?.quality ?? '', episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, isMobile: true, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
                                 final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
@@ -2340,27 +2418,70 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
                             },
                           );
                         } else {
-                          return GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio),
-                            itemCount: total,
-                            itemBuilder: (context, index) {
-                              final ep = index < epData.episodes.length ? epData.episodes[index] : null;
-                              final epNum = (ep?.number ?? index + 1).toString();
-                              final epHistory = history.firstWhereOrNull((h) => h.contentId == widget.title && h.season == currentSeason && h.episode == epNum);
-                              final epSource = epBundle.sourceForIndex(index) ?? currentSource;
-                              final epQuality = ep?.quality ?? epSource?.quality ?? '';
-                              return _EpisodeCard(episodeNumber: ep?.number ?? index + 1, title: ep?.title ?? 'Episodio ${index + 1}', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
-                                final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNum);
-                                final tapSource = epBundle.sourceForIndex(index) ?? currentSource;
-                                final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
-                                final epTitleRaw = (ep?.title != null && ep!.title!.isNotEmpty) ? ep.title! : '';
-                                final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
-                                final epTitleParam = epTitleRaw.isNotEmpty ? '&episodeTitle=${Uri.encodeComponent(epTitleRaw)}' : '';
-                                context.push('/watch/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, ep?.number ?? index + 1)}&episode=${ep?.number ?? index + 1}&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam$epTitleParam${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}${certification != null && certification.isNotEmpty ? '&certification=${Uri.encodeComponent(certification)}' : ''}');
-                              });
-                            },
+                          final rawEpisodes = epData.episodes;
+                          final searchQuery = _desktopEpisodeSearchQuery.trim();
+                          final intQuery = int.tryParse(searchQuery);
+
+                          List<({dynamic ep, int originalIndex})> filtered = [];
+                          for (int i = 0; i < rawEpisodes.length; i++) {
+                            final ep = rawEpisodes[i];
+                            final epNum = ep.number ?? (i + 1);
+                            bool matches = true;
+                            if (searchQuery.isNotEmpty) {
+                              if (intQuery != null) {
+                                matches = epNum == intQuery;
+                              } else {
+                                matches = epNum.toString().contains(searchQuery) ||
+                                    (ep.title ?? '').toLowerCase().contains(searchQuery.toLowerCase());
+                              }
+                            } else {
+                              matches = epNum >= _desktopSelectedRangeStart && epNum <= _desktopSelectedRangeEnd;
+                            }
+                            if (matches) {
+                              filtered.add((ep: ep, originalIndex: i));
+                            }
+                          }
+
+                          filtered.sort((a, b) {
+                            final numA = a.ep.number ?? (a.originalIndex + 1);
+                            final numB = b.ep.number ?? (b.originalIndex + 1);
+                            return _desktopSortAscending ? numA.compareTo(numB) : numB.compareTo(numA);
+                          });
+
+                          final bool isRangeSelectorVisible = total > 50;
+                          final shownTablet = searchQuery.isEmpty ? (isRangeSelectorVisible ? filtered.length : (_episodePageSize < total ? _episodePageSize : total)) : filtered.length;
+                          final displayedItems = searchQuery.isEmpty ? (isRangeSelectorVisible ? filtered : filtered.take(shownTablet).toList()) : filtered;
+                          final hasMoreTablet = !isRangeSelectorVisible && searchQuery.isEmpty && total > shownTablet;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: episodesCrossAxisCount, mainAxisSpacing: 20, crossAxisSpacing: 24, childAspectRatio: episodesAspectRatio),
+                                itemCount: displayedItems.length,
+                                itemBuilder: (context, index) {
+                                  final item = displayedItems[index];
+                                  final ep = item.ep;
+                                  final epNum = ep?.number ?? (item.originalIndex + 1);
+                                  final epNumStr = epNum.toString();
+                                  final epHistory = historyByEpisode[epNumStr];
+                                  final epSource = epBundle.sourceForNumber(epNum) ?? currentSource;
+                                  final epQuality = ep?.quality ?? epSource?.quality ?? '';
+                                  return _EpisodeCard(episodeNumber: epNum, title: ep?.title ?? 'Episodio $epNum', description: ep?.description ?? '', imageUrl: ApiEndpoints.proxyImage(ep?.thumbnail ?? epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), fallbackImageUrl: ApiEndpoints.proxyImage(epSource?.thumbnail ?? currentSource?.thumbnail ?? ''), releaseDate: ep?.airDate, duration: ep?.duration ?? (ep?.runtime != null ? '${ep!.runtime} min' : null), quality: epQuality, episodeUrl: ep?.url, source: epSource?.source ?? currentSource?.source, category: widget.category, certification: certification, scrollController: _scrollController, progress: epHistory?.progressPercentage, isCompact: isCompact, onTap: () {
+                                    final hist = ref.read(playbackHistoryStateProvider.notifier).getProgress(widget.title, currentSeason, epNumStr);
+                                    final tapSource = epBundle.sourceForNumber(epNum) ?? currentSource;
+                                    final epThumb = ep?.thumbnail ?? tapSource?.thumbnail ?? '';
+                                    final epTitleRaw = (ep?.title != null && ep!.title!.isNotEmpty) ? ep.title! : '';
+                                    final posterParam = '&title=${Uri.encodeComponent(seasonTitle ?? widget.title)}&posterUrl=${Uri.encodeComponent(epThumb)}&bannerUrl=${Uri.encodeComponent(heroBanner ?? '')}&logoUrl=${Uri.encodeComponent(detailData?.logo ?? '')}';
+                                    final epTitleParam = epTitleRaw.isNotEmpty ? '&episodeTitle=${Uri.encodeComponent(epTitleRaw)}' : '';
+                                    context.push('/watch/${Uri.encodeComponent(widget.title)}?source=${tapSource?.source ?? currentSource?.source ?? widget.source}&url=${_episodeUrlFor(ep, tapSource?.url ?? currentSource?.url ?? widget.url, tapSource?.source ?? currentSource?.source ?? widget.source, epNum)}&episode=$epNum&season=$currentSeason&serverName=${simplifySourceName(tapSource?.source ?? currentSource?.source ?? widget.source)}&startPosition=${hist?.positionInMilliseconds ?? ''}&category=${widget.category}&totalEpisodes=${epData.total}${widget.metadataTitle != null && widget.metadataTitle!.isNotEmpty ? '&metadataTitle=${Uri.encodeComponent(widget.metadataTitle!)}' : ''}$posterParam$epTitleParam${widget.kind != null && widget.kind!.isNotEmpty ? '&kind=${Uri.encodeComponent(widget.kind!)}' : ''}${widget.year != null ? '&year=${widget.year}' : ''}${certification != null && certification.isNotEmpty ? '&certification=${Uri.encodeComponent(certification)}' : ''}');
+                                  });
+                                },
+                              ),
+                              if (hasMoreTablet) moreButton(),
+                            ],
                           );
                         }
                       }
@@ -2380,6 +2501,155 @@ class _ContentScreenState extends ConsumerState<ContentScreen> {
             if (selectedTabIndex == galleryTabIndex && galleryTabIndex != -1) ..._buildGalleryTab(0, isMovieCategory ? 'movie' : 'tv', detailData?.title ?? widget.title, detailData is AnimeDetail ? (detailData as AnimeDetail).year : widget.year),
           ]),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopEpisodeControls(int totalEpisodes, {bool isCompact = false}) {
+    final chunks = <({int start, int end, String label})>[];
+    for (int i = 0; i < totalEpisodes; i += 50) {
+      final start = i + 1;
+      final end = (i + 50 < totalEpisodes) ? (i + 50) : totalEpisodes;
+      chunks.add((start: start, end: end, label: '$start-$end'));
+    }
+
+    final currentChunkLabel = chunks.firstWhereOrNull(
+          (c) => c.start == _desktopSelectedRangeStart && c.end == _desktopSelectedRangeEnd,
+        )?.label ?? '${_desktopSelectedRangeStart}-${_desktopSelectedRangeEnd}';
+
+    final double fontSize = isCompact ? 14.0 : 14.5;
+    final double controlHeight = isCompact ? 36.0 : 40.0;
+    final double paddingH = isCompact ? 12.0 : 16.0;
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (chunks.length > 1) ...[
+            PopupMenuButton<({int start, int end, String label})>(
+              tooltip: 'Seleccionar rango de episodios',
+              color: const Color(0xFF1A1A1E),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              child: Container(
+                height: controlHeight,
+                padding: EdgeInsets.symmetric(horizontal: paddingH),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      currentChunkLabel,
+                      style: TextStyle(color: Colors.white, fontSize: fontSize, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_drop_down_rounded, size: 20, color: Colors.white70),
+                  ],
+                ),
+              ),
+              itemBuilder: (context) => chunks.map((chunk) {
+                final isSelected = _desktopSelectedRangeStart == chunk.start;
+                return PopupMenuItem<({int start, int end, String label})>(
+                  value: chunk,
+                  child: Text(
+                    chunk.label,
+                    style: TextStyle(
+                      color: isSelected ? AurisPalette.brand : Colors.white,
+                      fontSize: fontSize,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onSelected: (chunk) {
+                setState(() {
+                  _desktopSelectedRangeStart = chunk.start;
+                  _desktopSelectedRangeEnd = chunk.end;
+                  _desktopEpisodeSearchController.clear();
+                  _desktopEpisodeSearchQuery = '';
+                });
+              },
+            ),
+            const SizedBox(width: 12),
+          ],
+          SizedBox(
+            width: 110,
+            height: controlHeight,
+            child: TextField(
+              controller: _desktopEpisodeSearchController,
+              keyboardType: TextInputType.number,
+              style: TextStyle(color: Colors.white, fontSize: fontSize),
+              decoration: InputDecoration(
+                hintText: 'N° ep',
+                hintStyle: TextStyle(color: Colors.white38, fontSize: fontSize),
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: (controlHeight - 16) / 2),
+                filled: true,
+                fillColor: Colors.black26,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (val) {
+                setState(() {
+                  _desktopEpisodeSearchQuery = val.trim();
+                });
+              },
+            ),
+          ),
+          if (_desktopEpisodeSearchQuery.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            SizedBox(
+              width: controlHeight,
+              height: controlHeight,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                hoverColor: Colors.transparent,
+                icon: const Icon(Icons.close_rounded, size: 18, color: Colors.white70),
+                onPressed: () {
+                  setState(() {
+                    _desktopEpisodeSearchController.clear();
+                    _desktopEpisodeSearchQuery = '';
+                  });
+                },
+                tooltip: 'Limpiar búsqueda',
+              ),
+            ),
+          ],
+          const SizedBox(width: 12),
+          SizedBox(
+            width: controlHeight,
+            height: controlHeight,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              hoverColor: Colors.transparent,
+              tooltip: _desktopSortAscending ? 'Orden: 1 ➔ N (Cambiar a N ➔ 1)' : 'Orden: N ➔ 1 (Cambiar a 1 ➔ N)',
+              icon: Icon(
+                _desktopSortAscending ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                size: 20,
+                color: AurisPalette.brand,
+              ),
+              onPressed: () {
+                setState(() {
+                  _desktopSortAscending = !_desktopSortAscending;
+                });
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

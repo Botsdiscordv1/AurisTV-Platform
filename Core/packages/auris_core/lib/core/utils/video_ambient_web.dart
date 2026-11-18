@@ -6,19 +6,23 @@ import 'dart:typed_data';
 @JS('document')
 external JSObject get _document;
 
-/// Valores medidos en el reproductor de YouTube (canvas `#cinematics`):
-/// buffer de 110×75 px, `ctx.filter = blur(5px)` al copiar el frame y el
-/// contenedor escalado 1.5 en X y 2 en Y.
+/// Valores medidos en el APK de YouTube (clase `kjv`, config cinemática):
+///  * refresco del frame: 5000 ms (adelanto de 4500 ms), crossfade 2500 ms (0,5×).
+///  * escala del fondo: 2,0 × 2,0 (`kjv.f` → `kjw(2.0f, 2.0f)`).
+///  * radio del degradado: mitad del lado menor del vídeo, en dp (`rkd.b`).
+///  * **no hay blur en el cliente**: en el APK ningún `BlurMaskFilter` ni
+///    `RenderEffect` toca el bitmap cinemático; llega ya difuminado desde el
+///    pipeline de miniaturas. Aquí se copia el frame sin `filter: blur()`: el
+///    suavizado lo da el reescalado del buffer diminuto y el degradado radial lo
+///    pone la máscara geométrica que aplica [AmbientVideoLayer].
 const int _kBufferWidth = 110;
 const int _kBufferHeight = 75;
-const double _kBlur = 5;
 
-
-/// Copia el frame actual del `<video>` a un buffer diminuto y lo difumina con el
-/// filtro del canvas, igual que YouTube: sin máscara, el PNG es el frame nítido
-/// de color pero sin detalle.
+/// Copia el frame actual del `<video>` a un buffer diminuto.
 ///
-/// El buffer de 110×75 es lo que da el degradado al estirarlo sobre el halo.
+/// El buffer de 110×75 es lo que da el degradado al estirarlo sobre el halo: al
+/// reducir tanto se promedian los píxeles y queda el color del cuadro sin
+/// detalle, sin necesidad de desenfocar.
 Uint8List? sampleVideoAmbientFrameImpl() {
   try {
     final video = _document.callMethod<JSObject?>(
@@ -41,20 +45,16 @@ Uint8List? sampleVideoAmbientFrameImpl() {
     final ctx = canvas.callMethod<JSObject?>('getContext'.toJS, '2d'.toJS);
     if (ctx == null) return null;
 
-    // El blur oscurece los bordes (muestrea fuera del frame), así que se dibuja
-    // con un margen extra y luego se recorta.
-    ctx.setProperty('filter'.toJS, 'blur($_kBlur' 'px)'.toJS);
     ctx.callMethodVarArgs<JSAny?>(
       'drawImage'.toJS,
       <JSAny>[
         video,
-        (-_kBlur).toJS,
-        (-_kBlur).toJS,
-        (_kBufferWidth + _kBlur * 2).toJS,
-        (_kBufferHeight + _kBlur * 2).toJS,
+        0.toJS,
+        0.toJS,
+        _kBufferWidth.toJS,
+        _kBufferHeight.toJS,
       ],
     );
-    ctx.setProperty('filter'.toJS, 'none'.toJS);
 
     final dataUrl = canvas.callMethod<JSString>('toDataURL'.toJS, 'image/png'.toJS);
     final String text = dataUrl.toDart;

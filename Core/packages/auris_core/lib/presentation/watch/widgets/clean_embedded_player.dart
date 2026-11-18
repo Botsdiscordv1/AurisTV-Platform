@@ -174,11 +174,10 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
     _isAmbientLightingEnabled = widget.isAmbientLightingEnabled;
     if (kIsWeb) {
       // Modo ambiente con los colores del video que se está reproduciendo.
-      // YouTube refresca cada ~5,05 s, pero con su canvas de 2× de alto el atraso
-      // no se nota. Acá el halo es fino y 5 s de atraso se leía como una imagen
-      // fija, así que se refresca cada 2 s.
+      // Cadencia medida en el APK (`kjv.c`): 5000 ms entre muestras, con el
+      // crossfade de 2500 ms (`kjv.d` = 0,5 × el intervalo).
       _ambientTimer = Timer.periodic(
-        const Duration(milliseconds: 2000),
+        const Duration(milliseconds: 5000),
         (_) => _sampleAmbient(),
       );
       // Primera muestra apenas haya frame, sin esperar el primer tick.
@@ -1604,17 +1603,23 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
       child: IgnorePointer(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final Rect video = _videoRect(constraints.biggest);
             final Widget light = AnimatedOpacity(
               duration: const Duration(milliseconds: 500),
-              // El frame del video ya trae la máscara radial y el buffer diminuto
-              // de YouTube, así que no necesita el atenuado del arte de respaldo.
+              // El frame del video ya trae el degradado radial geométrico y el
+              // buffer diminuto, así que no necesita el atenuado del arte de respaldo.
               opacity: ambientFrame != null
                   ? (cinematic ? 0.85 : 0.72)
                   : (cinematic ? 0.40 : (_isPlaying ? 0.32 : 0.16)),
               // Con frame disponible se usan los colores del video; si no, el
               // arte del contenido difuminado.
               child: ambientFrame != null
-                  ? AmbientVideoLayer(frame: ambientFrame)
+                  // Radio radial geométrico del APK: mitad del lado menor del
+                  // vídeo, en dp (`rkd.b`).
+                  ? AmbientVideoLayer(
+                      frame: ambientFrame,
+                      radius: video.shortestSide / 2,
+                    )
                   : ClipRect(
                       child: AmbientArtImage(
                         imageUrl: art,
@@ -1630,7 +1635,6 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
 
             // Embebido / teatro: una franja a la altura del video, de lado a
             // lado, que solo asoma donde el video no llega (las barras).
-            final Rect video = _videoRect(constraints.biggest);
             return Stack(
               children: [
                 Positioned(

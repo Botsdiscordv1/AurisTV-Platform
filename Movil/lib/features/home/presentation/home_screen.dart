@@ -377,6 +377,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: Stack(
         children: [
           CustomScrollView(
+            key: const ValueKey('home_scrollable'),
             controller: _scrollController,
             cacheExtent: 1000,
             slivers: [
@@ -454,12 +455,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final section = sections[index];
+                          final isLast = index == sections.length - 1;
                           return RepaintBoundary(
                             key: ValueKey('section_${section.id}'), // Senior Fix: Diffing Engine para preservación de estado
-                            child: _buildSection(
-                              section, 
-                              horizontalPadding,
-                              allowedExpandableSectionIds: allowedExpandableSectionIds,
+                            child: KeyedSubtree(
+                              key: isLast ? const ValueKey('target_item') : null,
+                              child: _buildSection(
+                                section, 
+                                horizontalPadding,
+                                allowedExpandableSectionIds: allowedExpandableSectionIds,
+                              ),
                             ),
                           );
                         },
@@ -483,9 +488,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final section = sections[index];
+                        final isLast = index == sections.length - 1;
                         return RepaintBoundary(
                           key: ValueKey('section_${section.id}'), // Senior Fix: Diffing Engine para preservación de estado
-                          child: _buildSection(section, horizontalPadding),
+                          child: KeyedSubtree(
+                            key: isLast ? const ValueKey('target_item') : null,
+                            child: _buildSection(section, horizontalPadding),
+                          ),
                         );
                       },
                       childCount: sections.length,
