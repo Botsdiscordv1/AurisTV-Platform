@@ -934,6 +934,67 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                           ),
                         ),
 
+                      // Botón Ajustes superior derecho (para web móvil / tablet)
+                      if (isTabletOrMobile)
+                        Positioned(
+                          top: 12,
+                          right: 12,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _showSettingsPanel = !_showSettingsPanel;
+                                  _settingsView = SettingsView.main;
+                                });
+                                _startHideTimer();
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              hoverColor: Colors.white.withValues(alpha: 0.08),
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.40),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  alignment: Alignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.settings_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                    if (widget.hasQualityOptions)
+                                      Positioned(
+                                        top: 2,
+                                        right: 2,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
+                                          decoration: BoxDecoration(
+                                            color: AurisPalette.brand,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                          child: const Text(
+                                            'HD',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 7,
+                                              fontWeight: FontWeight.w900,
+                                              height: 1.0,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
                       // --- Center Play/Pause & Seek -10s / +10s Controls (Mobile / Tablet) ---
                       if (isTabletOrMobile)
                         Center(
@@ -947,13 +1008,13 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                   player?.seek(Duration(seconds: newSec));
                                   _startHideTimer();
                                 },
-                                icon: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 36),
+                                icon: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 26),
                                 style: IconButton.styleFrom(
-                                  backgroundColor: Colors.black.withValues(alpha: 0.50),
-                                  padding: const EdgeInsets.all(12),
+                                  backgroundColor: Colors.black.withValues(alpha: 0.35),
+                                  padding: const EdgeInsets.all(10),
                                 ),
                               ),
-                              const SizedBox(width: 24),
+                              const SizedBox(width: 20),
 
                               // Play / Pause Button
                               IconButton(
@@ -963,14 +1024,14 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                 icon: AurisIcon(
                                   _isCompleted ? AurisIcons.ytReplay : (_isPlaying ? AurisIcons.pause : AurisIcons.play),
                                   color: Colors.white,
-                                  size: _isCompleted ? 52 : 38,
+                                  size: _isCompleted ? 48 : 40,
                                 ),
                                 style: IconButton.styleFrom(
-                                  backgroundColor: Colors.black.withValues(alpha: 0.50),
+                                  backgroundColor: Colors.black.withValues(alpha: 0.55),
                                   padding: const EdgeInsets.all(16),
                                 ),
                               ),
-                              const SizedBox(width: 24),
+                              const SizedBox(width: 20),
 
                               // +10s Button
                               IconButton(
@@ -979,10 +1040,10 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                   player?.seek(Duration(seconds: newSec));
                                   _startHideTimer();
                                 },
-                                icon: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 36),
+                                icon: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 26),
                                 style: IconButton.styleFrom(
-                                  backgroundColor: Colors.black.withValues(alpha: 0.50),
-                                  padding: const EdgeInsets.all(12),
+                                  backgroundColor: Colors.black.withValues(alpha: 0.35),
+                                  padding: const EdgeInsets.all(10),
                                 ),
                               ),
                             ],
@@ -1412,55 +1473,57 @@ class _CleanEmbeddedPlayerState extends ConsumerState<CleanEmbeddedPlayer> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         // 1. ytp-settings-button (Settings Gear with HD Badge)
-                                        IconButton(
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
-                                          style: IconButton.styleFrom(
-                                            hoverColor: Colors.white.withValues(alpha: 0.08),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                          ),
-                                          icon: Stack(
-                                            clipBehavior: Clip.none,
-                                            alignment: Alignment.center,
-                                            children: [
-                                              AurisIcon(
-                                                AurisIcons.settings,
-                                                color: Colors.white,
-                                                size: 23,
-                                              ),
-                                              if (widget.hasQualityOptions)
-                                                Positioned(
-                                                  top: -2,
-                                                  right: -4,
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
-                                                    decoration: BoxDecoration(
-                                                      color: AurisPalette.brand,
-                                                      borderRadius: BorderRadius.circular(2),
-                                                    ),
-                                                    child: const Text(
-                                                      'HD',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 7.5,
-                                                        fontWeight: FontWeight.w900,
-                                                        height: 1.0,
+                                        if (!isTabletOrMobile) ...[
+                                          IconButton(
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 44, minHeight: 32),
+                                            style: IconButton.styleFrom(
+                                              hoverColor: Colors.white.withValues(alpha: 0.08),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                            ),
+                                            icon: Stack(
+                                              clipBehavior: Clip.none,
+                                              alignment: Alignment.center,
+                                              children: [
+                                                AurisIcon(
+                                                  AurisIcons.settings,
+                                                  color: Colors.white,
+                                                  size: 23,
+                                                ),
+                                                if (widget.hasQualityOptions)
+                                                  Positioned(
+                                                    top: -2,
+                                                    right: -4,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 0.5),
+                                                      decoration: BoxDecoration(
+                                                        color: AurisPalette.brand,
+                                                        borderRadius: BorderRadius.circular(2),
+                                                      ),
+                                                      child: const Text(
+                                                        'HD',
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 7.5,
+                                                          fontWeight: FontWeight.w900,
+                                                          height: 1.0,
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                            ],
+                                              ],
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                _showSettingsPanel = !_showSettingsPanel;
+                                                _settingsView = SettingsView.main;
+                                              });
+                                              _startHideTimer();
+                                            },
+                                            tooltip: 'Configuración',
                                           ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _showSettingsPanel = !_showSettingsPanel;
-                                              _settingsView = SettingsView.main;
-                                            });
-                                            _startHideTimer();
-                                          },
-                                          tooltip: 'Configuración',
-                                        ),
-                                        const SizedBox(width: 2),
+                                          const SizedBox(width: 2),
+                                        ],
 
                                         // 4. ytp-size-button (Modo cine / Teatro)
                                         if (!isTheme && !isMovie && !isTabletOrMobile && widget.onTheaterModeToggle != null) ...[
